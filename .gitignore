@@ -1,0 +1,8 @@
+target/
+.DS_Store
+*.swp
+*.swo
+
+# Agents
+.claude/
+.codex/

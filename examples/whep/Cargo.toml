@@ -1,0 +1,16 @@
+[package]
+name = "whep"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+shiguredo_webrtc = { path = "../.." }
+noargs = "0.4"
+rustls = { version = "0.23", default-features = false, features = [
+    "std",
+    "tls12",
+    "aws-lc-rs",
+] }
+rustls-platform-verifier = "0.6"
+shiguredo_http11 = "2026.1.0-canary.7"

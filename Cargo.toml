@@ -1,0 +1,37 @@
+[package]
+name = "shiguredo_webrtc"
+version = "0.145.0"
+edition = "2024"
+rust-version = "1.88"
+authors = ["Shiguredo Inc."]
+license = "Apache-2.0"
+description = "Rust bindings for libwebrtc"
+homepage = "https://github.com/shiguredo/webrtc-rs"
+repository = "https://github.com/shiguredo/webrtc-rs"
+readme = "README.md"
+build = "build.rs"
+exclude = ["webrtc/_build"]
+
+[features]
+default = []
+local-export = []
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.72"
+cmake = "0.1"
+aws-lc-rs = "1"
+flate2 = "1"
+rustls = { version = "0.23", default-features = false, features = [
+    "std",
+    "tls12",
+    "aws-lc-rs",
+] }
+rustls-platform-verifier = "0.6"
+shiguredo_http11 = "2026.1.0-canary.4"
+tar = "0.4"
+zip = "0.6"
+
+[workspace]
+members = ["examples/*"]

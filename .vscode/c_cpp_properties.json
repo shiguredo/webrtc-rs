@@ -1,0 +1,27 @@
+{
+  "version": 4,
+  "configurations": [
+    {
+      "name": "ubuntu-24.04_x86_64",
+      "compilerPath": "${workspaceFolder}/webrtc/_build/ubuntu-24.04_x86_64/release/build/_deps/llvm/clang/bin/clang++",
+      "cStandard": "c17",
+      "cppStandard": "c++20",
+      "intelliSenseMode": "linux-clang-x64",
+      "includePath": [
+        "${workspaceFolder}/webrtc/_build/ubuntu-24.04_x86_64/release/build/_deps/llvm/libcxx/include",
+        "${workspaceFolder}/webrtc/_build/ubuntu-24.04_x86_64/release/build/_deps/webrtc/include",
+        "${workspaceFolder}/webrtc/_build/ubuntu-24.04_x86_64/release/build/_deps/webrtc/include/third_party/abseil-cpp",
+        "${workspaceFolder}/webrtc/_build/ubuntu-24.04_x86_64/release/build/_deps/webrtc/include/third_party/boringssl/src/include",
+        "${workspaceFolder}/webrtc/_build/ubuntu-24.04_x86_64/release/build/_deps/webrtc/include/third_party/libyuv/include",
+        "${workspaceFolder}/webrtc/_build/ubuntu-24.04_x86_64/release/build/_deps/webrtc/include/third_party/zlib"
+      ],
+      "defines": [
+        "_GNU_SOURCE",
+        "WEBRTC_POSIX",
+        "WEBRTC_LINUX",
+        "RTC_ENABLE_H265",
+        "BOOST_NO_CXX98_FUNCTION_BASE"
+      ]
+    }
+  ]
+}
