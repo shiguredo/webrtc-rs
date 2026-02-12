@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  github-release:
+    name: "Create GitHub Release"
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.VERSION }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Get the version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ${{ contains(steps.get_version.outputs.VERSION, 'canary') }}; then
+            gh release create ${{ steps.get_version.outputs.VERSION }} \
+              --prerelease \
+              --title "${{ steps.get_version.outputs.VERSION }}" \
+              --notes "Release ${{ steps.get_version.outputs.VERSION }}"
+          else
+            gh release create ${{ steps.get_version.outputs.VERSION }} \
+              --title "${{ steps.get_version.outputs.VERSION }}" \
+              --notes "Release ${{ steps.get_version.outputs.VERSION }}"
+          fi
+
+  publish:
+    needs: github-release
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  slack_notify_failed:
+    needs: [github-release, publish]
+    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    if: failure()
+    steps:
+      - name: Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: sora-rust-sdk
+          SLACK_COLOR: danger
+          SLACK_ICON_EMOJI: ":japanese_ogre:"
+          SLACK_TITLE: "FAILED"
+          SLACK_MESSAGE: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{github.event.head_commit.message }}>
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
