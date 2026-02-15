@@ -1,4 +1,5 @@
-use crate::{CxxString, Error, Result, ffi};
+use crate::{ffi, CxxString, Error, Result};
+use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::ptr::NonNull;
 
@@ -99,30 +100,19 @@ impl Drop for SessionDescription {
     }
 }
 
-pub struct IceCandidate {
+/// webrtc::IceCandidateInterface の借用ラッパー。
+pub struct IceCandidateRef<'a> {
     raw: NonNull<ffi::webrtc_IceCandidateInterface>,
-    owned: bool,
+    _marker: PhantomData<&'a ffi::webrtc_IceCandidateInterface>,
 }
 
-impl IceCandidate {
-    /// SDP 文字列から IceCandidate を生成する。
-    pub fn new(sdp_mid: &str, sdp_mline_index: i32, candidate: &str) -> Result<Self> {
-        let raw = unsafe {
-            ffi::webrtc_CreateIceCandidate(
-                sdp_mid.as_ptr() as *const _,
-                sdp_mid.len(),
-                sdp_mline_index,
-                candidate.as_ptr() as *const _,
-                candidate.len(),
-            )
-        };
-        let raw = NonNull::new(raw).ok_or(Error::InvalidIceCandidate)?;
-        Ok(Self { raw, owned: true })
-    }
-
-    /// 生ポインタからラップする。所有権は取らない（コールバック経由の借用）。
+impl<'a> IceCandidateRef<'a> {
+    /// 生ポインタから借用ラップする。
     pub fn from_raw(raw: NonNull<ffi::webrtc_IceCandidateInterface>) -> Self {
-        Self { raw, owned: false }
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_IceCandidateInterface {
@@ -154,10 +144,50 @@ impl IceCandidate {
     }
 }
 
+/// webrtc::IceCandidateInterface の所有ラッパー。
+pub struct IceCandidate {
+    raw: NonNull<ffi::webrtc_IceCandidateInterface>,
+}
+
+impl IceCandidate {
+    /// SDP 文字列から IceCandidate を生成する。
+    pub fn new(sdp_mid: &str, sdp_mline_index: i32, candidate: &str) -> Result<Self> {
+        let raw = unsafe {
+            ffi::webrtc_CreateIceCandidate(
+                sdp_mid.as_ptr() as *const _,
+                sdp_mid.len(),
+                sdp_mline_index,
+                candidate.as_ptr() as *const _,
+                candidate.len(),
+            )
+        };
+        let raw = NonNull::new(raw).ok_or(Error::InvalidIceCandidate)?;
+        Ok(Self { raw })
+    }
+
+    pub fn as_ref(&self) -> IceCandidateRef<'_> {
+        IceCandidateRef::from_raw(self.raw)
+    }
+
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_IceCandidateInterface {
+        self.raw.as_ptr()
+    }
+
+    pub fn sdp_mid(&self) -> Result<String> {
+        self.as_ref().sdp_mid()
+    }
+
+    pub fn sdp_mline_index(&self) -> i32 {
+        self.as_ref().sdp_mline_index()
+    }
+
+    pub fn to_string(&self) -> Result<String> {
+        self.as_ref().to_string()
+    }
+}
+
 impl Drop for IceCandidate {
     fn drop(&mut self) {
-        if self.owned {
-            unsafe { ffi::webrtc_IceCandidateInterface_delete(self.raw.as_ptr()) };
-        }
+        unsafe { ffi::webrtc_IceCandidateInterface_delete(self.raw.as_ptr()) };
     }
 }
