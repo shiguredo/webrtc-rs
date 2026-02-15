@@ -36,26 +36,21 @@ int webrtc_SessionDescriptionInterface_ToString(
     struct std_string_unique** out_sdp);
 
 // -------------------------
-// webrtc::IceCandidateInterface
+// webrtc::IceCandidate
 // -------------------------
 
-struct webrtc_IceCandidateInterface;
-struct webrtc_IceCandidateInterface* webrtc_CreateIceCandidate(
-    const char* sdp_mid,
-    size_t sdp_mid_len,
-    int sdp_mline_index,
-    const char* sdp,
-    size_t sdp_len);
-void webrtc_IceCandidateInterface_delete(
-    struct webrtc_IceCandidateInterface* self);
-void webrtc_IceCandidateInterface_sdp_mid(
-    const struct webrtc_IceCandidateInterface* self,
-    struct std_string_unique** out);
-int webrtc_IceCandidateInterface_sdp_mline_index(
-    const struct webrtc_IceCandidateInterface* self);
-int webrtc_IceCandidateInterface_ToString(
-    const struct webrtc_IceCandidateInterface* self,
-    struct std_string_unique** out_sdp);
+struct webrtc_IceCandidate;
+struct webrtc_IceCandidate* webrtc_CreateIceCandidate(const char* sdp_mid,
+                                                      size_t sdp_mid_len,
+                                                      int sdp_mline_index,
+                                                      const char* sdp,
+                                                      size_t sdp_len);
+void webrtc_IceCandidate_delete(struct webrtc_IceCandidate* self);
+void webrtc_IceCandidate_sdp_mid(const struct webrtc_IceCandidate* self,
+                                 struct std_string_unique** out);
+int webrtc_IceCandidate_sdp_mline_index(const struct webrtc_IceCandidate* self);
+int webrtc_IceCandidate_ToString(const struct webrtc_IceCandidate* self,
+                                 struct std_string_unique** out_sdp);
 
 // -------------------------
 // webrtc::CreateSessionDescriptionObserver

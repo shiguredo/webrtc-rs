@@ -100,42 +100,41 @@ impl Drop for SessionDescription {
     }
 }
 
-/// webrtc::IceCandidateInterface の借用ラッパー。
+/// webrtc::IceCandidate の借用ラッパー。
 pub struct IceCandidateRef<'a> {
-    raw: NonNull<ffi::webrtc_IceCandidateInterface>,
-    _marker: PhantomData<&'a ffi::webrtc_IceCandidateInterface>,
+    raw: NonNull<ffi::webrtc_IceCandidate>,
+    _marker: PhantomData<&'a ffi::webrtc_IceCandidate>,
 }
 
 impl<'a> IceCandidateRef<'a> {
     /// 生ポインタから借用ラップする。
-    pub fn from_raw(raw: NonNull<ffi::webrtc_IceCandidateInterface>) -> Self {
+    pub fn from_raw(raw: NonNull<ffi::webrtc_IceCandidate>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
         }
     }
 
-    pub fn as_ptr(&self) -> *mut ffi::webrtc_IceCandidateInterface {
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_IceCandidate {
         self.raw.as_ptr()
     }
 
     pub fn sdp_mid(&self) -> Result<String> {
         let mut out: *mut ffi::std_string_unique = std::ptr::null_mut();
-        unsafe { ffi::webrtc_IceCandidateInterface_sdp_mid(self.raw.as_ptr(), &mut out) };
+        unsafe { ffi::webrtc_IceCandidate_sdp_mid(self.raw.as_ptr(), &mut out) };
         CxxString::from_unique(
-            NonNull::new(out)
-                .expect("BUG: webrtc_IceCandidateInterface_sdp_mid が null を返しました"),
+            NonNull::new(out).expect("BUG: webrtc_IceCandidate_sdp_mid が null を返しました"),
         )
         .to_string()
     }
 
     pub fn sdp_mline_index(&self) -> i32 {
-        unsafe { ffi::webrtc_IceCandidateInterface_sdp_mline_index(self.raw.as_ptr()) }
+        unsafe { ffi::webrtc_IceCandidate_sdp_mline_index(self.raw.as_ptr()) }
     }
 
     pub fn to_string(&self) -> Result<String> {
         let mut out: *mut ffi::std_string_unique = std::ptr::null_mut();
-        let ok = unsafe { ffi::webrtc_IceCandidateInterface_ToString(self.raw.as_ptr(), &mut out) };
+        let ok = unsafe { ffi::webrtc_IceCandidate_ToString(self.raw.as_ptr(), &mut out) };
         if ok == 0 {
             return Err(Error::InvalidIceCandidate);
         }
@@ -144,9 +143,9 @@ impl<'a> IceCandidateRef<'a> {
     }
 }
 
-/// webrtc::IceCandidateInterface の所有ラッパー。
+/// webrtc::IceCandidate の所有ラッパー。
 pub struct IceCandidate {
-    raw: NonNull<ffi::webrtc_IceCandidateInterface>,
+    raw: NonNull<ffi::webrtc_IceCandidate>,
 }
 
 impl IceCandidate {
@@ -169,7 +168,7 @@ impl IceCandidate {
         IceCandidateRef::from_raw(self.raw)
     }
 
-    pub fn as_ptr(&self) -> *mut ffi::webrtc_IceCandidateInterface {
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_IceCandidate {
         self.raw.as_ptr()
     }
 
@@ -188,6 +187,6 @@ impl IceCandidate {
 
 impl Drop for IceCandidate {
     fn drop(&mut self) {
-        unsafe { ffi::webrtc_IceCandidateInterface_delete(self.raw.as_ptr()) };
+        unsafe { ffi::webrtc_IceCandidate_delete(self.raw.as_ptr()) };
     }
 }

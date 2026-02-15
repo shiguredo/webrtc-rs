@@ -870,13 +870,13 @@ unsafe extern "C" fn observer_on_track(
 }
 
 unsafe extern "C" fn observer_on_ice_candidate(
-    candidate: *const ffi::webrtc_IceCandidateInterface,
+    candidate: *const ffi::webrtc_IceCandidate,
     user_data: *mut c_void,
 ) {
     assert!(!user_data.is_null());
     let callbacks = unsafe { &mut *(user_data as *mut ObserverCallbacks) };
-    let candidate = NonNull::new(candidate as *mut ffi::webrtc_IceCandidateInterface)
-        .expect("BUG: candidate が null");
+    let candidate =
+        NonNull::new(candidate as *mut ffi::webrtc_IceCandidate).expect("BUG: candidate が null");
     let candidate = IceCandidateRef::from_raw(candidate);
     if let Some(cb) = callbacks.on_ice_candidate.as_mut() {
         cb(candidate);
