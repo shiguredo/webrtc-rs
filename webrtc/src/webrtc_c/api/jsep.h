@@ -40,6 +40,19 @@ int webrtc_SessionDescriptionInterface_ToString(
 // -------------------------
 
 struct webrtc_IceCandidateInterface;
+struct webrtc_IceCandidateInterface* webrtc_CreateIceCandidate(
+    const char* sdp_mid,
+    size_t sdp_mid_len,
+    int sdp_mline_index,
+    const char* sdp,
+    size_t sdp_len);
+void webrtc_IceCandidateInterface_delete(
+    struct webrtc_IceCandidateInterface* self);
+void webrtc_IceCandidateInterface_sdp_mid(
+    const struct webrtc_IceCandidateInterface* self,
+    struct std_string_unique** out);
+int webrtc_IceCandidateInterface_sdp_mline_index(
+    const struct webrtc_IceCandidateInterface* self);
 int webrtc_IceCandidateInterface_ToString(
     const struct webrtc_IceCandidateInterface* self,
     struct std_string_unique** out_sdp);

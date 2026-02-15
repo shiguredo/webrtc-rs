@@ -437,6 +437,14 @@ void webrtc_PeerConnectionInterface_SetRemoteDescription(
   }
   pc->SetRemoteDescription(std::move(cpp_desc), obs_ref);
 }
+int webrtc_PeerConnectionInterface_AddIceCandidate(
+    struct webrtc_PeerConnectionInterface* self,
+    const struct webrtc_IceCandidateInterface* candidate) {
+  auto pc = reinterpret_cast<webrtc::PeerConnectionInterface*>(self);
+  auto ice =
+      reinterpret_cast<const webrtc::IceCandidateInterface*>(candidate);
+  return pc->AddIceCandidate(ice) ? 1 : 0;
+}
 void webrtc_PeerConnectionInterface_SetConfiguration(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_PeerConnectionInterface_RTCConfiguration* config,

@@ -108,6 +108,9 @@ void webrtc_PeerConnectionInterface_SetRemoteDescription(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_SessionDescriptionInterface_unique* desc,
     struct webrtc_SetRemoteDescriptionObserverInterface_refcounted* observer);
+int webrtc_PeerConnectionInterface_AddIceCandidate(
+    struct webrtc_PeerConnectionInterface* self,
+    const struct webrtc_IceCandidateInterface* candidate);
 void webrtc_PeerConnectionInterface_SetConfiguration(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_PeerConnectionInterface_RTCConfiguration* config,

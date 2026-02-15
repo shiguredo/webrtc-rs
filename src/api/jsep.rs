@@ -101,16 +101,46 @@ impl Drop for SessionDescription {
 
 pub struct IceCandidate {
     raw: NonNull<ffi::webrtc_IceCandidateInterface>,
+    owned: bool,
 }
 
 impl IceCandidate {
-    /// 生ポインタからラップする。raw が null の場合は Err を返す。
+    /// SDP 文字列から IceCandidate を生成する。
+    pub fn new(sdp_mid: &str, sdp_mline_index: i32, candidate: &str) -> Result<Self> {
+        let raw = unsafe {
+            ffi::webrtc_CreateIceCandidate(
+                sdp_mid.as_ptr() as *const _,
+                sdp_mid.len(),
+                sdp_mline_index,
+                candidate.as_ptr() as *const _,
+                candidate.len(),
+            )
+        };
+        let raw = NonNull::new(raw).ok_or(Error::InvalidIceCandidate)?;
+        Ok(Self { raw, owned: true })
+    }
+
+    /// 生ポインタからラップする。所有権は取らない（コールバック経由の借用）。
     pub fn from_raw(raw: NonNull<ffi::webrtc_IceCandidateInterface>) -> Self {
-        Self { raw }
+        Self { raw, owned: false }
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_IceCandidateInterface {
         self.raw.as_ptr()
+    }
+
+    pub fn sdp_mid(&self) -> Result<String> {
+        let mut out: *mut ffi::std_string_unique = std::ptr::null_mut();
+        unsafe { ffi::webrtc_IceCandidateInterface_sdp_mid(self.raw.as_ptr(), &mut out) };
+        CxxString::from_unique(
+            NonNull::new(out)
+                .expect("BUG: webrtc_IceCandidateInterface_sdp_mid が null を返しました"),
+        )
+        .to_string()
+    }
+
+    pub fn sdp_mline_index(&self) -> i32 {
+        unsafe { ffi::webrtc_IceCandidateInterface_sdp_mline_index(self.raw.as_ptr()) }
     }
 
     pub fn to_string(&self) -> Result<String> {
@@ -121,5 +151,13 @@ impl IceCandidate {
         }
         CxxString::from_unique(NonNull::new(out).expect("BUG: ok != 0 なのに out が null"))
             .to_string()
+    }
+}
+
+impl Drop for IceCandidate {
+    fn drop(&mut self) {
+        if self.owned {
+            unsafe { ffi::webrtc_IceCandidateInterface_delete(self.raw.as_ptr()) };
+        }
     }
 }

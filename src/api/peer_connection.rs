@@ -1320,6 +1320,19 @@ impl PeerConnection {
         };
     }
 
+    pub fn add_ice_candidate(&self, candidate: &IceCandidate) -> Result<()> {
+        let ok = unsafe {
+            ffi::webrtc_PeerConnectionInterface_AddIceCandidate(
+                self.raw_ref.as_ptr(),
+                candidate.as_ptr(),
+            )
+        };
+        if ok == 0 {
+            return Err(Error::InvalidIceCandidate);
+        }
+        Ok(())
+    }
+
     pub fn set_configuration(&self, config: &mut PeerConnectionRtcConfiguration) -> Result<()> {
         let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
         unsafe {
