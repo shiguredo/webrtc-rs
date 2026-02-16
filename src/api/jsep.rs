@@ -21,7 +21,7 @@ impl SdpParseError {
         let mut len = 0usize;
         unsafe { ffi::webrtc_SdpParseError_line(raw.as_ptr(), &mut ptr, &mut len) };
         assert!(!ptr.is_null());
-        let bytes = unsafe { slice::from_raw_parts(ptr as *const u8, len) };
+        let bytes = unsafe { slice::from_raw_parts(ptr.cast::<u8>(), len) };
         let line = std::str::from_utf8(bytes)?;
         Ok(line.to_owned())
     }
@@ -32,7 +32,7 @@ impl SdpParseError {
         let mut len = 0usize;
         unsafe { ffi::webrtc_SdpParseError_description(raw.as_ptr(), &mut ptr, &mut len) };
         assert!(!ptr.is_null());
-        let bytes = unsafe { slice::from_raw_parts(ptr as *const u8, len) };
+        let bytes = unsafe { slice::from_raw_parts(ptr.cast::<u8>(), len) };
         let description = std::str::from_utf8(bytes)?;
         Ok(description.to_owned())
     }
