@@ -94,6 +94,17 @@ endif()
 message(STATUS "WEBRTC_C_TARGET: ${WEBRTC_C_TARGET}")
 message(STATUS "WEBRTC_BUILD_VERSION: ${WEBRTC_BUILD_VERSION}")
 
+set(WEBRTC_TARGETS_UBUNTU
+  "ubuntu-24.04_x86_64"
+  "ubuntu-24.04_armv8"
+  "ubuntu-22.04_x86_64"
+  "ubuntu-22.04_armv8"
+)
+set(WEBRTC_TARGETS_ARMV8
+  "ubuntu-24.04_armv8"
+  "ubuntu-22.04_armv8"
+)
+
 # WebRTC パッケージの URL を決定
 if(WEBRTC_C_TARGET STREQUAL "macos_arm64")
   set(WEBRTC_ARCHIVE_NAME "webrtc.macos_arm64.tar.gz")
@@ -138,7 +149,7 @@ endif()
 
 # ARM64 Linux では prebuilt Clang バイナリが提供されていないためシステムの Clang を使用
 # libc++ ヘッダーは ABI 互換性のためダウンロードする
-if(WEBRTC_C_TARGET MATCHES "armv8$")
+if(WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_ARMV8)
   set(WEBRTC_USE_PREBUILT_CLANG FALSE)
 endif()
 
@@ -532,7 +543,7 @@ elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
     )
   endforeach()
 
-elseif (WEBRTC_C_TARGET MATCHES "^ubuntu-")
+elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_UBUNTU)
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
     target_compile_definitions(${target}
       PRIVATE
@@ -640,7 +651,7 @@ elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
         "-framework ScreenCaptureKit"
     )
   endforeach()
-elseif (WEBRTC_C_TARGET MATCHES "^ubuntu-")
+elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_UBUNTU)
   foreach(target IN LISTS WEBRTC_C_TARGETS)
     target_link_libraries(${target} PRIVATE X11 dl rt Threads::Threads)
   endforeach()
