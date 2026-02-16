@@ -274,7 +274,7 @@ if((WEBRTC_USE_WEBRTC_PREBUILT_CLANG OR WEBRTC_USE_WEBRTC_LIBCXX) AND LLVM_NEEDS
   message(STATUS "LLVM installation complete")
 endif()
 
-if(WEBRTC_USE_PREBUILT_CLANG)
+if(WEBRTC_USE_WEBRTC_PREBUILT_CLANG)
   # Prebuilt Clang コンパイラのパスを設定（project() の前）
   set(CMAKE_C_COMPILER "${LLVM_CLANG_DIR}/bin/clang" CACHE FILEPATH "" FORCE)
   set(CMAKE_CXX_COMPILER "${LLVM_CLANG_DIR}/bin/clang++" CACHE FILEPATH "" FORCE)
@@ -294,7 +294,7 @@ elseif(WEBRTC_USE_WEBRTC_LIBCXX)
     message(FATAL_ERROR "System Clang is required for ARM64 Linux but not found. Install with: apt install clang")
   endif()
 else()
-  message(STATUS "WEBRTC_USE_PREBUILT_CLANG is OFF for target: ${WEBRTC_C_TARGET}")
+  message(STATUS "WEBRTC_USE_WEBRTC_PREBUILT_CLANG is OFF for target: ${WEBRTC_C_TARGET}")
 endif()
 
 if(WEBRTC_USE_WEBRTC_LIBCXX)
