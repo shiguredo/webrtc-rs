@@ -461,8 +461,10 @@ impl SignalingWhip {
                     let mut matched = false;
                     for idx in 0..encs.len() {
                         if let Some(enc) = encs.get(idx) {
-                            let enc_name = enc
-                                .codec()
+                            let Some(enc_codec) = enc.codec() else {
+                                continue;
+                            };
+                            let enc_name = enc_codec
                                 .name()
                                 .map_err(|e| format!("codec 名の取得に失敗しました : {e}"))?
                                 .to_ascii_lowercase();
@@ -839,8 +841,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (rid, scale) in [("r0", 4.0), ("r1", 2.0), ("r2", 1.0)] {
         let mut enc = RtpEncodingParameters::new();
         enc.set_rid(rid);
-        enc.set_scale_resolution_down_by(scale);
-        enc.set_codec(&av1);
+        enc.set_scale_resolution_down_by(Some(scale));
+        enc.set_codec(Some(&av1));
         send_encodings.push(&enc);
     }
 

@@ -193,6 +193,10 @@ impl FactoryHolder {
   - コーデック能力ベクタ
 - `RtpEncodingParameters` / `RtpEncodingParametersVector`
   - エンコーディング設定
+- `RtpParameters`
+  - RTP 送信パラメータ
+- `DegradationPreference`
+  - 映像劣化方針
 - `RtpTransceiver` / `RtpSender` / `RtpReceiver`
   - トランシーバー管理
 - `RtpTransceiverDirection`

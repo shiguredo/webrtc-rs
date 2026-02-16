@@ -1346,15 +1346,17 @@ void SignalingWhip_Connect(struct SignalingWhip* self) {
           struct webrtc_RtpEncodingParameters* enc =
               webrtc_RtpEncodingParameters_vector_get(
                   self->config->send_encodings, i);
-          struct webrtc_RtpCodecCapability* encoding_codec =
-              webrtc_RtpEncodingParameters_get_codec(enc);
+          int encoding_has_codec = 0;
+          struct webrtc_RtpCodecCapability* encoding_codec = NULL;
+          webrtc_RtpEncodingParameters_get_codec(enc, &encoding_has_codec,
+                                                 &encoding_codec);
           const char* encoding_codec_name = "none";
-          if (encoding_codec != NULL) {
+          if (encoding_has_codec != 0 && encoding_codec != NULL) {
             encoding_codec_name = std_string_c_str(
                 webrtc_RtpCodecCapability_get_name(encoding_codec));
           }
           RTC_LOG_WARNING("send_encoding: %s", encoding_codec_name);
-          if (encoding_codec == NULL) {
+          if (encoding_has_codec == 0 || encoding_codec == NULL) {
             continue;
           }
           for (int j = 0; j < src_codecs_size; ++j) {
@@ -1474,11 +1476,14 @@ int main() {
   struct webrtc_RtpEncodingParameters* enc2 =
       webrtc_RtpEncodingParameters_vector_get(send_encodings, 2);
   webrtc_RtpEncodingParameters_set_rid(enc0, "r0", strlen("r0"));
-  webrtc_RtpEncodingParameters_set_scale_resolution_down_by(enc0, 4.0);
+  const double scale0 = 4.0;
+  webrtc_RtpEncodingParameters_set_scale_resolution_down_by(enc0, 1, &scale0);
   webrtc_RtpEncodingParameters_set_rid(enc1, "r1", strlen("r1"));
-  webrtc_RtpEncodingParameters_set_scale_resolution_down_by(enc1, 2.0);
+  const double scale1 = 2.0;
+  webrtc_RtpEncodingParameters_set_scale_resolution_down_by(enc1, 1, &scale1);
   webrtc_RtpEncodingParameters_set_rid(enc2, "r2", strlen("r2"));
-  webrtc_RtpEncodingParameters_set_scale_resolution_down_by(enc2, 1.0);
+  const double scale2 = 1.0;
+  webrtc_RtpEncodingParameters_set_scale_resolution_down_by(enc2, 1, &scale2);
   struct webrtc_RtpCodecCapability* av1_codec = webrtc_RtpCodecCapability_new();
   webrtc_RtpCodecCapability_set_kind(av1_codec, webrtc_MediaType_VIDEO);
   webrtc_RtpCodecCapability_set_name(av1_codec, "AV1", strlen("AV1"));
@@ -1488,13 +1493,12 @@ int main() {
   std_map_string_string_set(av1_params, "level-idx", 9, "5", 1);
   std_map_string_string_set(av1_params, "profile", 7, "0", 1);
   std_map_string_string_set(av1_params, "tier", 4, "0", 1);
-  webrtc_RtpEncodingParameters_set_codec(enc0, av1_codec);
-  webrtc_RtpEncodingParameters_set_codec(enc1, av1_codec);
-  webrtc_RtpEncodingParameters_set_codec(enc2, av1_codec);
+  webrtc_RtpEncodingParameters_set_codec(enc0, 1, av1_codec);
+  webrtc_RtpEncodingParameters_set_codec(enc1, 1, av1_codec);
+  webrtc_RtpEncodingParameters_set_codec(enc2, 1, av1_codec);
 
   struct SignalingWhipConfig* config = SignalingWhipConfig_create();
-  SignalingWhipConfig_set_signaling_url(config,
-                                        "http://192.0.2.1/whip");
+  SignalingWhipConfig_set_signaling_url(config, "http://192.0.2.1/whip");
   SignalingWhipConfig_set_channel_id(config, "sora");
   SignalingWhipConfig_set_pc_factory(config, factory->factory);
   if (video_source != NULL) {

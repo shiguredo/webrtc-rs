@@ -249,6 +249,52 @@ impl<'a> RtpCodecCapabilityRef<'a> {
         self.raw.as_ptr()
     }
 }
+pub struct Resolution {
+    raw: NonNull<ffi::webrtc_Resolution>,
+}
+
+impl Default for Resolution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Resolution {
+    pub fn new() -> Self {
+        let raw = NonNull::new(unsafe { ffi::webrtc_Resolution_new() })
+            .expect("BUG: webrtc_Resolution_new が null を返しました");
+        Self { raw }
+    }
+
+    pub fn width(&self) -> i32 {
+        unsafe { ffi::webrtc_Resolution_get_width(self.raw.as_ptr()) }
+    }
+
+    pub fn set_width(&mut self, width: i32) {
+        unsafe { ffi::webrtc_Resolution_set_width(self.raw.as_ptr(), width) };
+    }
+
+    pub fn height(&self) -> i32 {
+        unsafe { ffi::webrtc_Resolution_get_height(self.raw.as_ptr()) }
+    }
+
+    pub fn set_height(&mut self, height: i32) {
+        unsafe { ffi::webrtc_Resolution_set_height(self.raw.as_ptr(), height) };
+    }
+
+    fn as_ptr(&self) -> *mut ffi::webrtc_Resolution {
+        self.raw.as_ptr()
+    }
+}
+
+impl Drop for Resolution {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_Resolution_delete(self.raw.as_ptr()) };
+    }
+}
+
+unsafe impl Send for Resolution {}
+
 /// RtpEncodingParameters のラッパー。
 pub struct RtpEncodingParameters {
     raw: NonNull<ffi::webrtc_RtpEncodingParameters>,
@@ -286,25 +332,266 @@ impl RtpEncodingParameters {
         .to_string()
     }
 
-    pub fn set_scale_resolution_down_by(&mut self, scale: f64) {
+    pub fn ssrc(&self) -> Option<u32> {
+        let mut has = 0;
+        let mut value: u32 = 0;
         unsafe {
-            ffi::webrtc_RtpEncodingParameters_set_scale_resolution_down_by(self.raw.as_ptr(), scale)
+            ffi::webrtc_RtpEncodingParameters_get_ssrc(self.raw.as_ptr(), &mut has, &mut value)
+        };
+        if has == 0 { None } else { Some(value) }
+    }
+
+    pub fn set_ssrc(&mut self, value: Option<u32>) {
+        match value {
+            Some(v) => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_ssrc(self.raw.as_ptr(), 1, &v);
+            },
+            None => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_ssrc(self.raw.as_ptr(), 0, std::ptr::null());
+            },
+        }
+    }
+
+    pub fn max_bitrate_bps(&self) -> Option<i32> {
+        let mut has = 0;
+        let mut value = 0;
+        unsafe {
+            ffi::webrtc_RtpEncodingParameters_get_max_bitrate_bps(
+                self.raw.as_ptr(),
+                &mut has,
+                &mut value,
+            );
+        }
+        if has == 0 { None } else { Some(value) }
+    }
+
+    pub fn set_max_bitrate_bps(&mut self, value: Option<i32>) {
+        match value {
+            Some(v) => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_max_bitrate_bps(self.raw.as_ptr(), 1, &v);
+            },
+            None => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_max_bitrate_bps(
+                    self.raw.as_ptr(),
+                    0,
+                    std::ptr::null(),
+                );
+            },
+        }
+    }
+
+    pub fn min_bitrate_bps(&self) -> Option<i32> {
+        let mut has = 0;
+        let mut value = 0;
+        unsafe {
+            ffi::webrtc_RtpEncodingParameters_get_min_bitrate_bps(
+                self.raw.as_ptr(),
+                &mut has,
+                &mut value,
+            );
+        }
+        if has == 0 { None } else { Some(value) }
+    }
+
+    pub fn set_min_bitrate_bps(&mut self, value: Option<i32>) {
+        match value {
+            Some(v) => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_min_bitrate_bps(self.raw.as_ptr(), 1, &v);
+            },
+            None => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_min_bitrate_bps(
+                    self.raw.as_ptr(),
+                    0,
+                    std::ptr::null(),
+                );
+            },
+        }
+    }
+
+    pub fn max_framerate(&self) -> Option<f64> {
+        let mut has = 0;
+        let mut value = 0.0;
+        unsafe {
+            ffi::webrtc_RtpEncodingParameters_get_max_framerate(
+                self.raw.as_ptr(),
+                &mut has,
+                &mut value,
+            );
+        }
+        if has == 0 { None } else { Some(value) }
+    }
+
+    pub fn set_max_framerate(&mut self, value: Option<f64>) {
+        match value {
+            Some(v) => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_max_framerate(self.raw.as_ptr(), 1, &v);
+            },
+            None => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_max_framerate(
+                    self.raw.as_ptr(),
+                    0,
+                    std::ptr::null(),
+                );
+            },
+        }
+    }
+
+    pub fn scale_resolution_down_by(&self) -> Option<f64> {
+        let mut has = 0;
+        let mut value = 0.0;
+        unsafe {
+            ffi::webrtc_RtpEncodingParameters_get_scale_resolution_down_by(
+                self.raw.as_ptr(),
+                &mut has,
+                &mut value,
+            );
+        }
+        if has == 0 { None } else { Some(value) }
+    }
+
+    pub fn set_scale_resolution_down_by(&mut self, value: Option<f64>) {
+        match value {
+            Some(v) => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_scale_resolution_down_by(
+                    self.raw.as_ptr(),
+                    1,
+                    &v,
+                );
+            },
+            None => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_scale_resolution_down_by(
+                    self.raw.as_ptr(),
+                    0,
+                    std::ptr::null(),
+                );
+            },
+        }
+    }
+
+    pub fn scale_resolution_down_to(&self) -> Option<Resolution> {
+        let mut has = 0;
+        let resolution = Resolution::new();
+        unsafe {
+            ffi::webrtc_RtpEncodingParameters_get_scale_resolution_down_to(
+                self.raw.as_ptr(),
+                &mut has,
+                resolution.as_ptr(),
+            );
+        }
+        if has == 0 { None } else { Some(resolution) }
+    }
+
+    pub fn set_scale_resolution_down_to(&mut self, value: Option<&Resolution>) {
+        match value {
+            Some(v) => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_scale_resolution_down_to(
+                    self.raw.as_ptr(),
+                    1,
+                    v.as_ptr(),
+                );
+            },
+            None => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_scale_resolution_down_to(
+                    self.raw.as_ptr(),
+                    0,
+                    std::ptr::null(),
+                );
+            },
+        }
+    }
+
+    pub fn active(&self) -> bool {
+        unsafe { ffi::webrtc_RtpEncodingParameters_get_active(self.raw.as_ptr()) != 0 }
+    }
+
+    pub fn set_active(&mut self, active: bool) {
+        unsafe {
+            ffi::webrtc_RtpEncodingParameters_set_active(
+                self.raw.as_ptr(),
+                if active { 1 } else { 0 },
+            )
         };
     }
 
-    pub fn has_codec(&self) -> bool {
-        unsafe { ffi::webrtc_RtpEncodingParameters_has_codec(self.raw.as_ptr()) != 0 }
+    pub fn adaptive_ptime(&self) -> bool {
+        unsafe { ffi::webrtc_RtpEncodingParameters_get_adaptive_ptime(self.raw.as_ptr()) != 0 }
     }
 
-    pub fn set_codec(&mut self, codec: &RtpCodecCapability) {
-        unsafe { ffi::webrtc_RtpEncodingParameters_set_codec(self.raw.as_ptr(), codec.as_ptr()) };
+    pub fn set_adaptive_ptime(&mut self, adaptive_ptime: bool) {
+        unsafe {
+            ffi::webrtc_RtpEncodingParameters_set_adaptive_ptime(
+                self.raw.as_ptr(),
+                if adaptive_ptime { 1 } else { 0 },
+            )
+        };
     }
 
-    pub fn codec(&self) -> RtpCodecCapabilityRef<'_> {
-        let raw =
-            NonNull::new(unsafe { ffi::webrtc_RtpEncodingParameters_get_codec(self.raw.as_ptr()) })
-                .expect("BUG: webrtc_RtpEncodingParameters_get_codec が null を返しました");
-        RtpCodecCapabilityRef::from_raw(raw)
+    pub fn scalability_mode(&self) -> Option<Result<String>> {
+        let mut has = 0;
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            ffi::webrtc_RtpEncodingParameters_get_scalability_mode(
+                self.raw.as_ptr(),
+                &mut has,
+                &mut ptr,
+            );
+        }
+        if has == 0 {
+            return None;
+        }
+        Some(
+            CxxStringRef::from_ptr(NonNull::new(ptr).expect(
+                "BUG: webrtc_RtpEncodingParameters_get_scalability_mode が null を返しました",
+            ))
+            .to_string(),
+        )
+    }
+
+    pub fn set_scalability_mode(&mut self, value: Option<&str>) {
+        match value {
+            Some(v) => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_scalability_mode(
+                    self.raw.as_ptr(),
+                    1,
+                    v.as_ptr() as *const _,
+                    v.len(),
+                );
+            },
+            None => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_scalability_mode(
+                    self.raw.as_ptr(),
+                    0,
+                    std::ptr::null(),
+                    0,
+                );
+            },
+        }
+    }
+
+    pub fn codec(&self) -> Option<RtpCodecCapabilityRef<'_>> {
+        let mut has = 0;
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            ffi::webrtc_RtpEncodingParameters_get_codec(self.raw.as_ptr(), &mut has, &mut ptr);
+        }
+        if has == 0 {
+            None
+        } else {
+            Some(RtpCodecCapabilityRef::from_raw(NonNull::new(ptr).expect(
+                "BUG: webrtc_RtpEncodingParameters_get_codec が null を返しました",
+            )))
+        }
+    }
+
+    pub fn set_codec(&mut self, codec: Option<&RtpCodecCapability>) {
+        match codec {
+            Some(v) => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_codec(self.raw.as_ptr(), 1, v.as_ptr());
+            },
+            None => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_codec(self.raw.as_ptr(), 0, std::ptr::null());
+            },
+        }
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_RtpEncodingParameters {
@@ -427,21 +714,203 @@ impl<'a> RtpEncodingParametersRef<'a> {
         .to_string()
     }
 
-    pub fn has_codec(&self) -> bool {
-        unsafe { ffi::webrtc_RtpEncodingParameters_has_codec(self.raw.as_ptr()) != 0 }
+    pub fn codec(&self) -> Option<RtpCodecCapabilityRef<'_>> {
+        let mut has = 0;
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            ffi::webrtc_RtpEncodingParameters_get_codec(self.raw.as_ptr(), &mut has, &mut ptr);
+        }
+        if has == 0 {
+            None
+        } else {
+            Some(RtpCodecCapabilityRef::from_raw(NonNull::new(ptr).expect(
+                "BUG: webrtc_RtpEncodingParameters_get_codec が null を返しました",
+            )))
+        }
     }
 
-    pub fn codec(&self) -> RtpCodecCapabilityRef<'_> {
-        let raw =
-            NonNull::new(unsafe { ffi::webrtc_RtpEncodingParameters_get_codec(self.raw.as_ptr()) })
-                .expect("BUG: webrtc_RtpEncodingParameters_get_codec が null を返しました");
-        RtpCodecCapabilityRef::from_raw(raw)
-    }
-
-    pub fn set_codec(&mut self, codec: &RtpCodecCapability) {
-        unsafe { ffi::webrtc_RtpEncodingParameters_set_codec(self.raw.as_ptr(), codec.as_ptr()) };
+    pub fn set_codec(&mut self, codec: Option<&RtpCodecCapability>) {
+        match codec {
+            Some(v) => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_codec(self.raw.as_ptr(), 1, v.as_ptr());
+            },
+            None => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_codec(self.raw.as_ptr(), 0, std::ptr::null());
+            },
+        }
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DegradationPreference {
+    Disabled,
+    MaintainFramerate,
+    MaintainResolution,
+    Balanced,
+    Unknown(i32),
+}
+
+impl DegradationPreference {
+    pub fn to_int(self) -> i32 {
+        match self {
+            DegradationPreference::Disabled => unsafe {
+                ffi::webrtc_DegradationPreference_DISABLED
+            },
+            DegradationPreference::MaintainFramerate => unsafe {
+                ffi::webrtc_DegradationPreference_MAINTAIN_FRAMERATE
+            },
+            DegradationPreference::MaintainResolution => unsafe {
+                ffi::webrtc_DegradationPreference_MAINTAIN_RESOLUTION
+            },
+            DegradationPreference::Balanced => unsafe {
+                ffi::webrtc_DegradationPreference_BALANCED
+            },
+            DegradationPreference::Unknown(v) => v,
+        }
+    }
+
+    pub fn from_int(v: i32) -> Self {
+        match v {
+            x if x == unsafe { ffi::webrtc_DegradationPreference_DISABLED } => {
+                DegradationPreference::Disabled
+            }
+            x if x == unsafe { ffi::webrtc_DegradationPreference_MAINTAIN_FRAMERATE } => {
+                DegradationPreference::MaintainFramerate
+            }
+            x if x == unsafe { ffi::webrtc_DegradationPreference_MAINTAIN_RESOLUTION } => {
+                DegradationPreference::MaintainResolution
+            }
+            x if x == unsafe { ffi::webrtc_DegradationPreference_BALANCED } => {
+                DegradationPreference::Balanced
+            }
+            _ => DegradationPreference::Unknown(v),
+        }
+    }
+}
+
+unsafe impl Send for DegradationPreference {}
+
+/// webrtc::RtpParameters のラッパー。
+pub struct RtpParameters {
+    raw: NonNull<ffi::webrtc_RtpParameters>,
+}
+
+impl Default for RtpParameters {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RtpParameters {
+    pub fn new() -> Self {
+        let raw = NonNull::new(unsafe { ffi::webrtc_RtpParameters_new() })
+            .expect("BUG: webrtc_RtpParameters_new が null を返しました");
+        Self { raw }
+    }
+
+    pub fn from_raw(raw: NonNull<ffi::webrtc_RtpParameters>) -> Self {
+        Self { raw }
+    }
+
+    pub fn transaction_id(&self) -> Result<String> {
+        let ptr = unsafe { ffi::webrtc_RtpParameters_get_transaction_id(self.raw.as_ptr()) };
+        CxxStringRef::from_ptr(
+            NonNull::new(ptr)
+                .expect("BUG: webrtc_RtpParameters_get_transaction_id が null を返しました"),
+        )
+        .to_string()
+    }
+
+    pub fn set_transaction_id(&mut self, value: &str) {
+        unsafe {
+            ffi::webrtc_RtpParameters_set_transaction_id(
+                self.raw.as_ptr(),
+                value.as_ptr() as *const _,
+                value.len(),
+            );
+        }
+    }
+
+    pub fn mid(&self) -> Result<String> {
+        let ptr = unsafe { ffi::webrtc_RtpParameters_get_mid(self.raw.as_ptr()) };
+        CxxStringRef::from_ptr(
+            NonNull::new(ptr).expect("BUG: webrtc_RtpParameters_get_mid が null を返しました"),
+        )
+        .to_string()
+    }
+
+    pub fn set_mid(&mut self, value: &str) {
+        unsafe {
+            ffi::webrtc_RtpParameters_set_mid(
+                self.raw.as_ptr(),
+                value.as_ptr() as *const _,
+                value.len(),
+            );
+        }
+    }
+
+    pub fn encodings(&self) -> RtpEncodingParametersVector {
+        let ptr = unsafe { ffi::webrtc_RtpParameters_get_encodings(self.raw.as_ptr()) };
+        let raw = NonNull::new(ptr).expect("BUG: webrtc_RtpParameters_get_encodings が null");
+        RtpEncodingParametersVector::clone_from_raw(raw)
+    }
+
+    pub fn set_encodings(&mut self, encodings: &RtpEncodingParametersVector) {
+        unsafe { ffi::webrtc_RtpParameters_set_encodings(self.raw.as_ptr(), encodings.as_ptr()) };
+    }
+
+    pub fn degradation_preference(&self) -> Option<DegradationPreference> {
+        let mut has = 0;
+        let mut value = 0;
+        unsafe {
+            ffi::webrtc_RtpParameters_get_degradation_preference(
+                self.raw.as_ptr(),
+                &mut has,
+                &mut value,
+            );
+        }
+        if has == 0 {
+            None
+        } else {
+            Some(DegradationPreference::from_int(value))
+        }
+    }
+
+    pub fn set_degradation_preference(&mut self, value: Option<DegradationPreference>) {
+        match value {
+            Some(v) => {
+                let raw = v.to_int();
+                unsafe {
+                    ffi::webrtc_RtpParameters_set_degradation_preference(
+                        self.raw.as_ptr(),
+                        1,
+                        &raw,
+                    );
+                }
+            }
+            None => unsafe {
+                ffi::webrtc_RtpParameters_set_degradation_preference(
+                    self.raw.as_ptr(),
+                    0,
+                    std::ptr::null(),
+                );
+            },
+        }
+    }
+
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_RtpParameters {
+        self.raw.as_ptr()
+    }
+}
+
+impl Drop for RtpParameters {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_RtpParameters_delete(self.raw.as_ptr()) };
+    }
+}
+
+// 安全性: 所有ポインタは drop 時に解放されるだけで共有状態を持たない。
+unsafe impl Send for RtpParameters {}
 
 /// RtpTransceiverDirection のラッパー。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -602,7 +1071,28 @@ impl RtpSender {
     pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_RtpSenderInterface_refcounted {
         self.raw_ref.as_refcounted_ptr()
     }
+
+    pub fn get_parameters(&self) -> RtpParameters {
+        let raw =
+            NonNull::new(unsafe { ffi::webrtc_RtpSenderInterface_GetParameters(self.as_ptr()) })
+                .expect("BUG: webrtc_RtpSenderInterface_GetParameters が null を返しました");
+        RtpParameters::from_raw(raw)
+    }
+
+    pub fn set_parameters(&self, parameters: &RtpParameters) -> Result<()> {
+        let err = unsafe {
+            ffi::webrtc_RtpSenderInterface_SetParameters(self.as_ptr(), parameters.as_ptr())
+        };
+        if !err.is_null() {
+            let rtc = RtcError::from_unique_ptr(NonNull::new(err).unwrap());
+            return Err(Error::RtcError(rtc));
+        }
+        Ok(())
+    }
 }
+
+// 安全性: libwebrtc 側で参照カウント管理されたポインタのみを保持する。
+unsafe impl Send for RtpSender {}
 
 /// webrtc::MediaStreamTrackInterface のラッパー。
 pub struct MediaStreamTrack {

@@ -408,15 +408,47 @@ fn rtp_encoding_parameters_and_transceiver_init() {
 
     let mut enc = RtpEncodingParameters::new();
     enc.set_rid("f");
-    enc.set_scale_resolution_down_by(2.0);
-    enc.set_codec(&codec);
-    assert!(enc.has_codec());
+    enc.set_ssrc(Some(1234));
+    enc.set_max_bitrate_bps(Some(1_500_000));
+    enc.set_min_bitrate_bps(Some(100_000));
+    enc.set_max_framerate(Some(30.0));
+    enc.set_scale_resolution_down_by(Some(2.0));
+    let mut resolution = Resolution::new();
+    resolution.set_width(960);
+    resolution.set_height(540);
+    enc.set_scale_resolution_down_to(Some(&resolution));
+    enc.set_active(false);
+    enc.set_adaptive_ptime(true);
+    enc.set_scalability_mode(Some("L1T3"));
+    enc.set_codec(Some(&codec));
     assert_eq!(enc.rid().expect("rid の取得に失敗しました"), "f");
-    let enc_codec = enc.codec();
+    assert_eq!(enc.ssrc(), Some(1234));
+    assert_eq!(enc.max_bitrate_bps(), Some(1_500_000));
+    assert_eq!(enc.min_bitrate_bps(), Some(100_000));
+    assert_eq!(enc.max_framerate(), Some(30.0));
+    assert_eq!(enc.scale_resolution_down_by(), Some(2.0));
+    let got_resolution = enc
+        .scale_resolution_down_to()
+        .expect("scale_resolution_down_to の取得に失敗しました");
+    assert_eq!(got_resolution.width(), 960);
+    assert_eq!(got_resolution.height(), 540);
+    assert!(!enc.active());
+    assert!(enc.adaptive_ptime());
+    assert_eq!(
+        enc.scalability_mode()
+            .expect("scalability_mode が未設定でした")
+            .expect("scalability_mode の取得に失敗しました"),
+        "L1T3".to_string()
+    );
+    let enc_codec = enc.codec().expect("codec の取得に失敗しました");
     assert_eq!(
         enc_codec.name().expect("codec 名の取得に失敗しました"),
         "opus"
     );
+    enc.set_scalability_mode(None);
+    assert!(enc.scalability_mode().is_none());
+    enc.set_codec(None);
+    assert!(enc.codec().is_none());
 
     let mut vec = RtpEncodingParametersVector::new(0);
     vec.push(&enc);
@@ -449,6 +481,111 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     assert_eq!(offer.offer_to_receive_video(), 1);
     assert!(offer.voice_activity_detection());
     assert!(offer.use_rtp_mux());
+}
+
+#[test]
+fn rtp_parameters_round_trip() {
+    let mut params = RtpParameters::new();
+    params.set_transaction_id("tx-1");
+    params.set_mid("video-0");
+    assert_eq!(
+        params
+            .transaction_id()
+            .expect("transaction_id の取得に失敗しました"),
+        "tx-1"
+    );
+    assert_eq!(params.mid().expect("mid の取得に失敗しました"), "video-0");
+
+    let mut enc = RtpEncodingParameters::new();
+    enc.set_rid("r0");
+    enc.set_max_bitrate_bps(Some(500_000));
+    let mut encodings = RtpEncodingParametersVector::new(0);
+    encodings.push(&enc);
+    params.set_encodings(&encodings);
+
+    let got = params.encodings();
+    assert_eq!(got.len(), 1);
+    let first = got.get(0).expect("encodings の取得に失敗しました");
+    assert_eq!(first.rid().expect("rid の取得に失敗しました"), "r0");
+
+    params.set_degradation_preference(Some(DegradationPreference::Balanced));
+    assert_eq!(
+        params.degradation_preference(),
+        Some(DegradationPreference::Balanced)
+    );
+    params.set_degradation_preference(None);
+    assert_eq!(params.degradation_preference(), None);
+}
+
+#[test]
+fn rtp_sender_get_set_parameters() {
+    let dec_audio = AudioDecoderFactory::builtin();
+    let enc_audio = AudioEncoderFactory::builtin();
+    let enc_video = VideoEncoderFactory::builtin();
+    let dec_video = VideoDecoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc_audio);
+    deps_factory.set_audio_decoder_factory(&dec_audio);
+    deps_factory.set_video_encoder_factory(enc_video);
+    deps_factory.set_video_decoder_factory(dec_video);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    let source = AdaptedVideoTrackSource::new();
+    let vts = source.cast_to_video_track_source();
+    let track = factory
+        .create_video_track(&vts, "video-track-1")
+        .expect("VideoTrack の生成に失敗しました");
+
+    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let observer = PeerConnectionObserverBuilder::new().build();
+    let mut pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+        .expect("PeerConnection の生成に失敗しました");
+
+    let stream_track = track.cast_to_media_stream_track();
+    let mut stream_ids = StringVector::new(0);
+    stream_ids.push(&CxxString::from_str("stream-0"));
+    let sender = pc
+        .add_track(&stream_track, &stream_ids)
+        .expect("AddTrack が失敗しました");
+
+    let params = sender.get_parameters();
+    sender
+        .set_parameters(&params)
+        .expect("set_parameters が失敗しました");
+
+    drop(sender);
+    drop(stream_track);
+    drop(pc);
+    drop(track);
+    drop(vts);
+    drop(source);
+    drop(pc_deps);
+    drop(factory);
+    drop(deps_factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    worker.stop();
+    signaling.stop();
 }
 
 #[test]
