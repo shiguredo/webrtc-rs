@@ -399,12 +399,14 @@ function(bundle_static_library target static_libs bundled_target)
     add_custom_command(
       COMMAND ${CMAKE_AR} /NOLOGO /OUT:${bundled_tgt_full_name} $<TARGET_FILE:${target}> ${static_libs}
       OUTPUT ${bundled_tgt_full_name}
+      DEPENDS $<TARGET_FILE:${target}> ${static_libs}
       VERBATIM
       COMMENT "Bundling libs: ${static_libs} to $<TARGET_FILE:${target}>")
   elseif (APPLE)
     add_custom_command(
       COMMAND libtool -static -o ${bundled_tgt_full_name} "$<TARGET_FILE:${target}>" ${static_libs}
       OUTPUT ${bundled_tgt_full_name}
+      DEPENDS $<TARGET_FILE:${target}> ${static_libs}
       VERBATIM
       COMMENT "Bundling libs: ${static_libs} to $<TARGET_FILE:${target}>")
   else ()
@@ -422,6 +424,7 @@ function(bundle_static_library target static_libs bundled_target)
     add_custom_command(
       COMMAND ${CMAKE_AR} -M < ${CMAKE_BINARY_DIR}/${bundled_target}.ar
       OUTPUT ${bundled_tgt_full_name}
+      DEPENDS $<TARGET_FILE:${target}> ${static_libs}
       VERBATIM
       COMMENT "Bundling libs: ${static_libs} to $<TARGET_FILE:${target}>")
   endif()
