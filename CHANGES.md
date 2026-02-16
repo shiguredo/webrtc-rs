@@ -23,7 +23,7 @@
   - `RtpSender::get_parameters`
   - `RtpSender::set_parameters`
   - `RtpEncodingParameters` の optional フィールド API を `out_has + ポインタ値` 方式に統一
-  - @voluntas
+  - @melpon
 
 ### misc
 
