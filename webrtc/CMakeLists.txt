@@ -94,6 +94,17 @@ endif()
 message(STATUS "WEBRTC_C_TARGET: ${WEBRTC_C_TARGET}")
 message(STATUS "WEBRTC_BUILD_VERSION: ${WEBRTC_BUILD_VERSION}")
 
+set(WEBRTC_TARGETS_UBUNTU
+  "ubuntu-24.04_x86_64"
+  "ubuntu-24.04_armv8"
+  "ubuntu-22.04_x86_64"
+  "ubuntu-22.04_armv8"
+)
+set(WEBRTC_TARGETS_ARMV8
+  "ubuntu-24.04_armv8"
+  "ubuntu-22.04_armv8"
+)
+
 # WebRTC パッケージの URL を決定
 if(WEBRTC_C_TARGET STREQUAL "macos_arm64")
   set(WEBRTC_ARCHIVE_NAME "webrtc.macos_arm64.tar.gz")
@@ -126,9 +137,19 @@ set(LLVM_BUILDTOOLS_DIR "${LLVM_DIR}/buildtools")
 set(WEBRTC_CACHE_KEY "${WEBRTC_BUILD_VERSION}:${WEBRTC_C_TARGET}")
 set(WEBRTC_VERSION_FILE "${DEPS_DIR}/webrtc.version")
 set(LLVM_VERSION_FILE "${DEPS_DIR}/llvm.version")
-set(WEBRTC_USE_PREBUILT_LLVM TRUE)
+# WebRTC 向けの Prebuilt Clang バイナリのダウンロードと使用
+set(WEBRTC_USE_WEBRTC_PREBUILT_CLANG TRUE)
+# WebRTC 向けの libc++ ヘッダーのダウンロードと使用（WebRTC との ABI 互換性のため）
+set(WEBRTC_USE_WEBRTC_LIBCXX TRUE)
+
 if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
-  set(WEBRTC_USE_PREBUILT_LLVM FALSE)
+  set(WEBRTC_USE_WEBRTC_PREBUILT_CLANG TRUE)
+  set(WEBRTC_USE_WEBRTC_LIBCXX FALSE)
+endif()
+
+# ARM64 Linux では prebuilt Clang バイナリが提供されていないためシステムの Clang を使用
+if(WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_ARMV8)
+  set(WEBRTC_USE_WEBRTC_PREBUILT_CLANG FALSE)
 endif()
 
 # WebRTC のダウンロード（project() の前に実行）
@@ -186,7 +207,7 @@ set(LLVM_CACHE_KEY "${LLVM_VERSION_STRING}:${WEBRTC_C_TARGET}")
 
 # LLVM のダウンロード（project() の前に実行）
 set(LLVM_NEEDS_INSTALL TRUE)
-if(WEBRTC_USE_PREBUILT_LLVM AND EXISTS "${LLVM_VERSION_FILE}")
+if((WEBRTC_USE_WEBRTC_PREBUILT_CLANG OR WEBRTC_USE_WEBRTC_LIBCXX) AND EXISTS "${LLVM_VERSION_FILE}")
   file(READ "${LLVM_VERSION_FILE}" LLVM_INSTALLED_VERSION)
   string(STRIP "${LLVM_INSTALLED_VERSION}" LLVM_INSTALLED_VERSION)
   if("${LLVM_INSTALLED_VERSION}" STREQUAL "${LLVM_CACHE_KEY}")
@@ -195,71 +216,90 @@ if(WEBRTC_USE_PREBUILT_LLVM AND EXISTS "${LLVM_VERSION_FILE}")
   endif()
 endif()
 
-if(WEBRTC_USE_PREBUILT_LLVM AND LLVM_NEEDS_INSTALL)
+if((WEBRTC_USE_WEBRTC_PREBUILT_CLANG OR WEBRTC_USE_WEBRTC_LIBCXX) AND LLVM_NEEDS_INSTALL)
   message(STATUS "Installing LLVM...")
   file(REMOVE_RECURSE "${LLVM_DIR}")
   file(MAKE_DIRECTORY "${LLVM_DIR}")
 
-  # tools を shallow clone
-  message(STATUS "Cloning tools...")
-  git_shallow_clone(
-    NAME "tools"
-    WORKING_DIRECTORY "${LLVM_TOOLS_DIR}"
-    REPOSITORY "${WEBRTC_WEBRTC_SRC_TOOLS_URL}"
-    COMMIT "${WEBRTC_WEBRTC_SRC_TOOLS_COMMIT}"
-  )
+  if(WEBRTC_USE_WEBRTC_PREBUILT_CLANG)
+    # tools を shallow clone
+    message(STATUS "Cloning tools...")
+    git_shallow_clone(
+      NAME "tools"
+      WORKING_DIRECTORY "${LLVM_TOOLS_DIR}"
+      REPOSITORY "${WEBRTC_WEBRTC_SRC_TOOLS_URL}"
+      COMMIT "${WEBRTC_WEBRTC_SRC_TOOLS_COMMIT}"
+    )
 
-  # update.py を実行して Clang をダウンロード
-  message(STATUS "Downloading Clang via update.py...")
-  execute_process_checked(
-    COMMAND python3 "${LLVM_TOOLS_DIR}/clang/scripts/update.py" --output-dir "${LLVM_CLANG_DIR}"
-    ERROR_MESSAGE "Failed to download Clang"
-  )
-
-  # libcxx を shallow clone
-  message(STATUS "Cloning libcxx...")
-  git_shallow_clone(
-    NAME "libcxx"
-    WORKING_DIRECTORY "${LLVM_LIBCXX_DIR}"
-    REPOSITORY "${WEBRTC_WEBRTC_SRC_THIRD_PARTY_LIBCXX_SRC_URL}"
-    COMMIT "${WEBRTC_WEBRTC_SRC_THIRD_PARTY_LIBCXX_SRC_COMMIT}"
-  )
-
-  # buildtools を shallow clone
-  message(STATUS "Cloning buildtools...")
-  git_shallow_clone(
-    NAME "buildtools"
-    WORKING_DIRECTORY "${LLVM_BUILDTOOLS_DIR}"
-    REPOSITORY "${WEBRTC_WEBRTC_SRC_BUILDTOOLS_URL}"
-    COMMIT "${WEBRTC_WEBRTC_SRC_BUILDTOOLS_COMMIT}"
-  )
-
-  # __config_site と __assertion_handler をコピー
-  message(STATUS "Copying libc++ config files...")
-  file(COPY "${LLVM_BUILDTOOLS_DIR}/third_party/libc++/__config_site" DESTINATION "${LLVM_LIBCXX_DIR}/include")
-  file(COPY "${LLVM_BUILDTOOLS_DIR}/third_party/libc++/__assertion_handler" DESTINATION "${LLVM_LIBCXX_DIR}/include")
-  if(NOT EXISTS "${LLVM_LIBCXX_DIR}/include/__config_site")
-    message(FATAL_ERROR "Failed to copy __config_site")
+    # update.py を実行して Clang をダウンロード
+    message(STATUS "Downloading Clang via update.py...")
+    execute_process_checked(
+      COMMAND python3 "${LLVM_TOOLS_DIR}/clang/scripts/update.py" --output-dir "${LLVM_CLANG_DIR}"
+      ERROR_MESSAGE "Failed to download Clang"
+    )
   endif()
-  if(NOT EXISTS "${LLVM_LIBCXX_DIR}/include/__assertion_handler")
-    message(FATAL_ERROR "Failed to copy __assertion_handler")
+
+  if(WEBRTC_USE_WEBRTC_LIBCXX)
+    # libcxx を shallow clone
+    message(STATUS "Cloning libcxx...")
+    git_shallow_clone(
+      NAME "libcxx"
+      WORKING_DIRECTORY "${LLVM_LIBCXX_DIR}"
+      REPOSITORY "${WEBRTC_WEBRTC_SRC_THIRD_PARTY_LIBCXX_SRC_URL}"
+      COMMIT "${WEBRTC_WEBRTC_SRC_THIRD_PARTY_LIBCXX_SRC_COMMIT}"
+    )
+
+    # buildtools を shallow clone
+    message(STATUS "Cloning buildtools...")
+    git_shallow_clone(
+      NAME "buildtools"
+      WORKING_DIRECTORY "${LLVM_BUILDTOOLS_DIR}"
+      REPOSITORY "${WEBRTC_WEBRTC_SRC_BUILDTOOLS_URL}"
+      COMMIT "${WEBRTC_WEBRTC_SRC_BUILDTOOLS_COMMIT}"
+    )
+
+    # __config_site と __assertion_handler をコピー
+    message(STATUS "Copying libc++ config files...")
+    file(COPY "${LLVM_BUILDTOOLS_DIR}/third_party/libc++/__config_site" DESTINATION "${LLVM_LIBCXX_DIR}/include")
+    file(COPY "${LLVM_BUILDTOOLS_DIR}/third_party/libc++/__assertion_handler" DESTINATION "${LLVM_LIBCXX_DIR}/include")
+    if(NOT EXISTS "${LLVM_LIBCXX_DIR}/include/__config_site")
+      message(FATAL_ERROR "Failed to copy __config_site")
+    endif()
+    if(NOT EXISTS "${LLVM_LIBCXX_DIR}/include/__assertion_handler")
+      message(FATAL_ERROR "Failed to copy __assertion_handler")
+    endif()
   endif()
 
   file(WRITE "${LLVM_VERSION_FILE}" "${LLVM_CACHE_KEY}")
   message(STATUS "LLVM installation complete")
 endif()
 
-if(WEBRTC_USE_PREBUILT_LLVM)
-  # Clang コンパイラのパスを設定（project() の前）
+if(WEBRTC_USE_WEBRTC_PREBUILT_CLANG)
+  # Prebuilt Clang コンパイラのパスを設定（project() の前）
   set(CMAKE_C_COMPILER "${LLVM_CLANG_DIR}/bin/clang" CACHE FILEPATH "" FORCE)
   set(CMAKE_CXX_COMPILER "${LLVM_CLANG_DIR}/bin/clang++" CACHE FILEPATH "" FORCE)
-  set(LIBCXX_INCLUDE_DIR "${LLVM_LIBCXX_DIR}/include")
-
   message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
   message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
-  message(STATUS "LIBCXX_INCLUDE_DIR: ${LIBCXX_INCLUDE_DIR}")
+elseif(WEBRTC_USE_WEBRTC_LIBCXX)
+  # libc++ を使用するがプリビルト Clang は使わない場合（ARM64 Linux）
+  # ABI 互換性のためシステムの Clang を使用する
+  find_program(SYSTEM_CLANG clang)
+  find_program(SYSTEM_CLANGPP clang++)
+  if(SYSTEM_CLANG AND SYSTEM_CLANGPP)
+    set(CMAKE_C_COMPILER "${SYSTEM_CLANG}" CACHE FILEPATH "" FORCE)
+    set(CMAKE_CXX_COMPILER "${SYSTEM_CLANGPP}" CACHE FILEPATH "" FORCE)
+    message(STATUS "Using system Clang: ${SYSTEM_CLANG}")
+    message(STATUS "Using system Clang++: ${SYSTEM_CLANGPP}")
+  else()
+    message(FATAL_ERROR "System Clang is required for ARM64 Linux but not found. Install with: apt install clang")
+  endif()
 else()
-  message(STATUS "WEBRTC_USE_PREBUILT_LLVM is OFF for target: ${WEBRTC_C_TARGET}")
+  message(STATUS "WEBRTC_USE_WEBRTC_PREBUILT_CLANG is OFF for target: ${WEBRTC_C_TARGET}")
+endif()
+
+if(WEBRTC_USE_WEBRTC_LIBCXX)
+  set(LIBCXX_INCLUDE_DIR "${LLVM_LIBCXX_DIR}/include")
+  message(STATUS "LIBCXX_INCLUDE_DIR: ${LIBCXX_INCLUDE_DIR}")
 endif()
 
 # ここで project() を呼び出す
@@ -346,8 +386,8 @@ endforeach()
 
 set(BUNDLE_STATIC_LIBS ${WEBRTC_LIBRARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}webrtc${CMAKE_STATIC_LIBRARY_SUFFIX})
 
-if(WEBRTC_USE_PREBUILT_LLVM)
-  # libc++ の設定（LLVM の libc++ を使用）
+if(WEBRTC_USE_WEBRTC_LIBCXX)
+  # libc++ の設定（WebRTC と同じ libc++ ヘッダーを使用）
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
     target_compile_options(${target}
       PRIVATE
@@ -502,7 +542,7 @@ elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
     )
   endforeach()
 
-elseif (WEBRTC_C_TARGET MATCHES "^ubuntu-")
+elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_UBUNTU)
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
     target_compile_definitions(${target}
       PRIVATE
@@ -610,7 +650,7 @@ elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
         "-framework ScreenCaptureKit"
     )
   endforeach()
-elseif (WEBRTC_C_TARGET MATCHES "^ubuntu-")
+elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_UBUNTU)
   foreach(target IN LISTS WEBRTC_C_TARGETS)
     target_link_libraries(${target} PRIVATE X11 dl rt Threads::Threads)
   endforeach()
