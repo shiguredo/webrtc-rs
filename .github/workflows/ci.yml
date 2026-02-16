@@ -34,12 +34,12 @@ jobs:
           sudo apt-get install -y build-essential \
             libclang-dev \
             libx11-dev
-      - name: Install Clang 20 for ARM64
+      - name: Install Clang 21 for ARM64
         if: runner.os == 'Linux' && runner.arch == 'ARM64'
         run: |
-          wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 20
-          sudo ln -sf /usr/bin/clang-20 /usr/bin/clang
-          sudo ln -sf /usr/bin/clang++-20 /usr/bin/clang++
+          wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 21
+          sudo ln -sf /usr/bin/clang-21 /usr/bin/clang
+          sudo ln -sf /usr/bin/clang++-21 /usr/bin/clang++
       - run: rustup update stable
       - uses: shiguredo/github-actions/.github/actions/rust-cache@main
         with:
