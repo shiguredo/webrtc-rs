@@ -96,11 +96,10 @@ class PeerConnectionObserverImpl : public webrtc::PeerConnectionObserver {
   }
   void OnIceGatheringChange(
       webrtc::PeerConnectionInterface::IceGatheringState new_state) override {}
-  void OnIceCandidate(const webrtc::IceCandidateInterface* candidate) override {
+  void OnIceCandidate(const webrtc::IceCandidate* candidate) override {
     if (observer_->OnIceCandidate) {
       observer_->OnIceCandidate(
-          reinterpret_cast<const struct webrtc_IceCandidateInterface*>(
-              candidate),
+          reinterpret_cast<const struct webrtc_IceCandidate*>(candidate),
           user_data_);
     }
   }
@@ -436,6 +435,13 @@ void webrtc_PeerConnectionInterface_SetRemoteDescription(
     obs_ref = obs;
   }
   pc->SetRemoteDescription(std::move(cpp_desc), obs_ref);
+}
+int webrtc_PeerConnectionInterface_AddIceCandidate(
+    struct webrtc_PeerConnectionInterface* self,
+    const struct webrtc_IceCandidate* candidate) {
+  auto pc = reinterpret_cast<webrtc::PeerConnectionInterface*>(self);
+  auto ice = reinterpret_cast<const webrtc::IceCandidate*>(candidate);
+  return pc->AddIceCandidate(ice) ? 1 : 0;
 }
 void webrtc_PeerConnectionInterface_SetConfiguration(
     struct webrtc_PeerConnectionInterface* self,
