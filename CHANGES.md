@@ -11,9 +11,14 @@
 
 ## develop
 
-### ADD
-
-- Ubuntu 24.04 LTS arm64 / Ubuntu 22.04 LTS arm64 をサポート
+- [ADD] Ubuntu 24.04 LTS arm64 / Ubuntu 22.04 LTS arm64 をサポート
+  - @voluntas
+- [ADD] `IceCandidate` と `PeerConnection::add_ice_candidate` の C API / Rust API を追加する
+  - `IceCandidate::new`
+  - `IceCandidate::sdp_mid`
+  - `IceCandidate::sdp_mline_index`
+  - `PeerConnection::add_ice_candidate`
+  - @voluntas
 
 ### misc
 

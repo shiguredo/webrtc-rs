@@ -6,10 +6,10 @@ use crate::ref_count::{
 use crate::{
     AudioDecoderFactory, AudioDeviceModule, AudioEncoderFactory, AudioProcessingBuilder,
     AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit, Error, IceCandidate,
-    MediaStreamTrack, MediaType, RTCStatsReport, Result, RtcError, RtcEventLogFactory,
-    RtpCapabilities, RtpReceiver, RtpSender, RtpTransceiver, RtpTransceiverInit, ScopedRef,
-    SessionDescription, StringVector, Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack,
-    VideoTrackSource, ffi,
+    IceCandidateRef, MediaStreamTrack, MediaType, RTCStatsReport, Result, RtcError,
+    RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender, RtpTransceiver,
+    RtpTransceiverInit, ScopedRef, SessionDescription, StringVector, Thread, VideoDecoderFactory,
+    VideoEncoderFactory, VideoTrack, VideoTrackSource, ffi,
 };
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -767,11 +767,13 @@ impl PeerConnectionState {
     }
 }
 
+type IceCandidateCallback = Option<Box<dyn FnMut(IceCandidateRef) + Send + 'static>>;
+
 struct ObserverCallbacks {
     on_connection_change: Option<Box<dyn FnMut(PeerConnectionState) + Send + 'static>>,
     on_track: Option<Box<dyn FnMut(RtpTransceiver) + Send + 'static>>,
     on_remove_track: Option<Box<dyn FnMut(RtpReceiver) + Send + 'static>>,
-    on_ice_candidate: Option<Box<dyn FnMut(IceCandidate) + Send + 'static>>,
+    on_ice_candidate: IceCandidateCallback,
     on_data_channel: Option<Box<dyn FnMut(DataChannel) + Send + 'static>>,
 }
 
@@ -780,7 +782,7 @@ pub struct PeerConnectionObserverBuilder {
     on_connection_change: Option<Box<dyn FnMut(PeerConnectionState) + Send + 'static>>,
     on_track: Option<Box<dyn FnMut(RtpTransceiver) + Send + 'static>>,
     on_remove_track: Option<Box<dyn FnMut(RtpReceiver) + Send + 'static>>,
-    on_ice_candidate: Option<Box<dyn FnMut(IceCandidate) + Send + 'static>>,
+    on_ice_candidate: IceCandidateCallback,
     on_data_channel: Option<Box<dyn FnMut(DataChannel) + Send + 'static>>,
 }
 
@@ -827,7 +829,7 @@ impl PeerConnectionObserverBuilder {
 
     pub fn on_ice_candidate<C>(mut self, on_ice_candidate: C) -> Self
     where
-        C: FnMut(IceCandidate) + Send + 'static,
+        C: FnMut(IceCandidateRef) + Send + 'static,
     {
         self.on_ice_candidate = Some(Box::new(on_ice_candidate));
         self
@@ -870,14 +872,14 @@ unsafe extern "C" fn observer_on_track(
 }
 
 unsafe extern "C" fn observer_on_ice_candidate(
-    candidate: *const ffi::webrtc_IceCandidateInterface,
+    candidate: *const ffi::webrtc_IceCandidate,
     user_data: *mut c_void,
 ) {
     assert!(!user_data.is_null());
     let callbacks = unsafe { &mut *(user_data as *mut ObserverCallbacks) };
-    let candidate = NonNull::new(candidate as *mut ffi::webrtc_IceCandidateInterface)
-        .expect("BUG: candidate が null");
-    let candidate = IceCandidate::from_raw(candidate);
+    let candidate =
+        NonNull::new(candidate as *mut ffi::webrtc_IceCandidate).expect("BUG: candidate が null");
+    let candidate = IceCandidateRef::from_raw(candidate);
     if let Some(cb) = callbacks.on_ice_candidate.as_mut() {
         cb(candidate);
     }
@@ -1318,6 +1320,19 @@ impl PeerConnection {
                 observer.as_refcounted_ptr(),
             )
         };
+    }
+
+    pub fn add_ice_candidate(&self, candidate: &IceCandidate) -> Result<()> {
+        let ok = unsafe {
+            ffi::webrtc_PeerConnectionInterface_AddIceCandidate(
+                self.raw_ref.as_ptr(),
+                candidate.as_ptr(),
+            )
+        };
+        if ok == 0 {
+            return Err(Error::InvalidIceCandidate);
+        }
+        Ok(())
     }
 
     pub fn set_configuration(&self, config: &mut PeerConnectionRtcConfiguration) -> Result<()> {
