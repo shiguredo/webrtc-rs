@@ -3,6 +3,7 @@ use crate::ref_count::{
     AudioTrackHandle, AudioTrackSourceHandle, MediaStreamTrackHandle,
 };
 use crate::{Environment, Error, MediaStreamTrack, Result, ScopedRef, ffi};
+use std::ffi::c_char;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 use std::slice;
@@ -178,8 +179,8 @@ impl AudioDeviceModule {
 
     /// 録音デバイスの名前と GUID を取得する。
     pub fn recording_device_name(&self, index: u16) -> Result<(String, String)> {
-        let mut name = [0i8; 128];
-        let mut guid = [0i8; 128];
+        let mut name = [0 as c_char; 128];
+        let mut guid = [0 as c_char; 128];
         let ret = unsafe {
             ffi::webrtc_AudioDeviceModule_RecordingDeviceName(
                 self.as_ptr(),
@@ -698,7 +699,7 @@ fn bool_from_i32(value: i32) -> bool {
     value != 0
 }
 
-fn write_c_string(dest: &mut [i8], value: &str) {
+fn write_c_string(dest: &mut [c_char], value: &str) {
     dest.fill(0);
     if dest.is_empty() {
         return;
@@ -706,7 +707,7 @@ fn write_c_string(dest: &mut [i8], value: &str) {
     let bytes = value.as_bytes();
     let len = bytes.len().min(dest.len() - 1);
     for (out, src) in dest[..len].iter_mut().zip(bytes.iter()) {
-        *out = *src as i8;
+        *out = *src as c_char;
     }
 }
 
@@ -804,7 +805,12 @@ unsafe extern "C" fn adm_recording_devices(user_data: *mut c_void) -> i16 {
         .map_or(0, |cb| cb())
 }
 
-fn handle_device_name(cb: &StringPairCallback, index: u16, name: *mut i8, guid: *mut i8) -> i32 {
+fn handle_device_name(
+    cb: &StringPairCallback,
+    index: u16,
+    name: *mut c_char,
+    guid: *mut c_char,
+) -> i32 {
     let (name_value, guid_value) = match cb(index) {
         Some(value) => value,
         None => return -1,
@@ -812,8 +818,8 @@ fn handle_device_name(cb: &StringPairCallback, index: u16, name: *mut i8, guid: 
     if name.is_null() || guid.is_null() {
         return -1;
     }
-    let name_buf = unsafe { slice::from_raw_parts_mut(name, 128) };
-    let guid_buf = unsafe { slice::from_raw_parts_mut(guid, 128) };
+    let name_buf: &mut [c_char] = unsafe { slice::from_raw_parts_mut(name, 128) };
+    let guid_buf: &mut [c_char] = unsafe { slice::from_raw_parts_mut(guid, 128) };
     write_c_string(name_buf, &name_value);
     write_c_string(guid_buf, &guid_value);
     0
@@ -821,8 +827,8 @@ fn handle_device_name(cb: &StringPairCallback, index: u16, name: *mut i8, guid: 
 
 unsafe extern "C" fn adm_playout_device_name(
     index: u16,
-    name: *mut i8,
-    guid: *mut i8,
+    name: *mut c_char,
+    guid: *mut c_char,
     user_data: *mut c_void,
 ) -> i32 {
     let data = unsafe { adm_user_data(user_data) };
@@ -835,8 +841,8 @@ unsafe extern "C" fn adm_playout_device_name(
 
 unsafe extern "C" fn adm_recording_device_name(
     index: u16,
-    name: *mut i8,
-    guid: *mut i8,
+    name: *mut c_char,
+    guid: *mut c_char,
     user_data: *mut c_void,
 ) -> i32 {
     let data = unsafe { adm_user_data(user_data) };

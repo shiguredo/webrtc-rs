@@ -1,4 +1,4 @@
-use crate::RtcError;
+use crate::{RtcError, SdpParseError};
 use std::fmt;
 
 /// shiguredo_webrtc 用の Error 型。
@@ -9,6 +9,7 @@ pub enum Error {
     NulError(std::ffi::NulError),
     Utf8Error(std::str::Utf8Error),
     RtcError(RtcError),
+    SdpParseError(SdpParseError),
     InvalidSdp,
     InvalidIceCandidate,
     OutOfIndex(usize),
@@ -26,6 +27,18 @@ impl fmt::Display for Error {
                     return f.write_str(&message);
                 }
                 f.write_str("RTCError が発生しました")
+            }
+            Error::SdpParseError(err) => {
+                let line = err.line().ok();
+                let description = err.description().ok();
+                match (line, description) {
+                    (Some(line), Some(description)) => {
+                        write!(f, "SDP parse error: {} ({})", description, line)
+                    }
+                    (Some(line), None) => write!(f, "SDP parse error: {}", line),
+                    (None, Some(description)) => write!(f, "SDP parse error: {}", description),
+                    (None, None) => f.write_str("SDP parse error が発生しました"),
+                }
             }
             Error::InvalidSdp => f.write_str("不正な SDP です"),
             Error::InvalidIceCandidate => f.write_str("不正な ICE candidate です"),
@@ -63,6 +76,12 @@ impl From<std::str::Utf8Error> for Error {
 impl From<RtcError> for Error {
     fn from(err: RtcError) -> Self {
         Error::RtcError(err)
+    }
+}
+
+impl From<SdpParseError> for Error {
+    fn from(err: SdpParseError) -> Self {
+        Error::SdpParseError(err)
     }
 }
 
