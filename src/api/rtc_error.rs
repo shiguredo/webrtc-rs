@@ -27,7 +27,7 @@ impl RtcError {
         let mut len = 0usize;
         unsafe { ffi::webrtc_RTCError_message(raw.as_ptr(), &mut ptr, &mut len) };
         assert!(!ptr.is_null());
-        let bytes = unsafe { slice::from_raw_parts(ptr as *const u8, len) };
+        let bytes = unsafe { slice::from_raw_parts(ptr.cast::<u8>(), len) };
         let msg = std::str::from_utf8(bytes)?;
         Ok(msg.to_owned())
     }
