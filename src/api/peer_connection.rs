@@ -4,12 +4,12 @@ use crate::ref_count::{
     SetLocalDescriptionObserverHandle, SetRemoteDescriptionObserverHandle, VideoTrackHandle,
 };
 use crate::{
-    ffi, AudioDecoderFactory, AudioDeviceModule, AudioEncoderFactory, AudioProcessingBuilder,
+    AudioDecoderFactory, AudioDeviceModule, AudioEncoderFactory, AudioProcessingBuilder,
     AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit, Error, IceCandidate,
     IceCandidateRef, MediaStreamTrack, MediaType, RTCStatsReport, Result, RtcError,
     RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender, RtpTransceiver,
     RtpTransceiverInit, ScopedRef, SessionDescription, StringVector, Thread, VideoDecoderFactory,
-    VideoEncoderFactory, VideoTrack, VideoTrackSource,
+    VideoEncoderFactory, VideoTrack, VideoTrackSource, ffi,
 };
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -767,11 +767,13 @@ impl PeerConnectionState {
     }
 }
 
+type IceCandidateCallback = Option<Box<dyn FnMut(IceCandidateRef) + Send + 'static>>;
+
 struct ObserverCallbacks {
     on_connection_change: Option<Box<dyn FnMut(PeerConnectionState) + Send + 'static>>,
     on_track: Option<Box<dyn FnMut(RtpTransceiver) + Send + 'static>>,
     on_remove_track: Option<Box<dyn FnMut(RtpReceiver) + Send + 'static>>,
-    on_ice_candidate: Option<Box<dyn FnMut(IceCandidateRef) + Send + 'static>>,
+    on_ice_candidate: IceCandidateCallback,
     on_data_channel: Option<Box<dyn FnMut(DataChannel) + Send + 'static>>,
 }
 
@@ -780,7 +782,7 @@ pub struct PeerConnectionObserverBuilder {
     on_connection_change: Option<Box<dyn FnMut(PeerConnectionState) + Send + 'static>>,
     on_track: Option<Box<dyn FnMut(RtpTransceiver) + Send + 'static>>,
     on_remove_track: Option<Box<dyn FnMut(RtpReceiver) + Send + 'static>>,
-    on_ice_candidate: Option<Box<dyn FnMut(IceCandidateRef) + Send + 'static>>,
+    on_ice_candidate: IceCandidateCallback,
     on_data_channel: Option<Box<dyn FnMut(DataChannel) + Send + 'static>>,
 }
 
