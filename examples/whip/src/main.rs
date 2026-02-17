@@ -8,7 +8,7 @@ use shiguredo_webrtc::{
     Environment, IceServer, IceTransportsType, MediaType, PeerConnection,
     PeerConnectionDependencies, PeerConnectionFactory, PeerConnectionFactoryDependencies,
     PeerConnectionObserver, PeerConnectionObserverBuilder, PeerConnectionOfferAnswerOptions,
-    PeerConnectionRtcConfiguration, PeerConnectionState, RtcEventLogFactory, RtpCodecCapability,
+    PeerConnectionRtcConfiguration, PeerConnectionState, RtcEventLogFactory, RtpCodec,
     RtpCodecCapabilityVector, RtpEncodingParameters, RtpEncodingParametersVector,
     RtpTransceiverDirection, RtpTransceiverInit, SdpType, SessionDescription,
     SetLocalDescriptionObserver, SetRemoteDescriptionObserver, Thread, VideoDecoderFactory,
@@ -461,8 +461,10 @@ impl SignalingWhip {
                     let mut matched = false;
                     for idx in 0..encs.len() {
                         if let Some(enc) = encs.get(idx) {
-                            let enc_name = enc
-                                .codec()
+                            let Some(enc_codec) = enc.codec() else {
+                                continue;
+                            };
+                            let enc_name = enc_codec
                                 .name()
                                 .map_err(|e| format!("codec 名の取得に失敗しました : {e}"))?
                                 .to_ascii_lowercase();
@@ -828,10 +830,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut send_encodings = RtpEncodingParametersVector::new(0);
-    let mut av1 = RtpCodecCapability::new();
+    let mut av1 = RtpCodec::new();
     av1.set_kind(MediaType::Video);
     av1.set_name("AV1");
-    av1.set_clock_rate(90_000);
+    av1.set_clock_rate(Some(90_000));
     let mut params = av1.parameters();
     params.set("level-idx", "5");
     params.set("profile", "0");
@@ -839,8 +841,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (rid, scale) in [("r0", 4.0), ("r1", 2.0), ("r2", 1.0)] {
         let mut enc = RtpEncodingParameters::new();
         enc.set_rid(rid);
-        enc.set_scale_resolution_down_by(scale);
-        enc.set_codec(&av1);
+        enc.set_scale_resolution_down_by(Some(scale));
+        enc.set_codec(Some(&av1));
         send_encodings.push(&enc);
     }
 

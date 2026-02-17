@@ -108,6 +108,9 @@ void webrtc_PeerConnectionInterface_SetRemoteDescription(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_SessionDescriptionInterface_unique* desc,
     struct webrtc_SetRemoteDescriptionObserverInterface_refcounted* observer);
+int webrtc_PeerConnectionInterface_AddIceCandidate(
+    struct webrtc_PeerConnectionInterface* self,
+    const struct webrtc_IceCandidate* candidate);
 void webrtc_PeerConnectionInterface_SetConfiguration(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_PeerConnectionInterface_RTCConfiguration* config,
@@ -187,7 +190,7 @@ struct webrtc_PeerConnectionObserver_cbs {
   void (*OnConnectionChange)(
       webrtc_PeerConnectionInterface_PeerConnectionState new_state,
       void* user_data);
-  void (*OnIceCandidate)(const struct webrtc_IceCandidateInterface* candidate,
+  void (*OnIceCandidate)(const struct webrtc_IceCandidate* candidate,
                          void* user_data);
   void (*OnTrack)(struct webrtc_RtpTransceiverInterface_refcounted* transceiver,
                   void* user_data);
@@ -197,7 +200,7 @@ struct webrtc_PeerConnectionObserver_cbs {
       struct webrtc_DataChannelInterface_refcounted* data_channel,
       void* user_data);
   // void OnIceGatheringChange(webrtc::PeerConnectionInterface::IceGatheringState new_state) override {}
-  // void OnIceCandidate(const webrtc::IceCandidateInterface* candidate) override {}
+  // void OnIceCandidate(const webrtc::IceCandidate* candidate) override {}
   // void OnIceCandidateError(const std::string& address, int port, const std::string& url, int error_code, const std::string& error_text) override {}
   // void OnTrack(webrtc::scoped_refptr<webrtc::RtpTransceiverInterface> transceiver) override {}
   // void OnRemoveTrack(webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) override {}

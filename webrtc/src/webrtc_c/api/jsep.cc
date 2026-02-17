@@ -77,10 +77,71 @@ int webrtc_SessionDescriptionInterface_ToString(
 }
 
 extern "C" {
-int webrtc_IceCandidateInterface_ToString(
-    const struct webrtc_IceCandidateInterface* self,
-    struct std_string_unique** out_sdp) {
-  auto candidate = reinterpret_cast<const webrtc::IceCandidateInterface*>(self);
+WEBRTC_DEFINE_UNIQUE(webrtc_SdpParseError, webrtc::SdpParseError);
+void webrtc_SdpParseError_line(struct webrtc_SdpParseError* self,
+                               const char** out_line,
+                               size_t* out_len) {
+  auto error = reinterpret_cast<webrtc::SdpParseError*>(self);
+  if (out_line != nullptr) {
+    *out_line = error->line.c_str();
+  }
+  if (out_len != nullptr) {
+    *out_len = error->line.size();
+  }
+}
+void webrtc_SdpParseError_description(struct webrtc_SdpParseError* self,
+                                      const char** out_description,
+                                      size_t* out_len) {
+  auto error = reinterpret_cast<webrtc::SdpParseError*>(self);
+  if (out_description != nullptr) {
+    *out_description = error->description.c_str();
+  }
+  if (out_len != nullptr) {
+    *out_len = error->description.size();
+  }
+}
+struct webrtc_IceCandidate* webrtc_CreateIceCandidate(
+    const char* sdp_mid,
+    size_t sdp_mid_len,
+    int sdp_mline_index,
+    const char* sdp,
+    size_t sdp_len,
+    struct webrtc_SdpParseError_unique** out_error) {
+  webrtc::SdpParseError error;
+  auto* ice_candidate = webrtc::CreateIceCandidate(
+      std::string(sdp_mid, sdp_mid_len), sdp_mline_index,
+      std::string(sdp, sdp_len), &error);
+  if (out_error != nullptr) {
+    *out_error = nullptr;
+  }
+  if (!ice_candidate) {
+    if (out_error != nullptr) {
+      auto out = std::make_unique<webrtc::SdpParseError>(std::move(error));
+      *out_error =
+          reinterpret_cast<struct webrtc_SdpParseError_unique*>(out.release());
+    }
+    return nullptr;
+  }
+  return reinterpret_cast<struct webrtc_IceCandidate*>(ice_candidate);
+}
+void webrtc_IceCandidate_delete(struct webrtc_IceCandidate* self) {
+  auto candidate = reinterpret_cast<webrtc::IceCandidate*>(self);
+  delete candidate;
+}
+void webrtc_IceCandidate_sdp_mid(const struct webrtc_IceCandidate* self,
+                                 struct std_string_unique** out) {
+  auto candidate = reinterpret_cast<const webrtc::IceCandidate*>(self);
+  auto mid = std::make_unique<std::string>(candidate->sdp_mid());
+  *out = reinterpret_cast<struct std_string_unique*>(mid.release());
+}
+int webrtc_IceCandidate_sdp_mline_index(
+    const struct webrtc_IceCandidate* self) {
+  auto candidate = reinterpret_cast<const webrtc::IceCandidate*>(self);
+  return candidate->sdp_mline_index();
+}
+int webrtc_IceCandidate_ToString(const struct webrtc_IceCandidate* self,
+                                 struct std_string_unique** out_sdp) {
+  auto candidate = reinterpret_cast<const webrtc::IceCandidate*>(self);
   std::string sdp;
   if (!candidate->ToString(&sdp)) {
     *out_sdp = nullptr;

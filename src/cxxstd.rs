@@ -56,7 +56,7 @@ impl CxxString {
     pub fn to_string(&self) -> Result<String> {
         let raw = self.raw_string();
         let len = self.len();
-        let ptr = unsafe { ffi::std_string_c_str(raw.as_ptr()) } as *const u8;
+        let ptr = unsafe { ffi::std_string_c_str(raw.as_ptr()) }.cast::<u8>();
         assert!(!ptr.is_null(), "BUG: std_string_c_str が null を返しました");
         let bytes = unsafe { slice::from_raw_parts(ptr, len) };
         let s = std::str::from_utf8(bytes)?;
@@ -67,7 +67,7 @@ impl CxxString {
     pub fn to_bytes(&self) -> Vec<u8> {
         let raw = self.raw_string();
         let len = self.len();
-        let ptr = unsafe { ffi::std_string_c_str(raw.as_ptr()) } as *const u8;
+        let ptr = unsafe { ffi::std_string_c_str(raw.as_ptr()) }.cast::<u8>();
         unsafe { slice::from_raw_parts(ptr, len) }.to_vec()
     }
 
@@ -125,7 +125,7 @@ impl<'a> CxxStringRef<'a> {
     /// UTF-8 に変換できない場合はエラーを返す。
     pub fn to_string(&self) -> Result<String> {
         let len = self.len();
-        let ptr = unsafe { ffi::std_string_c_str(self.as_ptr()) } as *const u8;
+        let ptr = unsafe { ffi::std_string_c_str(self.as_ptr()) }.cast::<u8>();
         assert!(!ptr.is_null(), "BUG: std_string_c_str が null を返しました");
         let bytes = unsafe { slice::from_raw_parts(ptr, len) };
         let s = std::str::from_utf8(bytes)?;
@@ -135,7 +135,7 @@ impl<'a> CxxStringRef<'a> {
     /// バイト列として取得する。
     pub fn to_bytes(&self) -> Vec<u8> {
         let len = self.len();
-        let ptr = unsafe { ffi::std_string_c_str(self.as_ptr()) } as *const u8;
+        let ptr = unsafe { ffi::std_string_c_str(self.as_ptr()) }.cast::<u8>();
         unsafe { slice::from_raw_parts(ptr, len) }.to_vec()
     }
 

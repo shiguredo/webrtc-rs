@@ -18,9 +18,9 @@ jobs:
           - ubuntu-22.04
           - macos-26
           - macos-15
+          - ubuntu-24.04-arm
+          - ubuntu-22.04-arm
           # 将来的に対応予定
-          # - ubuntu-24.04-arm
-          # - ubuntu-22.04-arm
           # - windows-2025
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -34,6 +34,14 @@ jobs:
           sudo apt-get install -y build-essential \
             libclang-dev \
             libx11-dev
+      # ARM64 Linux ではビルドに Clang 21 以上が必要なため、
+      # apt.llvm.org から Clang 21 をインストールし、clang / clang++ として使えるようにシンボリックリンクを作成する
+      - name: Install Clang 21 for ARM64
+        if: runner.os == 'Linux' && runner.arch == 'ARM64'
+        run: |
+          wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 21
+          sudo ln -sf /usr/bin/clang-21 /usr/bin/clang
+          sudo ln -sf /usr/bin/clang++-21 /usr/bin/clang++
       - run: rustup update stable
       - uses: shiguredo/github-actions/.github/actions/rust-cache@main
         with:
@@ -53,7 +61,7 @@ jobs:
       - name: Slack Notification
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_CHANNEL: webrtc-rs
+          SLACK_CHANNEL: sora-rust-sdk
           SLACK_COLOR: danger
           SLACK_ICON_EMOJI: ":japanese_ogre:"
           SLACK_TITLE: "FAILED"
