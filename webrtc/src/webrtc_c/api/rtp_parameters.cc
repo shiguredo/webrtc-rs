@@ -287,7 +287,7 @@ void webrtc_RtpEncodingParameters_get_scalability_mode(
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
   webrtc_c::OptionalGetAs(params->scalability_mode, out_has, out_value, [&]() {
     return reinterpret_cast<struct std_string*>(
-        const_cast<std::string*>(&params->scalability_mode.value()));
+        &params->scalability_mode.value());
   });
 }
 void webrtc_RtpEncodingParameters_set_scalability_mode(
