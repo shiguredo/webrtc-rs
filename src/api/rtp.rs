@@ -27,6 +27,14 @@ impl RtpCapabilities {
         }
         unsafe { ffi::webrtc_RtpCodecCapability_vector_size(codecs) }
     }
+
+    /// codecs のベクタを借用する。
+    pub fn codecs(&self) -> RtpCodecCapabilityVectorRef<'_> {
+        let raw =
+            NonNull::new(unsafe { ffi::webrtc_RtpCapabilities_get_codecs(self.raw.as_ptr()) })
+                .expect("BUG: webrtc_RtpCapabilities_get_codecs が null を返しました");
+        RtpCodecCapabilityVectorRef::from_raw(raw)
+    }
 }
 
 impl Drop for RtpCapabilities {
@@ -35,13 +43,155 @@ impl Drop for RtpCapabilities {
     }
 }
 
-impl RtpCapabilities {
-    /// codecs のベクタを借用する。
-    pub fn codecs(&self) -> RtpCodecCapabilityVectorRef<'_> {
-        let raw =
-            NonNull::new(unsafe { ffi::webrtc_RtpCapabilities_get_codecs(self.raw.as_ptr()) })
-                .expect("BUG: webrtc_RtpCapabilities_get_codecs が null を返しました");
-        RtpCodecCapabilityVectorRef::from_raw(raw)
+/// webrtc::RtpCodec のラッパー。
+pub struct RtpCodec {
+    raw: NonNull<ffi::webrtc_RtpCodec>,
+}
+
+impl Default for RtpCodec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RtpCodec {
+    pub fn new() -> Self {
+        let raw = unsafe { ffi::webrtc_RtpCodec_new() };
+        Self {
+            raw: NonNull::new(raw).expect("BUG: webrtc_RtpCodec_new が null を返しました"),
+        }
+    }
+
+    pub fn as_ref(&self) -> RtpCodecRef<'_> {
+        RtpCodecRef::from_raw(self.raw)
+    }
+
+    pub fn set_kind(&mut self, media_type: MediaType) {
+        self.as_ref().set_kind(media_type);
+    }
+
+    pub fn set_name(&mut self, name: &str) {
+        self.as_ref().set_name(name);
+    }
+
+    pub fn name(&self) -> Result<String> {
+        self.as_ref().name()
+    }
+
+    pub fn clock_rate(&self) -> Option<i32> {
+        self.as_ref().clock_rate()
+    }
+
+    pub fn set_clock_rate(&mut self, value: Option<i32>) {
+        self.as_ref().set_clock_rate(value);
+    }
+
+    pub fn num_channels(&self) -> Option<i32> {
+        self.as_ref().num_channels()
+    }
+
+    pub fn set_num_channels(&mut self, value: Option<i32>) {
+        self.as_ref().set_num_channels(value);
+    }
+
+    pub fn parameters(&mut self) -> MapStringString<'_> {
+        self.as_ref().parameters()
+    }
+
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_RtpCodec {
+        self.raw.as_ptr()
+    }
+}
+
+impl Drop for RtpCodec {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_RtpCodec_delete(self.raw.as_ptr()) };
+    }
+}
+
+unsafe impl Send for RtpCodec {}
+
+/// webrtc::RtpCodec の借用ラッパー。
+pub struct RtpCodecRef<'a> {
+    raw: NonNull<ffi::webrtc_RtpCodec>,
+    _marker: PhantomData<&'a ffi::webrtc_RtpCodec>,
+}
+
+impl<'a> RtpCodecRef<'a> {
+    pub fn from_raw(raw: NonNull<ffi::webrtc_RtpCodec>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn name(&self) -> Result<String> {
+        let ptr = unsafe { ffi::webrtc_RtpCodec_get_name(self.raw.as_ptr()) };
+        CxxStringRef::from_ptr(
+            NonNull::new(ptr).expect("BUG: webrtc_RtpCodec_get_name が null を返しました"),
+        )
+        .to_string()
+    }
+
+    pub fn set_kind(&self, media_type: MediaType) {
+        unsafe { ffi::webrtc_RtpCodec_set_kind(self.raw.as_ptr(), media_type.to_int()) };
+    }
+
+    pub fn set_name(&self, name: &str) {
+        unsafe {
+            ffi::webrtc_RtpCodec_set_name(self.raw.as_ptr(), name.as_ptr() as *const _, name.len());
+        }
+    }
+
+    pub fn clock_rate(&self) -> Option<i32> {
+        let mut has = 0;
+        let mut value = 0;
+        unsafe {
+            ffi::webrtc_RtpCodec_get_clock_rate(self.raw.as_ptr(), &mut has, &mut value);
+        }
+        if has == 0 { None } else { Some(value) }
+    }
+
+    pub fn num_channels(&self) -> Option<i32> {
+        let mut has = 0;
+        let mut value = 0;
+        unsafe {
+            ffi::webrtc_RtpCodec_get_num_channels(self.raw.as_ptr(), &mut has, &mut value);
+        }
+        if has == 0 { None } else { Some(value) }
+    }
+
+    pub fn set_clock_rate(&self, value: Option<i32>) {
+        match value {
+            Some(v) => unsafe {
+                ffi::webrtc_RtpCodec_set_clock_rate(self.raw.as_ptr(), 1, &v);
+            },
+            None => unsafe {
+                ffi::webrtc_RtpCodec_set_clock_rate(self.raw.as_ptr(), 0, std::ptr::null());
+            },
+        }
+    }
+
+    pub fn set_num_channels(&self, value: Option<i32>) {
+        match value {
+            Some(v) => unsafe {
+                ffi::webrtc_RtpCodec_set_num_channels(self.raw.as_ptr(), 1, &v);
+            },
+            None => unsafe {
+                ffi::webrtc_RtpCodec_set_num_channels(self.raw.as_ptr(), 0, std::ptr::null());
+            },
+        }
+    }
+
+    pub fn parameters(&self) -> MapStringString<'a> {
+        let raw = unsafe { ffi::webrtc_RtpCodec_get_parameters(self.raw.as_ptr()) };
+        MapStringString::from_raw(
+            NonNull::new(raw).expect("BUG: webrtc_RtpCodec_get_parameters が null を返しました"),
+        )
+    }
+
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_RtpCodec {
+        self.raw.as_ptr()
     }
 }
 
@@ -65,41 +215,44 @@ impl RtpCodecCapability {
         }
     }
 
+    pub fn as_ref(&self) -> RtpCodecCapabilityRef<'_> {
+        RtpCodecCapabilityRef::from_raw(self.raw)
+    }
+
+    pub fn cast_to_codec(&self) -> RtpCodecRef<'_> {
+        self.as_ref().cast_to_codec()
+    }
+
     pub fn set_kind(&mut self, media_type: MediaType) {
-        unsafe {
-            ffi::webrtc_RtpCodecCapability_set_kind(self.raw.as_ptr(), media_type.to_int());
-        }
+        self.as_ref().set_kind(media_type);
     }
 
     pub fn set_name(&mut self, name: &str) {
-        unsafe {
-            ffi::webrtc_RtpCodecCapability_set_name(
-                self.raw.as_ptr(),
-                name.as_ptr() as *const _,
-                name.len(),
-            );
-        }
-    }
-
-    pub fn set_clock_rate(&mut self, rate: i32) {
-        unsafe { ffi::webrtc_RtpCodecCapability_set_clock_rate(self.raw.as_ptr(), rate) };
+        self.as_ref().set_name(name);
     }
 
     pub fn name(&self) -> Result<String> {
-        let ptr = unsafe { ffi::webrtc_RtpCodecCapability_get_name(self.raw.as_ptr()) };
-        CxxStringRef::from_ptr(
-            NonNull::new(ptr)
-                .expect("BUG: webrtc_RtpCodecCapability_get_name が null を返しました"),
-        )
-        .to_string()
+        self.as_ref().name()
+    }
+
+    pub fn clock_rate(&self) -> Option<i32> {
+        self.as_ref().clock_rate()
+    }
+
+    pub fn set_clock_rate(&mut self, value: Option<i32>) {
+        self.as_ref().set_clock_rate(value);
+    }
+
+    pub fn num_channels(&self) -> Option<i32> {
+        self.as_ref().num_channels()
+    }
+
+    pub fn set_num_channels(&mut self, value: Option<i32>) {
+        self.as_ref().set_num_channels(value);
     }
 
     pub fn parameters(&mut self) -> MapStringString<'_> {
-        let raw = unsafe { ffi::webrtc_RtpCodecCapability_get_parameters(self.raw.as_ptr()) };
-        MapStringString::from_raw(
-            NonNull::new(raw)
-                .expect("BUG: webrtc_RtpCodecCapability_get_parameters が null を返しました"),
-        )
+        self.as_ref().parameters()
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_RtpCodecCapability {
@@ -236,13 +389,44 @@ impl<'a> RtpCodecCapabilityRef<'a> {
         }
     }
 
+    pub fn cast_to_codec(&self) -> RtpCodecRef<'a> {
+        let raw = NonNull::new(unsafe {
+            ffi::webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec(self.raw.as_ptr())
+        })
+        .expect("BUG: webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec が null を返しました");
+        RtpCodecRef::from_raw(raw)
+    }
+
+    pub fn set_kind(&self, media_type: MediaType) {
+        self.cast_to_codec().set_kind(media_type);
+    }
+
+    pub fn set_name(&self, name: &str) {
+        self.cast_to_codec().set_name(name);
+    }
+
     pub fn name(&self) -> Result<String> {
-        let ptr = unsafe { ffi::webrtc_RtpCodecCapability_get_name(self.raw.as_ptr()) };
-        CxxStringRef::from_ptr(
-            NonNull::new(ptr)
-                .expect("BUG: webrtc_RtpCodecCapability_get_name が null を返しました"),
-        )
-        .to_string()
+        self.cast_to_codec().name()
+    }
+
+    pub fn clock_rate(&self) -> Option<i32> {
+        self.cast_to_codec().clock_rate()
+    }
+
+    pub fn set_clock_rate(&self, value: Option<i32>) {
+        self.cast_to_codec().set_clock_rate(value);
+    }
+
+    pub fn num_channels(&self) -> Option<i32> {
+        self.cast_to_codec().num_channels()
+    }
+
+    pub fn set_num_channels(&self, value: Option<i32>) {
+        self.cast_to_codec().set_num_channels(value);
+    }
+
+    pub fn parameters(&self) -> MapStringString<'a> {
+        self.cast_to_codec().parameters()
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_RtpCodecCapability {
@@ -568,7 +752,7 @@ impl RtpEncodingParameters {
         }
     }
 
-    pub fn codec(&self) -> Option<RtpCodecCapabilityRef<'_>> {
+    pub fn codec(&self) -> Option<RtpCodecRef<'_>> {
         let mut has = 0;
         let mut ptr = std::ptr::null_mut();
         unsafe {
@@ -577,13 +761,13 @@ impl RtpEncodingParameters {
         if has == 0 {
             None
         } else {
-            Some(RtpCodecCapabilityRef::from_raw(NonNull::new(ptr).expect(
+            Some(RtpCodecRef::from_raw(NonNull::new(ptr).expect(
                 "BUG: webrtc_RtpEncodingParameters_get_codec が null を返しました",
             )))
         }
     }
 
-    pub fn set_codec(&mut self, codec: Option<&RtpCodecCapability>) {
+    pub fn set_codec(&mut self, codec: Option<&RtpCodec>) {
         match codec {
             Some(v) => unsafe {
                 ffi::webrtc_RtpEncodingParameters_set_codec(self.raw.as_ptr(), 1, v.as_ptr());
@@ -714,7 +898,7 @@ impl<'a> RtpEncodingParametersRef<'a> {
         .to_string()
     }
 
-    pub fn codec(&self) -> Option<RtpCodecCapabilityRef<'_>> {
+    pub fn codec(&self) -> Option<RtpCodecRef<'_>> {
         let mut has = 0;
         let mut ptr = std::ptr::null_mut();
         unsafe {
@@ -723,13 +907,13 @@ impl<'a> RtpEncodingParametersRef<'a> {
         if has == 0 {
             None
         } else {
-            Some(RtpCodecCapabilityRef::from_raw(NonNull::new(ptr).expect(
+            Some(RtpCodecRef::from_raw(NonNull::new(ptr).expect(
                 "BUG: webrtc_RtpEncodingParameters_get_codec が null を返しました",
             )))
         }
     }
 
-    pub fn set_codec(&mut self, codec: Option<&RtpCodecCapability>) {
+    pub fn set_codec(&mut self, codec: Option<&RtpCodec>) {
         match codec {
             Some(v) => unsafe {
                 ffi::webrtc_RtpEncodingParameters_set_codec(self.raw.as_ptr(), 1, v.as_ptr());

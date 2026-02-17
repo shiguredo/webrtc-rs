@@ -8,7 +8,7 @@ use shiguredo_webrtc::{
     Environment, IceServer, IceTransportsType, MediaType, PeerConnection,
     PeerConnectionDependencies, PeerConnectionFactory, PeerConnectionFactoryDependencies,
     PeerConnectionObserver, PeerConnectionObserverBuilder, PeerConnectionOfferAnswerOptions,
-    PeerConnectionRtcConfiguration, PeerConnectionState, RtcEventLogFactory, RtpCodecCapability,
+    PeerConnectionRtcConfiguration, PeerConnectionState, RtcEventLogFactory, RtpCodec,
     RtpCodecCapabilityVector, RtpEncodingParameters, RtpEncodingParametersVector,
     RtpTransceiverDirection, RtpTransceiverInit, SdpType, SessionDescription,
     SetLocalDescriptionObserver, SetRemoteDescriptionObserver, Thread, VideoDecoderFactory,
@@ -830,10 +830,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut send_encodings = RtpEncodingParametersVector::new(0);
-    let mut av1 = RtpCodecCapability::new();
+    let mut av1 = RtpCodec::new();
     av1.set_kind(MediaType::Video);
     av1.set_name("AV1");
-    av1.set_clock_rate(90_000);
+    av1.set_clock_rate(Some(90_000));
     let mut params = av1.parameters();
     params.set("level-idx", "5");
     params.set("profile", "0");

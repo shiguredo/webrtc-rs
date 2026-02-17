@@ -2,55 +2,86 @@
 
 #include <assert.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include <string>
 #include <vector>
 
 // WebRTC
+#include <api/media_types.h>
 #include <api/rtp_parameters.h>
+#include <api/video/resolution.h>
 
 #include "../common.impl.h"
 #include "../std.h"
-#include "api/media_types.h"
+#include "../std.impl.h"
 
-namespace {
+// -------------------------
+// webrtc::RtpCodec
+// -------------------------
 
-template <typename T>
-void OptionalGet(const std::optional<T>& src, int* out_has, T* out_value) {
-  const bool has = src.has_value();
-  if (out_has != nullptr) {
-    *out_has = has ? 1 : 0;
-  }
-  if (out_value != nullptr && has) {
-    *out_value = *src;
-  }
+struct webrtc_RtpCodec* webrtc_RtpCodec_new() {
+  auto codec = new webrtc::RtpCodec();
+  return reinterpret_cast<struct webrtc_RtpCodec*>(codec);
 }
-
-template <typename T>
-void OptionalSet(std::optional<T>& dst, int has, const T* value) {
-  if (has == 0) {
-    dst.reset();
-    return;
-  }
-  assert(value != nullptr);
-  if (value == nullptr) {
-    return;
-  }
-  dst = *value;
+void webrtc_RtpCodec_delete(struct webrtc_RtpCodec* self) {
+  auto codec = reinterpret_cast<webrtc::RtpCodec*>(self);
+  delete codec;
 }
-
-}  // namespace
+void webrtc_RtpCodec_set_kind(struct webrtc_RtpCodec* self, int kind) {
+  auto codec = reinterpret_cast<webrtc::RtpCodec*>(self);
+  codec->kind = static_cast<webrtc::MediaType>(kind);
+}
+struct std_string* webrtc_RtpCodec_get_name(struct webrtc_RtpCodec* self) {
+  auto codec = reinterpret_cast<webrtc::RtpCodec*>(self);
+  return reinterpret_cast<struct std_string*>(&codec->name);
+}
+void webrtc_RtpCodec_set_name(struct webrtc_RtpCodec* self,
+                              const char* name,
+                              size_t name_len) {
+  auto codec = reinterpret_cast<webrtc::RtpCodec*>(self);
+  codec->name = name != nullptr ? std::string(name, name_len) : std::string();
+}
+void webrtc_RtpCodec_get_clock_rate(struct webrtc_RtpCodec* self,
+                                    int* out_has,
+                                    int* out_value) {
+  auto codec = reinterpret_cast<webrtc::RtpCodec*>(self);
+  webrtc_c::OptionalGet(codec->clock_rate, out_has, out_value);
+}
+void webrtc_RtpCodec_set_clock_rate(struct webrtc_RtpCodec* self,
+                                    int has,
+                                    const int* value) {
+  auto codec = reinterpret_cast<webrtc::RtpCodec*>(self);
+  webrtc_c::OptionalSet(codec->clock_rate, has, value);
+}
+void webrtc_RtpCodec_get_num_channels(struct webrtc_RtpCodec* self,
+                                      int* out_has,
+                                      int* out_value) {
+  auto codec = reinterpret_cast<webrtc::RtpCodec*>(self);
+  webrtc_c::OptionalGet(codec->num_channels, out_has, out_value);
+}
+void webrtc_RtpCodec_set_num_channels(struct webrtc_RtpCodec* self,
+                                      int has,
+                                      const int* value) {
+  auto codec = reinterpret_cast<webrtc::RtpCodec*>(self);
+  webrtc_c::OptionalSet(codec->num_channels, has, value);
+}
+struct std_map_string_string* webrtc_RtpCodec_get_parameters(
+    struct webrtc_RtpCodec* self) {
+  auto codec = reinterpret_cast<webrtc::RtpCodec*>(self);
+  return reinterpret_cast<struct std_map_string_string*>(&codec->parameters);
+}
 
 // -------------------------
 // webrtc::RtpCodecCapability
 // -------------------------
 
 WEBRTC_DEFINE_VECTOR(webrtc_RtpCodecCapability, webrtc::RtpCodecCapability);
-struct std_string* webrtc_RtpCodecCapability_get_name(
-    struct webrtc_RtpCodecCapability* self) {
-  auto cap = reinterpret_cast<webrtc::RtpCodecCapability*>(self);
-  return reinterpret_cast<std_string*>(&cap->name);
-}
+WEBRTC_DEFINE_CAST(webrtc_RtpCodecCapability,
+                   webrtc_RtpCodec,
+                   webrtc::RtpCodecCapability,
+                   webrtc::RtpCodec);
+
 struct webrtc_RtpCodecCapability* webrtc_RtpCodecCapability_new() {
   auto cap = new webrtc::RtpCodecCapability();
   return reinterpret_cast<struct webrtc_RtpCodecCapability*>(cap);
@@ -58,28 +89,6 @@ struct webrtc_RtpCodecCapability* webrtc_RtpCodecCapability_new() {
 void webrtc_RtpCodecCapability_delete(struct webrtc_RtpCodecCapability* self) {
   auto cap = reinterpret_cast<webrtc::RtpCodecCapability*>(self);
   delete cap;
-}
-void webrtc_RtpCodecCapability_set_kind(struct webrtc_RtpCodecCapability* self,
-                                        int kind) {
-  auto cap = reinterpret_cast<webrtc::RtpCodecCapability*>(self);
-  cap->kind = static_cast<webrtc::MediaType>(kind);
-}
-void webrtc_RtpCodecCapability_set_name(struct webrtc_RtpCodecCapability* self,
-                                        const char* name,
-                                        size_t name_len) {
-  auto cap = reinterpret_cast<webrtc::RtpCodecCapability*>(self);
-  cap->name = name != nullptr ? std::string(name, name_len) : std::string();
-}
-void webrtc_RtpCodecCapability_set_clock_rate(
-    struct webrtc_RtpCodecCapability* self,
-    int clock_rate) {
-  auto cap = reinterpret_cast<webrtc::RtpCodecCapability*>(self);
-  cap->clock_rate = clock_rate;
-}
-struct std_map_string_string* webrtc_RtpCodecCapability_get_parameters(
-    struct webrtc_RtpCodecCapability* self) {
-  auto cap = reinterpret_cast<webrtc::RtpCodecCapability*>(self);
-  return reinterpret_cast<struct std_map_string_string*>(&cap->parameters);
 }
 
 // -------------------------
@@ -160,14 +169,14 @@ void webrtc_RtpEncodingParameters_get_ssrc(
     int* out_has,
     uint32_t* out_value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  OptionalGet(params->ssrc, out_has, out_value);
+  webrtc_c::OptionalGet(params->ssrc, out_has, out_value);
 }
 void webrtc_RtpEncodingParameters_set_ssrc(
     struct webrtc_RtpEncodingParameters* self,
     int has,
     const uint32_t* value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  OptionalSet(params->ssrc, has, value);
+  webrtc_c::OptionalSet(params->ssrc, has, value);
 }
 
 void webrtc_RtpEncodingParameters_get_max_bitrate_bps(
@@ -175,14 +184,14 @@ void webrtc_RtpEncodingParameters_get_max_bitrate_bps(
     int* out_has,
     int* out_value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  OptionalGet(params->max_bitrate_bps, out_has, out_value);
+  webrtc_c::OptionalGet(params->max_bitrate_bps, out_has, out_value);
 }
 void webrtc_RtpEncodingParameters_set_max_bitrate_bps(
     struct webrtc_RtpEncodingParameters* self,
     int has,
     const int* value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  OptionalSet(params->max_bitrate_bps, has, value);
+  webrtc_c::OptionalSet(params->max_bitrate_bps, has, value);
 }
 
 void webrtc_RtpEncodingParameters_get_min_bitrate_bps(
@@ -190,14 +199,14 @@ void webrtc_RtpEncodingParameters_get_min_bitrate_bps(
     int* out_has,
     int* out_value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  OptionalGet(params->min_bitrate_bps, out_has, out_value);
+  webrtc_c::OptionalGet(params->min_bitrate_bps, out_has, out_value);
 }
 void webrtc_RtpEncodingParameters_set_min_bitrate_bps(
     struct webrtc_RtpEncodingParameters* self,
     int has,
     const int* value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  OptionalSet(params->min_bitrate_bps, has, value);
+  webrtc_c::OptionalSet(params->min_bitrate_bps, has, value);
 }
 
 void webrtc_RtpEncodingParameters_get_max_framerate(
@@ -205,14 +214,14 @@ void webrtc_RtpEncodingParameters_get_max_framerate(
     int* out_has,
     double* out_value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  OptionalGet(params->max_framerate, out_has, out_value);
+  webrtc_c::OptionalGet(params->max_framerate, out_has, out_value);
 }
 void webrtc_RtpEncodingParameters_set_max_framerate(
     struct webrtc_RtpEncodingParameters* self,
     int has,
     const double* value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  OptionalSet(params->max_framerate, has, value);
+  webrtc_c::OptionalSet(params->max_framerate, has, value);
 }
 
 void webrtc_RtpEncodingParameters_get_scale_resolution_down_by(
@@ -220,14 +229,14 @@ void webrtc_RtpEncodingParameters_get_scale_resolution_down_by(
     int* out_has,
     double* out_value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  OptionalGet(params->scale_resolution_down_by, out_has, out_value);
+  webrtc_c::OptionalGet(params->scale_resolution_down_by, out_has, out_value);
 }
 void webrtc_RtpEncodingParameters_set_scale_resolution_down_by(
     struct webrtc_RtpEncodingParameters* self,
     int has,
     const double* value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  OptionalSet(params->scale_resolution_down_by, has, value);
+  webrtc_c::OptionalSet(params->scale_resolution_down_by, has, value);
 }
 
 void webrtc_RtpEncodingParameters_get_scale_resolution_down_to(
@@ -236,7 +245,7 @@ void webrtc_RtpEncodingParameters_get_scale_resolution_down_to(
     struct webrtc_Resolution* out_value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
   auto value = reinterpret_cast<webrtc::Resolution*>(out_value);
-  OptionalGet(params->scale_resolution_down_to, out_has, value);
+  webrtc_c::OptionalGet(params->scale_resolution_down_to, out_has, value);
 }
 void webrtc_RtpEncodingParameters_set_scale_resolution_down_to(
     struct webrtc_RtpEncodingParameters* self,
@@ -244,7 +253,7 @@ void webrtc_RtpEncodingParameters_set_scale_resolution_down_to(
     const struct webrtc_Resolution* value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
   auto v = reinterpret_cast<const webrtc::Resolution*>(value);
-  OptionalSet(params->scale_resolution_down_to, has, v);
+  webrtc_c::OptionalSet(params->scale_resolution_down_to, has, v);
 }
 
 int webrtc_RtpEncodingParameters_get_active(
@@ -276,18 +285,10 @@ void webrtc_RtpEncodingParameters_get_scalability_mode(
     int* out_has,
     struct std_string** out_value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  const bool has = params->scalability_mode.has_value();
-  if (out_has != nullptr) {
-    *out_has = has ? 1 : 0;
-  }
-  if (out_value != nullptr) {
-    if (has) {
-      *out_value = reinterpret_cast<struct std_string*>(
-          &params->scalability_mode.value());
-    } else {
-      *out_value = nullptr;
-    }
-  }
+  webrtc_c::OptionalGetAs(params->scalability_mode, out_has, out_value, [&]() {
+    return reinterpret_cast<struct std_string*>(
+        const_cast<std::string*>(&params->scalability_mode.value()));
+  });
 }
 void webrtc_RtpEncodingParameters_set_scalability_mode(
     struct webrtc_RtpEncodingParameters* self,
@@ -295,50 +296,26 @@ void webrtc_RtpEncodingParameters_set_scalability_mode(
     const char* value,
     size_t value_len) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  if (has == 0) {
-    params->scalability_mode.reset();
-    return;
-  }
-  assert(value != nullptr);
-  if (value == nullptr) {
-    return;
-  }
-  params->scalability_mode = std::string(value, value_len);
+  webrtc_c::OptionalSetAs(params->scalability_mode, has, value,
+                          [&]() { return std::string(value, value_len); });
 }
 
 void webrtc_RtpEncodingParameters_get_codec(
     struct webrtc_RtpEncodingParameters* self,
     int* out_has,
-    struct webrtc_RtpCodecCapability** out_value) {
+    struct webrtc_RtpCodec** out_value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  const bool has = params->codec.has_value();
-  if (out_has != nullptr) {
-    *out_has = has ? 1 : 0;
-  }
-  if (out_value != nullptr) {
-    if (has) {
-      *out_value = reinterpret_cast<struct webrtc_RtpCodecCapability*>(
-          &params->codec.value());
-    } else {
-      *out_value = nullptr;
-    }
-  }
+  webrtc_c::OptionalGetAs(params->codec, out_has, out_value, [&]() {
+    return reinterpret_cast<struct webrtc_RtpCodec*>(&params->codec.value());
+  });
 }
 void webrtc_RtpEncodingParameters_set_codec(
     struct webrtc_RtpEncodingParameters* self,
     int has,
-    const struct webrtc_RtpCodecCapability* value) {
+    const struct webrtc_RtpCodec* value) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  if (has == 0) {
-    params->codec.reset();
-    return;
-  }
-  assert(value != nullptr);
-  if (value == nullptr) {
-    return;
-  }
-  auto codec = reinterpret_cast<const webrtc::RtpCodecCapability*>(value);
-  params->codec = *codec;
+  auto codec = reinterpret_cast<const webrtc::RtpCodec*>(value);
+  webrtc_c::OptionalSet(params->codec, has, codec);
 }
 
 struct webrtc_RtpEncodingParameters_vector*
@@ -425,26 +402,17 @@ void webrtc_RtpParameters_get_degradation_preference(
     int* out_has,
     int* out_value) {
   auto params = reinterpret_cast<webrtc::RtpParameters*>(self);
-  if (out_has != nullptr) {
-    *out_has = params->degradation_preference.has_value() ? 1 : 0;
-  }
-  if (out_value != nullptr && params->degradation_preference.has_value()) {
-    *out_value = static_cast<int>(*params->degradation_preference);
-  }
+  webrtc_c::OptionalGetAs(
+      params->degradation_preference, out_has, out_value, [&]() {
+        return static_cast<int>(params->degradation_preference.value());
+      });
 }
 void webrtc_RtpParameters_set_degradation_preference(
     struct webrtc_RtpParameters* self,
     int has,
     const int* value) {
   auto params = reinterpret_cast<webrtc::RtpParameters*>(self);
-  if (has == 0) {
-    params->degradation_preference.reset();
-    return;
-  }
-  assert(value != nullptr);
-  if (value == nullptr) {
-    return;
-  }
-  params->degradation_preference =
-      static_cast<webrtc::DegradationPreference>(*value);
+  webrtc_c::OptionalSetAs(params->degradation_preference, has, value, [&]() {
+    return static_cast<webrtc::DegradationPreference>(*value);
+  });
 }

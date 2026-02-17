@@ -11,24 +11,40 @@ extern "C" {
 #endif
 
 // -------------------------
+// webrtc::RtpCodec
+// -------------------------
+
+struct webrtc_RtpCodec;
+struct webrtc_RtpCodec* webrtc_RtpCodec_new();
+void webrtc_RtpCodec_delete(struct webrtc_RtpCodec* self);
+void webrtc_RtpCodec_set_kind(struct webrtc_RtpCodec* self, int kind);
+struct std_string* webrtc_RtpCodec_get_name(struct webrtc_RtpCodec* self);
+void webrtc_RtpCodec_set_name(struct webrtc_RtpCodec* self,
+                              const char* name,
+                              size_t name_len);
+void webrtc_RtpCodec_get_clock_rate(struct webrtc_RtpCodec* self,
+                                    int* out_has,
+                                    int* out_value);
+void webrtc_RtpCodec_set_clock_rate(struct webrtc_RtpCodec* self,
+                                    int has,
+                                    const int* value);
+void webrtc_RtpCodec_get_num_channels(struct webrtc_RtpCodec* self,
+                                      int* out_has,
+                                      int* out_value);
+void webrtc_RtpCodec_set_num_channels(struct webrtc_RtpCodec* self,
+                                      int has,
+                                      const int* value);
+struct std_map_string_string* webrtc_RtpCodec_get_parameters(
+    struct webrtc_RtpCodec* self);
+
+// -------------------------
 // webrtc::RtpCodecCapability
 // -------------------------
 
 WEBRTC_DECLARE_VECTOR(webrtc_RtpCodecCapability);
-struct std_string* webrtc_RtpCodecCapability_get_name(
-    struct webrtc_RtpCodecCapability* self);
+WEBRTC_DECLARE_CAST(webrtc_RtpCodecCapability, webrtc_RtpCodec);
 struct webrtc_RtpCodecCapability* webrtc_RtpCodecCapability_new();
 void webrtc_RtpCodecCapability_delete(struct webrtc_RtpCodecCapability* self);
-void webrtc_RtpCodecCapability_set_kind(struct webrtc_RtpCodecCapability* self,
-                                        int kind);
-void webrtc_RtpCodecCapability_set_name(struct webrtc_RtpCodecCapability* self,
-                                        const char* name,
-                                        size_t name_len);
-void webrtc_RtpCodecCapability_set_clock_rate(
-    struct webrtc_RtpCodecCapability* self,
-    int clock_rate);
-struct std_map_string_string* webrtc_RtpCodecCapability_get_parameters(
-    struct webrtc_RtpCodecCapability* self);
 
 // -------------------------
 // webrtc::RtpCapabilities
@@ -144,11 +160,11 @@ void webrtc_RtpEncodingParameters_set_scalability_mode(
 void webrtc_RtpEncodingParameters_get_codec(
     struct webrtc_RtpEncodingParameters* self,
     int* out_has,
-    struct webrtc_RtpCodecCapability** out_value);
+    struct webrtc_RtpCodec** out_value);
 void webrtc_RtpEncodingParameters_set_codec(
     struct webrtc_RtpEncodingParameters* self,
     int has,
-    const struct webrtc_RtpCodecCapability* value);
+    const struct webrtc_RtpCodec* value);
 
 struct webrtc_RtpEncodingParameters_vector*
 webrtc_RtpEncodingParameters_vector_clone(

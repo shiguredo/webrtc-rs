@@ -2,9 +2,13 @@
 
 #include <assert.h>
 
+#include <api/rtc_error.h>
+#include <api/rtp_parameters.h>
 #include <api/rtp_sender_interface.h>
 
 #include "../common.impl.h"
+#include "rtc_error.h"
+#include "rtp_parameters.h"
 
 extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_RtpSenderInterface, webrtc::RtpSenderInterface);

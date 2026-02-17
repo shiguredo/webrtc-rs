@@ -369,7 +369,7 @@ fn rtp_codec_capability_vector() {
     let mut cap = RtpCodecCapability::new();
     cap.set_kind(MediaType::Audio);
     cap.set_name("opus");
-    cap.set_clock_rate(48_000);
+    cap.set_clock_rate(Some(48_000));
     {
         let mut params = cap.parameters();
         params.set("stereo", "1");
@@ -384,7 +384,7 @@ fn rtp_codec_capability_vector() {
     let mut cap2 = RtpCodecCapability::new();
     cap2.set_kind(MediaType::Audio);
     cap2.set_name("PCMU");
-    cap2.set_clock_rate(8_000);
+    cap2.set_clock_rate(Some(8_000));
     assert!(vec.set(1, &cap2));
     assert_eq!(vec.len(), 2);
     let first = vec.get(0).expect("先頭 codec の取得に失敗しました");
@@ -401,10 +401,11 @@ fn rtp_codec_capability_vector() {
 
 #[test]
 fn rtp_encoding_parameters_and_transceiver_init() {
-    let mut codec = RtpCodecCapability::new();
+    let mut codec = RtpCodec::new();
     codec.set_kind(MediaType::Audio);
     codec.set_name("opus");
-    codec.set_clock_rate(48_000);
+    codec.set_clock_rate(Some(48_000));
+    codec.set_num_channels(Some(2));
 
     let mut enc = RtpEncodingParameters::new();
     enc.set_rid("f");
@@ -445,6 +446,8 @@ fn rtp_encoding_parameters_and_transceiver_init() {
         enc_codec.name().expect("codec 名の取得に失敗しました"),
         "opus"
     );
+    assert_eq!(enc_codec.clock_rate(), Some(48_000));
+    assert_eq!(enc_codec.num_channels(), Some(2));
     enc.set_scalability_mode(None);
     assert!(enc.scalability_mode().is_none());
     enc.set_codec(None);

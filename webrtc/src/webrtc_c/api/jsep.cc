@@ -100,13 +100,13 @@ void webrtc_SdpParseError_description(struct webrtc_SdpParseError* self,
     *out_len = error->description.size();
   }
 }
-struct webrtc_IceCandidate* webrtc_CreateIceCandidate(const char* sdp_mid,
-                                                      size_t sdp_mid_len,
-                                                      int sdp_mline_index,
-                                                      const char* sdp,
-                                                      size_t sdp_len,
-                                                      struct webrtc_SdpParseError_unique**
-                                                          out_error) {
+struct webrtc_IceCandidate* webrtc_CreateIceCandidate(
+    const char* sdp_mid,
+    size_t sdp_mid_len,
+    int sdp_mline_index,
+    const char* sdp,
+    size_t sdp_len,
+    struct webrtc_SdpParseError_unique** out_error) {
   webrtc::SdpParseError error;
   auto* ice_candidate = webrtc::CreateIceCandidate(
       std::string(sdp_mid, sdp_mid_len), sdp_mline_index,
@@ -117,8 +117,8 @@ struct webrtc_IceCandidate* webrtc_CreateIceCandidate(const char* sdp_mid,
   if (!ice_candidate) {
     if (out_error != nullptr) {
       auto out = std::make_unique<webrtc::SdpParseError>(std::move(error));
-      *out_error = reinterpret_cast<struct webrtc_SdpParseError_unique*>(
-          out.release());
+      *out_error =
+          reinterpret_cast<struct webrtc_SdpParseError_unique*>(out.release());
     }
     return nullptr;
   }

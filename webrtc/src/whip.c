@@ -27,29 +27,45 @@
 #include <pthread.h>
 #include <unistd.h>
 
+static struct webrtc_RtpCodec* whip_RtpCodecCapability_cast(
+    struct webrtc_RtpCodecCapability* codec) {
+  return webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec(codec);
+}
+
+// webrtc::RtpCodec を SdpVideoFormat に変換するヘルパー
+static struct webrtc_SdpVideoFormat_unique*
+whip_SdpVideoFormat_from_RtpCodec(struct webrtc_RtpCodec* codec) {
+  struct std_string* name = webrtc_RtpCodec_get_name(codec);
+  return webrtc_SdpVideoFormat_new(
+      std_string_c_str(name), std_string_size(name),
+      webrtc_RtpCodec_get_parameters(codec));
+}
+
 // webrtc::RtpCodecCapability を SdpVideoFormat に変換するヘルパー
 static struct webrtc_SdpVideoFormat_unique*
 whip_SdpVideoFormat_from_RtpCodecCapability(
     struct webrtc_RtpCodecCapability* codec) {
-  struct std_string* name = webrtc_RtpCodecCapability_get_name(codec);
-  return webrtc_SdpVideoFormat_new(
-      std_string_c_str(name), std_string_size(name),
-      webrtc_RtpCodecCapability_get_parameters(codec));
+  return whip_SdpVideoFormat_from_RtpCodec(whip_RtpCodecCapability_cast(codec));
+}
+
+// webrtc::RtpCodec をフォーマット比較するヘルパー
+static int whip_RtpCodec_is_same_format(struct webrtc_RtpCodec* lhs,
+                                        struct webrtc_RtpCodec* rhs) {
+  struct webrtc_SdpVideoFormat_unique* a = whip_SdpVideoFormat_from_RtpCodec(lhs);
+  struct webrtc_SdpVideoFormat_unique* b = whip_SdpVideoFormat_from_RtpCodec(rhs);
+  int result = webrtc_SdpVideoFormat_is_equal(
+      webrtc_SdpVideoFormat_unique_get(a), webrtc_SdpVideoFormat_unique_get(b));
+  webrtc_SdpVideoFormat_unique_delete(a);
+  webrtc_SdpVideoFormat_unique_delete(b);
+  return result;
 }
 
 // webrtc::RtpCodecCapability をフォーマット比較するヘルパー
 static int whip_RtpCodecCapability_is_same_format(
     struct webrtc_RtpCodecCapability* lhs,
     struct webrtc_RtpCodecCapability* rhs) {
-  struct webrtc_SdpVideoFormat_unique* a =
-      whip_SdpVideoFormat_from_RtpCodecCapability(lhs);
-  struct webrtc_SdpVideoFormat_unique* b =
-      whip_SdpVideoFormat_from_RtpCodecCapability(rhs);
-  int result = webrtc_SdpVideoFormat_is_equal(
-      webrtc_SdpVideoFormat_unique_get(a), webrtc_SdpVideoFormat_unique_get(b));
-  webrtc_SdpVideoFormat_unique_delete(a);
-  webrtc_SdpVideoFormat_unique_delete(b);
-  return result;
+  return whip_RtpCodec_is_same_format(whip_RtpCodecCapability_cast(lhs),
+                                      whip_RtpCodecCapability_cast(rhs));
 }
 
 static void whip_OnSendRequestResponse(char* resp, void* user_data);
@@ -1236,12 +1252,13 @@ void SignalingWhip_Connect(struct SignalingWhip* self) {
     struct webrtc_RtpCodecCapability_vector* codecs =
         webrtc_RtpCodecCapability_vector_new(0);
     for (int i = 0; i < codecs_size; ++i) {
-      struct std_string* name = webrtc_RtpCodecCapability_get_name(
-          webrtc_RtpCodecCapability_vector_get(src_codecs, i));
+      struct webrtc_RtpCodecCapability* codec =
+          webrtc_RtpCodecCapability_vector_get(src_codecs, i);
+      struct std_string* name =
+          webrtc_RtpCodec_get_name(whip_RtpCodecCapability_cast(codec));
       const char* c_name = std_string_c_str(name);
       if (strcmp(c_name, "OPUS") == 0) {
-        webrtc_RtpCodecCapability_vector_push_back(
-            codecs, webrtc_RtpCodecCapability_vector_get(src_codecs, i));
+        webrtc_RtpCodecCapability_vector_push_back(codecs, codec);
         break;
       }
     }
@@ -1317,11 +1334,10 @@ void SignalingWhip_Connect(struct SignalingWhip* self) {
       for (int i = 0; i < src_codecs_size; ++i) {
         struct webrtc_RtpCodecCapability* codec =
             webrtc_RtpCodecCapability_vector_get(src_codecs, i);
-        struct std_string* codec_name =
-            webrtc_RtpCodecCapability_get_name(codec);
+        struct webrtc_RtpCodec* codec_base = whip_RtpCodecCapability_cast(codec);
+        struct std_string* codec_name = webrtc_RtpCodec_get_name(codec_base);
         RTC_LOG_WARNING("codec: %s", std_string_c_str(codec_name));
-        struct std_map_string_string* params =
-            webrtc_RtpCodecCapability_get_parameters(codec);
+        struct std_map_string_string* params = webrtc_RtpCodec_get_parameters(codec_base);
         struct std_map_string_string_iter* params_iter =
             std_map_string_string_iter_new(params);
         struct std_string_unique* key = NULL;
@@ -1347,13 +1363,13 @@ void SignalingWhip_Connect(struct SignalingWhip* self) {
               webrtc_RtpEncodingParameters_vector_get(
                   self->config->send_encodings, i);
           int encoding_has_codec = 0;
-          struct webrtc_RtpCodecCapability* encoding_codec = NULL;
+          struct webrtc_RtpCodec* encoding_codec = NULL;
           webrtc_RtpEncodingParameters_get_codec(enc, &encoding_has_codec,
                                                  &encoding_codec);
           const char* encoding_codec_name = "none";
           if (encoding_has_codec != 0 && encoding_codec != NULL) {
             encoding_codec_name = std_string_c_str(
-                webrtc_RtpCodecCapability_get_name(encoding_codec));
+                webrtc_RtpCodec_get_name(encoding_codec));
           }
           RTC_LOG_WARNING("send_encoding: %s", encoding_codec_name);
           if (encoding_has_codec == 0 || encoding_codec == NULL) {
@@ -1362,13 +1378,13 @@ void SignalingWhip_Connect(struct SignalingWhip* self) {
           for (int j = 0; j < src_codecs_size; ++j) {
             struct webrtc_RtpCodecCapability* cap_codec =
                 webrtc_RtpCodecCapability_vector_get(src_codecs, j);
-            if (!whip_RtpCodecCapability_is_same_format(cap_codec,
-                                                        encoding_codec)) {
+            if (!whip_RtpCodec_is_same_format(
+                    whip_RtpCodecCapability_cast(cap_codec), encoding_codec)) {
               continue;
             }
             RTC_LOG_WARNING("match codec: %s",
-                            std_string_c_str(
-                                webrtc_RtpCodecCapability_get_name(cap_codec)));
+                            std_string_c_str(webrtc_RtpCodec_get_name(
+                                whip_RtpCodecCapability_cast(cap_codec))));
             bool exists = false;
             int codecs_size = webrtc_RtpCodecCapability_vector_size(codecs);
             for (int k = 0; k < codecs_size; ++k) {
@@ -1382,8 +1398,8 @@ void SignalingWhip_Connect(struct SignalingWhip* self) {
             if (!exists) {
               RTC_LOG_WARNING(
                   "add codec: %s",
-                  std_string_c_str(
-                      webrtc_RtpCodecCapability_get_name(cap_codec)));
+                  std_string_c_str(webrtc_RtpCodec_get_name(
+                      whip_RtpCodecCapability_cast(cap_codec))));
               webrtc_RtpCodecCapability_vector_push_back(codecs, cap_codec);
             }
             break;
@@ -1393,7 +1409,8 @@ void SignalingWhip_Connect(struct SignalingWhip* self) {
       for (int i = 0; i < src_codecs_size; ++i) {
         struct webrtc_RtpCodecCapability* codec =
             webrtc_RtpCodecCapability_vector_get(src_codecs, i);
-        struct std_string* name = webrtc_RtpCodecCapability_get_name(codec);
+        struct std_string* name =
+            webrtc_RtpCodec_get_name(whip_RtpCodecCapability_cast(codec));
         if (strcmp(std_string_c_str(name), "rtx") == 0) {
           webrtc_RtpCodecCapability_vector_push_back(codecs, codec);
           break;
@@ -1484,12 +1501,12 @@ int main() {
   webrtc_RtpEncodingParameters_set_rid(enc2, "r2", strlen("r2"));
   const double scale2 = 1.0;
   webrtc_RtpEncodingParameters_set_scale_resolution_down_by(enc2, 1, &scale2);
-  struct webrtc_RtpCodecCapability* av1_codec = webrtc_RtpCodecCapability_new();
-  webrtc_RtpCodecCapability_set_kind(av1_codec, webrtc_MediaType_VIDEO);
-  webrtc_RtpCodecCapability_set_name(av1_codec, "AV1", strlen("AV1"));
-  webrtc_RtpCodecCapability_set_clock_rate(av1_codec, 90000);
-  struct std_map_string_string* av1_params =
-      webrtc_RtpCodecCapability_get_parameters(av1_codec);
+  struct webrtc_RtpCodec* av1_codec = webrtc_RtpCodec_new();
+  webrtc_RtpCodec_set_kind(av1_codec, webrtc_MediaType_VIDEO);
+  webrtc_RtpCodec_set_name(av1_codec, "AV1", strlen("AV1"));
+  const int av1_clock_rate = 90000;
+  webrtc_RtpCodec_set_clock_rate(av1_codec, 1, &av1_clock_rate);
+  struct std_map_string_string* av1_params = webrtc_RtpCodec_get_parameters(av1_codec);
   std_map_string_string_set(av1_params, "level-idx", 9, "5", 1);
   std_map_string_string_set(av1_params, "profile", 7, "0", 1);
   std_map_string_string_set(av1_params, "tier", 4, "0", 1);
@@ -1512,7 +1529,7 @@ int main() {
         webrtc_VideoTrackSourceInterface_refcounted_get(video_source));
   }
   webrtc_RtpEncodingParameters_vector_delete(send_encodings);
-  webrtc_RtpCodecCapability_delete(av1_codec);
+  webrtc_RtpCodec_delete(av1_codec);
   SignalingWhip_Connect(whip);
   SignalingWhip_WaitForConnect(whip);
 
