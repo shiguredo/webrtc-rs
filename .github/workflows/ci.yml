@@ -43,10 +43,11 @@ jobs:
           sudo ln -sf /usr/bin/clang-21 /usr/bin/clang
           sudo ln -sf /usr/bin/clang++-21 /usr/bin/clang++
       - run: rustup update stable
-      - uses: shiguredo/github-actions/.github/actions/rust-cache@main
-        with:
-          os: ${{ matrix.os }}
-          toolchain: stable
+      # あまり役立っていない感じがするので一旦コメントアウト
+      # - uses: shiguredo/github-actions/.github/actions/rust-cache@main
+      #   with:
+      #     os: ${{ matrix.os }}
+      #     toolchain: stable
       - run: cargo fmt --all --check
       - run: cargo check --workspace
       - run: cargo test --workspace
