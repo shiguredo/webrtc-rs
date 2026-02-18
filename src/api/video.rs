@@ -743,6 +743,12 @@ pub struct VideoEncoderEncoderInfo {
     raw_unique: NonNull<ffi::webrtc_VideoEncoder_EncoderInfo_unique>,
 }
 
+impl Default for VideoEncoderEncoderInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VideoEncoderEncoderInfo {
     pub fn new() -> Self {
         let raw = NonNull::new(unsafe { ffi::webrtc_VideoEncoder_EncoderInfo_new() })
@@ -802,6 +808,12 @@ unsafe impl Send for VideoEncoderEncoderInfo {}
 
 pub struct VideoDecoderDecoderInfo {
     raw_unique: NonNull<ffi::webrtc_VideoDecoder_DecoderInfo_unique>,
+}
+
+impl Default for VideoDecoderDecoderInfo {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl VideoDecoderDecoderInfo {
@@ -1730,18 +1742,18 @@ impl Drop for CodecSpecificInfo {
 
 unsafe impl Send for CodecSpecificInfo {}
 
+type VideoEncoderEncodedImageCallbackFn = Box<
+    dyn for<'a> FnMut(
+            EncodedImageRef<'a>,
+            Option<CodecSpecificInfoRef<'a>>,
+        ) -> VideoEncoderEncodedImageCallbackResult
+        + Send
+        + 'static,
+>;
+
 #[derive(Default)]
 pub struct VideoEncoderEncodedImageCallbackCallbacks {
-    pub on_encoded_image: Option<
-        Box<
-            dyn for<'a> FnMut(
-                    EncodedImageRef<'a>,
-                    Option<CodecSpecificInfoRef<'a>>,
-                ) -> VideoEncoderEncodedImageCallbackResult
-                + Send
-                + 'static,
-        >,
-    >,
+    pub on_encoded_image: Option<VideoEncoderEncodedImageCallbackFn>,
 }
 
 impl VideoEncoderEncodedImageCallbackCallbacks {
@@ -1825,33 +1837,29 @@ impl<'a> VideoDecoderDecodedImageCallbackRef<'a> {
 
 unsafe impl<'a> Send for VideoDecoderDecodedImageCallbackRef<'a> {}
 
+type VideoEncoderInitEncodeCallback =
+    Box<dyn for<'a> FnMut(VideoCodecRef<'a>, VideoEncoderSettingsRef<'a>) -> i32 + Send + 'static>;
+type VideoEncoderEncodeCallback = Box<
+    dyn for<'a> FnMut(VideoFrameRef<'a>, Option<VideoFrameTypeVectorRef<'a>>) -> i32
+        + Send
+        + 'static,
+>;
+type VideoEncoderRegisterEncodeCompleteCallback =
+    Box<dyn for<'a> FnMut(Option<VideoEncoderEncodedImageCallbackRef<'a>>) -> i32 + Send + 'static>;
+type VideoEncoderReleaseCallback = Box<dyn FnMut() -> i32 + Send + 'static>;
+type VideoEncoderSetRatesCallback =
+    Box<dyn for<'a> FnMut(VideoEncoderRateControlParametersRef<'a>) + Send + 'static>;
+type VideoEncoderGetEncoderInfoCallback =
+    Box<dyn FnMut() -> VideoEncoderEncoderInfo + Send + 'static>;
+
 #[derive(Default)]
 pub struct VideoEncoderCallbacks {
-    pub init_encode: Option<
-        Box<
-            dyn for<'a> FnMut(VideoCodecRef<'a>, VideoEncoderSettingsRef<'a>) -> i32
-                + Send
-                + 'static,
-        >,
-    >,
-    pub encode: Option<
-        Box<
-            dyn for<'a> FnMut(VideoFrameRef<'a>, Option<VideoFrameTypeVectorRef<'a>>) -> i32
-                + Send
-                + 'static,
-        >,
-    >,
-    pub register_encode_complete_callback: Option<
-        Box<
-            dyn for<'a> FnMut(Option<VideoEncoderEncodedImageCallbackRef<'a>>) -> i32
-                + Send
-                + 'static,
-        >,
-    >,
-    pub release: Option<Box<dyn FnMut() -> i32 + Send + 'static>>,
-    pub set_rates:
-        Option<Box<dyn for<'a> FnMut(VideoEncoderRateControlParametersRef<'a>) + Send + 'static>>,
-    pub get_encoder_info: Option<Box<dyn FnMut() -> VideoEncoderEncoderInfo + Send + 'static>>,
+    pub init_encode: Option<VideoEncoderInitEncodeCallback>,
+    pub encode: Option<VideoEncoderEncodeCallback>,
+    pub register_encode_complete_callback: Option<VideoEncoderRegisterEncodeCompleteCallback>,
+    pub release: Option<VideoEncoderReleaseCallback>,
+    pub set_rates: Option<VideoEncoderSetRatesCallback>,
+    pub get_encoder_info: Option<VideoEncoderGetEncoderInfoCallback>,
 }
 
 impl VideoEncoderCallbacks {
@@ -1878,20 +1886,23 @@ impl VideoEncoderCallbacks {
     }
 }
 
+type VideoDecoderConfigureCallback =
+    Box<dyn for<'a> FnMut(VideoDecoderSettingsRef<'a>) -> bool + Send + 'static>;
+type VideoDecoderDecodeCallback =
+    Box<dyn for<'a> FnMut(EncodedImageRef<'a>, i64) -> i32 + Send + 'static>;
+type VideoDecoderRegisterDecodeCompleteCallback =
+    Box<dyn for<'a> FnMut(Option<VideoDecoderDecodedImageCallbackRef<'a>>) -> i32 + Send + 'static>;
+type VideoDecoderReleaseCallback = Box<dyn FnMut() -> i32 + Send + 'static>;
+type VideoDecoderGetDecoderInfoCallback =
+    Box<dyn FnMut() -> VideoDecoderDecoderInfo + Send + 'static>;
+
 #[derive(Default)]
 pub struct VideoDecoderCallbacks {
-    pub configure:
-        Option<Box<dyn for<'a> FnMut(VideoDecoderSettingsRef<'a>) -> bool + Send + 'static>>,
-    pub decode: Option<Box<dyn for<'a> FnMut(EncodedImageRef<'a>, i64) -> i32 + Send + 'static>>,
-    pub register_decode_complete_callback: Option<
-        Box<
-            dyn for<'a> FnMut(Option<VideoDecoderDecodedImageCallbackRef<'a>>) -> i32
-                + Send
-                + 'static,
-        >,
-    >,
-    pub release: Option<Box<dyn FnMut() -> i32 + Send + 'static>>,
-    pub get_decoder_info: Option<Box<dyn FnMut() -> VideoDecoderDecoderInfo + Send + 'static>>,
+    pub configure: Option<VideoDecoderConfigureCallback>,
+    pub decode: Option<VideoDecoderDecodeCallback>,
+    pub register_decode_complete_callback: Option<VideoDecoderRegisterDecodeCompleteCallback>,
+    pub release: Option<VideoDecoderReleaseCallback>,
+    pub get_decoder_info: Option<VideoDecoderGetDecoderInfoCallback>,
 }
 
 impl VideoDecoderCallbacks {
@@ -1915,16 +1926,18 @@ impl VideoDecoderCallbacks {
     }
 }
 
+type VideoEncoderFactoryGetSupportedFormatsCallback =
+    Box<dyn FnMut() -> Vec<SdpVideoFormat> + Send + 'static>;
+type VideoEncoderFactoryCreateCallback = Box<
+    dyn for<'a> FnMut(EnvironmentRef<'a>, SdpVideoFormatRef<'a>) -> Option<VideoEncoder>
+        + Send
+        + 'static,
+>;
+
 #[derive(Default)]
 pub struct VideoEncoderFactoryCallbacks {
-    pub get_supported_formats: Option<Box<dyn FnMut() -> Vec<SdpVideoFormat> + Send + 'static>>,
-    pub create: Option<
-        Box<
-            dyn for<'a> FnMut(EnvironmentRef<'a>, SdpVideoFormatRef<'a>) -> Option<VideoEncoder>
-                + Send
-                + 'static,
-        >,
-    >,
+    pub get_supported_formats: Option<VideoEncoderFactoryGetSupportedFormatsCallback>,
+    pub create: Option<VideoEncoderFactoryCreateCallback>,
 }
 
 impl VideoEncoderFactoryCallbacks {
@@ -1939,16 +1952,18 @@ impl VideoEncoderFactoryCallbacks {
     }
 }
 
+type VideoDecoderFactoryGetSupportedFormatsCallback =
+    Box<dyn FnMut() -> Vec<SdpVideoFormat> + Send + 'static>;
+type VideoDecoderFactoryCreateCallback = Box<
+    dyn for<'a> FnMut(EnvironmentRef<'a>, SdpVideoFormatRef<'a>) -> Option<VideoDecoder>
+        + Send
+        + 'static,
+>;
+
 #[derive(Default)]
 pub struct VideoDecoderFactoryCallbacks {
-    pub get_supported_formats: Option<Box<dyn FnMut() -> Vec<SdpVideoFormat> + Send + 'static>>,
-    pub create: Option<
-        Box<
-            dyn for<'a> FnMut(EnvironmentRef<'a>, SdpVideoFormatRef<'a>) -> Option<VideoDecoder>
-                + Send
-                + 'static,
-        >,
-    >,
+    pub get_supported_formats: Option<VideoDecoderFactoryGetSupportedFormatsCallback>,
+    pub create: Option<VideoDecoderFactoryCreateCallback>,
 }
 
 impl VideoDecoderFactoryCallbacks {
