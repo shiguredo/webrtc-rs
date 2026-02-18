@@ -79,6 +79,8 @@ jobs:
           mkdir -p ${{ github.workspace }}/rootfs/etc/apt/trusted.gpg.d
           cp /usr/share/keyrings/debian-archive-keyring.gpg ${{ github.workspace }}/rootfs/etc/apt/trusted.gpg.d/
           sudo multistrap --no-auth -a arm64 -d ${{ github.workspace }}/rootfs -f multistrap/${{ matrix.target }}.conf
+          # Cargo がワークスペースをスキャンする際に Permission denied にならないようにする
+          sudo chmod -R a+rX ${{ github.workspace }}/rootfs
           # multistrap が作る絶対パスのシンボリックリンクを相対パスに修正
           find ${{ github.workspace }}/rootfs -type l | while read link; do
             target=$(readlink "$link")
