@@ -104,6 +104,9 @@ set(WEBRTC_TARGETS_ARMV8
   "ubuntu-24.04_armv8"
   "ubuntu-22.04_armv8"
 )
+set(WEBRTC_TARGETS_RASPBERRY_PI
+  "raspberry-pi-os_armv8"
+)
 
 # WebRTC パッケージの URL を決定
 if(WEBRTC_C_TARGET STREQUAL "macos_arm64")
@@ -116,6 +119,8 @@ elseif(WEBRTC_C_TARGET STREQUAL "ubuntu-22.04_x86_64")
   set(WEBRTC_ARCHIVE_NAME "webrtc.ubuntu-22.04_x86_64.tar.gz")
 elseif(WEBRTC_C_TARGET STREQUAL "ubuntu-22.04_armv8")
   set(WEBRTC_ARCHIVE_NAME "webrtc.ubuntu-22.04_armv8.tar.gz")
+elseif(WEBRTC_C_TARGET STREQUAL "raspberry-pi-os_armv8")
+  set(WEBRTC_ARCHIVE_NAME "webrtc.raspberry-pi-os_armv8.tar.gz")
 elseif(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
   set(WEBRTC_ARCHIVE_NAME "webrtc.windows_x86_64.zip")
 else()
@@ -300,6 +305,21 @@ endif()
 if(WEBRTC_USE_WEBRTC_LIBCXX)
   set(LIBCXX_INCLUDE_DIR "${LLVM_LIBCXX_DIR}/include")
   message(STATUS "LIBCXX_INCLUDE_DIR: ${LIBCXX_INCLUDE_DIR}")
+endif()
+
+# Raspberry Pi OS 向けクロスコンパイル設定（project() の前に配置が必要）
+if(WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_RASPBERRY_PI AND DEFINED WEBRTC_C_SYSROOT)
+  set(CMAKE_SYSTEM_NAME Linux)
+  set(CMAKE_SYSTEM_PROCESSOR aarch64)
+  set(CMAKE_SYSROOT "${WEBRTC_C_SYSROOT}")
+  set(CMAKE_C_COMPILER_TARGET aarch64-linux-gnu)
+  set(CMAKE_CXX_COMPILER_TARGET aarch64-linux-gnu)
+  set(CMAKE_FIND_ROOT_PATH "${WEBRTC_C_SYSROOT}")
+  set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+  set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY BOTH)
+  set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)
+  set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)
+  set(CMAKE_AR "${LLVM_CLANG_DIR}/bin/llvm-ar" CACHE FILEPATH "" FORCE)
 endif()
 
 # ここで project() を呼び出す
@@ -578,6 +598,30 @@ elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_UBUNTU)
     )
   endforeach()
 
+elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_RASPBERRY_PI)
+  foreach(target IN LISTS WEBRTC_CPP_TARGETS)
+    target_compile_definitions(${target}
+      PRIVATE
+        WEBRTC_POSIX
+        WEBRTC_LINUX
+        _LIBCPP_ABI_NAMESPACE=Cr
+        _LIBCPP_ABI_VERSION=2
+        _LIBCPP_DISABLE_AVAILABILITY
+        _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
+        BOOST_NO_CXX98_FUNCTION_BASE
+        RTC_ENABLE_H265
+    )
+    target_compile_options(${target} PRIVATE -Wno-nullability-completeness)
+    set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_link_libraries(${target}
+      PRIVATE
+        X11
+        dl
+        rt
+        Threads::Threads
+    )
+  endforeach()
+
 endif()
 
 # 静的ライブラリを webrtc_c.lib に含める
@@ -651,6 +695,10 @@ elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
     )
   endforeach()
 elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_UBUNTU)
+  foreach(target IN LISTS WEBRTC_C_TARGETS)
+    target_link_libraries(${target} PRIVATE X11 dl rt Threads::Threads)
+  endforeach()
+elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_RASPBERRY_PI)
   foreach(target IN LISTS WEBRTC_C_TARGETS)
     target_link_libraries(${target} PRIVATE X11 dl rt Threads::Threads)
   endforeach()

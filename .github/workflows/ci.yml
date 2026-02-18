@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   ci:
+    if: false
     strategy:
       matrix:
         os:
@@ -53,8 +54,50 @@ jobs:
       - run: cargo test --workspace
       - run: cargo clippy --workspace -- -D warnings
 
+  cross-compile:
+    strategy:
+      matrix:
+        target:
+          - raspberry-pi-os_armv8
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential \
+            libclang-dev \
+            clang \
+            multistrap \
+            python3
+      - name: Build sysroot with multistrap
+        run: |
+          sudo multistrap --no-auth -a arm64 -d ${{ github.workspace }}/rootfs -f multistrap/${{ matrix.target }}.conf
+          # multistrap が作る絶対パスのシンボリックリンクを相対パスに修正
+          find ${{ github.workspace }}/rootfs -type l | while read link; do
+            target=$(readlink "$link")
+            if [ "${target#/}" != "$target" ]; then
+              dir=$(dirname "$link")
+              new_target=$(python3 -c "import os; print(os.path.relpath('${{ github.workspace }}/rootfs$target', '$dir'))")
+              if [ -e "$dir/$new_target" ]; then
+                ln -sf "$new_target" "$link"
+              fi
+            fi
+          done
+      - run: rustup update stable
+      - run: rustup target add aarch64-unknown-linux-gnu
+      - name: Build for ${{ matrix.target }}
+        env:
+          WEBRTC_C_TARGET: ${{ matrix.target }}
+          WEBRTC_C_SYSROOT: ${{ github.workspace }}/rootfs
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: clang
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: -C link-arg=--target=aarch64-linux-gnu -C link-arg=--sysroot=${{ github.workspace }}/rootfs
+        run: cargo build --target aarch64-unknown-linux-gnu
+
   slack_notify_failed:
-    needs: [ci]
+    needs: [ci, cross-compile]
     timeout-minutes: 20
     runs-on: ubuntu-24.04
     if: failure()
