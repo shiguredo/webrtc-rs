@@ -33,7 +33,8 @@ extern const int webrtc_VideoFrameType_Delta;
 int webrtc_VideoCodec_codec_type(struct webrtc_VideoCodec* self);
 int webrtc_VideoCodec_width(struct webrtc_VideoCodec* self);
 int webrtc_VideoCodec_height(struct webrtc_VideoCodec* self);
-unsigned int webrtc_VideoCodec_start_bitrate_kbps(struct webrtc_VideoCodec* self);
+unsigned int webrtc_VideoCodec_start_bitrate_kbps(
+    struct webrtc_VideoCodec* self);
 unsigned int webrtc_VideoCodec_max_bitrate_kbps(struct webrtc_VideoCodec* self);
 unsigned int webrtc_VideoCodec_min_bitrate_kbps(struct webrtc_VideoCodec* self);
 uint32_t webrtc_VideoCodec_max_framerate(struct webrtc_VideoCodec* self);

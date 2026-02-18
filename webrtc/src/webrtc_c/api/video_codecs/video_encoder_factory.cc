@@ -11,6 +11,9 @@
 #include <api/video_codecs/video_encoder_factory.h>
 
 #include "../../common.impl.h"
+#include "/home/melpon/dev/sora-rust-sdk-private/crates/webrtc-rs/webrtc/src/webrtc_c/api/environment.h"
+#include "api/video_codecs/sdp_video_format.h"
+#include "api/video_codecs/video_encoder.h"
 #include "sdp_video_format.h"
 #include "video_encoder.h"
 
@@ -53,12 +56,12 @@ class RustVideoEncoderFactory : public webrtc::VideoEncoderFactory {
     if (cbs_.Create == nullptr) {
       return nullptr;
     }
-    auto raw_encoder = cbs_.Create(
-        reinterpret_cast<struct webrtc_Environment*>(
-            const_cast<webrtc::Environment*>(&env)),
-        reinterpret_cast<struct webrtc_SdpVideoFormat*>(
-            const_cast<webrtc::SdpVideoFormat*>(&format)),
-        user_data_);
+    auto raw_encoder =
+        cbs_.Create(reinterpret_cast<struct webrtc_Environment*>(
+                        const_cast<webrtc::Environment*>(&env)),
+                    reinterpret_cast<struct webrtc_SdpVideoFormat*>(
+                        const_cast<webrtc::SdpVideoFormat*>(&format)),
+                    user_data_);
     if (raw_encoder == nullptr) {
       return nullptr;
     }
@@ -99,7 +102,8 @@ struct webrtc_VideoEncoder_unique* webrtc_VideoEncoderFactory_Create(
   auto cpp_env = reinterpret_cast<webrtc::Environment*>(env);
   auto cpp_format = reinterpret_cast<webrtc::SdpVideoFormat*>(format);
   auto encoder = factory->Create(*cpp_env, *cpp_format);
-  return reinterpret_cast<struct webrtc_VideoEncoder_unique*>(encoder.release());
+  return reinterpret_cast<struct webrtc_VideoEncoder_unique*>(
+      encoder.release());
 }
 
 struct webrtc_VideoEncoderFactory_unique*

@@ -66,7 +66,7 @@
 // std::vector<T> (T does not have default constructor)
 // -------------------------
 
-#define WEBRTC_DECLARE_VECTOR_NO_DEFAULT_CTOR(type)                             \
+#define WEBRTC_DECLARE_VECTOR_NO_DEFAULT_CTOR(type)                            \
   struct type;                                                                 \
   struct WEBRTC_CONCAT(type, _vector);                                         \
   struct WEBRTC_CONCAT(type, _vector) *                                        \

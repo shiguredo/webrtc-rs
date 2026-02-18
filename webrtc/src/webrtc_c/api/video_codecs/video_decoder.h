@@ -24,7 +24,8 @@ struct webrtc_VideoDecoder_DecodedImageCallback;
 
 struct webrtc_VideoDecoder_DecoderInfo_unique*
 webrtc_VideoDecoder_DecoderInfo_new();
-struct std_string_unique* webrtc_VideoDecoder_DecoderInfo_get_implementation_name(
+struct std_string_unique*
+webrtc_VideoDecoder_DecoderInfo_get_implementation_name(
     struct webrtc_VideoDecoder_DecoderInfo* self);
 void webrtc_VideoDecoder_DecoderInfo_set_implementation_name(
     struct webrtc_VideoDecoder_DecoderInfo* self,
@@ -65,13 +66,14 @@ struct webrtc_VideoDecoder_cbs {
 struct webrtc_VideoDecoder_unique* webrtc_VideoDecoder_new(
     const struct webrtc_VideoDecoder_cbs* cbs,
     void* user_data);
-int webrtc_VideoDecoder_Configure(struct webrtc_VideoDecoder* self,
-                                  struct webrtc_VideoDecoder_Settings* settings);
+int webrtc_VideoDecoder_Configure(
+    struct webrtc_VideoDecoder* self,
+    struct webrtc_VideoDecoder_Settings* settings);
 int32_t webrtc_VideoDecoder_Decode(struct webrtc_VideoDecoder* self,
                                    struct webrtc_EncodedImage* input_image,
                                    int64_t render_time_ms);
-struct webrtc_VideoDecoder_DecoderInfo_unique* webrtc_VideoDecoder_GetDecoderInfo(
-    struct webrtc_VideoDecoder* self);
+struct webrtc_VideoDecoder_DecoderInfo_unique*
+webrtc_VideoDecoder_GetDecoderInfo(struct webrtc_VideoDecoder* self);
 
 #if defined(__cplusplus)
 }

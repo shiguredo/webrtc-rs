@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <vector>
 
 // WebRTC
 #include <api/video/video_codec_type.h>
@@ -12,16 +13,22 @@
 #include "../../common.impl.h"
 
 extern "C" {
-const int webrtc_VideoCodecType_Generic = static_cast<int>(webrtc::kVideoCodecGeneric);
+const int webrtc_VideoCodecType_Generic =
+    static_cast<int>(webrtc::kVideoCodecGeneric);
 const int webrtc_VideoCodecType_VP8 = static_cast<int>(webrtc::kVideoCodecVP8);
 const int webrtc_VideoCodecType_VP9 = static_cast<int>(webrtc::kVideoCodecVP9);
 const int webrtc_VideoCodecType_AV1 = static_cast<int>(webrtc::kVideoCodecAV1);
-const int webrtc_VideoCodecType_H264 = static_cast<int>(webrtc::kVideoCodecH264);
-const int webrtc_VideoCodecType_H265 = static_cast<int>(webrtc::kVideoCodecH265);
+const int webrtc_VideoCodecType_H264 =
+    static_cast<int>(webrtc::kVideoCodecH264);
+const int webrtc_VideoCodecType_H265 =
+    static_cast<int>(webrtc::kVideoCodecH265);
 
-const int webrtc_VideoFrameType_Empty = static_cast<int>(webrtc::VideoFrameType::kEmptyFrame);
-const int webrtc_VideoFrameType_Key = static_cast<int>(webrtc::VideoFrameType::kVideoFrameKey);
-const int webrtc_VideoFrameType_Delta = static_cast<int>(webrtc::VideoFrameType::kVideoFrameDelta);
+const int webrtc_VideoFrameType_Empty =
+    static_cast<int>(webrtc::VideoFrameType::kEmptyFrame);
+const int webrtc_VideoFrameType_Key =
+    static_cast<int>(webrtc::VideoFrameType::kVideoFrameKey);
+const int webrtc_VideoFrameType_Delta =
+    static_cast<int>(webrtc::VideoFrameType::kVideoFrameDelta);
 
 int webrtc_VideoCodec_codec_type(struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
@@ -38,17 +45,20 @@ int webrtc_VideoCodec_height(struct webrtc_VideoCodec* self) {
   return static_cast<int>(codec->height);
 }
 
-unsigned int webrtc_VideoCodec_start_bitrate_kbps(struct webrtc_VideoCodec* self) {
+unsigned int webrtc_VideoCodec_start_bitrate_kbps(
+    struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
   return codec->startBitrate;
 }
 
-unsigned int webrtc_VideoCodec_max_bitrate_kbps(struct webrtc_VideoCodec* self) {
+unsigned int webrtc_VideoCodec_max_bitrate_kbps(
+    struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
   return codec->maxBitrate;
 }
 
-unsigned int webrtc_VideoCodec_min_bitrate_kbps(struct webrtc_VideoCodec* self) {
+unsigned int webrtc_VideoCodec_min_bitrate_kbps(
+    struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
   return codec->minBitrate;
 }

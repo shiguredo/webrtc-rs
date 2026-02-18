@@ -1,7 +1,6 @@
 #pragma once
 
 #include "common.h"
-#include <vector>
 
 #define WEBRTC_DEFINE_CAST(type, cast_to, cpptype, cpp_cast_to)             \
   struct cast_to* WEBRTC_CONCAT(                                            \

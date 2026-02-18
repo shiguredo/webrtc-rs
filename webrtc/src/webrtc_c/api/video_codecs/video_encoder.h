@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 #include "../../common.h"
+#include "../../modules/video_coding/include/video_codec_interface.h"
 #include "../../std.h"
-#include "codec_specific_info.h"
 #include "video_codec.h"
 
 #if defined(__cplusplus)
@@ -36,7 +36,8 @@ enum webrtc_VideoEncoder_EncodedImageCallback_Result_Error {
 
 struct webrtc_VideoEncoder_EncoderInfo_unique*
 webrtc_VideoEncoder_EncoderInfo_new();
-struct std_string_unique* webrtc_VideoEncoder_EncoderInfo_get_implementation_name(
+struct std_string_unique*
+webrtc_VideoEncoder_EncoderInfo_get_implementation_name(
     struct webrtc_VideoEncoder_EncoderInfo* self);
 void webrtc_VideoEncoder_EncoderInfo_set_implementation_name(
     struct webrtc_VideoEncoder_EncoderInfo* self,
@@ -48,8 +49,7 @@ void webrtc_VideoEncoder_EncoderInfo_set_is_hardware_accelerated(
     int value);
 
 struct webrtc_VideoEncoder_EncodedImageCallback_Result_unique*
-webrtc_VideoEncoder_EncodedImageCallback_Result_new(
-    int error);
+webrtc_VideoEncoder_EncodedImageCallback_Result_new(int error);
 struct webrtc_VideoEncoder_EncodedImageCallback_Result_unique*
 webrtc_VideoEncoder_EncodedImageCallback_Result_new_with_frame_id(
     int error,
@@ -71,10 +71,10 @@ void webrtc_VideoEncoder_EncodedImageCallback_Result_set_drop_next_frame(
     int drop_next_frame);
 
 struct webrtc_VideoEncoder_EncodedImageCallback_cbs {
-  struct webrtc_VideoEncoder_EncodedImageCallback_Result_unique* (*OnEncodedImage)(
-      struct webrtc_EncodedImage* encoded_image,
-      struct webrtc_CodecSpecificInfo* codec_specific_info,
-      void* user_data);
+  struct webrtc_VideoEncoder_EncodedImageCallback_Result_unique* (
+      *OnEncodedImage)(struct webrtc_EncodedImage* encoded_image,
+                       struct webrtc_CodecSpecificInfo* codec_specific_info,
+                       void* user_data);
   void (*OnDestroy)(void* user_data);
 };
 
@@ -125,8 +125,8 @@ int32_t webrtc_VideoEncoder_RegisterEncodeCompleteCallback(
 void webrtc_VideoEncoder_SetRates(
     struct webrtc_VideoEncoder* self,
     struct webrtc_VideoEncoder_RateControlParameters* parameters);
-struct webrtc_VideoEncoder_EncoderInfo_unique* webrtc_VideoEncoder_GetEncoderInfo(
-    struct webrtc_VideoEncoder* self);
+struct webrtc_VideoEncoder_EncoderInfo_unique*
+webrtc_VideoEncoder_GetEncoderInfo(struct webrtc_VideoEncoder* self);
 
 #if defined(__cplusplus)
 }

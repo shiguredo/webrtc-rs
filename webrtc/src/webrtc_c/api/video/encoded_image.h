@@ -4,7 +4,6 @@
 #include <stdint.h>
 
 #include "../../common.h"
-#include "encoded_image_buffer.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -15,9 +14,17 @@ extern "C" {
 // -------------------------
 
 WEBRTC_DECLARE_UNIQUE(webrtc_EncodedImage);
+WEBRTC_DECLARE_REFCOUNTED(webrtc_EncodedImageBuffer);
 
 struct webrtc_EncodedImage;
 struct webrtc_EncodedImageBuffer;
+
+struct webrtc_EncodedImageBuffer_refcounted* webrtc_EncodedImageBuffer_Create();
+struct webrtc_EncodedImageBuffer_refcounted*
+webrtc_EncodedImageBuffer_Create_from_data(const uint8_t* data, size_t size);
+size_t webrtc_EncodedImageBuffer_size(struct webrtc_EncodedImageBuffer* self);
+const uint8_t* webrtc_EncodedImageBuffer_data(
+    struct webrtc_EncodedImageBuffer* self);
 
 struct webrtc_EncodedImage_unique* webrtc_EncodedImage_new();
 void webrtc_EncodedImage_set_encoded_data(

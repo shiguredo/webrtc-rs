@@ -340,18 +340,17 @@ add_library(webrtc_c
     src/webrtc_c/api/rtp_transceiver_interface.cc
     src/webrtc_c/api/stats/rtc_stats_report.cc
     src/webrtc_c/api/video/encoded_image.cc
-    src/webrtc_c/api/video/encoded_image_buffer.cc
     src/webrtc_c/api/video/i420_buffer.cc
     src/webrtc_c/api/video/video_frame.cc
     src/webrtc_c/api/video/video_sink_interface.cc
     src/webrtc_c/api/video/video_source_interface.cc
-    src/webrtc_c/api/video_codecs/codec_specific_info.cc
     src/webrtc_c/api/video_codecs/video_codec.cc
     src/webrtc_c/api/video_codecs/video_decoder.cc
     src/webrtc_c/api/video_codecs/video_encoder.cc
     src/webrtc_c/api/video_codecs/sdp_video_format.cc
     src/webrtc_c/api/video_codecs/video_decoder_factory.cc
     src/webrtc_c/api/video_codecs/video_encoder_factory.cc
+    src/webrtc_c/modules/video_coding/include/video_codec_interface.cc
     src/webrtc_c/libyuv.cc
     src/webrtc_c/media/base/adapted_video_track_source.cc
     src/webrtc_c/rtc_base/crypto_random.cc
