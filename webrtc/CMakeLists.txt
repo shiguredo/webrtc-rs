@@ -152,7 +152,10 @@ if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
   set(WEBRTC_USE_WEBRTC_LIBCXX FALSE)
 endif()
 
-# ARM64 Linux では prebuilt Clang バイナリが提供されていないためシステムの Clang を使用
+# ARM64 Linux（ネイティブビルド）では prebuilt Clang バイナリが x86_64 向けのみ提供のため
+# システムの Clang を使用する。
+# raspberry-pi-os_armv8 は x86_64 ホストからのクロスコンパイルなので prebuilt Clang を使用する
+# （WEBRTC_TARGETS_ARMV8 に含めない = デフォルトの TRUE のまま）。
 if(WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_ARMV8)
   set(WEBRTC_USE_WEBRTC_PREBUILT_CLANG FALSE)
 endif()

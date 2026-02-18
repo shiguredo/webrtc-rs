@@ -73,6 +73,9 @@ jobs:
             multistrap \
             python3 \
             debian-archive-keyring \
+            # bindgen がクロスコンパイル時に aarch64 用ヘッダーを参照するために必要
+            # cc クレートが aarch64-linux-gnu-g++ を探す warning が出るが、
+            # WebRTC は自前の libc++ を使うため g++-aarch64-linux-gnu は不要
             gcc-aarch64-linux-gnu
       - name: Build sysroot with multistrap
         run: |
@@ -95,6 +98,9 @@ jobs:
           done
       - run: rustup update stable
       - run: rustup target add aarch64-unknown-linux-gnu
+      # webrtc_c の C++ ビルドは CMakeLists.txt 内で Google の prebuilt Clang を使用する。
+      # Rust のリンクはシステムの clang を使用し、--target と --sysroot で
+      # クロスコンパイル先を指定する。
       - name: Build for ${{ matrix.target }}
         env:
           WEBRTC_C_TARGET: ${{ matrix.target }}
