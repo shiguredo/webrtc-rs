@@ -735,3 +735,413 @@ fn create_and_set_local_description_observers() {
     let _set_local = SetLocalDescriptionObserver::new(|_| {});
     let _set_remote = SetRemoteDescriptionObserver::new(|_| {});
 }
+
+#[test]
+fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
+    let mut created = false;
+
+    let factory = VideoEncoderFactory::new_with_callbacks(VideoEncoderFactoryCallbacks {
+        create: {
+            Some(Box::new(move |env, format| {
+                assert!(!env.as_ptr().is_null());
+                assert_eq!(
+                    format.name().expect("SdpVideoFormatRef::name に失敗しました"),
+                    "VP8"
+                );
+                if created {
+                    return None;
+                }
+                created = true;
+                let mut encode_count = 0;
+                Some(VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
+                    encode: Some(Box::new(move |_, frame_types| {
+                        let frame_types = frame_types.expect("frame_types が None です");
+                        assert_eq!(frame_types.len(), 2);
+                        assert_eq!(frame_types.get(0), Some(VideoFrameType::Key));
+                        assert_eq!(frame_types.get(1), Some(VideoFrameType::Delta));
+                        encode_count += 1;
+                        encode_count
+                    })),
+                    ..Default::default()
+                }))
+            }))
+        },
+        ..Default::default()
+    });
+
+    let env = Environment::new();
+    let format = SdpVideoFormat::new("VP8");
+    let encoder = factory
+        .create(&env, &format)
+        .expect("custom encoder の作成に失敗しました");
+
+    let buffer = I420Buffer::new(2, 2);
+    let frame = VideoFrame::from_i420(&buffer, 123);
+    let mut frame_types = VideoFrameTypeVector::new(0);
+    frame_types.push(VideoFrameType::Key);
+    frame_types.push(VideoFrameType::Delta);
+
+    assert_eq!(encoder.encode_with_frame_types(&frame, Some(frame_types.as_ref())), 1);
+    assert_eq!(encoder.encode_with_frame_types(&frame, Some(frame_types.as_ref())), 2);
+    assert!(
+        factory.create(&env, &format).is_none(),
+        "2 回目の create は None を返す想定です"
+    );
+}
+
+#[test]
+fn custom_video_encoder_register_and_encode_calls_encoded_image_callback() {
+    #[derive(Default)]
+    struct State {
+        callback_ptr: Option<VideoEncoderEncodedImageCallbackPtr>,
+        register_called: bool,
+        encode_called: bool,
+        on_encoded_image_called: bool,
+        order: Vec<&'static str>,
+    }
+
+    #[derive(Clone, Copy)]
+    struct StatePtr(*mut State);
+    unsafe impl Send for StatePtr {}
+    impl StatePtr {
+        unsafe fn get_mut<'a>(&self) -> &'a mut State {
+            unsafe { &mut *self.0 }
+        }
+    }
+
+    let mut state = Box::new(State::default());
+    let state_ptr = StatePtr((&mut *state) as *mut State);
+    let state_ptr_for_register = state_ptr;
+    let state_ptr_for_encode = state_ptr;
+    let state_ptr_for_callback = state_ptr;
+
+    let encoder = VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
+        register_encode_complete_callback: Some(Box::new(move |callback| {
+            let callback = callback.expect("register 側 callback が None です");
+            let state = unsafe { state_ptr_for_register.get_mut() };
+            state.register_called = true;
+            state.order.push("register");
+            state.callback_ptr = Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_ref(callback) });
+            0
+        })),
+        encode: Some(Box::new(move |_, _| {
+            {
+                let state = unsafe { state_ptr_for_encode.get_mut() };
+                state.encode_called = true;
+                state.order.push("encode");
+            }
+
+            let callback_ptr = {
+                let state = unsafe { state_ptr_for_encode.get_mut() };
+                state.callback_ptr.expect("encode 側 callback_ptr が未設定です")
+            };
+            let image = EncodedImage::new();
+            let result = unsafe { callback_ptr.on_encoded_image(image.as_ref(), None) };
+            assert_eq!(result.error(), VideoEncoderEncodedImageCallbackResultError::Ok);
+            77
+        })),
+        ..Default::default()
+    });
+
+    let encoded_image_callback = VideoEncoderEncodedImageCallback::new_with_callbacks(
+        VideoEncoderEncodedImageCallbackCallbacks {
+            on_encoded_image: Some(Box::new(move |image, codec_specific_info| {
+                let state = unsafe { state_ptr_for_callback.get_mut() };
+                state.on_encoded_image_called = true;
+                state.order.push("on_encoded_image");
+                assert!(image.encoded_data().is_none());
+                assert!(
+                    codec_specific_info.is_none(),
+                    "codec_specific_info は None の想定です"
+                );
+                VideoEncoderEncodedImageCallbackResult::new(
+                    VideoEncoderEncodedImageCallbackResultError::Ok,
+                )
+            })),
+        },
+    );
+
+    assert_eq!(
+        encoder.register_encode_complete_callback(Some(encoded_image_callback.as_ref())),
+        0
+    );
+
+    let buffer = I420Buffer::new(2, 2);
+    let frame = VideoFrame::from_i420(&buffer, 123);
+    assert_eq!(encoder.encode(&frame), 77);
+
+    assert!(state.register_called, "register が呼ばれていません");
+    assert!(state.encode_called, "encode が呼ばれていません");
+    assert!(
+        state.on_encoded_image_called,
+        "on_encoded_image が呼ばれていません"
+    );
+    assert_eq!(
+        state.order,
+        vec!["register", "encode", "on_encoded_image"],
+        "呼び出し順が不正です"
+    );
+}
+
+#[test]
+fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specific_info() {
+    #[derive(Default)]
+    struct State {
+        callback_ptr: Option<VideoEncoderEncodedImageCallbackPtr>,
+        register_called: bool,
+        encode_called: bool,
+        on_encoded_image_called: bool,
+        order: Vec<&'static str>,
+    }
+
+    #[derive(Clone, Copy)]
+    struct StatePtr(*mut State);
+    unsafe impl Send for StatePtr {}
+    impl StatePtr {
+        unsafe fn get_mut<'a>(&self) -> &'a mut State {
+            unsafe { &mut *self.0 }
+        }
+    }
+
+    let mut state = Box::new(State::default());
+    let state_ptr = StatePtr((&mut *state) as *mut State);
+    let state_ptr_for_register = state_ptr;
+    let state_ptr_for_encode = state_ptr;
+    let state_ptr_for_callback = state_ptr;
+
+    let encoder = VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
+        register_encode_complete_callback: Some(Box::new(move |callback| {
+            let callback = callback.expect("register 側 callback が None です");
+            let state = unsafe { state_ptr_for_register.get_mut() };
+            state.register_called = true;
+            state.order.push("register");
+            state.callback_ptr = Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_ref(callback) });
+            0
+        })),
+        encode: Some(Box::new(move |_, _| {
+            {
+                let state = unsafe { state_ptr_for_encode.get_mut() };
+                state.encode_called = true;
+                state.order.push("encode");
+            }
+
+            let callback_ptr = {
+                let state = unsafe { state_ptr_for_encode.get_mut() };
+                state.callback_ptr.expect("encode 側 callback_ptr が未設定です")
+            };
+
+            let buffer = EncodedImageBuffer::from_bytes(&[1, 2, 3, 4]);
+            let mut image = EncodedImage::new();
+            image.set_encoded_data(&buffer);
+            image.set_rtp_timestamp(12345);
+            image.set_encoded_width(640);
+            image.set_encoded_height(360);
+            image.set_frame_type(VideoFrameType::Key);
+            image.set_qp(31);
+
+            let mut codec_specific_info = CodecSpecificInfo::new();
+            codec_specific_info.set_codec_type(VideoCodecType::H264);
+            codec_specific_info.set_end_of_picture(true);
+            codec_specific_info.set_h264_packetization_mode(H264PacketizationMode::SingleNalUnit);
+            codec_specific_info.set_h264_temporal_idx(2);
+            codec_specific_info.set_h264_base_layer_sync(true);
+            codec_specific_info.set_h264_idr_frame(true);
+
+            let result = unsafe {
+                callback_ptr.on_encoded_image(
+                    image.as_ref(),
+                    Some(codec_specific_info.as_ref()),
+                )
+            };
+            assert_eq!(result.error(), VideoEncoderEncodedImageCallbackResultError::Ok);
+            assert_eq!(result.frame_id(), 9999);
+            assert!(!result.drop_next_frame());
+            88
+        })),
+        ..Default::default()
+    });
+
+    let encoded_image_callback = VideoEncoderEncodedImageCallback::new_with_callbacks(
+        VideoEncoderEncodedImageCallbackCallbacks {
+            on_encoded_image: Some(Box::new(move |image, codec_specific_info| {
+                let state = unsafe { state_ptr_for_callback.get_mut() };
+                state.on_encoded_image_called = true;
+                state.order.push("on_encoded_image");
+
+                let encoded_data = image
+                    .encoded_data()
+                    .expect("encoded_data が None です");
+                assert_eq!(encoded_data.data(), [1, 2, 3, 4]);
+                assert_eq!(encoded_data.data().len(), 4);
+                assert_eq!(image.rtp_timestamp(), 12345);
+                assert_eq!(image.encoded_width(), 640);
+                assert_eq!(image.encoded_height(), 360);
+                assert_eq!(image.frame_type(), VideoFrameType::Key);
+                assert_eq!(image.qp(), 31);
+
+                let codec_specific_info =
+                    codec_specific_info.expect("codec_specific_info が None です");
+                assert_eq!(codec_specific_info.codec_type(), VideoCodecType::H264);
+                assert!(codec_specific_info.end_of_picture());
+                assert_eq!(
+                    codec_specific_info.h264_packetization_mode(),
+                    H264PacketizationMode::SingleNalUnit
+                );
+                assert_eq!(codec_specific_info.h264_temporal_idx(), 2);
+                assert!(codec_specific_info.h264_base_layer_sync());
+                assert!(codec_specific_info.h264_idr_frame());
+                VideoEncoderEncodedImageCallbackResult::new_with_frame_id(
+                    VideoEncoderEncodedImageCallbackResultError::Ok,
+                    9999,
+                )
+            })),
+        },
+    );
+
+    assert_eq!(
+        encoder.register_encode_complete_callback(Some(encoded_image_callback.as_ref())),
+        0
+    );
+
+    let buffer = I420Buffer::new(2, 2);
+    let frame = VideoFrame::from_i420(&buffer, 123);
+    assert_eq!(encoder.encode(&frame), 88);
+
+    assert!(state.register_called, "register が呼ばれていません");
+    assert!(state.encode_called, "encode が呼ばれていません");
+    assert!(
+        state.on_encoded_image_called,
+        "on_encoded_image が呼ばれていません"
+    );
+    assert_eq!(
+        state.order,
+        vec!["register", "encode", "on_encoded_image"],
+        "呼び出し順が不正です"
+    );
+}
+
+#[test]
+fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
+    let mut created = false;
+
+    let factory = VideoDecoderFactory::new_with_callbacks(VideoDecoderFactoryCallbacks {
+        create: {
+            Some(Box::new(move |env, _| {
+                assert!(!env.as_ptr().is_null());
+                if created {
+                    return None;
+                }
+                created = true;
+                let mut decode_count = 0;
+                Some(VideoDecoder::new_with_callbacks(VideoDecoderCallbacks {
+                    decode: Some(Box::new(move |input, render_time_ms| {
+                        assert!(input.encoded_data().is_none());
+                        assert_eq!(render_time_ms, 456);
+                        decode_count += 1;
+                        decode_count
+                    })),
+                    ..Default::default()
+                }))
+            }))
+        },
+        ..Default::default()
+    });
+
+    let env = Environment::new();
+    let format = SdpVideoFormat::new("VP8");
+    let decoder = factory
+        .create(&env, &format)
+        .expect("custom decoder の作成に失敗しました");
+
+    assert_eq!(decoder.decode(None, 456), 1);
+    assert_eq!(decoder.decode(None, 456), 2);
+    assert!(
+        factory.create(&env, &format).is_none(),
+        "2 回目の create は None を返す想定です"
+    );
+}
+
+#[test]
+fn custom_video_encoder_init_encode_and_set_rates_callbacks_getters() {
+    struct BoolPtr(*mut bool);
+    unsafe impl Send for BoolPtr {}
+    impl BoolPtr {
+        fn set_true(&self) {
+            unsafe {
+                *self.0 = true;
+            }
+        }
+    }
+
+    let mut set_rates_called = false;
+    let set_rates_called_ptr = BoolPtr(&mut set_rates_called as *mut bool);
+    let encoder = VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
+        init_encode: Some(Box::new(move |codec, settings| {
+            assert_eq!(codec.codec_type(), VideoCodecType::Generic);
+            assert_eq!(codec.width(), 0);
+            assert_eq!(codec.height(), 0);
+            assert_eq!(settings.number_of_cores(), 1);
+            assert_eq!(settings.max_payload_size(), 1200);
+            assert!(!settings.loss_notification());
+            assert_eq!(settings.encoder_thread_limit(), None);
+            123
+        })),
+        set_rates: Some(Box::new(move |parameters| {
+            assert_eq!(parameters.framerate_fps(), 30.0);
+            assert_eq!(parameters.target_bitrate_sum_bps(), 300_000);
+            assert_eq!(parameters.bitrate_sum_bps(), 250_000);
+            assert_eq!(parameters.bandwidth_allocation_bps(), 350_000);
+            set_rates_called_ptr.set_true();
+        })),
+        ..Default::default()
+    });
+
+    assert_eq!(encoder.init_encode(), 123);
+    encoder.set_rates();
+    assert!(set_rates_called, "set_rates callback が呼ばれませんでした");
+}
+
+#[test]
+fn custom_video_decoder_configure_callback_getters() {
+    let decoder = VideoDecoder::new_with_callbacks(VideoDecoderCallbacks {
+        configure: Some(Box::new(move |settings| {
+            assert_eq!(settings.number_of_cores(), 1);
+            assert_eq!(settings.codec_type(), VideoCodecType::Generic);
+            assert_eq!(settings.buffer_pool_size(), None);
+            assert_eq!(settings.max_render_resolution_width(), 0);
+            assert_eq!(settings.max_render_resolution_height(), 0);
+            false
+        })),
+        ..Default::default()
+    });
+
+    assert!(!decoder.configure());
+}
+
+#[test]
+fn custom_video_decoder_get_decoder_info_name_experiment() {
+    let expected = "decoder-info-name-".repeat(128);
+    let decoder = VideoDecoder::new_with_callbacks(VideoDecoderCallbacks {
+        get_decoder_info: Some(Box::new({
+            let expected = expected.clone();
+            move || {
+                let mut info = VideoDecoderDecoderInfo::new();
+                info.set_implementation_name(&expected);
+                info.set_is_hardware_accelerated(false);
+                info
+            }
+        })),
+        ..Default::default()
+    });
+
+    for _ in 0..100 {
+        let info = decoder.get_decoder_info();
+        assert_eq!(
+            info.implementation_name()
+                .expect("implementation_name の取得に失敗しました"),
+            expected,
+            "GetDecoderInfo の implementation_name が不一致になりました"
+        );
+        assert!(!info.is_hardware_accelerated());
+    }
+}

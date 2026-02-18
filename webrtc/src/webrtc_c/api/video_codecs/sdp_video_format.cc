@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 // WebRTC
 #include <api/video_codecs/sdp_video_format.h>
@@ -13,6 +14,8 @@
 
 extern "C" {
 WEBRTC_DEFINE_UNIQUE(webrtc_SdpVideoFormat, webrtc::SdpVideoFormat);
+WEBRTC_DEFINE_VECTOR_NO_DEFAULT_CTOR(webrtc_SdpVideoFormat,
+                                     webrtc::SdpVideoFormat);
 
 struct webrtc_SdpVideoFormat_unique* webrtc_SdpVideoFormat_new(
     const char* name,

@@ -85,6 +85,11 @@ impl CxxString {
         self.raw_string().as_ptr()
     }
 
+    /// FFI へ所有権を移譲する。
+    pub fn into_raw(self) -> *mut ffi::std_string_unique {
+        std::mem::ManuallyDrop::new(self).raw_unique.as_ptr()
+    }
+
     fn raw_string(&self) -> NonNull<ffi::std_string> {
         let raw = unsafe { ffi::std_string_unique_get(self.raw_unique.as_ptr()) };
         NonNull::new(raw).expect("BUG: std_string_unique_get が null を返しました")
