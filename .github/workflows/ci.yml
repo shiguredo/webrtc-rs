@@ -72,7 +72,8 @@ jobs:
             clang \
             multistrap \
             python3 \
-            debian-archive-keyring
+            debian-archive-keyring \
+            gcc-aarch64-linux-gnu
       - name: Build sysroot with multistrap
         run: |
           # Debian の GPG 鍵を rootfs にコピーしてリポジトリ署名検証を通す
