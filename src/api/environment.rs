@@ -25,7 +25,12 @@ impl Environment {
 
     /// 生ポインタを取得する。FFI 呼び出し用。
     pub fn as_ptr(&self) -> *mut ffi::webrtc_Environment {
-        self.raw.as_ptr()
+        self.as_ref().as_ptr()
+    }
+
+    pub fn as_ref(&self) -> EnvironmentRef<'_> {
+        // Safety: self.raw は Environment の生存中は常に有効です。
+        unsafe { EnvironmentRef::from_raw(self.raw) }
     }
 }
 

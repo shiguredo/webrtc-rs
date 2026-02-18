@@ -388,30 +388,19 @@ impl IceServer {
     }
 
     pub fn add_url(&mut self, url: &str) {
-        let urls =
-            unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_get_urls(self.raw.as_ptr()) };
-        let cxx = CxxString::from_str(url);
-        unsafe { ffi::std_string_vector_push_back(urls, cxx.as_ptr()) };
+        self.as_ref().add_url(url);
     }
 
     pub fn set_username(&mut self, username: &str) {
-        unsafe {
-            ffi::webrtc_PeerConnectionInterface_IceServer_set_username(
-                self.raw.as_ptr(),
-                username.as_ptr() as *const _,
-                username.len(),
-            );
-        }
+        self.as_ref().set_username(username);
     }
 
     pub fn set_password(&mut self, password: &str) {
-        unsafe {
-            ffi::webrtc_PeerConnectionInterface_IceServer_set_password(
-                self.raw.as_ptr(),
-                password.as_ptr() as *const _,
-                password.len(),
-            );
-        }
+        self.as_ref().set_password(password);
+    }
+
+    pub fn as_ref(&self) -> IceServerRef<'_> {
+        IceServerRef::from_raw(self.raw)
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_IceServer {
@@ -422,6 +411,52 @@ impl IceServer {
 impl Drop for IceServer {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_delete(self.raw.as_ptr()) };
+    }
+}
+
+/// IceServer への借用ラッパー。
+pub struct IceServerRef<'a> {
+    raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>,
+    _marker: PhantomData<&'a mut ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
+}
+
+impl<'a> IceServerRef<'a> {
+    pub fn from_raw(raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_IceServer {
+        self.raw.as_ptr()
+    }
+
+    pub fn add_url(&self, url: &str) {
+        let urls =
+            unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_get_urls(self.raw.as_ptr()) };
+        let cxx = CxxString::from_str(url);
+        unsafe { ffi::std_string_vector_push_back(urls, cxx.as_ptr()) };
+    }
+
+    pub fn set_username(&self, username: &str) {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_IceServer_set_username(
+                self.raw.as_ptr(),
+                username.as_ptr() as *const _,
+                username.len(),
+            );
+        }
+    }
+
+    pub fn set_password(&self, password: &str) {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_IceServer_set_password(
+                self.raw.as_ptr(),
+                password.as_ptr() as *const _,
+                password.len(),
+            );
+        }
     }
 }
 
@@ -441,41 +476,27 @@ impl IceServerVector {
     }
 
     pub fn len(&self) -> usize {
-        let len =
-            unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_vector_size(self.raw.as_ptr()) };
-        len.max(0) as usize
+        self.as_ref().len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.as_ref().is_empty()
     }
 
     pub fn get(&self, index: usize) -> Option<IceServerRef<'_>> {
-        let len = self.len();
-        if index >= len {
-            return None;
-        }
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_PeerConnectionInterface_IceServer_vector_get(
-                self.raw.as_ptr(),
-                index as i32,
-            )
-        })
-        .expect("BUG: webrtc_PeerConnectionInterface_IceServer_vector_get が null を返しました");
-        Some(IceServerRef::from_raw(raw))
+        self.as_ref().get(index)
     }
 
     pub fn push(&mut self, server: &IceServer) {
-        unsafe {
-            ffi::webrtc_PeerConnectionInterface_IceServer_vector_push_back(
-                self.raw.as_ptr(),
-                server.as_ptr(),
-            );
-        }
+        self.as_ref().push(server);
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_IceServer_vector {
         self.raw.as_ptr()
+    }
+
+    pub fn as_ref(&self) -> IceServerVectorRef<'_> {
+        IceServerVectorRef::from_raw(self.raw)
     }
 }
 
@@ -509,32 +530,28 @@ impl<'a> IceServerVectorRef<'a> {
         self.len() == 0
     }
 
-    pub fn push(&mut self, server: &IceServer) {
+    pub fn get(&self, index: usize) -> Option<IceServerRef<'a>> {
+        let len = self.len();
+        if index >= len {
+            return None;
+        }
+        let raw = NonNull::new(unsafe {
+            ffi::webrtc_PeerConnectionInterface_IceServer_vector_get(
+                self.raw.as_ptr(),
+                index as i32,
+            )
+        })
+        .expect("BUG: webrtc_PeerConnectionInterface_IceServer_vector_get が null を返しました");
+        Some(IceServerRef::from_raw(raw))
+    }
+
+    pub fn push(&self, server: &IceServer) {
         unsafe {
             ffi::webrtc_PeerConnectionInterface_IceServer_vector_push_back(
                 self.raw.as_ptr(),
                 server.as_ptr(),
             );
         }
-    }
-}
-
-/// IceServer への借用ラッパー。
-pub struct IceServerRef<'a> {
-    raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>,
-    _marker: PhantomData<&'a mut ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
-}
-
-impl<'a> IceServerRef<'a> {
-    pub fn from_raw(raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>) -> Self {
-        Self {
-            raw,
-            _marker: PhantomData,
-        }
-    }
-
-    pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_IceServer {
-        self.raw.as_ptr()
     }
 }
 

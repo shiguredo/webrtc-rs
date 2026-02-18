@@ -32,24 +32,20 @@ impl SdpVideoFormat {
     }
 
     pub fn name(&self) -> Result<String> {
-        let raw = self.raw();
-        let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_name(raw.as_ptr()) };
-        CxxStringRef::from_ptr(
-            NonNull::new(ptr).expect("BUG: webrtc_SdpVideoFormat_get_name が null を返しました"),
-        )
-        .to_string()
+        self.as_ref().name()
     }
 
     pub fn parameters_mut(&mut self) -> MapStringString<'_> {
-        let raw = self.raw();
-        let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(raw.as_ptr()) };
-        MapStringString::from_raw(NonNull::new(ptr).expect("BUF: ptr が null"))
+        self.as_ref().parameters_mut()
     }
 
     pub fn is_equal(&self, other: &SdpVideoFormat) -> bool {
-        let lhs = self.raw();
-        let rhs = other.raw();
-        unsafe { ffi::webrtc_SdpVideoFormat_is_equal(lhs.as_ptr(), rhs.as_ptr()) != 0 }
+        self.as_ref().is_equal(other.as_ref())
+    }
+
+    pub fn as_ref(&self) -> SdpVideoFormatRef<'_> {
+        // Safety: self.raw() は SdpVideoFormat の生存中は常に有効です。
+        unsafe { SdpVideoFormatRef::from_raw(self.raw()) }
     }
 
     fn raw(&self) -> NonNull<ffi::webrtc_SdpVideoFormat> {
@@ -79,6 +75,15 @@ impl<'a> SdpVideoFormatRef<'a> {
             NonNull::new(ptr).expect("BUG: webrtc_SdpVideoFormat_get_name が null を返しました"),
         )
         .to_string()
+    }
+
+    pub fn parameters_mut(&self) -> MapStringString<'a> {
+        let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(self.raw.as_ptr()) };
+        MapStringString::from_raw(NonNull::new(ptr).expect("BUG: ptr が null"))
+    }
+
+    pub fn is_equal(&self, other: SdpVideoFormatRef<'_>) -> bool {
+        unsafe { ffi::webrtc_SdpVideoFormat_is_equal(self.raw.as_ptr(), other.raw.as_ptr()) != 0 }
     }
 }
 
@@ -214,31 +219,25 @@ impl VideoFrame {
     }
 
     pub fn width(&self) -> i32 {
-        let raw = self.raw();
-        unsafe { ffi::webrtc_VideoFrame_width(raw.as_ptr()) }
+        self.as_ref().width()
     }
 
     pub fn height(&self) -> i32 {
-        let raw = self.raw();
-        unsafe { ffi::webrtc_VideoFrame_height(raw.as_ptr()) }
+        self.as_ref().height()
     }
 
     pub fn timestamp_us(&self) -> i64 {
-        let raw = self.raw();
-        unsafe { ffi::webrtc_VideoFrame_timestamp_us(raw.as_ptr()) }
+        self.as_ref().timestamp_us()
     }
 
     /// I420Buffer を取得する。
     pub fn buffer(&self) -> I420Buffer {
-        let raw = self.raw();
-        let buf = NonNull::new(unsafe { ffi::webrtc_VideoFrame_video_frame_buffer(raw.as_ptr()) })
-            .expect("BUG: webrtc_VideoFrame_video_frame_buffer が null を返しました");
-        let raw_ref = ScopedRef::<I420BufferHandle>::from_raw(buf);
-        I420Buffer {
-            raw_ref,
-            width: self.width(),
-            height: self.height(),
-        }
+        self.as_ref().buffer()
+    }
+
+    pub fn as_ref(&self) -> VideoFrameRef<'_> {
+        // Safety: self.raw() は VideoFrame の生存中は常に有効です。
+        unsafe { VideoFrameRef::from_raw(self.raw()) }
     }
 
     fn raw(&self) -> NonNull<ffi::webrtc_VideoFrame> {
@@ -347,28 +346,19 @@ impl VideoFrameTypeVector {
     }
 
     pub fn len(&self) -> usize {
-        let len = unsafe { ffi::webrtc_VideoFrameType_vector_size(self.raw.as_ptr()) };
-        len.max(0) as usize
+        self.as_ref().len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.as_ref().is_empty()
     }
 
     pub fn get(&self, index: usize) -> Option<VideoFrameType> {
-        if index >= self.len() {
-            return None;
-        }
-        let raw = unsafe { ffi::webrtc_VideoFrameType_vector_get(self.raw.as_ptr(), index as i32) };
-        let raw = NonNull::new(raw)?;
-        let value = unsafe { ffi::webrtc_VideoFrameType_value(raw.as_ptr()) };
-        Some(VideoFrameType::from_raw(value))
+        self.as_ref().get(index)
     }
 
     pub fn push(&mut self, value: VideoFrameType) {
-        unsafe {
-            ffi::webrtc_VideoFrameType_vector_push_back_value(self.raw.as_ptr(), value.to_raw())
-        };
+        self.as_ref().push(value);
     }
 
     pub fn as_ref(&self) -> VideoFrameTypeVectorRef<'_> {
@@ -416,6 +406,12 @@ impl<'a> VideoFrameTypeVectorRef<'a> {
         let raw = NonNull::new(raw)?;
         let value = unsafe { ffi::webrtc_VideoFrameType_value(raw.as_ptr()) };
         Some(VideoFrameType::from_raw(value))
+    }
+
+    pub fn push(&self, value: VideoFrameType) {
+        unsafe {
+            ffi::webrtc_VideoFrameType_vector_push_back_value(self.raw.as_ptr(), value.to_raw())
+        };
     }
 
     pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoFrameType_vector {
@@ -1042,11 +1038,6 @@ impl<'a> VideoEncoderRateControlParametersRef<'a> {
 
 unsafe impl<'a> Send for VideoEncoderRateControlParametersRef<'a> {}
 
-pub struct VideoEncoderEncodedImageCallbackRef<'a> {
-    raw: NonNull<ffi::webrtc_VideoEncoder_EncodedImageCallback>,
-    _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_EncodedImageCallback>,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VideoEncoderEncodedImageCallbackResultError {
     Ok,
@@ -1186,43 +1177,6 @@ impl Drop for VideoEncoderEncodedImageCallbackResult {
 }
 
 unsafe impl Send for VideoEncoderEncodedImageCallbackResult {}
-
-impl<'a> VideoEncoderEncodedImageCallbackRef<'a> {
-    /// # Safety
-    /// `raw` は有効な `webrtc_VideoEncoder_EncodedImageCallback` を指している必要があります。
-    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoEncoder_EncodedImageCallback>) -> Self {
-        Self {
-            raw,
-            _marker: PhantomData,
-        }
-    }
-
-    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoEncoder_EncodedImageCallback {
-        self.raw.as_ptr()
-    }
-
-    pub fn on_encoded_image(
-        &self,
-        image: EncodedImageRef<'_>,
-        codec_specific_info: Option<CodecSpecificInfoRef<'_>>,
-    ) -> VideoEncoderEncodedImageCallbackResult {
-        let image = image.as_ptr();
-        let codec_specific_info = codec_specific_info.map_or(std::ptr::null_mut(), |v| v.as_ptr());
-        let raw_unique = unsafe {
-            ffi::webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage(
-                self.as_ptr(),
-                image,
-                codec_specific_info,
-            )
-        };
-        let raw_unique = NonNull::new(raw_unique).expect(
-            "BUG: webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage が null を返しました",
-        );
-        unsafe { VideoEncoderEncodedImageCallbackResult::from_raw_unique(raw_unique) }
-    }
-}
-
-unsafe impl<'a> Send for VideoEncoderEncodedImageCallbackRef<'a> {}
 
 #[derive(Clone, Copy)]
 pub struct VideoEncoderEncodedImageCallbackPtr {
@@ -1376,27 +1330,27 @@ impl EncodedImage {
     }
 
     pub fn set_encoded_data(&mut self, encoded_data: &EncodedImageBuffer) {
-        unsafe { ffi::webrtc_EncodedImage_set_encoded_data(self.as_ptr(), encoded_data.as_ptr()) };
+        self.as_ref().set_encoded_data(encoded_data);
     }
 
     pub fn set_rtp_timestamp(&mut self, rtp_timestamp: u32) {
-        unsafe { ffi::webrtc_EncodedImage_set_rtp_timestamp(self.as_ptr(), rtp_timestamp) };
+        self.as_ref().set_rtp_timestamp(rtp_timestamp);
     }
 
     pub fn set_encoded_width(&mut self, encoded_width: u32) {
-        unsafe { ffi::webrtc_EncodedImage_set_encoded_width(self.as_ptr(), encoded_width) };
+        self.as_ref().set_encoded_width(encoded_width);
     }
 
     pub fn set_encoded_height(&mut self, encoded_height: u32) {
-        unsafe { ffi::webrtc_EncodedImage_set_encoded_height(self.as_ptr(), encoded_height) };
+        self.as_ref().set_encoded_height(encoded_height);
     }
 
     pub fn set_frame_type(&mut self, frame_type: VideoFrameType) {
-        unsafe { ffi::webrtc_EncodedImage_set_frame_type(self.as_ptr(), frame_type.to_raw()) };
+        self.as_ref().set_frame_type(frame_type);
     }
 
     pub fn set_qp(&mut self, qp: i32) {
-        unsafe { ffi::webrtc_EncodedImage_set_qp(self.as_ptr(), qp) };
+        self.as_ref().set_qp(qp);
     }
 
     pub fn as_ref(&self) -> EncodedImageRef<'_> {
@@ -1425,10 +1379,6 @@ impl EncodedImage {
 
     pub fn qp(&self) -> i32 {
         self.as_ref().qp()
-    }
-
-    fn as_ptr(&self) -> *mut ffi::webrtc_EncodedImage {
-        self.raw().as_ptr()
     }
 
     fn raw(&self) -> NonNull<ffi::webrtc_EncodedImage> {
@@ -1464,6 +1414,30 @@ impl<'a> EncodedImageRef<'a> {
         let raw_ref = unsafe { ffi::webrtc_EncodedImage_encoded_data(self.raw.as_ptr()) };
         let raw_ref = NonNull::new(raw_ref)?;
         Some(EncodedImageBuffer::from_raw_ref(raw_ref))
+    }
+
+    pub fn set_encoded_data(&self, encoded_data: &EncodedImageBuffer) {
+        unsafe { ffi::webrtc_EncodedImage_set_encoded_data(self.raw.as_ptr(), encoded_data.as_ptr()) };
+    }
+
+    pub fn set_rtp_timestamp(&self, rtp_timestamp: u32) {
+        unsafe { ffi::webrtc_EncodedImage_set_rtp_timestamp(self.raw.as_ptr(), rtp_timestamp) };
+    }
+
+    pub fn set_encoded_width(&self, encoded_width: u32) {
+        unsafe { ffi::webrtc_EncodedImage_set_encoded_width(self.raw.as_ptr(), encoded_width) };
+    }
+
+    pub fn set_encoded_height(&self, encoded_height: u32) {
+        unsafe { ffi::webrtc_EncodedImage_set_encoded_height(self.raw.as_ptr(), encoded_height) };
+    }
+
+    pub fn set_frame_type(&self, frame_type: VideoFrameType) {
+        unsafe { ffi::webrtc_EncodedImage_set_frame_type(self.raw.as_ptr(), frame_type.to_raw()) };
+    }
+
+    pub fn set_qp(&self, qp: i32) {
+        unsafe { ffi::webrtc_EncodedImage_set_qp(self.raw.as_ptr(), qp) };
     }
 
     pub fn rtp_timestamp(&self) -> u32 {
@@ -1595,6 +1569,107 @@ impl<'a> CodecSpecificInfoRef<'a> {
         unsafe { ffi::webrtc_CodecSpecificInfo_h264_idr_frame(self.raw.as_ptr()) != 0 }
     }
 
+    pub fn set_codec_type(&self, codec_type: VideoCodecType) {
+        unsafe { ffi::webrtc_CodecSpecificInfo_set_codec_type(self.raw.as_ptr(), codec_type.to_raw()) };
+    }
+
+    pub fn set_end_of_picture(&self, end_of_picture: bool) {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_set_end_of_picture(
+                self.raw.as_ptr(),
+                if end_of_picture { 1 } else { 0 },
+            )
+        };
+    }
+
+    pub fn set_vp8_non_reference(&self, non_reference: bool) {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_set_vp8_non_reference(
+                self.raw.as_ptr(),
+                if non_reference { 1 } else { 0 },
+            )
+        };
+    }
+
+    pub fn set_vp8_temporal_idx(&self, temporal_idx: i32) {
+        unsafe { ffi::webrtc_CodecSpecificInfo_set_vp8_temporal_idx(self.raw.as_ptr(), temporal_idx) };
+    }
+
+    pub fn set_vp8_layer_sync(&self, layer_sync: bool) {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_set_vp8_layer_sync(
+                self.raw.as_ptr(),
+                if layer_sync { 1 } else { 0 },
+            )
+        };
+    }
+
+    pub fn set_vp8_key_idx(&self, key_idx: i32) {
+        unsafe { ffi::webrtc_CodecSpecificInfo_set_vp8_key_idx(self.raw.as_ptr(), key_idx) };
+    }
+
+    pub fn set_vp9_temporal_idx(&self, temporal_idx: i32) {
+        unsafe { ffi::webrtc_CodecSpecificInfo_set_vp9_temporal_idx(self.raw.as_ptr(), temporal_idx) };
+    }
+
+    pub fn set_vp9_inter_pic_predicted(&self, inter_pic_predicted: bool) {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_set_vp9_inter_pic_predicted(
+                self.raw.as_ptr(),
+                if inter_pic_predicted { 1 } else { 0 },
+            )
+        };
+    }
+
+    pub fn set_vp9_flexible_mode(&self, flexible_mode: bool) {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_set_vp9_flexible_mode(
+                self.raw.as_ptr(),
+                if flexible_mode { 1 } else { 0 },
+            )
+        };
+    }
+
+    pub fn set_vp9_inter_layer_predicted(&self, inter_layer_predicted: bool) {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_set_vp9_inter_layer_predicted(
+                self.raw.as_ptr(),
+                if inter_layer_predicted { 1 } else { 0 },
+            )
+        };
+    }
+
+    pub fn set_h264_packetization_mode(&self, packetization_mode: H264PacketizationMode) {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_set_h264_packetization_mode(
+                self.raw.as_ptr(),
+                packetization_mode.to_raw(),
+            )
+        };
+    }
+
+    pub fn set_h264_temporal_idx(&self, temporal_idx: i32) {
+        unsafe { ffi::webrtc_CodecSpecificInfo_set_h264_temporal_idx(self.raw.as_ptr(), temporal_idx) };
+    }
+
+    pub fn set_h264_base_layer_sync(&self, base_layer_sync: bool) {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_set_h264_base_layer_sync(
+                self.raw.as_ptr(),
+                if base_layer_sync { 1 } else { 0 },
+            )
+        };
+    }
+
+    pub fn set_h264_idr_frame(&self, idr_frame: bool) {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_set_h264_idr_frame(
+                self.raw.as_ptr(),
+                if idr_frame { 1 } else { 0 },
+            )
+        };
+    }
+
     pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_CodecSpecificInfo {
         self.raw.as_ptr()
     }
@@ -1619,113 +1694,122 @@ impl CodecSpecificInfo {
         Self { raw_unique }
     }
 
+    pub fn codec_type(&self) -> VideoCodecType {
+        self.as_ref().codec_type()
+    }
+
+    pub fn end_of_picture(&self) -> bool {
+        self.as_ref().end_of_picture()
+    }
+
+    pub fn vp8_non_reference(&self) -> bool {
+        self.as_ref().vp8_non_reference()
+    }
+
+    pub fn vp8_temporal_idx(&self) -> i32 {
+        self.as_ref().vp8_temporal_idx()
+    }
+
+    pub fn vp8_layer_sync(&self) -> bool {
+        self.as_ref().vp8_layer_sync()
+    }
+
+    pub fn vp8_key_idx(&self) -> i32 {
+        self.as_ref().vp8_key_idx()
+    }
+
+    pub fn vp9_temporal_idx(&self) -> i32 {
+        self.as_ref().vp9_temporal_idx()
+    }
+
+    pub fn vp9_inter_pic_predicted(&self) -> bool {
+        self.as_ref().vp9_inter_pic_predicted()
+    }
+
+    pub fn vp9_flexible_mode(&self) -> bool {
+        self.as_ref().vp9_flexible_mode()
+    }
+
+    pub fn vp9_inter_layer_predicted(&self) -> bool {
+        self.as_ref().vp9_inter_layer_predicted()
+    }
+
+    pub fn h264_packetization_mode(&self) -> H264PacketizationMode {
+        self.as_ref().h264_packetization_mode()
+    }
+
+    pub fn h264_temporal_idx(&self) -> i32 {
+        self.as_ref().h264_temporal_idx()
+    }
+
+    pub fn h264_base_layer_sync(&self) -> bool {
+        self.as_ref().h264_base_layer_sync()
+    }
+
+    pub fn h264_idr_frame(&self) -> bool {
+        self.as_ref().h264_idr_frame()
+    }
+
     pub fn set_codec_type(&mut self, codec_type: VideoCodecType) {
-        unsafe { ffi::webrtc_CodecSpecificInfo_set_codec_type(self.as_ptr(), codec_type.to_raw()) };
+        self.as_ref().set_codec_type(codec_type);
     }
 
     pub fn set_end_of_picture(&mut self, end_of_picture: bool) {
-        unsafe {
-            ffi::webrtc_CodecSpecificInfo_set_end_of_picture(
-                self.as_ptr(),
-                if end_of_picture { 1 } else { 0 },
-            )
-        };
+        self.as_ref().set_end_of_picture(end_of_picture);
     }
 
     pub fn set_vp8_non_reference(&mut self, non_reference: bool) {
-        unsafe {
-            ffi::webrtc_CodecSpecificInfo_set_vp8_non_reference(
-                self.as_ptr(),
-                if non_reference { 1 } else { 0 },
-            )
-        };
+        self.as_ref().set_vp8_non_reference(non_reference);
     }
 
     pub fn set_vp8_temporal_idx(&mut self, temporal_idx: i32) {
-        unsafe { ffi::webrtc_CodecSpecificInfo_set_vp8_temporal_idx(self.as_ptr(), temporal_idx) };
+        self.as_ref().set_vp8_temporal_idx(temporal_idx);
     }
 
     pub fn set_vp8_layer_sync(&mut self, layer_sync: bool) {
-        unsafe {
-            ffi::webrtc_CodecSpecificInfo_set_vp8_layer_sync(
-                self.as_ptr(),
-                if layer_sync { 1 } else { 0 },
-            )
-        };
+        self.as_ref().set_vp8_layer_sync(layer_sync);
     }
 
     pub fn set_vp8_key_idx(&mut self, key_idx: i32) {
-        unsafe { ffi::webrtc_CodecSpecificInfo_set_vp8_key_idx(self.as_ptr(), key_idx) };
+        self.as_ref().set_vp8_key_idx(key_idx);
     }
 
     pub fn set_vp9_temporal_idx(&mut self, temporal_idx: i32) {
-        unsafe { ffi::webrtc_CodecSpecificInfo_set_vp9_temporal_idx(self.as_ptr(), temporal_idx) };
+        self.as_ref().set_vp9_temporal_idx(temporal_idx);
     }
 
     pub fn set_vp9_inter_pic_predicted(&mut self, inter_pic_predicted: bool) {
-        unsafe {
-            ffi::webrtc_CodecSpecificInfo_set_vp9_inter_pic_predicted(
-                self.as_ptr(),
-                if inter_pic_predicted { 1 } else { 0 },
-            )
-        };
+        self.as_ref()
+            .set_vp9_inter_pic_predicted(inter_pic_predicted);
     }
 
     pub fn set_vp9_flexible_mode(&mut self, flexible_mode: bool) {
-        unsafe {
-            ffi::webrtc_CodecSpecificInfo_set_vp9_flexible_mode(
-                self.as_ptr(),
-                if flexible_mode { 1 } else { 0 },
-            )
-        };
+        self.as_ref().set_vp9_flexible_mode(flexible_mode);
     }
 
     pub fn set_vp9_inter_layer_predicted(&mut self, inter_layer_predicted: bool) {
-        unsafe {
-            ffi::webrtc_CodecSpecificInfo_set_vp9_inter_layer_predicted(
-                self.as_ptr(),
-                if inter_layer_predicted { 1 } else { 0 },
-            )
-        };
+        self.as_ref()
+            .set_vp9_inter_layer_predicted(inter_layer_predicted);
     }
 
     pub fn set_h264_packetization_mode(&mut self, packetization_mode: H264PacketizationMode) {
-        unsafe {
-            ffi::webrtc_CodecSpecificInfo_set_h264_packetization_mode(
-                self.as_ptr(),
-                packetization_mode.to_raw(),
-            )
-        };
+        self.as_ref().set_h264_packetization_mode(packetization_mode);
     }
 
     pub fn set_h264_temporal_idx(&mut self, temporal_idx: i32) {
-        unsafe { ffi::webrtc_CodecSpecificInfo_set_h264_temporal_idx(self.as_ptr(), temporal_idx) };
+        self.as_ref().set_h264_temporal_idx(temporal_idx);
     }
 
     pub fn set_h264_base_layer_sync(&mut self, base_layer_sync: bool) {
-        unsafe {
-            ffi::webrtc_CodecSpecificInfo_set_h264_base_layer_sync(
-                self.as_ptr(),
-                if base_layer_sync { 1 } else { 0 },
-            )
-        };
+        self.as_ref().set_h264_base_layer_sync(base_layer_sync);
     }
 
     pub fn set_h264_idr_frame(&mut self, idr_frame: bool) {
-        unsafe {
-            ffi::webrtc_CodecSpecificInfo_set_h264_idr_frame(
-                self.as_ptr(),
-                if idr_frame { 1 } else { 0 },
-            )
-        };
+        self.as_ref().set_h264_idr_frame(idr_frame);
     }
 
     pub fn as_ref(&self) -> CodecSpecificInfoRef<'_> {
         unsafe { CodecSpecificInfoRef::from_raw(self.raw()) }
-    }
-
-    fn as_ptr(&self) -> *mut ffi::webrtc_CodecSpecificInfo {
-        self.raw().as_ptr()
     }
 
     fn raw(&self) -> NonNull<ffi::webrtc_CodecSpecificInfo> {
@@ -1803,6 +1887,14 @@ impl VideoEncoderEncodedImageCallback {
     pub fn as_ref(&self) -> VideoEncoderEncodedImageCallbackRef<'_> {
         unsafe { VideoEncoderEncodedImageCallbackRef::from_raw(self.raw) }
     }
+
+    pub fn on_encoded_image(
+        &self,
+        image: EncodedImageRef<'_>,
+        codec_specific_info: Option<CodecSpecificInfoRef<'_>>,
+    ) -> VideoEncoderEncodedImageCallbackResult {
+        self.as_ref().on_encoded_image(image, codec_specific_info)
+    }
 }
 
 impl Drop for VideoEncoderEncodedImageCallback {
@@ -1812,6 +1904,48 @@ impl Drop for VideoEncoderEncodedImageCallback {
 }
 
 unsafe impl Send for VideoEncoderEncodedImageCallback {}
+
+pub struct VideoEncoderEncodedImageCallbackRef<'a> {
+    raw: NonNull<ffi::webrtc_VideoEncoder_EncodedImageCallback>,
+    _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_EncodedImageCallback>,
+}
+
+impl<'a> VideoEncoderEncodedImageCallbackRef<'a> {
+    /// # Safety
+    /// `raw` は有効な `webrtc_VideoEncoder_EncodedImageCallback` を指している必要があります。
+    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoEncoder_EncodedImageCallback>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoEncoder_EncodedImageCallback {
+        self.raw.as_ptr()
+    }
+
+    pub fn on_encoded_image(
+        &self,
+        image: EncodedImageRef<'_>,
+        codec_specific_info: Option<CodecSpecificInfoRef<'_>>,
+    ) -> VideoEncoderEncodedImageCallbackResult {
+        let image = image.as_ptr();
+        let codec_specific_info = codec_specific_info.map_or(std::ptr::null_mut(), |v| v.as_ptr());
+        let raw_unique = unsafe {
+            ffi::webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage(
+                self.as_ptr(),
+                image,
+                codec_specific_info,
+            )
+        };
+        let raw_unique = NonNull::new(raw_unique).expect(
+            "BUG: webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage が null を返しました",
+        );
+        unsafe { VideoEncoderEncodedImageCallbackResult::from_raw_unique(raw_unique) }
+    }
+}
+
+unsafe impl<'a> Send for VideoEncoderEncodedImageCallbackRef<'a> {}
 
 #[allow(dead_code)]
 pub struct VideoDecoderDecodedImageCallbackRef<'a> {
