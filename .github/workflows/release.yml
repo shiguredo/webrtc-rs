@@ -6,9 +6,11 @@ on:
       - "*"
 
 jobs:
-  github-release:
+  create-release:
     name: "Create GitHub Release"
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.get_version.outputs.VERSION }}
     steps:
@@ -34,8 +36,128 @@ jobs:
               --notes "Release ${{ steps.get_version.outputs.VERSION }}"
           fi
 
+  build-prebuilt:
+    name: "Build prebuilt (${{ matrix.target }})"
+    needs: create-release
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ネイティブビルド
+          - target: ubuntu-24.04_x86_64
+            os: ubuntu-24.04
+            rust_target: x86_64-unknown-linux-gnu
+          - target: ubuntu-22.04_x86_64
+            os: ubuntu-22.04
+            rust_target: x86_64-unknown-linux-gnu
+          - target: macos_arm64
+            os: macos-26
+            rust_target: aarch64-apple-darwin
+          # クロスコンパイル
+          - target: ubuntu-24.04_armv8
+            os: ubuntu-24.04
+            rust_target: aarch64-unknown-linux-gnu
+            cross: true
+          - target: ubuntu-22.04_armv8
+            os: ubuntu-24.04
+            rust_target: aarch64-unknown-linux-gnu
+            cross: true
+          - target: raspberry-pi-os_armv8
+            os: ubuntu-24.04
+            rust_target: aarch64-unknown-linux-gnu
+            cross: true
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Install build dependencies (Linux native)
+        if: runner.os == 'Linux' && !matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential \
+            libclang-dev \
+            libx11-dev
+
+      - name: Install build dependencies (Linux cross)
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential \
+            libclang-dev \
+            clang \
+            multistrap \
+            python3 \
+            debian-archive-keyring \
+            gcc-aarch64-linux-gnu
+
+      - name: Build sysroot with multistrap
+        if: matrix.cross
+        run: |
+          # GPG 鍵を rootfs にコピーしてリポジトリ署名検証を通す
+          mkdir -p ${{ github.workspace }}/rootfs/etc/apt/trusted.gpg.d
+          for keyring in /usr/share/keyrings/ubuntu-archive-keyring.gpg /usr/share/keyrings/debian-archive-keyring.gpg; do
+            [ -f "$keyring" ] && cp "$keyring" ${{ github.workspace }}/rootfs/etc/apt/trusted.gpg.d/
+          done
+          sudo multistrap --no-auth -a arm64 -d ${{ github.workspace }}/rootfs -f multistrap/${{ matrix.target }}.conf
+          # multistrap が作る絶対パスのシンボリックリンクを相対パスに修正
+          find ${{ github.workspace }}/rootfs -type l | while read link; do
+            target=$(readlink "$link")
+            if [ "${target#/}" != "$target" ]; then
+              dir=$(dirname "$link")
+              new_target=$(python3 -c "import os; print(os.path.relpath('${{ github.workspace }}/rootfs$target', '$dir'))")
+              if [ -e "$dir/$new_target" ]; then
+                sudo ln -sf "$new_target" "$link"
+              fi
+            fi
+          done
+          sudo chmod -R a+rX ${{ github.workspace }}/rootfs
+
+      - run: rustup update stable
+
+      - name: Add cross-compile target
+        if: matrix.cross
+        run: rustup target add aarch64-unknown-linux-gnu
+
+      - name: Build (native)
+        if: "!matrix.cross"
+        run: cargo build --features source-build --target ${{ matrix.rust_target }}
+
+      - name: Build (cross)
+        if: matrix.cross
+        env:
+          WEBRTC_C_TARGET: ${{ matrix.target }}
+          WEBRTC_C_SYSROOT: ${{ github.workspace }}/rootfs
+          CC_aarch64_unknown_linux_gnu: clang
+          CFLAGS_aarch64_unknown_linux_gnu: --target=aarch64-linux-gnu --sysroot=${{ github.workspace }}/rootfs
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: clang
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: -C link-arg=--target=aarch64-linux-gnu -C link-arg=--sysroot=${{ github.workspace }}/rootfs
+        run: cargo build --features source-build --target ${{ matrix.rust_target }}
+
+      - name: Package prebuilt artifacts
+        run: |
+          OUT_DIR=$(find target/${{ matrix.rust_target }}/debug/build/shiguredo_webrtc-*/out -maxdepth 0 -type d | head -1)
+          if [ -z "$OUT_DIR" ]; then
+            echo "ERROR: OUT_DIR が見つかりません"
+            exit 1
+          fi
+          echo "OUT_DIR: $OUT_DIR"
+          mkdir -p staging/lib
+          cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
+          cp "$OUT_DIR/bindings.rs" staging/
+          tar czf "libwebrtc_c-${{ matrix.target }}.tar.gz" -C staging .
+
+      - name: Upload to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" "libwebrtc_c-${{ matrix.target }}.tar.gz" --clobber
+
   publish:
-    needs: github-release
+    needs: build-prebuilt
+    if: false
     runs-on: ubuntu-24.04
     environment: release
     permissions:
@@ -49,7 +171,7 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
   slack_notify_failed:
-    needs: [github-release, publish]
+    needs: [create-release, build-prebuilt, publish]
     timeout-minutes: 20
     runs-on: ubuntu-24.04
     if: failure()

@@ -23,7 +23,8 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 - [webrtc-build](https://github.com/shiguredo-webrtc-build/webrtc-build) でビルドされた libwebrtc を利用
 - C++ の薄い C API ラッパー層と Rust の安全な API 層の 2 層構造
 - `cargo build` だけでビルド
-  - CMake / webrtc-build のダウンロード -> C++ コンパイル -> bindgen
+  - デフォルトでは prebuilt 済みライブラリを GitHub Releases から自動ダウンロード
+  - CMake、libclang、C++ コンパイラなどのインストールは不要
 
 ## サポートプラットフォーム
 
@@ -267,11 +268,61 @@ impl FactoryHolder {
 - `log` / `rtc_log_format_file`
   - ログ機能
 
-## ビルド要件
+## ビルド
+
+### デフォルト (prebuilt)
+
+デフォルトでは、リリース時に GitHub Actions でビルドされた prebuilt ライブラリ (`libwebrtc_c.a`) と生成済みバインディング (`bindings.rs`) を GitHub Releases から自動ダウンロードします。
+
+**CMake、libclang、C++ コンパイラなどのインストールは不要です。**
+
+必要なもの:
 
 - Rust 1.88 以上
+- Linux の場合: `libx11-dev` (リンク時に必要)
+
+```bash
+# Linux
+sudo apt-get install libx11-dev
+
+# macOS は追加のインストール不要
+```
+
+### ソースビルド
+
+C++ ラッパーのコード変更や、prebuilt が提供されていないプラットフォームでビルドする場合は `source-build` feature を有効にしてください。
+
+```toml
+[dependencies]
+shiguredo_webrtc = { version = "0.145", features = ["source-build"] }
+```
+
+または `cargo build` 時に指定:
+
+```bash
+cargo build --features source-build
+```
+
+ソースビルドでは以下が自動的に行われます:
+
+1. CMake のダウンロード
+2. libwebrtc のダウンロード (webrtc-build の GitHub Releases から)
+3. C++ ラッパーのコンパイル
+4. bindgen によるバインディング生成
+
+ソースビルドに必要なもの:
+
+- Rust 1.88 以上
+- C++ コンパイラ (build-essential)
 - libclang (bindgen が利用)
-- CMake / webrtc-build は build.rs が自動ダウンロード
+- Linux の場合: `libx11-dev`
+
+```bash
+# Linux
+sudo apt-get install build-essential libclang-dev libx11-dev
+
+# macOS は Xcode Command Line Tools があれば OK
+```
 
 ## 環境変数
 

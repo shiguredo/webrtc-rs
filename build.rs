@@ -1,7 +1,8 @@
 use std::env;
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 use std::net::TcpStream;
+use std::panic::{self, AssertUnwindSafe};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
@@ -39,17 +40,125 @@ fn main() {
         webrtc_dir.join("deps.json").display()
     );
 
-    let header = webrtc_dir.join("src").join("webrtc_c.h");
-    let include_dir = webrtc_dir.join("src");
     let target_platform = get_target_platform();
     let out_dir = get_out_dir();
 
-    // CMake でビルド（依存関係のダウンロードも CMakeLists.txt 内で行われる）
-    let lib_path = build_webrtc_c(&webrtc_dir, &target_platform, &out_dir);
-    maybe_export_local_build_dir(&webrtc_dir, &out_dir);
+    let lib_path = if should_use_prebuilt() {
+        let paths = try_download_prebuilt(&target_platform, &out_dir).unwrap_or_else(|e| {
+            panic!(
+                "prebuilt ライブラリのダウンロードに失敗しました: {}\n\
+                 ソースからビルドする場合は --features source-build を指定してください",
+                e
+            )
+        });
+        paths.lib_path
+    } else {
+        build_from_source(&webrtc_dir, &target_platform, &out_dir)
+    };
 
-    generate_bindings(&header, &include_dir);
     emit_link_directives(&lib_path);
+}
+
+struct PrebuiltPaths {
+    lib_path: PathBuf,
+}
+
+/// prebuilt バイナリを使用するかどうかを判定する
+fn should_use_prebuilt() -> bool {
+    // source-build feature が有効 → ソースビルド
+    if env::var("CARGO_FEATURE_SOURCE_BUILD").is_ok() {
+        return false;
+    }
+    // デフォルトで prebuilt を試みる
+    true
+}
+
+/// ソースからビルドする（CMake + bindgen）
+fn build_from_source(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> PathBuf {
+    let header = webrtc_dir.join("src").join("webrtc_c.h");
+    let include_dir = webrtc_dir.join("src");
+    let lib_path = build_webrtc_c(webrtc_dir, target_platform, out_dir);
+    maybe_export_local_build_dir(webrtc_dir, out_dir);
+    generate_bindings(&header, &include_dir);
+    lib_path
+}
+
+/// prebuilt バイナリをダウンロードして展開する
+fn try_download_prebuilt(target: &str, out_dir: &Path) -> Result<PrebuiltPaths, String> {
+    let version = env::var("CARGO_PKG_VERSION").map_err(|e| e.to_string())?;
+    let url = format!(
+        "https://github.com/shiguredo/webrtc-rs/releases/download/{}/libwebrtc_c-{}.tar.gz",
+        version, target
+    );
+
+    eprintln!("prebuilt ライブラリをダウンロード中: {}", url);
+
+    let archive_bytes = try_fetch_url(&url)?;
+
+    // OUT_DIR/prebuilt/ に展開
+    let prebuilt_dir = out_dir.join("prebuilt");
+    extract_tar_gz_from_bytes(&archive_bytes, &prebuilt_dir)?;
+
+    // libwebrtc_c.a を OUT_DIR/lib/ にコピー
+    let lib_dir = out_dir.join("lib");
+    fs::create_dir_all(&lib_dir).map_err(|e| format!("lib ディレクトリ作成に失敗: {}", e))?;
+    let lib_path = lib_dir.join("libwebrtc_c.a");
+    fs::copy(prebuilt_dir.join("lib").join("libwebrtc_c.a"), &lib_path)
+        .map_err(|e| format!("libwebrtc_c.a のコピーに失敗: {}", e))?;
+
+    // bindgen 生成済みの bindings.rs を OUT_DIR/ にコピー
+    // （利用者が libclang-dev をインストールしなくて済むようにするため）
+    fs::copy(
+        prebuilt_dir.join("bindings.rs"),
+        out_dir.join("bindings.rs"),
+    )
+    .map_err(|e| format!("bindings.rs のコピーに失敗: {}", e))?;
+
+    Ok(PrebuiltPaths { lib_path })
+}
+
+/// fetch_url のエラーハンドリング版（パニックをキャッチして Result に変換）
+fn try_fetch_url(url: &str) -> Result<Vec<u8>, String> {
+    let url_owned = url.to_string();
+    panic::catch_unwind(AssertUnwindSafe(|| fetch_url(&url_owned))).map_err(|e| {
+        if let Some(s) = e.downcast_ref::<String>() {
+            s.clone()
+        } else if let Some(s) = e.downcast_ref::<&str>() {
+            s.to_string()
+        } else {
+            format!("ダウンロードに失敗しました: {}", url_owned)
+        }
+    })
+}
+
+/// バイト列から tar.gz を展開する
+fn extract_tar_gz_from_bytes(data: &[u8], dest_dir: &Path) -> Result<(), String> {
+    fs::create_dir_all(dest_dir).map_err(|e| format!("展開先ディレクトリ作成に失敗: {}", e))?;
+    let decoder = flate2::read::GzDecoder::new(Cursor::new(data));
+    let mut archive = tar::Archive::new(decoder);
+    let entries = archive
+        .entries()
+        .map_err(|e| format!("tar エントリ取得に失敗: {}", e))?;
+
+    for entry in entries {
+        let mut entry = entry.map_err(|e| format!("tar エントリ読み込みに失敗: {}", e))?;
+        let path = entry
+            .path()
+            .map_err(|e| format!("tar パス取得に失敗: {}", e))?;
+        if !is_safe_path(&path) {
+            return Err(format!("不正なパスが含まれています: {}", path.display()));
+        }
+        let out_path = dest_dir.join(&*path);
+        if let Some(parent) = out_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("展開先ディレクトリ作成に失敗: {}", e))?;
+        }
+        entry
+            .unpack(&out_path)
+            .map_err(|e| format!("tar 展開に失敗: {}", e))?;
+    }
+
+    Ok(())
 }
 
 /// ターゲットプラットフォーム名を取得する

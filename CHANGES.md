@@ -13,6 +13,9 @@
 
 - [CHANGE] Ubuntu 24.04 LTS arm64 / Ubuntu 22.04 LTS arm64 / Raspberry Pi OS arm64 のクロスコンパイルに対応する
   - @voluntas
+- [ADD] リリース時に prebuilt `libwebrtc_c.a` と `bindings.rs` を GitHub Releases に配布し、`cargo build` 時に自動ダウンロードする
+  - `--features source-build` でソースビルドに切り替え可能
+  - @voluntas
 
 ### misc
 
