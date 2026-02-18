@@ -71,9 +71,13 @@ jobs:
             libclang-dev \
             clang \
             multistrap \
-            python3
+            python3 \
+            debian-archive-keyring
       - name: Build sysroot with multistrap
         run: |
+          # Debian の GPG 鍵を rootfs にコピーしてリポジトリ署名検証を通す
+          mkdir -p ${{ github.workspace }}/rootfs/etc/apt/trusted.gpg.d
+          cp /usr/share/keyrings/debian-archive-keyring.gpg ${{ github.workspace }}/rootfs/etc/apt/trusted.gpg.d/
           sudo multistrap --no-auth -a arm64 -d ${{ github.workspace }}/rootfs -f multistrap/${{ matrix.target }}.conf
           # multistrap が作る絶対パスのシンボリックリンクを相対パスに修正
           find ${{ github.workspace }}/rootfs -type l | while read link; do
