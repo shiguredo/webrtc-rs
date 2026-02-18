@@ -152,11 +152,11 @@ if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
   set(WEBRTC_USE_WEBRTC_LIBCXX FALSE)
 endif()
 
-# ARM64 Linux（ネイティブビルド）では prebuilt Clang バイナリが x86_64 向けのみ提供のため
+# ARM64 Linux のネイティブビルドでは prebuilt Clang バイナリが x86_64 向けのみ提供のため
 # システムの Clang を使用する。
-# raspberry-pi-os_armv8 は x86_64 ホストからのクロスコンパイルなので prebuilt Clang を使用する
-# （WEBRTC_TARGETS_ARMV8 に含めない = デフォルトの TRUE のまま）。
-if(WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_ARMV8)
+# クロスコンパイル時（WEBRTC_C_SYSROOT が定義されている場合）は x86_64 ホスト上で実行するため
+# prebuilt Clang を使用する（デフォルトの TRUE のまま）。
+if(WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_ARMV8 AND NOT DEFINED WEBRTC_C_SYSROOT)
   set(WEBRTC_USE_WEBRTC_PREBUILT_CLANG FALSE)
 endif()
 
@@ -310,8 +310,9 @@ if(WEBRTC_USE_WEBRTC_LIBCXX)
   message(STATUS "LIBCXX_INCLUDE_DIR: ${LIBCXX_INCLUDE_DIR}")
 endif()
 
-# Raspberry Pi OS 向けクロスコンパイル設定（project() の前に配置が必要）
-if(WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_RASPBERRY_PI AND DEFINED WEBRTC_C_SYSROOT)
+# ARM64 クロスコンパイル設定（project() の前に配置が必要）
+# WEBRTC_C_SYSROOT が定義されている場合、x86_64 ホストから ARM64 ターゲットへのクロスコンパイルを行う
+if((WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_RASPBERRY_PI OR WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_ARMV8) AND DEFINED WEBRTC_C_SYSROOT)
   set(CMAKE_SYSTEM_NAME Linux)
   set(CMAKE_SYSTEM_PROCESSOR aarch64)
   set(CMAKE_SYSROOT "${WEBRTC_C_SYSROOT}")

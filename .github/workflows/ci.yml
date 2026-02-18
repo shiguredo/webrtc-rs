@@ -19,8 +19,6 @@ jobs:
           - ubuntu-22.04
           - macos-26
           - macos-15
-          - ubuntu-24.04-arm
-          - ubuntu-22.04-arm
           # 将来的に対応予定
           # - windows-2025
     runs-on: ${{ matrix.os }}
@@ -35,14 +33,6 @@ jobs:
           sudo apt-get install -y build-essential \
             libclang-dev \
             libx11-dev
-      # ARM64 Linux ではビルドに Clang 21 以上が必要なため、
-      # apt.llvm.org から Clang 21 をインストールし、clang / clang++ として使えるようにシンボリックリンクを作成する
-      - name: Install Clang 21 for ARM64
-        if: runner.os == 'Linux' && runner.arch == 'ARM64'
-        run: |
-          wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 21
-          sudo ln -sf /usr/bin/clang-21 /usr/bin/clang
-          sudo ln -sf /usr/bin/clang++-21 /usr/bin/clang++
       - run: rustup update stable
       # あまり役立っていない感じがするので一旦コメントアウト
       # - uses: shiguredo/github-actions/.github/actions/rust-cache@main
@@ -58,6 +48,8 @@ jobs:
     strategy:
       matrix:
         target:
+          - ubuntu-24.04_armv8
+          - ubuntu-22.04_armv8
           - raspberry-pi-os_armv8
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -79,9 +71,12 @@ jobs:
             gcc-aarch64-linux-gnu
       - name: Build sysroot with multistrap
         run: |
-          # Debian の GPG 鍵を rootfs にコピーしてリポジトリ署名検証を通す
+          # GPG 鍵を rootfs にコピーしてリポジトリ署名検証を通す
           mkdir -p ${{ github.workspace }}/rootfs/etc/apt/trusted.gpg.d
-          cp /usr/share/keyrings/debian-archive-keyring.gpg ${{ github.workspace }}/rootfs/etc/apt/trusted.gpg.d/
+          # Ubuntu と Debian のどちらのリポジトリでも対応できるよう両方コピー
+          for keyring in /usr/share/keyrings/ubuntu-archive-keyring.gpg /usr/share/keyrings/debian-archive-keyring.gpg; do
+            [ -f "$keyring" ] && cp "$keyring" ${{ github.workspace }}/rootfs/etc/apt/trusted.gpg.d/
+          done
           sudo multistrap --no-auth -a arm64 -d ${{ github.workspace }}/rootfs -f multistrap/${{ matrix.target }}.conf
           # Cargo がワークスペースをスキャンする際に Permission denied にならないようにする
           sudo chmod -R a+rX ${{ github.workspace }}/rootfs
