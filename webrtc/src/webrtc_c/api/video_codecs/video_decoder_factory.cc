@@ -8,12 +8,12 @@
 // WebRTC
 #include <api/environment/environment.h>
 #include <api/video_codecs/builtin_video_decoder_factory.h>
+#include <api/video_codecs/sdp_video_format.h>
+#include <api/video_codecs/video_decoder.h>
 #include <api/video_codecs/video_decoder_factory.h>
 
 #include "../../common.impl.h"
-#include "/home/melpon/dev/sora-rust-sdk-private/crates/webrtc-rs/webrtc/src/webrtc_c/api/environment.h"
-#include "api/video_codecs/sdp_video_format.h"
-#include "api/video_codecs/video_decoder.h"
+#include "../environment.h"
 #include "sdp_video_format.h"
 #include "video_decoder.h"
 
