@@ -11,6 +11,9 @@
 
 ## develop
 
+- [CHANGE] Ubuntu 24.04 LTS arm64 / Ubuntu 22.04 LTS arm64 / Raspberry Pi OS arm64 のクロスコンパイルに対応する
+  - @voluntas
+
 ### misc
 
 

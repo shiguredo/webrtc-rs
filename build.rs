@@ -18,6 +18,7 @@ fn main() {
     println!("cargo::rerun-if-changed=Cargo.toml");
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-env-changed=CARGO_FEATURE_LOCAL_EXPORT");
+    println!("cargo::rerun-if-env-changed=WEBRTC_C_SYSROOT");
 
     let manifest_dir = PathBuf::from(
         env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR の取得に失敗しました"),
@@ -108,6 +109,11 @@ fn build_webrtc_c(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> P
         .define("WEBRTC_C_TARGET", target_platform)
         .define("CMAKE_BUILD_TYPE", "Release")
         .define("CMAKE_EXPORT_COMPILE_COMMANDS", "ON");
+
+    // WEBRTC_C_SYSROOT が設定されていれば CMake に渡す
+    if let Ok(sysroot) = env::var("WEBRTC_C_SYSROOT") {
+        config.define("WEBRTC_C_SYSROOT", &sysroot);
+    }
 
     // bundled_webrtc_c_bundling ターゲットのみをビルド（all ターゲットを避ける）
     let dst = config.build_target("bundled_webrtc_c_bundling").build();
