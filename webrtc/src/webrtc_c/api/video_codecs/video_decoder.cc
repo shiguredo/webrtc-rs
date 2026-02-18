@@ -16,16 +16,16 @@ namespace {
 
 constexpr int32_t kVideoCodecOk = 0;
 
-class RustVideoDecoder : public webrtc::VideoDecoder {
+class VideoDecoderImpl : public webrtc::VideoDecoder {
  public:
-  RustVideoDecoder(const webrtc_VideoDecoder_cbs* cbs, void* user_data)
+  VideoDecoderImpl(const webrtc_VideoDecoder_cbs* cbs, void* user_data)
       : user_data_(user_data) {
     if (cbs != nullptr) {
       cbs_ = *cbs;
     }
   }
 
-  ~RustVideoDecoder() override {
+  ~VideoDecoderImpl() override {
     if (cbs_.OnDestroy != nullptr) {
       cbs_.OnDestroy(user_data_);
     }
@@ -184,7 +184,7 @@ int webrtc_VideoDecoder_Settings_max_render_resolution_height(
 struct webrtc_VideoDecoder_unique* webrtc_VideoDecoder_new(
     const struct webrtc_VideoDecoder_cbs* cbs,
     void* user_data) {
-  auto decoder = new RustVideoDecoder(cbs, user_data);
+  auto decoder = new VideoDecoderImpl(cbs, user_data);
   return reinterpret_cast<struct webrtc_VideoDecoder_unique*>(decoder);
 }
 

@@ -19,9 +19,9 @@
 
 namespace {
 
-class RustVideoEncoderFactory : public webrtc::VideoEncoderFactory {
+class VideoEncoderFactoryImpl : public webrtc::VideoEncoderFactory {
  public:
-  RustVideoEncoderFactory(const webrtc_VideoEncoderFactory_cbs* cbs,
+  VideoEncoderFactoryImpl(const webrtc_VideoEncoderFactory_cbs* cbs,
                           void* user_data)
       : user_data_(user_data) {
     if (cbs != nullptr) {
@@ -29,7 +29,7 @@ class RustVideoEncoderFactory : public webrtc::VideoEncoderFactory {
     }
   }
 
-  ~RustVideoEncoderFactory() override {
+  ~VideoEncoderFactoryImpl() override {
     if (cbs_.OnDestroy != nullptr) {
       cbs_.OnDestroy(user_data_);
     }
@@ -87,7 +87,7 @@ WEBRTC_DEFINE_UNIQUE(webrtc_VideoEncoderFactory, webrtc::VideoEncoderFactory);
 struct webrtc_VideoEncoderFactory_unique* webrtc_VideoEncoderFactory_new(
     const struct webrtc_VideoEncoderFactory_cbs* cbs,
     void* user_data) {
-  auto factory = new RustVideoEncoderFactory(cbs, user_data);
+  auto factory = new VideoEncoderFactoryImpl(cbs, user_data);
   return reinterpret_cast<struct webrtc_VideoEncoderFactory_unique*>(factory);
 }
 

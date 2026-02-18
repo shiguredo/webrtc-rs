@@ -24,9 +24,9 @@ namespace {
 
 constexpr int32_t kVideoCodecOk = 0;
 
-class RustEncodedImageCallback : public webrtc::EncodedImageCallback {
+class EncodedImageCallbackImpl : public webrtc::EncodedImageCallback {
  public:
-  RustEncodedImageCallback(
+  EncodedImageCallbackImpl(
       const webrtc_VideoEncoder_EncodedImageCallback_cbs* cbs,
       void* user_data)
       : user_data_(user_data) {
@@ -35,7 +35,7 @@ class RustEncodedImageCallback : public webrtc::EncodedImageCallback {
     }
   }
 
-  ~RustEncodedImageCallback() override {
+  ~EncodedImageCallbackImpl() override {
     if (cbs_.OnDestroy != nullptr) {
       cbs_.OnDestroy(user_data_);
     }
@@ -77,16 +77,16 @@ class RustEncodedImageCallback : public webrtc::EncodedImageCallback {
   void* user_data_ = nullptr;
 };
 
-class RustVideoEncoder : public webrtc::VideoEncoder {
+class VideoEncoderImpl : public webrtc::VideoEncoder {
  public:
-  RustVideoEncoder(const webrtc_VideoEncoder_cbs* cbs, void* user_data)
+  VideoEncoderImpl(const webrtc_VideoEncoder_cbs* cbs, void* user_data)
       : user_data_(user_data) {
     if (cbs != nullptr) {
       cbs_ = *cbs;
     }
   }
 
-  ~RustVideoEncoder() override {
+  ~VideoEncoderImpl() override {
     if (cbs_.OnDestroy != nullptr) {
       cbs_.OnDestroy(user_data_);
     }
@@ -291,14 +291,14 @@ struct webrtc_VideoEncoder_EncodedImageCallback*
 webrtc_VideoEncoder_EncodedImageCallback_new(
     const struct webrtc_VideoEncoder_EncodedImageCallback_cbs* cbs,
     void* user_data) {
-  auto callback = new RustEncodedImageCallback(cbs, user_data);
+  auto callback = new EncodedImageCallbackImpl(cbs, user_data);
   return reinterpret_cast<struct webrtc_VideoEncoder_EncodedImageCallback*>(
       callback);
 }
 
 void webrtc_VideoEncoder_EncodedImageCallback_delete(
     struct webrtc_VideoEncoder_EncodedImageCallback* self) {
-  auto callback = reinterpret_cast<RustEncodedImageCallback*>(self);
+  auto callback = reinterpret_cast<EncodedImageCallbackImpl*>(self);
   delete callback;
 }
 
@@ -325,7 +325,7 @@ webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage(
 struct webrtc_VideoEncoder_unique* webrtc_VideoEncoder_new(
     const struct webrtc_VideoEncoder_cbs* cbs,
     void* user_data) {
-  auto encoder = new RustVideoEncoder(cbs, user_data);
+  auto encoder = new VideoEncoderImpl(cbs, user_data);
   return reinterpret_cast<struct webrtc_VideoEncoder_unique*>(encoder);
 }
 
