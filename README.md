@@ -275,8 +275,6 @@ impl FactoryHolder {
 
 ## 環境変数
 
-- `WEBRTC_C_LIB_PATH`
-  - libwebrtc_c.a の絶対パスを直接指定する場合に利用
 - `WEBRTC_C_TARGET`
   - ビルドターゲットを変更する場合に指定 (デフォルトはホスト環境に応じて自動判定)
 
