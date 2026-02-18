@@ -745,7 +745,9 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
             Some(Box::new(move |env, format| {
                 assert!(!env.as_ptr().is_null());
                 assert_eq!(
-                    format.name().expect("SdpVideoFormatRef::name に失敗しました"),
+                    format
+                        .name()
+                        .expect("SdpVideoFormatRef::name に失敗しました"),
                     "VP8"
                 );
                 if created {
@@ -781,8 +783,14 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
     frame_types.push(VideoFrameType::Key);
     frame_types.push(VideoFrameType::Delta);
 
-    assert_eq!(encoder.encode_with_frame_types(&frame, Some(frame_types.as_ref())), 1);
-    assert_eq!(encoder.encode_with_frame_types(&frame, Some(frame_types.as_ref())), 2);
+    assert_eq!(
+        encoder.encode_with_frame_types(&frame, Some(frame_types.as_ref())),
+        1
+    );
+    assert_eq!(
+        encoder.encode_with_frame_types(&frame, Some(frame_types.as_ref())),
+        2
+    );
     assert!(
         factory.create(&env, &format).is_none(),
         "2 回目の create は None を返す想定です"
@@ -821,7 +829,8 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_callback() {
             let state = unsafe { state_ptr_for_register.get_mut() };
             state.register_called = true;
             state.order.push("register");
-            state.callback_ptr = Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_ref(callback) });
+            state.callback_ptr =
+                Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_ref(callback) });
             0
         })),
         encode: Some(Box::new(move |_, _| {
@@ -833,11 +842,16 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_callback() {
 
             let callback_ptr = {
                 let state = unsafe { state_ptr_for_encode.get_mut() };
-                state.callback_ptr.expect("encode 側 callback_ptr が未設定です")
+                state
+                    .callback_ptr
+                    .expect("encode 側 callback_ptr が未設定です")
             };
             let image = EncodedImage::new();
             let result = unsafe { callback_ptr.on_encoded_image(image.as_ref(), None) };
-            assert_eq!(result.error(), VideoEncoderEncodedImageCallbackResultError::Ok);
+            assert_eq!(
+                result.error(),
+                VideoEncoderEncodedImageCallbackResultError::Ok
+            );
             77
         })),
         ..Default::default()
@@ -915,7 +929,8 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
             let state = unsafe { state_ptr_for_register.get_mut() };
             state.register_called = true;
             state.order.push("register");
-            state.callback_ptr = Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_ref(callback) });
+            state.callback_ptr =
+                Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_ref(callback) });
             0
         })),
         encode: Some(Box::new(move |_, _| {
@@ -927,7 +942,9 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
 
             let callback_ptr = {
                 let state = unsafe { state_ptr_for_encode.get_mut() };
-                state.callback_ptr.expect("encode 側 callback_ptr が未設定です")
+                state
+                    .callback_ptr
+                    .expect("encode 側 callback_ptr が未設定です")
             };
 
             let buffer = EncodedImageBuffer::from_bytes(&[1, 2, 3, 4]);
@@ -948,12 +965,12 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
             codec_specific_info.set_h264_idr_frame(true);
 
             let result = unsafe {
-                callback_ptr.on_encoded_image(
-                    image.as_ref(),
-                    Some(codec_specific_info.as_ref()),
-                )
+                callback_ptr.on_encoded_image(image.as_ref(), Some(codec_specific_info.as_ref()))
             };
-            assert_eq!(result.error(), VideoEncoderEncodedImageCallbackResultError::Ok);
+            assert_eq!(
+                result.error(),
+                VideoEncoderEncodedImageCallbackResultError::Ok
+            );
             assert_eq!(result.frame_id(), 9999);
             assert!(!result.drop_next_frame());
             88
@@ -968,9 +985,7 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
                 state.on_encoded_image_called = true;
                 state.order.push("on_encoded_image");
 
-                let encoded_data = image
-                    .encoded_data()
-                    .expect("encoded_data が None です");
+                let encoded_data = image.encoded_data().expect("encoded_data が None です");
                 assert_eq!(encoded_data.data(), [1, 2, 3, 4]);
                 assert_eq!(encoded_data.data().len(), 4);
                 assert_eq!(image.rtp_timestamp(), 12345);
