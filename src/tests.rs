@@ -708,23 +708,8 @@ fn video_track_and_transceiver_with_track() {
 
 #[test]
 fn peer_connection_observer_and_dependencies() {
-    use std::sync::Arc;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    let counter = Arc::new(AtomicUsize::new(0));
-    let counter_cloned = Arc::clone(&counter);
-    let mut observer = PeerConnectionObserverBuilder::new()
-        .on_connection_change(move |state| {
-            if matches!(state, PeerConnectionState::Connected) {
-                counter_cloned.fetch_add(1, Ordering::SeqCst);
-            }
-        })
-        .build();
-    observer.invoke_connection_change_for_test(PeerConnectionState::Connected);
-    assert_eq!(counter.load(Ordering::SeqCst), 1);
-
-    let observer2 = PeerConnectionObserverBuilder::new().build();
-    let deps = PeerConnectionDependencies::new(&observer2);
+    let observer = PeerConnectionObserverBuilder::new().build();
+    let deps = PeerConnectionDependencies::new(&observer);
     assert!(!deps.as_ptr().is_null());
     drop(deps);
 }

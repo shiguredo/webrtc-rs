@@ -23,19 +23,32 @@ class SetRemoteDescriptionObserverInterfaceImpl
     : public webrtc::SetRemoteDescriptionObserverInterface {
  public:
   SetRemoteDescriptionObserverInterfaceImpl(
-      struct webrtc_SetRemoteDescriptionObserverInterface_cbs* cbs,
+      const struct webrtc_SetRemoteDescriptionObserverInterface_cbs* cbs,
       void* user_data)
-      : cbs_(cbs), user_data_(user_data) {}
+      : user_data_(user_data) {
+    if (cbs != nullptr) {
+      cbs_ = *cbs;
+    }
+  }
+
+  ~SetRemoteDescriptionObserverInterfaceImpl() override {
+    if (cbs_.OnDestroy != nullptr) {
+      cbs_.OnDestroy(user_data_);
+    }
+  }
 
   void OnSetRemoteDescriptionComplete(webrtc::RTCError error) override {
+    if (cbs_.OnSetRemoteDescriptionComplete == nullptr) {
+      return;
+    }
     auto rtc_error = std::make_unique<webrtc::RTCError>(std::move(error));
-    cbs_->OnSetRemoteDescriptionComplete(
+    cbs_.OnSetRemoteDescriptionComplete(
         reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error.release()),
         user_data_);
   }
 
  private:
-  struct webrtc_SetRemoteDescriptionObserverInterface_cbs* cbs_;
+  webrtc_SetRemoteDescriptionObserverInterface_cbs cbs_{};
   void* user_data_;
 };
 
@@ -45,7 +58,7 @@ WEBRTC_DEFINE_REFCOUNTED(webrtc_SetRemoteDescriptionObserverInterface,
 
 struct webrtc_SetRemoteDescriptionObserverInterface_refcounted*
 webrtc_SetRemoteDescriptionObserverInterface_make_ref_counted(
-    struct webrtc_SetRemoteDescriptionObserverInterface_cbs* cbs,
+    const struct webrtc_SetRemoteDescriptionObserverInterface_cbs* cbs,
     void* user_data) {
   auto impl =
       webrtc::make_ref_counted<SetRemoteDescriptionObserverInterfaceImpl>(

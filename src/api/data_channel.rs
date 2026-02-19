@@ -153,9 +153,10 @@ impl Default for DataChannelObserverBuilder {
 }
 
 unsafe extern "C" fn dc_observer_on_state_change(user_data: *mut c_void) {
-    if user_data.is_null() {
-        return;
-    }
+    assert!(
+        !user_data.is_null(),
+        "dc_observer_on_state_change: user_data is null"
+    );
     let callbacks = unsafe { &mut *(user_data as *mut DataChannelCallbacks) };
     if let Some(cb) = callbacks.on_state_change.as_mut() {
         cb();
@@ -168,9 +169,10 @@ unsafe extern "C" fn dc_observer_on_message(
     is_binary: i32,
     user_data: *mut c_void,
 ) {
-    if user_data.is_null() {
-        return;
-    }
+    assert!(
+        !user_data.is_null(),
+        "dc_observer_on_message: user_data is null"
+    );
     let callbacks = unsafe { &mut *(user_data as *mut DataChannelCallbacks) };
     let slice = unsafe { slice::from_raw_parts(data, len) };
     if let Some(cb) = callbacks.on_message.as_mut() {
@@ -178,11 +180,17 @@ unsafe extern "C" fn dc_observer_on_message(
     }
 }
 
+unsafe extern "C" fn dc_observer_on_destroy(user_data: *mut c_void) {
+    assert!(
+        !user_data.is_null(),
+        "dc_observer_on_destroy: user_data is null"
+    );
+    let _ = unsafe { Box::from_raw(user_data as *mut DataChannelCallbacks) };
+}
+
 /// DataChannelObserver のラッパー。
 pub struct DataChannelObserver {
     raw: NonNull<ffi::webrtc_DataChannelObserver>,
-    _cbs: *mut ffi::webrtc_DataChannelObserver_cbs,
-    _user_data: *mut DataChannelCallbacks,
 }
 
 impl DataChannelObserver {
@@ -198,7 +206,7 @@ impl DataChannelObserver {
             on_message,
         });
         let user_data = Box::into_raw(callbacks) as *mut c_void;
-        let cbs = Box::new(ffi::webrtc_DataChannelObserver_cbs {
+        let cbs = ffi::webrtc_DataChannelObserver_cbs {
             OnStateChange: if has_on_state_change {
                 Some(dc_observer_on_state_change)
             } else {
@@ -209,16 +217,17 @@ impl DataChannelObserver {
             } else {
                 None
             },
-        });
-        let cbs_ptr = Box::into_raw(cbs);
-        let raw = unsafe { ffi::webrtc_DataChannelObserver_new(cbs_ptr, user_data) };
+            OnDestroy: Some(dc_observer_on_destroy),
+        };
         let raw =
-            NonNull::new(raw).expect("BUG: webrtc_DataChannelObserver_new が null を返しました");
-        Self {
-            raw,
-            _cbs: cbs_ptr,
-            _user_data: user_data as *mut DataChannelCallbacks,
-        }
+            match NonNull::new(unsafe { ffi::webrtc_DataChannelObserver_new(&cbs, user_data) }) {
+                Some(raw) => raw,
+                None => {
+                    let _ = unsafe { Box::from_raw(user_data as *mut DataChannelCallbacks) };
+                    panic!("BUG: webrtc_DataChannelObserver_new が null を返しました");
+                }
+            };
+        Self { raw }
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_DataChannelObserver {
@@ -229,11 +238,6 @@ impl DataChannelObserver {
 impl Drop for DataChannelObserver {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_DataChannelObserver_delete(self.raw.as_ptr()) };
-        // cbs と user_data の解放
-        unsafe {
-            let _ = Box::from_raw(self._cbs);
-            let _ = Box::from_raw(self._user_data);
-        };
     }
 }
 

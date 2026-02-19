@@ -417,27 +417,26 @@ unsafe impl Send for AudioTransportRef {}
 /// Rust 側でカスタム実装を持てる webrtc::AudioTransport の所有型。
 pub struct AudioTransport {
     raw: NonNull<ffi::webrtc_AudioTransport>,
-    _cbs: Box<ffi::webrtc_AudioTransport_cbs>,
-    _user_data: Box<AudioTransportCallbackState>,
 }
 
 impl AudioTransport {
     pub fn new(callbacks: AudioTransportCallbacks) -> Self {
-        let mut state = Box::new(AudioTransportCallbackState { callbacks });
-        let user_data = state.as_mut() as *mut AudioTransportCallbackState as *mut c_void;
-        let mut cbs = Box::new(ffi::webrtc_AudioTransport_cbs {
+        let state = Box::new(AudioTransportCallbackState { callbacks });
+        let user_data = Box::into_raw(state) as *mut c_void;
+        let cbs = ffi::webrtc_AudioTransport_cbs {
             RecordedDataIsAvailable: Some(audio_transport_recorded_data_is_available),
             NeedMorePlayData: Some(audio_transport_need_more_play_data),
             PullRenderData: Some(audio_transport_pull_render_data),
-        });
-        let cbs_ptr = cbs.as_mut() as *mut ffi::webrtc_AudioTransport_cbs;
-        let raw = NonNull::new(unsafe { ffi::webrtc_AudioTransport_new(cbs_ptr, user_data) })
-            .expect("BUG: webrtc_AudioTransport_new が null を返しました");
-        Self {
-            raw,
-            _cbs: cbs,
-            _user_data: state,
-        }
+            OnDestroy: Some(audio_transport_on_destroy),
+        };
+        let raw = match NonNull::new(unsafe { ffi::webrtc_AudioTransport_new(&cbs, user_data) }) {
+            Some(raw) => raw,
+            None => {
+                let _ = unsafe { Box::from_raw(user_data as *mut AudioTransportCallbackState) };
+                panic!("BUG: webrtc_AudioTransport_new が null を返しました");
+            }
+        };
+        Self { raw }
     }
 
     pub fn as_ref(&self) -> AudioTransportRef {
@@ -573,6 +572,14 @@ pub struct AudioTransportCallbacks {
 
 struct AudioTransportCallbackState {
     callbacks: AudioTransportCallbacks,
+}
+
+unsafe extern "C" fn audio_transport_on_destroy(user_data: *mut c_void) {
+    assert!(
+        !user_data.is_null(),
+        "audio_transport_on_destroy: user_data is null"
+    );
+    let _ = unsafe { Box::from_raw(user_data as *mut AudioTransportCallbackState) };
 }
 
 unsafe extern "C" fn audio_transport_recorded_data_is_available(
@@ -1506,9 +1513,7 @@ unsafe extern "C" fn adm_get_stats(
 }
 
 unsafe extern "C" fn adm_on_destroy(user_data: *mut c_void) {
-    if user_data.is_null() {
-        return;
-    }
+    assert!(!user_data.is_null(), "adm_on_destroy: user_data is null");
     unsafe {
         let _ = Box::from_raw(user_data as *mut AudioDeviceModuleUserData);
     }
