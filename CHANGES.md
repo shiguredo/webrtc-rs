@@ -11,8 +11,10 @@
 
 ## develop
 
-### misc
+- [ADD] `VideoEncoderFactory` / `VideoDecoderFactory` / `VideoEncoder` / `VideoDecoder` の C API / Rust API を追加する
+  - callback 構造体ベースで Rust 実装を差し込めるようにする
 
+### misc
 
 ## 0.145.1
 
@@ -37,4 +39,3 @@
 ## 0.145.0
 
 **リリース日**: 2026-02-12
-

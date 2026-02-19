@@ -9,6 +9,9 @@ mod rtc_event_log;
 mod rtp;
 mod stats;
 mod video;
+mod video_codec_common;
+mod video_decoder;
+mod video_encoder;
 
 pub use audio::*;
 pub use data_channel::*;
@@ -21,3 +24,6 @@ pub use rtc_event_log::*;
 pub use rtp::*;
 pub use stats::*;
 pub use video::*;
+pub use video_codec_common::*;
+pub use video_decoder::*;
+pub use video_encoder::*;

@@ -423,7 +423,7 @@ impl SignalingWhip {
         if let Some(encodings) = &self.config.send_encodings {
             init.set_send_encodings(encodings);
         }
-        let mut stream_ids = init.stream_ids();
+        let stream_ids = init.stream_ids();
         let stream_id = shiguredo_webrtc::random_string(16);
         stream_ids.push(&CxxString::from_str(&stream_id));
         let source = match &self.config.video_source {

@@ -41,48 +41,43 @@ impl CxxString {
 
     /// 長さを取得する。
     pub fn len(&self) -> usize {
-        let raw = self.raw_string();
-        let len = unsafe { ffi::std_string_size(raw.as_ptr()) };
-        len.max(0) as usize
+        self.as_ref().len()
     }
 
     /// 空かどうかを返す。
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.as_ref().is_empty()
     }
 
     /// Rust の String として取得する。
     /// UTF-8 に変換できない場合はエラーを返す。
     pub fn to_string(&self) -> Result<String> {
-        let raw = self.raw_string();
-        let len = self.len();
-        let ptr = unsafe { ffi::std_string_c_str(raw.as_ptr()) }.cast::<u8>();
-        assert!(!ptr.is_null(), "BUG: std_string_c_str が null を返しました");
-        let bytes = unsafe { slice::from_raw_parts(ptr, len) };
-        let s = std::str::from_utf8(bytes)?;
-        Ok(s.to_owned())
+        self.as_ref().to_string()
     }
 
     /// バイト列として取得する。
     pub fn to_bytes(&self) -> Vec<u8> {
-        let raw = self.raw_string();
-        let len = self.len();
-        let ptr = unsafe { ffi::std_string_c_str(raw.as_ptr()) }.cast::<u8>();
-        unsafe { slice::from_raw_parts(ptr, len) }.to_vec()
+        self.as_ref().to_bytes()
     }
 
     /// 末尾に追記する。
     /// s に null バイトが含まれていてもエラーにしない。
     pub fn append(&mut self, s: &str) {
-        let raw = self.raw_string();
-        unsafe {
-            ffi::std_string_append(raw.as_ptr(), s.as_ptr() as *const _, s.len());
-        }
+        self.as_ref().append(s);
     }
 
     /// FFI に渡す生ポインタ。
     pub fn as_ptr(&self) -> *mut ffi::std_string {
         self.raw_string().as_ptr()
+    }
+
+    pub fn as_ref(&self) -> CxxStringRef<'_> {
+        CxxStringRef::from_ptr(self.raw_string())
+    }
+
+    /// FFI へ所有権を移譲する。
+    pub fn into_raw(self) -> *mut ffi::std_string_unique {
+        std::mem::ManuallyDrop::new(self).raw_unique.as_ptr()
     }
 
     fn raw_string(&self) -> NonNull<ffi::std_string> {
@@ -139,6 +134,14 @@ impl<'a> CxxStringRef<'a> {
         unsafe { slice::from_raw_parts(ptr, len) }.to_vec()
     }
 
+    /// 末尾に追記する。
+    /// s に null バイトが含まれていてもエラーにしない。
+    pub fn append(&self, s: &str) {
+        unsafe {
+            ffi::std_string_append(self.as_ptr(), s.as_ptr() as *const _, s.len());
+        }
+    }
+
     /// FFI に渡す生ポインタ。
     pub fn as_ptr(&self) -> *mut ffi::std_string {
         self.raw.as_ptr()
@@ -161,18 +164,17 @@ impl StringVector {
 
     /// 要素数を取得する。
     pub fn len(&self) -> usize {
-        let len = unsafe { ffi::std_string_vector_size(self.raw.as_ptr()) };
-        len.max(0) as usize
+        self.as_ref().len()
     }
 
     /// 空かどうかを返す。
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.as_ref().is_empty()
     }
 
     /// 末尾に要素を追加する。
     pub fn push(&mut self, value: &CxxString) {
-        unsafe { ffi::std_string_vector_push_back(self.raw.as_ptr(), value.as_ptr()) };
+        self.as_ref().push(value);
     }
 
     pub fn as_ptr(&self) -> *mut ffi::std_string_vector {
@@ -181,15 +183,11 @@ impl StringVector {
 
     /// index の要素を Rust の String として取得する。
     pub fn get(&self, index: usize) -> Result<String> {
-        let len = self.len();
-        if index >= len {
-            return Err(Error::OutOfIndex(index));
-        }
-        let ptr = unsafe { ffi::std_string_vector_get(self.raw.as_ptr(), index as i32) };
-        CxxStringRef::from_ptr(
-            NonNull::new(ptr).expect("BUG: std_string_vector_get が null を返しました"),
-        )
-        .to_string()
+        self.as_ref().get(index)
+    }
+
+    pub fn as_ref(&self) -> StringVectorRef<'_> {
+        StringVectorRef::from_raw(self.raw)
     }
 }
 
@@ -222,8 +220,20 @@ impl<'a> StringVectorRef<'a> {
         self.len() == 0
     }
 
-    pub fn push(&mut self, value: &CxxString) {
+    pub fn push(&self, value: &CxxString) {
         unsafe { ffi::std_string_vector_push_back(self.raw.as_ptr(), value.as_ptr()) };
+    }
+
+    pub fn get(&self, index: usize) -> Result<String> {
+        let len = self.len();
+        if index >= len {
+            return Err(Error::OutOfIndex(index));
+        }
+        let ptr = unsafe { ffi::std_string_vector_get(self.raw.as_ptr(), index as i32) };
+        CxxStringRef::from_ptr(
+            NonNull::new(ptr).expect("BUG: std_string_vector_get が null を返しました"),
+        )
+        .to_string()
     }
 }
 

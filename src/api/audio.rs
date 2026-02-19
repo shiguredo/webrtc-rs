@@ -414,6 +414,131 @@ impl AudioTransportRef {
 
 unsafe impl Send for AudioTransportRef {}
 
+/// Rust 側でカスタム実装を持てる webrtc::AudioTransport の所有型。
+pub struct AudioTransport {
+    raw: NonNull<ffi::webrtc_AudioTransport>,
+    _cbs: Box<ffi::webrtc_AudioTransport_cbs>,
+    _user_data: Box<AudioTransportCallbackState>,
+}
+
+impl AudioTransport {
+    pub fn new(callbacks: AudioTransportCallbacks) -> Self {
+        let mut state = Box::new(AudioTransportCallbackState { callbacks });
+        let user_data = state.as_mut() as *mut AudioTransportCallbackState as *mut c_void;
+        let mut cbs = Box::new(ffi::webrtc_AudioTransport_cbs {
+            RecordedDataIsAvailable: Some(audio_transport_recorded_data_is_available),
+            NeedMorePlayData: Some(audio_transport_need_more_play_data),
+            PullRenderData: Some(audio_transport_pull_render_data),
+        });
+        let cbs_ptr = cbs.as_mut() as *mut ffi::webrtc_AudioTransport_cbs;
+        let raw = NonNull::new(unsafe { ffi::webrtc_AudioTransport_new(cbs_ptr, user_data) })
+            .expect("BUG: webrtc_AudioTransport_new が null を返しました");
+        Self {
+            raw,
+            _cbs: cbs,
+            _user_data: state,
+        }
+    }
+
+    pub fn as_ref(&self) -> AudioTransportRef {
+        AudioTransportRef { raw: self.raw }
+    }
+
+    /// # Safety
+    /// `AudioTransportRef::recorded_data_is_available` と同じ前提条件を満たす必要がある。
+    #[allow(clippy::too_many_arguments)]
+    pub unsafe fn recorded_data_is_available(
+        &self,
+        audio_samples: *const u8,
+        n_samples: usize,
+        n_bytes_per_sample: usize,
+        n_channels: usize,
+        samples_per_sec: u32,
+        total_delay_ms: u32,
+        clock_drift: i32,
+        current_mic_level: u32,
+        key_pressed: bool,
+        new_mic_level: &mut u32,
+        estimated_capture_time_ns: Option<i64>,
+    ) -> i32 {
+        unsafe {
+            self.as_ref().recorded_data_is_available(
+                audio_samples,
+                n_samples,
+                n_bytes_per_sample,
+                n_channels,
+                samples_per_sec,
+                total_delay_ms,
+                clock_drift,
+                current_mic_level,
+                key_pressed,
+                new_mic_level,
+                estimated_capture_time_ns,
+            )
+        }
+    }
+
+    /// # Safety
+    /// `AudioTransportRef::need_more_play_data` と同じ前提条件を満たす必要がある。
+    #[allow(clippy::too_many_arguments)]
+    pub unsafe fn need_more_play_data(
+        &self,
+        n_samples: usize,
+        n_bytes_per_sample: usize,
+        n_channels: usize,
+        samples_per_sec: u32,
+        audio_samples: *mut u8,
+        n_samples_out: &mut usize,
+        elapsed_time_ms: *mut i64,
+        ntp_time_ms: *mut i64,
+    ) -> i32 {
+        unsafe {
+            self.as_ref().need_more_play_data(
+                n_samples,
+                n_bytes_per_sample,
+                n_channels,
+                samples_per_sec,
+                audio_samples,
+                n_samples_out,
+                elapsed_time_ms,
+                ntp_time_ms,
+            )
+        }
+    }
+
+    /// # Safety
+    /// `AudioTransportRef::pull_render_data` と同じ前提条件を満たす必要がある。
+    #[allow(clippy::too_many_arguments)]
+    pub unsafe fn pull_render_data(
+        &self,
+        bits_per_sample: i32,
+        sample_rate: i32,
+        number_of_channels: usize,
+        number_of_frames: usize,
+        audio_data: *mut u8,
+        elapsed_time_ms: *mut i64,
+        ntp_time_ms: *mut i64,
+    ) {
+        unsafe {
+            self.as_ref().pull_render_data(
+                bits_per_sample,
+                sample_rate,
+                number_of_channels,
+                number_of_frames,
+                audio_data,
+                elapsed_time_ms,
+                ntp_time_ms,
+            )
+        }
+    }
+}
+
+impl Drop for AudioTransport {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_AudioTransport_delete(self.raw.as_ptr()) };
+    }
+}
+
 type RecordedDataIsAvailableCallback = Box<
     dyn FnMut(
             *const u8,
@@ -557,43 +682,6 @@ unsafe extern "C" fn audio_transport_pull_render_data(
         elapsed_time_ms,
         ntp_time_ms,
     );
-}
-
-/// Rust 側でカスタム実装を持てる webrtc::AudioTransport の所有型。
-pub struct AudioTransport {
-    raw: NonNull<ffi::webrtc_AudioTransport>,
-    _cbs: Box<ffi::webrtc_AudioTransport_cbs>,
-    _user_data: Box<AudioTransportCallbackState>,
-}
-
-impl AudioTransport {
-    pub fn new(callbacks: AudioTransportCallbacks) -> Self {
-        let mut state = Box::new(AudioTransportCallbackState { callbacks });
-        let user_data = state.as_mut() as *mut AudioTransportCallbackState as *mut c_void;
-        let mut cbs = Box::new(ffi::webrtc_AudioTransport_cbs {
-            RecordedDataIsAvailable: Some(audio_transport_recorded_data_is_available),
-            NeedMorePlayData: Some(audio_transport_need_more_play_data),
-            PullRenderData: Some(audio_transport_pull_render_data),
-        });
-        let cbs_ptr = cbs.as_mut() as *mut ffi::webrtc_AudioTransport_cbs;
-        let raw = NonNull::new(unsafe { ffi::webrtc_AudioTransport_new(cbs_ptr, user_data) })
-            .expect("BUG: webrtc_AudioTransport_new が null を返しました");
-        Self {
-            raw,
-            _cbs: cbs,
-            _user_data: state,
-        }
-    }
-
-    pub fn as_ref(&self) -> AudioTransportRef {
-        AudioTransportRef { raw: self.raw }
-    }
-}
-
-impl Drop for AudioTransport {
-    fn drop(&mut self) {
-        unsafe { ffi::webrtc_AudioTransport_delete(self.raw.as_ptr()) };
-    }
 }
 
 type AudioLayerCallback = Box<dyn Fn(&mut i32) -> i32 + Send + Sync + 'static>;
