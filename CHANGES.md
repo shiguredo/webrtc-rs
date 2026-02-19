@@ -17,6 +17,8 @@
 - [UPDATE] video codec 関連 API のモジュール構成を整理する
   - `video_codec_common.rs` / `video_encoder.rs` / `video_decoder.rs` に分割する
   - `EncodedImage` 系、`VideoFrame` 系、`SdpVideoFormat` 系などの共通型を `video_codec_common.rs` に集約する
+- [UPDATE] audio API のモジュール構成を整理する
+  - `AudioDeviceModule` / `AudioTransport` 実装を `audio_device_module.rs` へ分離する
 - [UPDATE] `Xxx` / `XxxRef` の API 一貫性を改善する
   - 公開操作メソッド名を揃え、`Xxx` 側は `XxxRef` へ委譲する
   - `Xxx` と `XxxRef` の定義位置を隣接化する

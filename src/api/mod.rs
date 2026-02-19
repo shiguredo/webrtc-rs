@@ -1,4 +1,5 @@
 mod audio;
+mod audio_device_module;
 mod data_channel;
 mod environment;
 mod jsep;
@@ -14,6 +15,7 @@ mod video_decoder;
 mod video_encoder;
 
 pub use audio::*;
+pub use audio_device_module::*;
 pub use data_channel::*;
 pub use environment::*;
 pub use jsep::*;
