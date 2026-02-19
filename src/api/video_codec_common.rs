@@ -69,7 +69,7 @@ impl<'a> SdpVideoFormatRef<'a> {
         .to_string()
     }
 
-    pub fn parameters_mut(&self) -> MapStringString<'a> {
+    pub fn parameters_mut(&mut self) -> MapStringString<'a> {
         let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(self.raw.as_ptr()) };
         MapStringString::from_raw(NonNull::new(ptr).expect("BUG: ptr が null"))
     }
@@ -390,7 +390,7 @@ impl<'a> VideoFrameTypeVectorRef<'a> {
         Some(VideoFrameType::from_raw(value))
     }
 
-    pub fn push(&self, value: VideoFrameType) {
+    pub fn push(&mut self, value: VideoFrameType) {
         unsafe {
             ffi::webrtc_VideoFrameType_vector_push_back_value(self.raw.as_ptr(), value.to_raw())
         };
@@ -711,29 +711,29 @@ impl<'a> EncodedImageRef<'a> {
         Some(EncodedImageBuffer::from_raw_ref(raw_ref))
     }
 
-    pub fn set_encoded_data(&self, encoded_data: &EncodedImageBuffer) {
+    pub fn set_encoded_data(&mut self, encoded_data: &EncodedImageBuffer) {
         unsafe {
             ffi::webrtc_EncodedImage_set_encoded_data(self.raw.as_ptr(), encoded_data.as_ptr())
         };
     }
 
-    pub fn set_rtp_timestamp(&self, rtp_timestamp: u32) {
+    pub fn set_rtp_timestamp(&mut self, rtp_timestamp: u32) {
         unsafe { ffi::webrtc_EncodedImage_set_rtp_timestamp(self.raw.as_ptr(), rtp_timestamp) };
     }
 
-    pub fn set_encoded_width(&self, encoded_width: u32) {
+    pub fn set_encoded_width(&mut self, encoded_width: u32) {
         unsafe { ffi::webrtc_EncodedImage_set_encoded_width(self.raw.as_ptr(), encoded_width) };
     }
 
-    pub fn set_encoded_height(&self, encoded_height: u32) {
+    pub fn set_encoded_height(&mut self, encoded_height: u32) {
         unsafe { ffi::webrtc_EncodedImage_set_encoded_height(self.raw.as_ptr(), encoded_height) };
     }
 
-    pub fn set_frame_type(&self, frame_type: VideoFrameType) {
+    pub fn set_frame_type(&mut self, frame_type: VideoFrameType) {
         unsafe { ffi::webrtc_EncodedImage_set_frame_type(self.raw.as_ptr(), frame_type.to_raw()) };
     }
 
-    pub fn set_qp(&self, qp: i32) {
+    pub fn set_qp(&mut self, qp: i32) {
         unsafe { ffi::webrtc_EncodedImage_set_qp(self.raw.as_ptr(), qp) };
     }
 

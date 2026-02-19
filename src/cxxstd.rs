@@ -136,7 +136,7 @@ impl<'a> CxxStringRef<'a> {
 
     /// 末尾に追記する。
     /// s に null バイトが含まれていてもエラーにしない。
-    pub fn append(&self, s: &str) {
+    pub fn append(&mut self, s: &str) {
         unsafe {
             ffi::std_string_append(self.as_ptr(), s.as_ptr() as *const _, s.len());
         }
@@ -220,7 +220,7 @@ impl<'a> StringVectorRef<'a> {
         self.len() == 0
     }
 
-    pub fn push(&self, value: &CxxString) {
+    pub fn push(&mut self, value: &CxxString) {
         unsafe { ffi::std_string_vector_push_back(self.raw.as_ptr(), value.as_ptr()) };
     }
 

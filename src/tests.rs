@@ -263,7 +263,7 @@ fn audio_device_module_recording_device_name_roundtrip() {
             })),
             ..Default::default()
         };
-        let adm = AudioDeviceModule::new_with_callbacks(callbacks);
+        let mut adm = AudioDeviceModule::new_with_callbacks(callbacks);
         adm.init().expect("AudioDeviceModule::init が失敗しました");
         assert_eq!(adm.recording_devices(), 1);
         let (got_name, got_guid) = adm
@@ -316,7 +316,7 @@ fn peer_connection_factory_and_capabilities() {
     deps.enable_media();
 
     // Factory を生成し、オプションと RTP 能力を取得する。
-    let factory = PeerConnectionFactory::create_modular(&mut deps)
+    let mut factory = PeerConnectionFactory::create_modular(&mut deps)
         .expect("PeerConnectionFactory の生成に失敗しました");
     let mut opts = PeerConnectionFactoryOptions::new();
     opts.set_disable_encryption(false);
@@ -351,7 +351,7 @@ fn rtc_configuration_and_ice_server() {
     server.add_url("stun:192.0.2.1:3478");
 
     {
-        let servers = config.servers();
+        let mut servers = config.servers();
         let len_before = servers.len();
         servers.push(&server);
         assert_eq!(servers.len(), len_before + 1);
@@ -467,7 +467,7 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     let mut init = RtpTransceiverInit::new();
     init.set_direction(RtpTransceiverDirection::SendOnly);
     init.set_send_encodings(&vec);
-    let stream_ids = init.stream_ids();
+    let mut stream_ids = init.stream_ids();
     stream_ids.push(&CxxString::from_str("stream-1"));
     assert_eq!(stream_ids.len(), 1);
 
@@ -566,7 +566,7 @@ fn rtp_sender_get_set_parameters() {
     let stream_track = track.cast_to_media_stream_track();
     let mut stream_ids = StringVector::new(0);
     stream_ids.push(&CxxString::from_str("stream-0"));
-    let sender = pc
+    let mut sender = pc
         .add_track(&stream_track, &stream_ids)
         .expect("AddTrack が失敗しました");
 
@@ -724,7 +724,7 @@ fn peer_connection_observer_and_dependencies() {
     assert_eq!(counter.load(Ordering::SeqCst), 1);
 
     let observer2 = PeerConnectionObserverBuilder::new().build();
-    let mut deps = PeerConnectionDependencies::new(&observer2);
+    let deps = PeerConnectionDependencies::new(&observer2);
     assert!(!deps.as_ptr().is_null());
     drop(deps);
 }
@@ -775,7 +775,7 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
 
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
-    let encoder = factory
+    let mut encoder = factory
         .create(&env, &format)
         .expect("custom encoder の作成に失敗しました");
 
@@ -827,7 +827,7 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     let state_ptr_for_encode = state_ptr;
     let state_ptr_for_callback = state_ptr;
 
-    let encoder = VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
+    let mut encoder = VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
         register_encode_complete_callback: Some(Box::new(move |callback| {
             let callback = callback.expect("register 側 callback が None です");
             let state = unsafe { state_ptr_for_register.get_mut() };
@@ -969,7 +969,7 @@ fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
 
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
-    let decoder = factory
+    let mut decoder = factory
         .create(&env, &format)
         .expect("custom decoder の作成に失敗しました");
 
@@ -996,7 +996,7 @@ fn custom_video_encoder_init_encode_and_set_rates_callbacks_getters() {
 
     let mut set_rates_called = false;
     let set_rates_called_ptr = BoolPtr(&mut set_rates_called as *mut bool);
-    let encoder = VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
+    let mut encoder = VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
         init_encode: Some(Box::new(move |codec, settings| {
             assert_eq!(codec.codec_type(), VideoCodecType::Generic);
             assert_eq!(codec.width(), 0);

@@ -213,7 +213,7 @@ impl PeerConnectionFactory {
         Ok(Self { raw_ref })
     }
 
-    pub fn set_options(&self, options: &PeerConnectionFactoryOptions) {
+    pub fn set_options(&mut self, options: &PeerConnectionFactoryOptions) {
         unsafe {
             ffi::webrtc_PeerConnectionFactoryInterface_SetOptions(self.as_ptr(), options.as_ptr())
         };
@@ -432,14 +432,14 @@ impl<'a> IceServerRef<'a> {
         self.raw.as_ptr()
     }
 
-    pub fn add_url(&self, url: &str) {
+    pub fn add_url(&mut self, url: &str) {
         let urls =
             unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_get_urls(self.raw.as_ptr()) };
         let cxx = CxxString::from_str(url);
         unsafe { ffi::std_string_vector_push_back(urls, cxx.as_ptr()) };
     }
 
-    pub fn set_username(&self, username: &str) {
+    pub fn set_username(&mut self, username: &str) {
         unsafe {
             ffi::webrtc_PeerConnectionInterface_IceServer_set_username(
                 self.raw.as_ptr(),
@@ -449,7 +449,7 @@ impl<'a> IceServerRef<'a> {
         }
     }
 
-    pub fn set_password(&self, password: &str) {
+    pub fn set_password(&mut self, password: &str) {
         unsafe {
             ffi::webrtc_PeerConnectionInterface_IceServer_set_password(
                 self.raw.as_ptr(),
@@ -545,7 +545,7 @@ impl<'a> IceServerVectorRef<'a> {
         Some(IceServerRef::from_raw(raw))
     }
 
-    pub fn push(&self, server: &IceServer) {
+    pub fn push(&mut self, server: &IceServer) {
         unsafe {
             ffi::webrtc_PeerConnectionInterface_IceServer_vector_push_back(
                 self.raw.as_ptr(),
@@ -1033,7 +1033,7 @@ impl PeerConnectionDependencies {
         Self { raw }
     }
 
-    pub fn as_ptr(&mut self) -> *mut ffi::webrtc_PeerConnectionDependencies {
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionDependencies {
         self.raw.as_ptr()
     }
 }
@@ -1339,7 +1339,7 @@ impl PeerConnection {
         };
     }
 
-    pub fn add_ice_candidate(&self, candidate: &IceCandidate) -> Result<()> {
+    pub fn add_ice_candidate(&mut self, candidate: &IceCandidate) -> Result<()> {
         let ok = unsafe {
             ffi::webrtc_PeerConnectionInterface_AddIceCandidate(
                 self.raw_ref.as_ptr(),
@@ -1352,7 +1352,7 @@ impl PeerConnection {
         Ok(())
     }
 
-    pub fn set_configuration(&self, config: &mut PeerConnectionRtcConfiguration) -> Result<()> {
+    pub fn set_configuration(&mut self, config: &mut PeerConnectionRtcConfiguration) -> Result<()> {
         let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
         unsafe {
             ffi::webrtc_PeerConnectionInterface_SetConfiguration(

@@ -75,7 +75,7 @@ impl DataChannel {
     }
 
     /// Observer を登録する。
-    pub fn register_observer(&self, observer: &DataChannelObserver) {
+    pub fn register_observer(&mut self, observer: &DataChannelObserver) {
         unsafe {
             ffi::webrtc_DataChannelInterface_RegisterObserver(
                 self.raw_ref.as_ptr(),
@@ -272,7 +272,7 @@ impl DataChannelInit {
         }
     }
 
-    pub fn as_ptr(&mut self) -> *mut ffi::webrtc_DataChannelInit {
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_DataChannelInit {
         self.raw.as_ptr()
     }
 }

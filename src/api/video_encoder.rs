@@ -439,13 +439,13 @@ impl<'a> CodecSpecificInfoRef<'a> {
         unsafe { ffi::webrtc_CodecSpecificInfo_h264_idr_frame(self.raw.as_ptr()) != 0 }
     }
 
-    pub fn set_codec_type(&self, codec_type: VideoCodecType) {
+    pub fn set_codec_type(&mut self, codec_type: VideoCodecType) {
         unsafe {
             ffi::webrtc_CodecSpecificInfo_set_codec_type(self.raw.as_ptr(), codec_type.to_raw())
         };
     }
 
-    pub fn set_end_of_picture(&self, end_of_picture: bool) {
+    pub fn set_end_of_picture(&mut self, end_of_picture: bool) {
         unsafe {
             ffi::webrtc_CodecSpecificInfo_set_end_of_picture(
                 self.raw.as_ptr(),
@@ -454,7 +454,7 @@ impl<'a> CodecSpecificInfoRef<'a> {
         };
     }
 
-    pub fn set_vp8_non_reference(&self, non_reference: bool) {
+    pub fn set_vp8_non_reference(&mut self, non_reference: bool) {
         unsafe {
             ffi::webrtc_CodecSpecificInfo_set_vp8_non_reference(
                 self.raw.as_ptr(),
@@ -463,13 +463,13 @@ impl<'a> CodecSpecificInfoRef<'a> {
         };
     }
 
-    pub fn set_vp8_temporal_idx(&self, temporal_idx: i32) {
+    pub fn set_vp8_temporal_idx(&mut self, temporal_idx: i32) {
         unsafe {
             ffi::webrtc_CodecSpecificInfo_set_vp8_temporal_idx(self.raw.as_ptr(), temporal_idx)
         };
     }
 
-    pub fn set_vp8_layer_sync(&self, layer_sync: bool) {
+    pub fn set_vp8_layer_sync(&mut self, layer_sync: bool) {
         unsafe {
             ffi::webrtc_CodecSpecificInfo_set_vp8_layer_sync(
                 self.raw.as_ptr(),
@@ -478,17 +478,17 @@ impl<'a> CodecSpecificInfoRef<'a> {
         };
     }
 
-    pub fn set_vp8_key_idx(&self, key_idx: i32) {
+    pub fn set_vp8_key_idx(&mut self, key_idx: i32) {
         unsafe { ffi::webrtc_CodecSpecificInfo_set_vp8_key_idx(self.raw.as_ptr(), key_idx) };
     }
 
-    pub fn set_vp9_temporal_idx(&self, temporal_idx: i32) {
+    pub fn set_vp9_temporal_idx(&mut self, temporal_idx: i32) {
         unsafe {
             ffi::webrtc_CodecSpecificInfo_set_vp9_temporal_idx(self.raw.as_ptr(), temporal_idx)
         };
     }
 
-    pub fn set_vp9_inter_pic_predicted(&self, inter_pic_predicted: bool) {
+    pub fn set_vp9_inter_pic_predicted(&mut self, inter_pic_predicted: bool) {
         unsafe {
             ffi::webrtc_CodecSpecificInfo_set_vp9_inter_pic_predicted(
                 self.raw.as_ptr(),
@@ -497,7 +497,7 @@ impl<'a> CodecSpecificInfoRef<'a> {
         };
     }
 
-    pub fn set_vp9_flexible_mode(&self, flexible_mode: bool) {
+    pub fn set_vp9_flexible_mode(&mut self, flexible_mode: bool) {
         unsafe {
             ffi::webrtc_CodecSpecificInfo_set_vp9_flexible_mode(
                 self.raw.as_ptr(),
@@ -506,7 +506,7 @@ impl<'a> CodecSpecificInfoRef<'a> {
         };
     }
 
-    pub fn set_vp9_inter_layer_predicted(&self, inter_layer_predicted: bool) {
+    pub fn set_vp9_inter_layer_predicted(&mut self, inter_layer_predicted: bool) {
         unsafe {
             ffi::webrtc_CodecSpecificInfo_set_vp9_inter_layer_predicted(
                 self.raw.as_ptr(),
@@ -515,7 +515,7 @@ impl<'a> CodecSpecificInfoRef<'a> {
         };
     }
 
-    pub fn set_h264_packetization_mode(&self, packetization_mode: H264PacketizationMode) {
+    pub fn set_h264_packetization_mode(&mut self, packetization_mode: H264PacketizationMode) {
         unsafe {
             ffi::webrtc_CodecSpecificInfo_set_h264_packetization_mode(
                 self.raw.as_ptr(),
@@ -524,13 +524,13 @@ impl<'a> CodecSpecificInfoRef<'a> {
         };
     }
 
-    pub fn set_h264_temporal_idx(&self, temporal_idx: i32) {
+    pub fn set_h264_temporal_idx(&mut self, temporal_idx: i32) {
         unsafe {
             ffi::webrtc_CodecSpecificInfo_set_h264_temporal_idx(self.raw.as_ptr(), temporal_idx)
         };
     }
 
-    pub fn set_h264_base_layer_sync(&self, base_layer_sync: bool) {
+    pub fn set_h264_base_layer_sync(&mut self, base_layer_sync: bool) {
         unsafe {
             ffi::webrtc_CodecSpecificInfo_set_h264_base_layer_sync(
                 self.raw.as_ptr(),
@@ -539,7 +539,7 @@ impl<'a> CodecSpecificInfoRef<'a> {
         };
     }
 
-    pub fn set_h264_idr_frame(&self, idr_frame: bool) {
+    pub fn set_h264_idr_frame(&mut self, idr_frame: bool) {
         unsafe {
             ffi::webrtc_CodecSpecificInfo_set_h264_idr_frame(
                 self.raw.as_ptr(),
@@ -1166,7 +1166,7 @@ impl VideoEncoder {
         std::mem::ManuallyDrop::new(self).raw_unique.as_ptr()
     }
 
-    pub fn init_encode(&self) -> VideoCodecStatus {
+    pub fn init_encode(&mut self) -> VideoCodecStatus {
         let value = unsafe {
             ffi::webrtc_VideoEncoder_InitEncode(
                 self.as_ptr(),
@@ -1177,12 +1177,12 @@ impl VideoEncoder {
         VideoCodecStatus::from_raw(value)
     }
 
-    pub fn encode(&self, frame: &VideoFrame) -> VideoCodecStatus {
+    pub fn encode(&mut self, frame: &VideoFrame) -> VideoCodecStatus {
         self.encode_with_frame_types(frame, None)
     }
 
     pub fn encode_with_frame_types(
-        &self,
+        &mut self,
         frame: &VideoFrame,
         frame_types: Option<VideoFrameTypeVectorRef<'_>>,
     ) -> VideoCodecStatus {
@@ -1195,7 +1195,7 @@ impl VideoEncoder {
     }
 
     pub fn register_encode_complete_callback(
-        &self,
+        &mut self,
         callback: Option<VideoEncoderEncodedImageCallbackRef<'_>>,
     ) -> VideoCodecStatus {
         let callback = callback.map_or(std::ptr::null_mut(), |callback| callback.as_ptr());
@@ -1205,7 +1205,7 @@ impl VideoEncoder {
         VideoCodecStatus::from_raw(value)
     }
 
-    pub fn set_rates(&self) {
+    pub fn set_rates(&mut self) {
         unsafe { ffi::webrtc_VideoEncoder_SetRates(self.as_ptr(), std::ptr::null_mut()) };
     }
 
