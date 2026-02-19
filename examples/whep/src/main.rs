@@ -182,7 +182,7 @@ struct VideoState {
 
 impl VideoState {
     fn detach_sink(&mut self) {
-        if let Some(track) = self.video_track.take() {
+        if let Some(mut track) = self.video_track.take() {
             track.remove_sink(self.renderer.sink());
         }
     }
@@ -268,14 +268,14 @@ impl SignalingWhep {
                 if kind != "video" {
                     return;
                 }
-                let video_track = track.cast_to_video_track();
+                let mut video_track = track.cast_to_video_track();
                 let mut state = video_state_track.lock().unwrap();
                 if let Some(current) = state.video_track.as_ref()
                     && current.as_ptr() == video_track.as_ptr()
                 {
                     return;
                 }
-                if let Some(track) = state.video_track.take() {
+                if let Some(mut track) = state.video_track.take() {
                     track.remove_sink(state.renderer.sink());
                 }
                 let wants = VideoSinkWants::new();
@@ -334,7 +334,7 @@ impl SignalingWhep {
     }
 
     fn create_offer_and_exchange(&mut self) -> Result<(), String> {
-        let pc = self.pc.as_ref().ok_or("pc not available")?;
+        let pc = self.pc.as_mut().ok_or("pc not available")?;
         let mut opts = PeerConnectionOfferAnswerOptions::new();
 
         let (offer_tx, offer_rx) = std::sync::mpsc::channel::<Result<String, String>>();

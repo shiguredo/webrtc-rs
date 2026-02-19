@@ -407,12 +407,12 @@ impl VideoDecoder {
         std::mem::ManuallyDrop::new(self).raw_unique.as_ptr()
     }
 
-    pub fn configure(&self) -> bool {
+    pub fn configure(&mut self) -> bool {
         unsafe { ffi::webrtc_VideoDecoder_Configure(self.as_ptr(), std::ptr::null_mut()) != 0 }
     }
 
     pub fn decode(
-        &self,
+        &mut self,
         input_image: Option<EncodedImageRef<'_>>,
         render_time_ms: i64,
     ) -> VideoCodecStatus {

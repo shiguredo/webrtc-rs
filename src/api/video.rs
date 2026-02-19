@@ -291,7 +291,7 @@ impl VideoTrack {
         MediaStreamTrack::from_scoped_ref(ScopedRef::<MediaStreamTrackHandle>::from_raw(raw_ref))
     }
 
-    pub fn add_or_update_sink(&self, sink: &VideoSink, wants: &VideoSinkWants) {
+    pub fn add_or_update_sink(&mut self, sink: &VideoSink, wants: &VideoSinkWants) {
         unsafe {
             ffi::webrtc_VideoTrackInterface_AddOrUpdateSink(
                 self.raw_ref.as_ptr(),
@@ -301,7 +301,7 @@ impl VideoTrack {
         }
     }
 
-    pub fn remove_sink(&self, sink: &VideoSink) {
+    pub fn remove_sink(&mut self, sink: &VideoSink) {
         unsafe { ffi::webrtc_VideoTrackInterface_RemoveSink(self.raw_ref.as_ptr(), sink.as_ptr()) };
     }
 }

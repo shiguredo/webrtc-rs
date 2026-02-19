@@ -161,7 +161,7 @@ impl AudioDeviceModule {
     }
 
     /// ADM を初期化する。デバイス列挙・選択の前に呼び出す必要がある。
-    pub fn init(&self) -> Result<()> {
+    pub fn init(&mut self) -> Result<()> {
         let ret = unsafe { ffi::webrtc_AudioDeviceModule_Init(self.as_ptr()) };
         if ret != 0 {
             return Err(Error::Message(format!(
@@ -207,7 +207,7 @@ impl AudioDeviceModule {
     }
 
     /// 録音デバイスを選択する。
-    pub fn set_recording_device(&self, index: u16) -> Result<()> {
+    pub fn set_recording_device(&mut self, index: u16) -> Result<()> {
         let ret = unsafe { ffi::webrtc_AudioDeviceModule_SetRecordingDevice(self.as_ptr(), index) };
         if ret != 0 {
             return Err(Error::Message(format!(

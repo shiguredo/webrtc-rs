@@ -133,11 +133,11 @@ impl<'a> RtpCodecRef<'a> {
         .to_string()
     }
 
-    pub fn set_kind(&self, media_type: MediaType) {
+    pub fn set_kind(&mut self, media_type: MediaType) {
         unsafe { ffi::webrtc_RtpCodec_set_kind(self.raw.as_ptr(), media_type.to_int()) };
     }
 
-    pub fn set_name(&self, name: &str) {
+    pub fn set_name(&mut self, name: &str) {
         unsafe {
             ffi::webrtc_RtpCodec_set_name(self.raw.as_ptr(), name.as_ptr() as *const _, name.len());
         }
@@ -161,7 +161,7 @@ impl<'a> RtpCodecRef<'a> {
         if has == 0 { None } else { Some(value) }
     }
 
-    pub fn set_clock_rate(&self, value: Option<i32>) {
+    pub fn set_clock_rate(&mut self, value: Option<i32>) {
         match value {
             Some(v) => unsafe {
                 ffi::webrtc_RtpCodec_set_clock_rate(self.raw.as_ptr(), 1, &v);
@@ -172,7 +172,7 @@ impl<'a> RtpCodecRef<'a> {
         }
     }
 
-    pub fn set_num_channels(&self, value: Option<i32>) {
+    pub fn set_num_channels(&mut self, value: Option<i32>) {
         match value {
             Some(v) => unsafe {
                 ffi::webrtc_RtpCodec_set_num_channels(self.raw.as_ptr(), 1, &v);
@@ -183,7 +183,7 @@ impl<'a> RtpCodecRef<'a> {
         }
     }
 
-    pub fn parameters(&self) -> MapStringString<'a> {
+    pub fn parameters(&mut self) -> MapStringString<'a> {
         let raw = unsafe { ffi::webrtc_RtpCodec_get_parameters(self.raw.as_ptr()) };
         MapStringString::from_raw(
             NonNull::new(raw).expect("BUG: webrtc_RtpCodec_get_parameters が null を返しました"),
@@ -288,11 +288,11 @@ impl<'a> RtpCodecCapabilityRef<'a> {
         RtpCodecRef::from_raw(raw)
     }
 
-    pub fn set_kind(&self, media_type: MediaType) {
+    pub fn set_kind(&mut self, media_type: MediaType) {
         self.cast_to_codec().set_kind(media_type);
     }
 
-    pub fn set_name(&self, name: &str) {
+    pub fn set_name(&mut self, name: &str) {
         self.cast_to_codec().set_name(name);
     }
 
@@ -304,7 +304,7 @@ impl<'a> RtpCodecCapabilityRef<'a> {
         self.cast_to_codec().clock_rate()
     }
 
-    pub fn set_clock_rate(&self, value: Option<i32>) {
+    pub fn set_clock_rate(&mut self, value: Option<i32>) {
         self.cast_to_codec().set_clock_rate(value);
     }
 
@@ -312,11 +312,11 @@ impl<'a> RtpCodecCapabilityRef<'a> {
         self.cast_to_codec().num_channels()
     }
 
-    pub fn set_num_channels(&self, value: Option<i32>) {
+    pub fn set_num_channels(&mut self, value: Option<i32>) {
         self.cast_to_codec().set_num_channels(value);
     }
 
-    pub fn parameters(&self) -> MapStringString<'a> {
+    pub fn parameters(&mut self) -> MapStringString<'a> {
         self.cast_to_codec().parameters()
     }
 
@@ -414,24 +414,24 @@ impl<'a> RtpCodecCapabilityVectorRef<'a> {
         Some(RtpCodecCapabilityRef::from_raw(raw))
     }
 
-    pub fn push(&self, cap: &RtpCodecCapability) {
+    pub fn push(&mut self, cap: &RtpCodecCapability) {
         unsafe {
             ffi::webrtc_RtpCodecCapability_vector_push_back(self.raw.as_ptr(), cap.as_ptr());
         }
     }
 
-    pub fn push_ref(&self, cap: &RtpCodecCapabilityRef<'_>) {
+    pub fn push_ref(&mut self, cap: &RtpCodecCapabilityRef<'_>) {
         unsafe {
             ffi::webrtc_RtpCodecCapability_vector_push_back(self.raw.as_ptr(), cap.as_ptr());
         }
     }
 
-    pub fn resize(&self, len: usize) {
+    pub fn resize(&mut self, len: usize) {
         let len = i32::try_from(len).unwrap_or(i32::MAX);
         unsafe { ffi::webrtc_RtpCodecCapability_vector_resize(self.raw.as_ptr(), len) };
     }
 
-    pub fn set(&self, index: usize, cap: &RtpCodecCapability) -> bool {
+    pub fn set(&mut self, index: usize, cap: &RtpCodecCapability) -> bool {
         if index >= self.len() {
             return false;
         }
@@ -635,7 +635,7 @@ impl<'a> RtpEncodingParametersRef<'a> {
         .to_string()
     }
 
-    pub fn set_rid(&self, rid: &str) {
+    pub fn set_rid(&mut self, rid: &str) {
         unsafe {
             ffi::webrtc_RtpEncodingParameters_set_rid(
                 self.raw.as_ptr(),
@@ -654,7 +654,7 @@ impl<'a> RtpEncodingParametersRef<'a> {
         if has == 0 { None } else { Some(value) }
     }
 
-    pub fn set_ssrc(&self, value: Option<u32>) {
+    pub fn set_ssrc(&mut self, value: Option<u32>) {
         match value {
             Some(v) => unsafe {
                 ffi::webrtc_RtpEncodingParameters_set_ssrc(self.raw.as_ptr(), 1, &v);
@@ -678,7 +678,7 @@ impl<'a> RtpEncodingParametersRef<'a> {
         if has == 0 { None } else { Some(value) }
     }
 
-    pub fn set_max_bitrate_bps(&self, value: Option<i32>) {
+    pub fn set_max_bitrate_bps(&mut self, value: Option<i32>) {
         match value {
             Some(v) => unsafe {
                 ffi::webrtc_RtpEncodingParameters_set_max_bitrate_bps(self.raw.as_ptr(), 1, &v);
@@ -706,7 +706,7 @@ impl<'a> RtpEncodingParametersRef<'a> {
         if has == 0 { None } else { Some(value) }
     }
 
-    pub fn set_min_bitrate_bps(&self, value: Option<i32>) {
+    pub fn set_min_bitrate_bps(&mut self, value: Option<i32>) {
         match value {
             Some(v) => unsafe {
                 ffi::webrtc_RtpEncodingParameters_set_min_bitrate_bps(self.raw.as_ptr(), 1, &v);
@@ -734,7 +734,7 @@ impl<'a> RtpEncodingParametersRef<'a> {
         if has == 0 { None } else { Some(value) }
     }
 
-    pub fn set_max_framerate(&self, value: Option<f64>) {
+    pub fn set_max_framerate(&mut self, value: Option<f64>) {
         match value {
             Some(v) => unsafe {
                 ffi::webrtc_RtpEncodingParameters_set_max_framerate(self.raw.as_ptr(), 1, &v);
@@ -762,7 +762,7 @@ impl<'a> RtpEncodingParametersRef<'a> {
         if has == 0 { None } else { Some(value) }
     }
 
-    pub fn set_scale_resolution_down_by(&self, value: Option<f64>) {
+    pub fn set_scale_resolution_down_by(&mut self, value: Option<f64>) {
         match value {
             Some(v) => unsafe {
                 ffi::webrtc_RtpEncodingParameters_set_scale_resolution_down_by(
@@ -794,7 +794,7 @@ impl<'a> RtpEncodingParametersRef<'a> {
         if has == 0 { None } else { Some(resolution) }
     }
 
-    pub fn set_scale_resolution_down_to(&self, value: Option<&Resolution>) {
+    pub fn set_scale_resolution_down_to(&mut self, value: Option<&Resolution>) {
         match value {
             Some(v) => unsafe {
                 ffi::webrtc_RtpEncodingParameters_set_scale_resolution_down_to(
@@ -817,7 +817,7 @@ impl<'a> RtpEncodingParametersRef<'a> {
         unsafe { ffi::webrtc_RtpEncodingParameters_get_active(self.raw.as_ptr()) != 0 }
     }
 
-    pub fn set_active(&self, active: bool) {
+    pub fn set_active(&mut self, active: bool) {
         unsafe {
             ffi::webrtc_RtpEncodingParameters_set_active(
                 self.raw.as_ptr(),
@@ -830,7 +830,7 @@ impl<'a> RtpEncodingParametersRef<'a> {
         unsafe { ffi::webrtc_RtpEncodingParameters_get_adaptive_ptime(self.raw.as_ptr()) != 0 }
     }
 
-    pub fn set_adaptive_ptime(&self, adaptive_ptime: bool) {
+    pub fn set_adaptive_ptime(&mut self, adaptive_ptime: bool) {
         unsafe {
             ffi::webrtc_RtpEncodingParameters_set_adaptive_ptime(
                 self.raw.as_ptr(),
@@ -860,7 +860,7 @@ impl<'a> RtpEncodingParametersRef<'a> {
         )
     }
 
-    pub fn set_scalability_mode(&self, value: Option<&str>) {
+    pub fn set_scalability_mode(&mut self, value: Option<&str>) {
         match value {
             Some(v) => unsafe {
                 ffi::webrtc_RtpEncodingParameters_set_scalability_mode(
@@ -896,7 +896,7 @@ impl<'a> RtpEncodingParametersRef<'a> {
         }
     }
 
-    pub fn set_codec(&self, codec: Option<&RtpCodec>) {
+    pub fn set_codec(&mut self, codec: Option<&RtpCodec>) {
         match codec {
             Some(v) => unsafe {
                 ffi::webrtc_RtpEncodingParameters_set_codec(self.raw.as_ptr(), 1, v.as_ptr());
@@ -1267,7 +1267,7 @@ impl RtpTransceiver {
         RtpReceiver::from_scoped_ref(raw_ref)
     }
 
-    pub fn set_codec_preferences(&self, codecs: &RtpCodecCapabilityVector) -> Result<()> {
+    pub fn set_codec_preferences(&mut self, codecs: &RtpCodecCapabilityVector) -> Result<()> {
         let err = unsafe {
             ffi::webrtc_RtpTransceiverInterface_SetCodecPreferences(
                 self.raw_ref.as_ptr(),
@@ -1332,7 +1332,7 @@ impl RtpSender {
         RtpParameters::from_raw(raw)
     }
 
-    pub fn set_parameters(&self, parameters: &RtpParameters) -> Result<()> {
+    pub fn set_parameters(&mut self, parameters: &RtpParameters) -> Result<()> {
         let err = unsafe {
             ffi::webrtc_RtpSenderInterface_SetParameters(self.as_ptr(), parameters.as_ptr())
         };
