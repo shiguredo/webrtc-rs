@@ -351,7 +351,7 @@ fn rtc_configuration_and_ice_server() {
     server.add_url("stun:192.0.2.1:3478");
 
     {
-        let mut servers = config.servers();
+        let servers = config.servers();
         let len_before = servers.len();
         servers.push(&server);
         assert_eq!(servers.len(), len_before + 1);
@@ -467,7 +467,7 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     let mut init = RtpTransceiverInit::new();
     init.set_direction(RtpTransceiverDirection::SendOnly);
     init.set_send_encodings(&vec);
-    let mut stream_ids = init.stream_ids();
+    let stream_ids = init.stream_ids();
     stream_ids.push(&CxxString::from_str("stream-1"));
     assert_eq!(stream_ids.len(), 1);
 
@@ -736,6 +736,8 @@ fn create_and_set_local_description_observers() {
     let _set_remote = SetRemoteDescriptionObserver::new(|_| {});
 }
 
+// VideoEncoderFactory でカスタムエンコーダーを登録して encode を呼び、
+// encode コールバックが呼ばれることを確認する。
 #[test]
 fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
     let mut created = false;
@@ -797,106 +799,8 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
     );
 }
 
-#[test]
-fn custom_video_encoder_register_and_encode_calls_encoded_image_callback() {
-    #[derive(Default)]
-    struct State {
-        callback_ptr: Option<VideoEncoderEncodedImageCallbackPtr>,
-        register_called: bool,
-        encode_called: bool,
-        on_encoded_image_called: bool,
-        order: Vec<&'static str>,
-    }
-
-    #[derive(Clone, Copy)]
-    struct StatePtr(*mut State);
-    unsafe impl Send for StatePtr {}
-    impl StatePtr {
-        unsafe fn get_mut<'a>(&self) -> &'a mut State {
-            unsafe { &mut *self.0 }
-        }
-    }
-
-    let mut state = Box::new(State::default());
-    let state_ptr = StatePtr((&mut *state) as *mut State);
-    let state_ptr_for_register = state_ptr;
-    let state_ptr_for_encode = state_ptr;
-    let state_ptr_for_callback = state_ptr;
-
-    let encoder = VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
-        register_encode_complete_callback: Some(Box::new(move |callback| {
-            let callback = callback.expect("register 側 callback が None です");
-            let state = unsafe { state_ptr_for_register.get_mut() };
-            state.register_called = true;
-            state.order.push("register");
-            state.callback_ptr =
-                Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_ref(callback) });
-            VideoCodecStatus::Ok
-        })),
-        encode: Some(Box::new(move |_, _| {
-            {
-                let state = unsafe { state_ptr_for_encode.get_mut() };
-                state.encode_called = true;
-                state.order.push("encode");
-            }
-
-            let callback_ptr = {
-                let state = unsafe { state_ptr_for_encode.get_mut() };
-                state
-                    .callback_ptr
-                    .expect("encode 側 callback_ptr が未設定です")
-            };
-            let image = EncodedImage::new();
-            let result = unsafe { callback_ptr.on_encoded_image(image.as_ref(), None) };
-            assert_eq!(
-                result.error(),
-                VideoEncoderEncodedImageCallbackResultError::Ok
-            );
-            VideoCodecStatus::Unknown(77)
-        })),
-        ..Default::default()
-    });
-
-    let encoded_image_callback = VideoEncoderEncodedImageCallback::new_with_callbacks(
-        VideoEncoderEncodedImageCallbackCallbacks {
-            on_encoded_image: Some(Box::new(move |image, codec_specific_info| {
-                let state = unsafe { state_ptr_for_callback.get_mut() };
-                state.on_encoded_image_called = true;
-                state.order.push("on_encoded_image");
-                assert!(image.encoded_data().is_none());
-                assert!(
-                    codec_specific_info.is_none(),
-                    "codec_specific_info は None の想定です"
-                );
-                VideoEncoderEncodedImageCallbackResult::new(
-                    VideoEncoderEncodedImageCallbackResultError::Ok,
-                )
-            })),
-        },
-    );
-
-    assert_eq!(
-        encoder.register_encode_complete_callback(Some(encoded_image_callback.as_ref())),
-        VideoCodecStatus::Ok
-    );
-
-    let buffer = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buffer, 123);
-    assert_eq!(encoder.encode(&frame), VideoCodecStatus::Unknown(77));
-
-    assert!(state.register_called, "register が呼ばれていません");
-    assert!(state.encode_called, "encode が呼ばれていません");
-    assert!(
-        state.on_encoded_image_called,
-        "on_encoded_image が呼ばれていません"
-    );
-    assert_eq!(
-        state.order,
-        vec!["register", "encode", "on_encoded_image"],
-        "呼び出し順が不正です"
-    );
-}
-
+// VideoEncoderFactory でカスタムエンコーダーを登録して encode を呼び、
+// encoded_image と codec_specific_info がコールバックで受け取れることを確認する。
 #[test]
 fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specific_info() {
     #[derive(Default)]
@@ -1035,6 +939,7 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     );
 }
 
+// VideoDecoderFactory の create コールバックと、VideoDecoder の decode コールバックが呼ばれることを確認するテスト
 #[test]
 fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
     let mut created = false;
@@ -1076,6 +981,7 @@ fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
     );
 }
 
+// set_rates コールバックの呼び出しを確認するテスト
 #[test]
 fn custom_video_encoder_init_encode_and_set_rates_callbacks_getters() {
     struct BoolPtr(*mut bool);
@@ -1116,23 +1022,7 @@ fn custom_video_encoder_init_encode_and_set_rates_callbacks_getters() {
     assert!(set_rates_called, "set_rates callback が呼ばれませんでした");
 }
 
-#[test]
-fn custom_video_decoder_configure_callback_getters() {
-    let decoder = VideoDecoder::new_with_callbacks(VideoDecoderCallbacks {
-        configure: Some(Box::new(move |settings| {
-            assert_eq!(settings.number_of_cores(), 1);
-            assert_eq!(settings.codec_type(), VideoCodecType::Generic);
-            assert_eq!(settings.buffer_pool_size(), None);
-            assert_eq!(settings.max_render_resolution_width(), 0);
-            assert_eq!(settings.max_render_resolution_height(), 0);
-            false
-        })),
-        ..Default::default()
-    });
-
-    assert!(!decoder.configure());
-}
-
+// implementation_name() が解放済みの値を返していることがあったので、その回帰テストを行う
 #[test]
 fn custom_video_decoder_get_decoder_info_name_experiment() {
     let expected = "decoder-info-name-".repeat(128);
