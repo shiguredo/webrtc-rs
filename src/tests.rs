@@ -762,7 +762,7 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
                         assert_eq!(frame_types.get(0), Some(VideoFrameType::Key));
                         assert_eq!(frame_types.get(1), Some(VideoFrameType::Delta));
                         encode_count += 1;
-                        encode_count
+                        VideoCodecStatus::Unknown(encode_count)
                     })),
                     ..Default::default()
                 }))
@@ -785,11 +785,11 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
 
     assert_eq!(
         encoder.encode_with_frame_types(&frame, Some(frame_types.as_ref())),
-        1
+        VideoCodecStatus::NoOutput
     );
     assert_eq!(
         encoder.encode_with_frame_types(&frame, Some(frame_types.as_ref())),
-        2
+        VideoCodecStatus::Unknown(2)
     );
     assert!(
         factory.create(&env, &format).is_none(),
@@ -831,7 +831,7 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_callback() {
             state.order.push("register");
             state.callback_ptr =
                 Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_ref(callback) });
-            0
+            VideoCodecStatus::Ok
         })),
         encode: Some(Box::new(move |_, _| {
             {
@@ -852,7 +852,7 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_callback() {
                 result.error(),
                 VideoEncoderEncodedImageCallbackResultError::Ok
             );
-            77
+            VideoCodecStatus::Unknown(77)
         })),
         ..Default::default()
     });
@@ -877,12 +877,12 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_callback() {
 
     assert_eq!(
         encoder.register_encode_complete_callback(Some(encoded_image_callback.as_ref())),
-        0
+        VideoCodecStatus::Ok
     );
 
     let buffer = I420Buffer::new(2, 2);
     let frame = VideoFrame::from_i420(&buffer, 123);
-    assert_eq!(encoder.encode(&frame), 77);
+    assert_eq!(encoder.encode(&frame), VideoCodecStatus::Unknown(77));
 
     assert!(state.register_called, "register が呼ばれていません");
     assert!(state.encode_called, "encode が呼ばれていません");
@@ -931,7 +931,7 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
             state.order.push("register");
             state.callback_ptr =
                 Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_ref(callback) });
-            0
+            VideoCodecStatus::Ok
         })),
         encode: Some(Box::new(move |_, _| {
             {
@@ -973,7 +973,7 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
             );
             assert_eq!(result.frame_id(), 9999);
             assert!(!result.drop_next_frame());
-            88
+            VideoCodecStatus::Unknown(88)
         })),
         ..Default::default()
     });
@@ -1015,12 +1015,12 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
 
     assert_eq!(
         encoder.register_encode_complete_callback(Some(encoded_image_callback.as_ref())),
-        0
+        VideoCodecStatus::Ok
     );
 
     let buffer = I420Buffer::new(2, 2);
     let frame = VideoFrame::from_i420(&buffer, 123);
-    assert_eq!(encoder.encode(&frame), 88);
+    assert_eq!(encoder.encode(&frame), VideoCodecStatus::Unknown(88));
 
     assert!(state.register_called, "register が呼ばれていません");
     assert!(state.encode_called, "encode が呼ばれていません");
@@ -1053,7 +1053,7 @@ fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
                         assert!(input.encoded_data().is_none());
                         assert_eq!(render_time_ms, 456);
                         decode_count += 1;
-                        decode_count
+                        VideoCodecStatus::Unknown(decode_count)
                     })),
                     ..Default::default()
                 }))
@@ -1068,8 +1068,8 @@ fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
         .create(&env, &format)
         .expect("custom decoder の作成に失敗しました");
 
-    assert_eq!(decoder.decode(None, 456), 1);
-    assert_eq!(decoder.decode(None, 456), 2);
+    assert_eq!(decoder.decode(None, 456), VideoCodecStatus::NoOutput);
+    assert_eq!(decoder.decode(None, 456), VideoCodecStatus::Unknown(2));
     assert!(
         factory.create(&env, &format).is_none(),
         "2 回目の create は None を返す想定です"
@@ -1099,7 +1099,7 @@ fn custom_video_encoder_init_encode_and_set_rates_callbacks_getters() {
             assert_eq!(settings.max_payload_size(), 1200);
             assert!(!settings.loss_notification());
             assert_eq!(settings.encoder_thread_limit(), None);
-            123
+            VideoCodecStatus::Unknown(123)
         })),
         set_rates: Some(Box::new(move |parameters| {
             assert_eq!(parameters.framerate_fps(), 30.0);
@@ -1111,7 +1111,7 @@ fn custom_video_encoder_init_encode_and_set_rates_callbacks_getters() {
         ..Default::default()
     });
 
-    assert_eq!(encoder.init_encode(), 123);
+    assert_eq!(encoder.init_encode(), VideoCodecStatus::Unknown(123));
     encoder.set_rates();
     assert!(set_rates_called, "set_rates callback が呼ばれませんでした");
 }

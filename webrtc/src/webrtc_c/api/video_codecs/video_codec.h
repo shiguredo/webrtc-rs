@@ -26,6 +26,19 @@ extern const int webrtc_VideoCodecType_AV1;
 extern const int webrtc_VideoCodecType_H264;
 extern const int webrtc_VideoCodecType_H265;
 
+extern const int webrtc_VideoCodecStatus_TargetBitrateOvershoot;
+extern const int webrtc_VideoCodecStatus_OkRequestKeyframe;
+extern const int webrtc_VideoCodecStatus_NoOutput;
+extern const int webrtc_VideoCodecStatus_Ok;
+extern const int webrtc_VideoCodecStatus_Error;
+extern const int webrtc_VideoCodecStatus_Memory;
+extern const int webrtc_VideoCodecStatus_ErrParameter;
+extern const int webrtc_VideoCodecStatus_Timeout;
+extern const int webrtc_VideoCodecStatus_Uninitialized;
+extern const int webrtc_VideoCodecStatus_FallbackSoftware;
+extern const int webrtc_VideoCodecStatus_ErrSimulcastParametersNotSupported;
+extern const int webrtc_VideoCodecStatus_EncoderFailure;
+
 extern const int webrtc_VideoFrameType_Empty;
 extern const int webrtc_VideoFrameType_Key;
 extern const int webrtc_VideoFrameType_Delta;

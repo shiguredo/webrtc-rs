@@ -9,6 +9,7 @@
 #include <api/video/video_frame_type.h>
 #include <api/video_codecs/video_codec.h>
 #include <api/video_codecs/video_encoder.h>
+#include <modules/video_coding/include/video_error_codes.h>
 
 #include "../../common.impl.h"
 
@@ -22,6 +23,26 @@ const int webrtc_VideoCodecType_H264 =
     static_cast<int>(webrtc::kVideoCodecH264);
 const int webrtc_VideoCodecType_H265 =
     static_cast<int>(webrtc::kVideoCodecH265);
+
+const int webrtc_VideoCodecStatus_TargetBitrateOvershoot =
+    WEBRTC_VIDEO_CODEC_TARGET_BITRATE_OVERSHOOT;
+const int webrtc_VideoCodecStatus_OkRequestKeyframe =
+    WEBRTC_VIDEO_CODEC_OK_REQUEST_KEYFRAME;
+const int webrtc_VideoCodecStatus_NoOutput = WEBRTC_VIDEO_CODEC_NO_OUTPUT;
+const int webrtc_VideoCodecStatus_Ok = WEBRTC_VIDEO_CODEC_OK;
+const int webrtc_VideoCodecStatus_Error = WEBRTC_VIDEO_CODEC_ERROR;
+const int webrtc_VideoCodecStatus_Memory = WEBRTC_VIDEO_CODEC_MEMORY;
+const int webrtc_VideoCodecStatus_ErrParameter =
+    WEBRTC_VIDEO_CODEC_ERR_PARAMETER;
+const int webrtc_VideoCodecStatus_Timeout = WEBRTC_VIDEO_CODEC_TIMEOUT;
+const int webrtc_VideoCodecStatus_Uninitialized =
+    WEBRTC_VIDEO_CODEC_UNINITIALIZED;
+const int webrtc_VideoCodecStatus_FallbackSoftware =
+    WEBRTC_VIDEO_CODEC_FALLBACK_SOFTWARE;
+const int webrtc_VideoCodecStatus_ErrSimulcastParametersNotSupported =
+    WEBRTC_VIDEO_CODEC_ERR_SIMULCAST_PARAMETERS_NOT_SUPPORTED;
+const int webrtc_VideoCodecStatus_EncoderFailure =
+    WEBRTC_VIDEO_CODEC_ENCODER_FAILURE;
 
 const int webrtc_VideoFrameType_Empty =
     static_cast<int>(webrtc::VideoFrameType::kEmptyFrame);

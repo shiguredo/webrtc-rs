@@ -1,6 +1,6 @@
-use super::video::{SdpVideoFormat, SdpVideoFormatRef};
-use super::video_codec_common::VideoCodecType;
-use super::video_encoder::EncodedImageRef;
+use super::video_codec_common::{
+    EncodedImageRef, SdpVideoFormat, SdpVideoFormatRef, VideoCodecStatus, VideoCodecType,
+};
 use crate::{CxxString, EnvironmentRef, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -143,10 +143,13 @@ unsafe impl<'a> Send for VideoDecoderDecodedImageCallbackRef<'a> {}
 type VideoDecoderConfigureCallback =
     Box<dyn for<'a> FnMut(VideoDecoderSettingsRef<'a>) -> bool + Send + 'static>;
 type VideoDecoderDecodeCallback =
-    Box<dyn for<'a> FnMut(EncodedImageRef<'a>, i64) -> i32 + Send + 'static>;
-type VideoDecoderRegisterDecodeCompleteCallback =
-    Box<dyn for<'a> FnMut(Option<VideoDecoderDecodedImageCallbackRef<'a>>) -> i32 + Send + 'static>;
-type VideoDecoderReleaseCallback = Box<dyn FnMut() -> i32 + Send + 'static>;
+    Box<dyn for<'a> FnMut(EncodedImageRef<'a>, i64) -> VideoCodecStatus + Send + 'static>;
+type VideoDecoderRegisterDecodeCompleteCallback = Box<
+    dyn for<'a> FnMut(Option<VideoDecoderDecodedImageCallbackRef<'a>>) -> VideoCodecStatus
+        + Send
+        + 'static,
+>;
+type VideoDecoderReleaseCallback = Box<dyn FnMut() -> VideoCodecStatus + Send + 'static>;
 type VideoDecoderGetDecoderInfoCallback =
     Box<dyn FnMut() -> VideoDecoderDecoderInfo + Send + 'static>;
 
@@ -165,13 +168,13 @@ impl VideoDecoderCallbacks {
             self.configure = Some(Box::new(|_| true));
         }
         if self.decode.is_none() {
-            self.decode = Some(Box::new(|_, _| 0));
+            self.decode = Some(Box::new(|_, _| VideoCodecStatus::Ok));
         }
         if self.register_decode_complete_callback.is_none() {
-            self.register_decode_complete_callback = Some(Box::new(|_| 0));
+            self.register_decode_complete_callback = Some(Box::new(|_| VideoCodecStatus::Ok));
         }
         if self.release.is_none() {
-            self.release = Some(Box::new(|| 0));
+            self.release = Some(Box::new(|| VideoCodecStatus::Ok));
         }
         if self.get_decoder_info.is_none() {
             self.get_decoder_info = Some(Box::new(VideoDecoderDecoderInfo::new));
@@ -257,7 +260,7 @@ unsafe extern "C" fn video_decoder_decode(
         .expect("video_decoder_decode: callback is None");
     let input_image = NonNull::new(input_image).expect("video_decoder_decode: input_image is null");
     let input_image = unsafe { EncodedImageRef::from_raw(input_image) };
-    cb(input_image, render_time_ms)
+    cb(input_image, render_time_ms).to_raw()
 }
 
 unsafe extern "C" fn video_decoder_register_decode_complete_callback(
@@ -276,7 +279,7 @@ unsafe extern "C" fn video_decoder_register_decode_complete_callback(
         .expect("video_decoder_register_decode_complete_callback: callback is None");
     let callback = NonNull::new(callback)
         .map(|callback| unsafe { VideoDecoderDecodedImageCallbackRef::from_raw(callback) });
-    cb(callback)
+    cb(callback).to_raw()
 }
 
 unsafe extern "C" fn video_decoder_release(user_data: *mut c_void) -> i32 {
@@ -290,7 +293,7 @@ unsafe extern "C" fn video_decoder_release(user_data: *mut c_void) -> i32 {
         .release
         .as_mut()
         .expect("video_decoder_release: callback is None");
-    cb()
+    cb().to_raw()
 }
 
 unsafe extern "C" fn video_decoder_get_decoder_info(
@@ -408,10 +411,16 @@ impl VideoDecoder {
         unsafe { ffi::webrtc_VideoDecoder_Configure(self.as_ptr(), std::ptr::null_mut()) != 0 }
     }
 
-    pub fn decode(&self, input_image: Option<EncodedImageRef<'_>>, render_time_ms: i64) -> i32 {
+    pub fn decode(
+        &self,
+        input_image: Option<EncodedImageRef<'_>>,
+        render_time_ms: i64,
+    ) -> VideoCodecStatus {
         let input_image =
             input_image.map_or(std::ptr::null_mut(), |input_image| input_image.as_ptr());
-        unsafe { ffi::webrtc_VideoDecoder_Decode(self.as_ptr(), input_image, render_time_ms) }
+        let value =
+            unsafe { ffi::webrtc_VideoDecoder_Decode(self.as_ptr(), input_image, render_time_ms) };
+        VideoCodecStatus::from_raw(value)
     }
 
     pub fn get_decoder_info(&self) -> VideoDecoderDecoderInfo {

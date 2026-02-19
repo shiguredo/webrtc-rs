@@ -16,13 +16,12 @@
 #include <api/video_codecs/video_codec.h>
 #include <api/video_codecs/video_encoder.h>
 #include <modules/video_coding/include/video_codec_interface.h>
+#include <modules/video_coding/include/video_error_codes.h>
 
 #include "../../common.impl.h"
 #include "../../std.h"
 
 namespace {
-
-constexpr int32_t kVideoCodecOk = 0;
 
 class EncodedImageCallbackImpl : public webrtc::EncodedImageCallback {
  public:
@@ -102,7 +101,7 @@ class VideoEncoderImpl : public webrtc::VideoEncoder {
               const_cast<webrtc::VideoEncoder::Settings*>(&settings)),
           user_data_);
     }
-    return kVideoCodecOk;
+    return WEBRTC_VIDEO_CODEC_OK;
   }
 
   int32_t Encode(
@@ -116,7 +115,7 @@ class VideoEncoderImpl : public webrtc::VideoEncoder {
               const_cast<std::vector<webrtc::VideoFrameType>*>(frame_types)),
           user_data_);
     }
-    return kVideoCodecOk;
+    return WEBRTC_VIDEO_CODEC_OK;
   }
 
   int32_t RegisterEncodeCompleteCallback(
@@ -127,14 +126,14 @@ class VideoEncoderImpl : public webrtc::VideoEncoder {
               callback),
           user_data_);
     }
-    return kVideoCodecOk;
+    return WEBRTC_VIDEO_CODEC_OK;
   }
 
   int32_t Release() override {
     if (cbs_.Release != nullptr) {
       return cbs_.Release(user_data_);
     }
-    return kVideoCodecOk;
+    return WEBRTC_VIDEO_CODEC_OK;
   }
 
   void SetRates(

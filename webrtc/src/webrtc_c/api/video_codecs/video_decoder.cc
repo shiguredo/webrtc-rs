@@ -8,13 +8,12 @@
 // WebRTC
 #include <api/video/encoded_image.h>
 #include <api/video_codecs/video_decoder.h>
+#include <modules/video_coding/include/video_error_codes.h>
 
 #include "../../common.impl.h"
 #include "../../std.h"
 
 namespace {
-
-constexpr int32_t kVideoCodecOk = 0;
 
 class VideoDecoderImpl : public webrtc::VideoDecoder {
  public:
@@ -48,7 +47,7 @@ class VideoDecoderImpl : public webrtc::VideoDecoder {
                              const_cast<webrtc::EncodedImage*>(&input_image)),
                          render_time_ms, user_data_);
     }
-    return kVideoCodecOk;
+    return WEBRTC_VIDEO_CODEC_OK;
   }
 
   int32_t RegisterDecodeCompleteCallback(
@@ -59,14 +58,14 @@ class VideoDecoderImpl : public webrtc::VideoDecoder {
               callback),
           user_data_);
     }
-    return kVideoCodecOk;
+    return WEBRTC_VIDEO_CODEC_OK;
   }
 
   int32_t Release() override {
     if (cbs_.Release != nullptr) {
       return cbs_.Release(user_data_);
     }
-    return kVideoCodecOk;
+    return WEBRTC_VIDEO_CODEC_OK;
   }
 
   webrtc::VideoDecoder::DecoderInfo GetDecoderInfo() const override {
