@@ -71,11 +71,12 @@ struct webrtc_CreateSessionDescriptionObserver_cbs {
   void (*OnSuccess)(struct webrtc_SessionDescriptionInterface_unique* desc,
                     void* user_data);
   void (*OnFailure)(struct webrtc_RTCError_unique* error, void* user_data);
+  void (*OnDestroy)(void* user_data);
 };
 
 struct webrtc_CreateSessionDescriptionObserver*
 webrtc_CreateSessionDescriptionObserver_make_ref_counted(
-    struct webrtc_CreateSessionDescriptionObserver_cbs* cbs,
+    const struct webrtc_CreateSessionDescriptionObserver_cbs* cbs,
     void* user_data);
 
 #if defined(__cplusplus)

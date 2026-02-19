@@ -218,9 +218,10 @@ struct VideoDecoderFactoryCallbackState {
 }
 
 unsafe extern "C" fn video_decoder_on_destroy(user_data: *mut c_void) {
-    if user_data.is_null() {
-        return;
-    }
+    assert!(
+        !user_data.is_null(),
+        "video_decoder_on_destroy: user_data is null"
+    );
     let _ = unsafe { Box::from_raw(user_data as *mut VideoDecoderCallbackState) };
 }
 
@@ -313,9 +314,10 @@ unsafe extern "C" fn video_decoder_get_decoder_info(
 }
 
 unsafe extern "C" fn video_decoder_factory_on_destroy(user_data: *mut c_void) {
-    if user_data.is_null() {
-        return;
-    }
+    assert!(
+        !user_data.is_null(),
+        "video_decoder_factory_on_destroy: user_data is null"
+    );
     let _ = unsafe { Box::from_raw(user_data as *mut VideoDecoderFactoryCallbackState) };
 }
 

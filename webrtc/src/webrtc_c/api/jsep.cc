@@ -161,26 +161,36 @@ class CreateSessionDescriptionObserverImpl
     : public webrtc::CreateSessionDescriptionObserver {
  public:
   CreateSessionDescriptionObserverImpl(
-      struct webrtc_CreateSessionDescriptionObserver_cbs* cbs,
+      const struct webrtc_CreateSessionDescriptionObserver_cbs* cbs,
       void* user_data)
-      : cbs_(cbs), user_data_(user_data) {}
+      : user_data_(user_data) {
+    if (cbs != nullptr) {
+      cbs_ = *cbs;
+    }
+  }
+
+  ~CreateSessionDescriptionObserverImpl() override {
+    if (cbs_.OnDestroy != nullptr) {
+      cbs_.OnDestroy(user_data_);
+    }
+  }
 
   void OnSuccess(webrtc::SessionDescriptionInterface* desc) override {
     std::unique_ptr<webrtc::SessionDescriptionInterface> ptr(desc);
-    cbs_->OnSuccess(
+    cbs_.OnSuccess(
         reinterpret_cast<struct webrtc_SessionDescriptionInterface_unique*>(
             ptr.release()),
         user_data_);
   }
   void OnFailure(webrtc::RTCError error) override {
     auto rtc_error = std::make_unique<webrtc::RTCError>(std::move(error));
-    cbs_->OnFailure(
+    cbs_.OnFailure(
         reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error.release()),
         user_data_);
   }
 
  private:
-  struct webrtc_CreateSessionDescriptionObserver_cbs* cbs_;
+  webrtc_CreateSessionDescriptionObserver_cbs cbs_{};
   void* user_data_;
 };
 
@@ -190,7 +200,7 @@ WEBRTC_DEFINE_REFCOUNTED(webrtc_CreateSessionDescriptionObserver,
 
 struct webrtc_CreateSessionDescriptionObserver*
 webrtc_CreateSessionDescriptionObserver_make_ref_counted(
-    struct webrtc_CreateSessionDescriptionObserver_cbs* cbs,
+    const struct webrtc_CreateSessionDescriptionObserver_cbs* cbs,
     void* user_data) {
   auto impl = webrtc::make_ref_counted<CreateSessionDescriptionObserverImpl>(
       cbs, user_data);

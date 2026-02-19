@@ -39,10 +39,11 @@ struct webrtc_AudioTransport_cbs {
                          int64_t* elapsed_time_ms,
                          int64_t* ntp_time_ms,
                          void* user_data);
+  void (*OnDestroy)(void* user_data);
 };
 
 struct webrtc_AudioTransport* webrtc_AudioTransport_new(
-    struct webrtc_AudioTransport_cbs* cbs,
+    const struct webrtc_AudioTransport_cbs* cbs,
     void* user_data);
 void webrtc_AudioTransport_delete(struct webrtc_AudioTransport* self);
 

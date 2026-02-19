@@ -920,16 +920,18 @@ struct VideoEncoderFactoryCallbackState {
 }
 
 unsafe extern "C" fn video_encoder_on_destroy(user_data: *mut c_void) {
-    if user_data.is_null() {
-        return;
-    }
+    assert!(
+        !user_data.is_null(),
+        "video_encoder_on_destroy: user_data is null"
+    );
     let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderCallbackState) };
 }
 
 unsafe extern "C" fn video_encoder_encoded_image_callback_on_destroy(user_data: *mut c_void) {
-    if user_data.is_null() {
-        return;
-    }
+    assert!(
+        !user_data.is_null(),
+        "video_encoder_encoded_image_callback_on_destroy: user_data is null"
+    );
     let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderEncodedImageCallbackState) };
 }
 
@@ -1071,9 +1073,10 @@ unsafe extern "C" fn video_encoder_get_encoder_info(
 }
 
 unsafe extern "C" fn video_encoder_factory_on_destroy(user_data: *mut c_void) {
-    if user_data.is_null() {
-        return;
-    }
+    assert!(
+        !user_data.is_null(),
+        "video_encoder_factory_on_destroy: user_data is null"
+    );
     let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderFactoryCallbackState) };
 }
 
