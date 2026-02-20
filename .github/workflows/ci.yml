@@ -69,18 +69,19 @@ jobs:
             gcc-aarch64-linux-gnu
       - name: Build sysroot with mmdebstrap
         run: |
+          # --mode=unshare: user namespaces を使って sudo 不要で実行
           # --variant=extract: パッケージを展開するのみ（設定スクリプト不実行、sysroot 用途に最適）
           # --architectures=arm64: ARM64 用パッケージを取得
           case "${{ matrix.target }}" in
             ubuntu-24.04_armv8)
-              sudo mmdebstrap --architectures=arm64 --variant=extract \
+              mmdebstrap --mode=unshare --architectures=arm64 --variant=extract \
                 --include=libc6-dev,libstdc++-13-dev,libx11-dev,libxext-dev \
                 --components=main,universe \
                 noble "${{ github.workspace }}/rootfs" \
                 http://ports.ubuntu.com/ubuntu-ports
               ;;
             ubuntu-22.04_armv8)
-              sudo mmdebstrap --architectures=arm64 --variant=extract \
+              mmdebstrap --mode=unshare --architectures=arm64 --variant=extract \
                 --include=libc6-dev,libstdc++-11-dev,libx11-dev,libxext-dev \
                 --components=main,universe \
                 jammy "${{ github.workspace }}/rootfs" \
@@ -88,7 +89,7 @@ jobs:
               ;;
             raspberry-pi-os_armv8)
               # Raspberry Pi OS (64-bit) は Debian Trixie ベース
-              sudo mmdebstrap --architectures=arm64 --variant=extract \
+              mmdebstrap --mode=unshare --architectures=arm64 --variant=extract \
                 --include=libc6-dev,libstdc++-14-dev,libx11-dev,libxext-dev \
                 --components=main \
                 trixie "${{ github.workspace }}/rootfs" \
@@ -96,11 +97,9 @@ jobs:
               ;;
           esac
           # sysroot に不要な /dev を削除（シンボリックリンクループで Cargo のスキャンが失敗するため）
-          sudo rm -rf "${{ github.workspace }}/rootfs/dev"
+          rm -rf "${{ github.workspace }}/rootfs/dev"
           # usrmerge シンボリックリンクを作成（リンカスクリプト内の絶対パス /lib/... を解決するため）
-          sudo ln -sf usr/lib "${{ github.workspace }}/rootfs/lib"
-          # Cargo がワークスペースをスキャンする際に Permission denied にならないようにする
-          sudo chmod -R a+rX "${{ github.workspace }}/rootfs"
+          ln -sf usr/lib "${{ github.workspace }}/rootfs/lib"
       - run: rustup update stable
       - run: rustup target add aarch64-unknown-linux-gnu
       # webrtc_c の C++ ビルドは CMakeLists.txt 内で Google の prebuilt Clang を使用する。
