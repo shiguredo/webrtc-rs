@@ -7,32 +7,42 @@
 class VideoSinkInterfaceImpl
     : public webrtc::VideoSinkInterface<webrtc::VideoFrame> {
  public:
-  VideoSinkInterfaceImpl(struct webrtc_VideoSinkInterface_cbs* cbs,
+  VideoSinkInterfaceImpl(const struct webrtc_VideoSinkInterface_cbs* cbs,
                          void* user_data)
-      : cbs_(cbs), user_data_(user_data) {}
+      : user_data_(user_data) {
+    if (cbs != nullptr) {
+      cbs_ = *cbs;
+    }
+  }
+
+  ~VideoSinkInterfaceImpl() override {
+    if (cbs_.OnDestroy != nullptr) {
+      cbs_.OnDestroy(user_data_);
+    }
+  }
 
   void OnFrame(const webrtc::VideoFrame& frame) override {
-    if (cbs_ != nullptr && cbs_->OnFrame != nullptr) {
+    if (cbs_.OnFrame != nullptr) {
       auto* frame_ptr =
           reinterpret_cast<const struct webrtc_VideoFrame*>(&frame);
-      cbs_->OnFrame(frame_ptr, user_data_);
+      cbs_.OnFrame(frame_ptr, user_data_);
     }
   }
 
   void OnDiscardedFrame() override {
-    if (cbs_ != nullptr && cbs_->OnDiscardedFrame != nullptr) {
-      cbs_->OnDiscardedFrame(user_data_);
+    if (cbs_.OnDiscardedFrame != nullptr) {
+      cbs_.OnDiscardedFrame(user_data_);
     }
   }
 
  private:
-  struct webrtc_VideoSinkInterface_cbs* cbs_;
+  webrtc_VideoSinkInterface_cbs cbs_{};
   void* user_data_;
 };
 
 extern "C" {
 struct webrtc_VideoSinkInterface* webrtc_VideoSinkInterface_new(
-    struct webrtc_VideoSinkInterface_cbs* cbs,
+    const struct webrtc_VideoSinkInterface_cbs* cbs,
     void* user_data) {
   auto sink = new VideoSinkInterfaceImpl(cbs, user_data);
   return reinterpret_cast<struct webrtc_VideoSinkInterface*>(sink);

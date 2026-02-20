@@ -213,7 +213,7 @@ impl PeerConnectionFactory {
         Ok(Self { raw_ref })
     }
 
-    pub fn set_options(&self, options: &PeerConnectionFactoryOptions) {
+    pub fn set_options(&mut self, options: &PeerConnectionFactoryOptions) {
         unsafe {
             ffi::webrtc_PeerConnectionFactoryInterface_SetOptions(self.as_ptr(), options.as_ptr())
         };
@@ -388,6 +388,51 @@ impl IceServer {
     }
 
     pub fn add_url(&mut self, url: &str) {
+        self.as_ref().add_url(url);
+    }
+
+    pub fn set_username(&mut self, username: &str) {
+        self.as_ref().set_username(username);
+    }
+
+    pub fn set_password(&mut self, password: &str) {
+        self.as_ref().set_password(password);
+    }
+
+    pub fn as_ref(&self) -> IceServerRef<'_> {
+        IceServerRef::from_raw(self.raw)
+    }
+
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_IceServer {
+        self.raw.as_ptr()
+    }
+}
+
+impl Drop for IceServer {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_delete(self.raw.as_ptr()) };
+    }
+}
+
+/// IceServer への借用ラッパー。
+pub struct IceServerRef<'a> {
+    raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>,
+    _marker: PhantomData<&'a mut ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
+}
+
+impl<'a> IceServerRef<'a> {
+    pub fn from_raw(raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_IceServer {
+        self.raw.as_ptr()
+    }
+
+    pub fn add_url(&mut self, url: &str) {
         let urls =
             unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_get_urls(self.raw.as_ptr()) };
         let cxx = CxxString::from_str(url);
@@ -413,16 +458,6 @@ impl IceServer {
             );
         }
     }
-
-    pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_IceServer {
-        self.raw.as_ptr()
-    }
-}
-
-impl Drop for IceServer {
-    fn drop(&mut self) {
-        unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_delete(self.raw.as_ptr()) };
-    }
 }
 
 /// PeerConnectionInterface::IceServer_vector の所有ラッパー。
@@ -441,41 +476,27 @@ impl IceServerVector {
     }
 
     pub fn len(&self) -> usize {
-        let len =
-            unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_vector_size(self.raw.as_ptr()) };
-        len.max(0) as usize
+        self.as_ref().len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.as_ref().is_empty()
     }
 
     pub fn get(&self, index: usize) -> Option<IceServerRef<'_>> {
-        let len = self.len();
-        if index >= len {
-            return None;
-        }
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_PeerConnectionInterface_IceServer_vector_get(
-                self.raw.as_ptr(),
-                index as i32,
-            )
-        })
-        .expect("BUG: webrtc_PeerConnectionInterface_IceServer_vector_get が null を返しました");
-        Some(IceServerRef::from_raw(raw))
+        self.as_ref().get(index)
     }
 
     pub fn push(&mut self, server: &IceServer) {
-        unsafe {
-            ffi::webrtc_PeerConnectionInterface_IceServer_vector_push_back(
-                self.raw.as_ptr(),
-                server.as_ptr(),
-            );
-        }
+        self.as_ref().push(server);
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_IceServer_vector {
         self.raw.as_ptr()
+    }
+
+    pub fn as_ref(&self) -> IceServerVectorRef<'_> {
+        IceServerVectorRef::from_raw(self.raw)
     }
 }
 
@@ -509,6 +530,21 @@ impl<'a> IceServerVectorRef<'a> {
         self.len() == 0
     }
 
+    pub fn get(&self, index: usize) -> Option<IceServerRef<'a>> {
+        let len = self.len();
+        if index >= len {
+            return None;
+        }
+        let raw = NonNull::new(unsafe {
+            ffi::webrtc_PeerConnectionInterface_IceServer_vector_get(
+                self.raw.as_ptr(),
+                index as i32,
+            )
+        })
+        .expect("BUG: webrtc_PeerConnectionInterface_IceServer_vector_get が null を返しました");
+        Some(IceServerRef::from_raw(raw))
+    }
+
     pub fn push(&mut self, server: &IceServer) {
         unsafe {
             ffi::webrtc_PeerConnectionInterface_IceServer_vector_push_back(
@@ -516,25 +552,6 @@ impl<'a> IceServerVectorRef<'a> {
                 server.as_ptr(),
             );
         }
-    }
-}
-
-/// IceServer への借用ラッパー。
-pub struct IceServerRef<'a> {
-    raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>,
-    _marker: PhantomData<&'a mut ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
-}
-
-impl<'a> IceServerRef<'a> {
-    pub fn from_raw(raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>) -> Self {
-        Self {
-            raw,
-            _marker: PhantomData,
-        }
-    }
-
-    pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_IceServer {
-        self.raw.as_ptr()
     }
 }
 
@@ -904,9 +921,10 @@ unsafe extern "C" fn observer_on_data_channel(
     data_channel: *mut ffi::webrtc_DataChannelInterface_refcounted,
     user_data: *mut c_void,
 ) {
-    if user_data.is_null() {
-        return;
-    }
+    assert!(
+        !user_data.is_null(),
+        "observer_on_data_channel: user_data is null"
+    );
     let callbacks = unsafe { &mut *(user_data as *mut ObserverCallbacks) };
     let raw_ref = ScopedRef::<DataChannelHandle>::from_raw(
         NonNull::new(data_channel).expect("BUG: data_channel が null"),
@@ -917,11 +935,17 @@ unsafe extern "C" fn observer_on_data_channel(
     }
 }
 
+unsafe extern "C" fn observer_on_destroy(user_data: *mut c_void) {
+    assert!(
+        !user_data.is_null(),
+        "observer_on_destroy: user_data is null"
+    );
+    let _ = unsafe { Box::from_raw(user_data as *mut ObserverCallbacks) };
+}
+
 /// PeerConnectionObserver のラッパー。
 pub struct PeerConnectionObserver {
     raw: NonNull<ffi::webrtc_PeerConnectionObserver>,
-    _cbs: Box<ffi::webrtc_PeerConnectionObserver_cbs>,
-    _user_data: Box<ObserverCallbacks>,
 }
 
 impl PeerConnectionObserver {
@@ -938,15 +962,15 @@ impl PeerConnectionObserver {
         let has_on_remove_track = on_remove_track.is_some();
         let has_on_ice_candidate = on_ice_candidate.is_some();
         let has_on_data_channel = on_data_channel.is_some();
-        let mut callbacks = Box::new(ObserverCallbacks {
+        let callbacks = Box::new(ObserverCallbacks {
             on_connection_change,
             on_track,
             on_remove_track,
             on_ice_candidate,
             on_data_channel,
         });
-        let user_data = callbacks.as_mut() as *mut ObserverCallbacks as *mut c_void;
-        let mut cbs = Box::new(ffi::webrtc_PeerConnectionObserver_cbs {
+        let user_data = Box::into_raw(callbacks) as *mut c_void;
+        let cbs = ffi::webrtc_PeerConnectionObserver_cbs {
             OnConnectionChange: if has_on_connection_change {
                 Some(observer_on_connection_change)
             } else {
@@ -972,26 +996,22 @@ impl PeerConnectionObserver {
             } else {
                 None
             },
-        });
-        let cbs_ptr = cbs.as_mut() as *mut ffi::webrtc_PeerConnectionObserver_cbs;
-        let raw = unsafe { ffi::webrtc_PeerConnectionObserver_new(cbs_ptr, user_data) };
-        let raw =
-            NonNull::new(raw).expect("BUG: webrtc_PeerConnectionObserver_new が null を返しました");
-        Self {
-            raw,
-            _cbs: cbs,
-            _user_data: callbacks,
-        }
+            OnDestroy: Some(observer_on_destroy),
+        };
+        let raw = match NonNull::new(unsafe {
+            ffi::webrtc_PeerConnectionObserver_new(&cbs, user_data)
+        }) {
+            Some(raw) => raw,
+            None => {
+                let _ = unsafe { Box::from_raw(user_data as *mut ObserverCallbacks) };
+                panic!("BUG: webrtc_PeerConnectionObserver_new が null を返しました");
+            }
+        };
+        Self { raw }
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionObserver {
         self.raw.as_ptr()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn invoke_connection_change_for_test(&mut self, state: PeerConnectionState) {
-        let user_data = self._user_data.as_mut() as *mut ObserverCallbacks as *mut c_void;
-        unsafe { observer_on_connection_change(state.to_int(), user_data) };
     }
 }
 
@@ -1016,7 +1036,7 @@ impl PeerConnectionDependencies {
         Self { raw }
     }
 
-    pub fn as_ptr(&mut self) -> *mut ffi::webrtc_PeerConnectionDependencies {
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionDependencies {
         self.raw.as_ptr()
     }
 }
@@ -1036,9 +1056,10 @@ unsafe extern "C" fn peer_connection_on_stats(
     report: *const ffi::webrtc_RTCStatsReport_refcounted,
     user_data: *mut c_void,
 ) {
-    if user_data.is_null() {
-        return;
-    }
+    assert!(
+        !user_data.is_null(),
+        "peer_connection_on_stats: user_data is null"
+    );
     let state = unsafe { Box::from_raw(user_data as *mut PeerConnectionStatsCallbackState) };
     let Some(report) = NonNull::new(report as *mut ffi::webrtc_RTCStatsReport_refcounted) else {
         return;
@@ -1071,11 +1092,14 @@ unsafe extern "C" fn csd_on_failure(
     (callbacks.on_failure)(err);
 }
 
+unsafe extern "C" fn csd_on_destroy(user_data: *mut c_void) {
+    assert!(!user_data.is_null(), "csd_on_destroy: user_data is null");
+    let _ = unsafe { Box::from_raw(user_data as *mut CreateSessionDescriptionCallbacks) };
+}
+
 /// CreateSessionDescriptionObserver のラッパー。
 pub struct CreateSessionDescriptionObserver {
     raw: NonNull<ffi::webrtc_CreateSessionDescriptionObserver>,
-    _cbs: Box<ffi::webrtc_CreateSessionDescriptionObserver_cbs>,
-    _user_data: Box<CreateSessionDescriptionCallbacks>,
 }
 
 impl CreateSessionDescriptionObserver {
@@ -1084,24 +1108,27 @@ impl CreateSessionDescriptionObserver {
         S: FnMut(SessionDescription) + Send + 'static,
         F: FnMut(RtcError) + Send + 'static,
     {
-        let mut callbacks = Box::new(CreateSessionDescriptionCallbacks {
+        let callbacks = Box::new(CreateSessionDescriptionCallbacks {
             on_success: Box::new(on_success),
             on_failure: Box::new(on_failure),
         });
-        let user_data = callbacks.as_mut() as *mut CreateSessionDescriptionCallbacks as *mut c_void;
-        let mut cbs = Box::new(ffi::webrtc_CreateSessionDescriptionObserver_cbs {
+        let user_data = Box::into_raw(callbacks) as *mut c_void;
+        let cbs = ffi::webrtc_CreateSessionDescriptionObserver_cbs {
             OnSuccess: Some(csd_on_success),
             OnFailure: Some(csd_on_failure),
-        });
-        let cbs_ptr = cbs.as_mut() as *mut ffi::webrtc_CreateSessionDescriptionObserver_cbs;
-        let raw = unsafe {
-            ffi::webrtc_CreateSessionDescriptionObserver_make_ref_counted(cbs_ptr, user_data)
+            OnDestroy: Some(csd_on_destroy),
         };
-        Self {
-            raw: NonNull::new(raw).expect("BUG: raw が null です"),
-            _cbs: cbs,
-            _user_data: callbacks,
-        }
+        let raw = match NonNull::new(unsafe {
+            ffi::webrtc_CreateSessionDescriptionObserver_make_ref_counted(&cbs, user_data)
+        }) {
+            Some(raw) => raw,
+            None => {
+                let _ =
+                    unsafe { Box::from_raw(user_data as *mut CreateSessionDescriptionCallbacks) };
+                panic!("BUG: raw が null です");
+            }
+        };
+        Self { raw }
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_CreateSessionDescriptionObserver {
@@ -1130,11 +1157,14 @@ unsafe extern "C" fn sld_on_complete(
     (callbacks.on_complete)(err);
 }
 
+unsafe extern "C" fn sld_on_destroy(user_data: *mut c_void) {
+    assert!(!user_data.is_null(), "sld_on_destroy: user_data is null");
+    let _ = unsafe { Box::from_raw(user_data as *mut SetLocalDescriptionCallbacks) };
+}
+
 /// SetLocalDescriptionObserverInterface のラッパー。
 pub struct SetLocalDescriptionObserver {
     raw_ref: ScopedRef<SetLocalDescriptionObserverHandle>,
-    _cbs: Box<ffi::webrtc_SetLocalDescriptionObserverInterface_cbs>,
-    _user_data: Box<SetLocalDescriptionCallbacks>,
 }
 
 impl SetLocalDescriptionObserver {
@@ -1142,23 +1172,27 @@ impl SetLocalDescriptionObserver {
     where
         F: FnMut(RtcError) + Send + 'static,
     {
-        let mut callbacks = Box::new(SetLocalDescriptionCallbacks {
+        let callbacks = Box::new(SetLocalDescriptionCallbacks {
             on_complete: Box::new(on_complete),
         });
-        let user_data = callbacks.as_mut() as *mut SetLocalDescriptionCallbacks as *mut c_void;
-        let mut cbs = Box::new(ffi::webrtc_SetLocalDescriptionObserverInterface_cbs {
+        let user_data = Box::into_raw(callbacks) as *mut c_void;
+        let cbs = ffi::webrtc_SetLocalDescriptionObserverInterface_cbs {
             OnSetLocalDescriptionComplete: Some(sld_on_complete),
-        });
-        let cbs_ptr = cbs.as_mut() as *mut ffi::webrtc_SetLocalDescriptionObserverInterface_cbs;
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_SetLocalDescriptionObserverInterface_make_ref_counted(cbs_ptr, user_data)
-        }).expect("BUG: webrtc_SetLocalDescriptionObserverInterface_make_ref_counted が null を返しました");
+            OnDestroy: Some(sld_on_destroy),
+        };
+        let raw = match NonNull::new(unsafe {
+            ffi::webrtc_SetLocalDescriptionObserverInterface_make_ref_counted(&cbs, user_data)
+        }) {
+            Some(raw) => raw,
+            None => {
+                let _ = unsafe { Box::from_raw(user_data as *mut SetLocalDescriptionCallbacks) };
+                panic!(
+                    "BUG: webrtc_SetLocalDescriptionObserverInterface_make_ref_counted が null を返しました"
+                );
+            }
+        };
         let raw_ref = ScopedRef::<SetLocalDescriptionObserverHandle>::from_raw(raw);
-        Self {
-            raw_ref,
-            _cbs: cbs,
-            _user_data: callbacks,
-        }
+        Self { raw_ref }
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_SetLocalDescriptionObserverInterface {
@@ -1187,11 +1221,14 @@ unsafe extern "C" fn srd_on_complete(
     (callbacks.on_complete)(err);
 }
 
+unsafe extern "C" fn srd_on_destroy(user_data: *mut c_void) {
+    assert!(!user_data.is_null(), "srd_on_destroy: user_data is null");
+    let _ = unsafe { Box::from_raw(user_data as *mut SetRemoteDescriptionCallbacks) };
+}
+
 /// SetRemoteDescriptionObserverInterface のラッパー。
 pub struct SetRemoteDescriptionObserver {
     raw_ref: ScopedRef<SetRemoteDescriptionObserverHandle>,
-    _cbs: Box<ffi::webrtc_SetRemoteDescriptionObserverInterface_cbs>,
-    _user_data: Box<SetRemoteDescriptionCallbacks>,
 }
 
 impl SetRemoteDescriptionObserver {
@@ -1199,24 +1236,25 @@ impl SetRemoteDescriptionObserver {
     where
         F: FnMut(RtcError) + Send + 'static,
     {
-        let mut callbacks = Box::new(SetRemoteDescriptionCallbacks {
+        let callbacks = Box::new(SetRemoteDescriptionCallbacks {
             on_complete: Box::new(on_complete),
         });
-        let user_data = callbacks.as_mut() as *mut SetRemoteDescriptionCallbacks as *mut c_void;
-        let mut cbs = Box::new(ffi::webrtc_SetRemoteDescriptionObserverInterface_cbs {
+        let user_data = Box::into_raw(callbacks) as *mut c_void;
+        let cbs = ffi::webrtc_SetRemoteDescriptionObserverInterface_cbs {
             OnSetRemoteDescriptionComplete: Some(srd_on_complete),
-        });
-        let cbs_ptr = cbs.as_mut() as *mut ffi::webrtc_SetRemoteDescriptionObserverInterface_cbs;
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_SetRemoteDescriptionObserverInterface_make_ref_counted(cbs_ptr, user_data)
-        })
-        .expect("BUG: raw が null です");
+            OnDestroy: Some(srd_on_destroy),
+        };
+        let raw = match NonNull::new(unsafe {
+            ffi::webrtc_SetRemoteDescriptionObserverInterface_make_ref_counted(&cbs, user_data)
+        }) {
+            Some(raw) => raw,
+            None => {
+                let _ = unsafe { Box::from_raw(user_data as *mut SetRemoteDescriptionCallbacks) };
+                panic!("BUG: raw が null です");
+            }
+        };
         let raw_ref = ScopedRef::<SetRemoteDescriptionObserverHandle>::from_raw(raw);
-        Self {
-            raw_ref,
-            _cbs: cbs,
-            _user_data: callbacks,
-        }
+        Self { raw_ref }
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_SetRemoteDescriptionObserverInterface {
@@ -1322,7 +1360,7 @@ impl PeerConnection {
         };
     }
 
-    pub fn add_ice_candidate(&self, candidate: &IceCandidate) -> Result<()> {
+    pub fn add_ice_candidate(&mut self, candidate: &IceCandidate) -> Result<()> {
         let ok = unsafe {
             ffi::webrtc_PeerConnectionInterface_AddIceCandidate(
                 self.raw_ref.as_ptr(),
@@ -1335,7 +1373,7 @@ impl PeerConnection {
         Ok(())
     }
 
-    pub fn set_configuration(&self, config: &mut PeerConnectionRtcConfiguration) -> Result<()> {
+    pub fn set_configuration(&mut self, config: &mut PeerConnectionRtcConfiguration) -> Result<()> {
         let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
         unsafe {
             ffi::webrtc_PeerConnectionInterface_SetConfiguration(

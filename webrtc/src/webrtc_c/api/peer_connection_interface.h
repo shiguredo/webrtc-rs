@@ -199,6 +199,7 @@ struct webrtc_PeerConnectionObserver_cbs {
   void (*OnDataChannel)(
       struct webrtc_DataChannelInterface_refcounted* data_channel,
       void* user_data);
+  void (*OnDestroy)(void* user_data);
   // void OnIceGatheringChange(webrtc::PeerConnectionInterface::IceGatheringState new_state) override {}
   // void OnIceCandidate(const webrtc::IceCandidate* candidate) override {}
   // void OnIceCandidateError(const std::string& address, int port, const std::string& url, int error_code, const std::string& error_text) override {}
@@ -206,7 +207,7 @@ struct webrtc_PeerConnectionObserver_cbs {
   // void OnRemoveTrack(webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) override {}
 };
 struct webrtc_PeerConnectionObserver* webrtc_PeerConnectionObserver_new(
-    struct webrtc_PeerConnectionObserver_cbs* observer,
+    const struct webrtc_PeerConnectionObserver_cbs* observer,
     void* user_data);
 void webrtc_PeerConnectionObserver_delete(
     struct webrtc_PeerConnectionObserver* self);
