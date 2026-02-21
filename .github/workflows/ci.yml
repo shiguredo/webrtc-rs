@@ -64,9 +64,18 @@ jobs:
           sudo apt-get install -y build-essential \
             libclang-dev \
             clang \
-            mmdebstrap \
             debian-archive-keyring \
             gcc-aarch64-linux-gnu
+          # cargo-shiguredo-sysroot は独自 apt 設定で sources.list のみ差し替えるため、
+          # Debian の keyring を trusted.gpg.d に配置しないと trixie の署名検証に失敗する。
+          sudo install -Dm644 /usr/share/keyrings/debian-archive-keyring.gpg \
+            /etc/apt/trusted.gpg.d/debian-archive-keyring.gpg
+      - run: rustup update stable
+      - run: rustup target add aarch64-unknown-linux-gnu
+      - name: Install cargo-shiguredo-sysroot
+        run: |
+          # shiguredo-sysroot をインストール
+          cargo install shiguredo_sysroot --git https://github.com/melpon/sysroot-rs.git
       - name: Build sysroot with mmdebstrap
         run: |
           # --mode=unshare: user namespaces を使って sudo 不要で実行
@@ -74,45 +83,29 @@ jobs:
           # --architectures=arm64: ARM64 用パッケージを取得
           case "${{ matrix.target }}" in
             ubuntu-24.04_armv8)
-              mmdebstrap --mode=unshare --architectures=arm64 --variant=extract \
-                --include=libc6-dev,libstdc++-13-dev,libx11-dev,libxext-dev \
-                --components=main,universe \
-                noble "${{ github.workspace }}/rootfs" \
-                http://ports.ubuntu.com/ubuntu-ports
+              cargo-shiguredo-sysroot \
+                --arch arm64 \
+                --packages "libc6-dev,libstdc++-13-dev,libx11-dev,libxext-dev" \
+                --repo "http://ports.ubuntu.com/ubuntu-ports|noble|main,universe"
               ;;
             ubuntu-22.04_armv8)
-              mmdebstrap --mode=unshare --architectures=arm64 --variant=extract \
-                --include=libc6-dev,libstdc++-11-dev,libx11-dev,libxext-dev \
-                --components=main,universe \
-                jammy "${{ github.workspace }}/rootfs" \
-                http://ports.ubuntu.com/ubuntu-ports
+              cargo-shiguredo-sysroot \
+                --arch arm64 \
+                --packages "libc6-dev,libstdc++-11-dev,libx11-dev,libxext-dev" \
+                --repo "http://ports.ubuntu.com/ubuntu-ports|jammy|main,universe"
               ;;
             raspberry-pi-os_armv8)
               # Raspberry Pi OS (64-bit) は Debian Trixie ベース
-              mmdebstrap --mode=unshare --architectures=arm64 --variant=extract \
-                --include=libc6-dev,libstdc++-14-dev,libx11-dev,libxext-dev \
-                --components=main \
-                trixie "${{ github.workspace }}/rootfs" \
-                http://deb.debian.org/debian
+              cargo-shiguredo-sysroot \
+                --arch arm64 \
+                --packages "libc6-dev,libstdc++-14-dev,libx11-dev,libxext-dev" \
+                --repo "http://deb.debian.org/debian|trixie|main"
               ;;
           esac
-          # sysroot に不要な /dev を削除（シンボリックリンクループで Cargo のスキャンが失敗するため）
-          rm -rf "${{ github.workspace }}/rootfs/dev"
-          # usrmerge シンボリックリンクを作成（リンカスクリプト内の絶対パス /lib/... を解決するため）
-          ln -sf usr/lib "${{ github.workspace }}/rootfs/lib"
-      - run: rustup update stable
-      - run: rustup target add aarch64-unknown-linux-gnu
-      # webrtc_c の C++ ビルドは CMakeLists.txt 内で Google の prebuilt Clang を使用する。
-      # Rust のリンクはシステムの clang を使用し、--target と --sysroot で
-      # クロスコンパイル先を指定する。
       - name: Build for ${{ matrix.target }}
         env:
           WEBRTC_C_TARGET: ${{ matrix.target }}
-          WEBRTC_C_SYSROOT: ${{ github.workspace }}/rootfs
-          CC_aarch64_unknown_linux_gnu: clang
-          CFLAGS_aarch64_unknown_linux_gnu: --target=aarch64-linux-gnu --sysroot=${{ github.workspace }}/rootfs
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: clang
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: -C link-arg=--target=aarch64-linux-gnu -C link-arg=--sysroot=${{ github.workspace }}/rootfs
+          WEBRTC_C_SYSROOT: ${{ github.workspace }}/target/sysroot
         run: cargo build --workspace --target aarch64-unknown-linux-gnu
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
