@@ -86,20 +86,23 @@ jobs:
               cargo-shiguredo-sysroot \
                 --arch arm64 \
                 --packages "libc6-dev,libstdc++-13-dev,libx11-dev,libxext-dev" \
-                --repo "http://ports.ubuntu.com/ubuntu-ports|noble|main,universe"
+                --repo "http://ports.ubuntu.com/ubuntu-ports|noble|main,universe" \
+                --include-updates --include-security
               ;;
             ubuntu-22.04_armv8)
               cargo-shiguredo-sysroot \
                 --arch arm64 \
                 --packages "libc6-dev,libstdc++-11-dev,libx11-dev,libxext-dev" \
-                --repo "http://ports.ubuntu.com/ubuntu-ports|jammy|main,universe"
+                --repo "http://ports.ubuntu.com/ubuntu-ports|jammy|main,universe" \
+                --include-updates --include-security
               ;;
             raspberry-pi-os_armv8)
               # Raspberry Pi OS (64-bit) は Debian Trixie ベース
               cargo-shiguredo-sysroot \
                 --arch arm64 \
                 --packages "libc6-dev,libstdc++-14-dev,libx11-dev,libxext-dev" \
-                --repo "http://deb.debian.org/debian|trixie|main"
+                --repo "http://deb.debian.org/debian|trixie|main" \
+                --include-updates --include-security
               ;;
           esac
       - name: Build for ${{ matrix.target }}
