@@ -102,7 +102,7 @@ jobs:
                 --arch arm64 \
                 --packages "libc6-dev,libstdc++-14-dev,libx11-dev,libxext-dev" \
                 --repo "http://deb.debian.org/debian|trixie|main" \
-                --include-updates --include-security
+                --include-updates
               ;;
           esac
       - name: Build for ${{ matrix.target }}
