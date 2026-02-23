@@ -25,13 +25,6 @@ WEBRTC_DEFINE_UNIQUE(webrtc_VideoFrame, webrtc::VideoFrame);
 struct webrtc_VideoFrame_unique* webrtc_VideoFrame_Create(
     struct webrtc_I420Buffer_refcounted* buffer,
     int rotation,
-    int64_t timestamp_us) {
-  return webrtc_VideoFrame_Create_with_timestamp_rtp(buffer, rotation,
-                                                     timestamp_us, 0);
-}
-struct webrtc_VideoFrame_unique* webrtc_VideoFrame_Create_with_timestamp_rtp(
-    struct webrtc_I420Buffer_refcounted* buffer,
-    int rotation,
     int64_t timestamp_us,
     uint32_t timestamp_rtp) {
   webrtc::scoped_refptr<webrtc::I420Buffer> buf(

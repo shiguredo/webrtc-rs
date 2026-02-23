@@ -144,7 +144,7 @@ fn sdp_video_format_with_parameters() {
         params.set("level", "3.1");
     }
 
-    assert!(fmt.is_equal(&other));
+    assert!(fmt.is_equal(other.as_ref()));
 }
 
 #[test]
@@ -153,7 +153,7 @@ fn i420_buffer_and_video_frame() {
     buf.fill_y(0x10);
     buf.fill_uv(0x80, 0x90);
 
-    let frame = VideoFrame::from_i420(&buf, 12345);
+    let frame = VideoFrame::from_i420(&buf, 12345, 0);
     assert_eq!(frame.width(), 4);
     assert_eq!(frame.height(), 4);
     assert_eq!(frame.timestamp_us(), 12345);
@@ -172,7 +172,7 @@ fn i420_buffer_mutable_planes_and_video_frame_rtp_timestamp() {
     assert!(buf.u_data().iter().all(|&v| v == 0x22));
     assert!(buf.v_data().iter().all(|&v| v == 0x33));
 
-    let frame = VideoFrame::from_i420_with_timestamp_rtp(&buf, 12345, 67890);
+    let frame = VideoFrame::from_i420(&buf, 12345, 67890);
     assert_eq!(frame.timestamp_us(), 12345);
     assert_eq!(frame.rtp_timestamp(), 67890);
     assert_eq!(frame.as_ref().rtp_timestamp(), 67890);
@@ -299,7 +299,7 @@ fn adapted_video_track_source() {
     assert!(adapted.size.adapted_height >= 0);
 
     let buf = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buf, 2_000_000);
+    let frame = VideoFrame::from_i420(&buf, 2_000_000, 0);
     src.on_frame(&frame);
 }
 
@@ -394,14 +394,14 @@ fn rtp_codec_capability_vector() {
 
     let mut vec = RtpCodecCapabilityVector::new(0);
     let len_before = vec.len();
-    vec.push(&cap);
+    vec.push(&cap.as_ref());
     assert_eq!(vec.len(), len_before + 1);
     vec.resize(2);
     let mut cap2 = RtpCodecCapability::new();
     cap2.set_kind(MediaType::Audio);
     cap2.set_name("PCMU");
     cap2.set_clock_rate(Some(8_000));
-    assert!(vec.set(1, &cap2));
+    assert!(vec.set(1, &cap2.as_ref()));
     assert_eq!(vec.len(), 2);
     let first = vec.get(0).expect("先頭 codec の取得に失敗しました");
     let second = vec.get(1).expect("2 番目 codec の取得に失敗しました");
@@ -692,7 +692,7 @@ fn video_track_and_transceiver_with_track() {
         .expect("VideoTrack の生成に失敗しました");
     // ついでにフレーム投入 API も呼んでおく。
     let buf = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buf, 1_000_000);
+    let frame = VideoFrame::from_i420(&buf, 1_000_000, 0);
     source.on_frame(&frame);
 
     // PeerConnection を作成し、トラック付きで transceiver を追加する。
@@ -777,11 +777,11 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
     let mut encoder = factory
-        .create(&env, &format)
+        .create(env.as_ref(), format.as_ref())
         .expect("custom encoder の作成に失敗しました");
 
     let buffer = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buffer, 123);
+    let frame = VideoFrame::from_i420(&buffer, 123, 0);
     let mut frame_types = VideoFrameTypeVector::new(0);
     frame_types.push(VideoFrameType::Key);
     frame_types.push(VideoFrameType::Delta);
@@ -795,7 +795,7 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
         VideoCodecStatus::Unknown(2)
     );
     assert!(
-        factory.create(&env, &format).is_none(),
+        factory.create(env.as_ref(), format.as_ref()).is_none(),
         "2 回目の create は None を返す想定です"
     );
 }
@@ -863,7 +863,7 @@ fn video_decoder_factory_get_supported_formats_returns_owned_formats() {
 }
 
 #[test]
-fn video_encoder_factory_create_from_ref_calls_create_callback() {
+fn video_encoder_factory_create_calls_create_callback() {
     let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let called_clone = called.clone();
     let factory = VideoEncoderFactory::new_with_callbacks(VideoEncoderFactoryCallbacks {
@@ -885,8 +885,8 @@ fn video_encoder_factory_create_from_ref_calls_create_callback() {
 
     let env = Environment::new();
     let format = SdpVideoFormat::new("H264");
-    let encoder = factory.create_from_ref(env.as_ref(), format.as_ref());
-    assert!(encoder.is_some(), "create_from_ref が None を返しました");
+    let encoder = factory.create(env.as_ref(), format.as_ref());
+    assert!(encoder.is_some(), "create が None を返しました");
     assert!(
         called.load(std::sync::atomic::Ordering::SeqCst),
         "create callback が呼ばれていません"
@@ -894,7 +894,7 @@ fn video_encoder_factory_create_from_ref_calls_create_callback() {
 }
 
 #[test]
-fn video_decoder_factory_create_from_ref_calls_create_callback() {
+fn video_decoder_factory_create_calls_create_callback() {
     let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let called_clone = called.clone();
     let factory = VideoDecoderFactory::new_with_callbacks(VideoDecoderFactoryCallbacks {
@@ -916,8 +916,8 @@ fn video_decoder_factory_create_from_ref_calls_create_callback() {
 
     let env = Environment::new();
     let format = SdpVideoFormat::new("H264");
-    let decoder = factory.create_from_ref(env.as_ref(), format.as_ref());
-    assert!(decoder.is_some(), "create_from_ref が None を返しました");
+    let decoder = factory.create(env.as_ref(), format.as_ref());
+    assert!(decoder.is_some(), "create が None を返しました");
     assert!(
         called.load(std::sync::atomic::Ordering::SeqCst),
         "create callback が呼ばれていません"
@@ -1048,7 +1048,7 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     );
 
     let buffer = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buffer, 123);
+    let frame = VideoFrame::from_i420(&buffer, 123, 0);
     assert_eq!(encoder.encode(&frame), VideoCodecStatus::Unknown(88));
 
     assert!(state.register_called, "register が呼ばれていません");
@@ -1095,13 +1095,13 @@ fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
     let mut decoder = factory
-        .create(&env, &format)
+        .create(env.as_ref(), format.as_ref())
         .expect("custom decoder の作成に失敗しました");
 
     assert_eq!(decoder.decode(None, 456), VideoCodecStatus::NoOutput);
     assert_eq!(decoder.decode(None, 456), VideoCodecStatus::Unknown(2));
     assert!(
-        factory.create(&env, &format).is_none(),
+        factory.create(env.as_ref(), format.as_ref()).is_none(),
         "2 回目の create は None を返す想定です"
     );
 }

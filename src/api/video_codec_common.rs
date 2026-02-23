@@ -31,8 +31,8 @@ impl SdpVideoFormat {
         self.as_ref().parameters_mut()
     }
 
-    pub fn is_equal(&self, other: &SdpVideoFormat) -> bool {
-        self.as_ref().is_equal(other.as_ref())
+    pub fn is_equal(&self, other: SdpVideoFormatRef<'_>) -> bool {
+        unsafe { ffi::webrtc_SdpVideoFormat_is_equal(self.raw().as_ptr(), other.raw.as_ptr()) != 0 }
     }
 
     pub fn as_ref(&self) -> SdpVideoFormatRef<'_> {
@@ -72,10 +72,6 @@ impl<'a> SdpVideoFormatRef<'a> {
     pub fn parameters_mut(&mut self) -> MapStringString<'a> {
         let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(self.raw.as_ptr()) };
         MapStringString::from_raw(NonNull::new(ptr).expect("BUG: ptr が null"))
-    }
-
-    pub fn is_equal(&self, other: SdpVideoFormatRef<'_>) -> bool {
-        unsafe { ffi::webrtc_SdpVideoFormat_is_equal(self.raw.as_ptr(), other.raw.as_ptr()) != 0 }
     }
 
     pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_SdpVideoFormat {
@@ -223,24 +219,16 @@ pub struct VideoFrame {
 }
 
 impl VideoFrame {
-    pub fn from_i420(buffer: &I420Buffer, timestamp_us: i64) -> Self {
-        Self::from_i420_with_timestamp_rtp(buffer, timestamp_us, 0)
-    }
-
-    pub fn from_i420_with_timestamp_rtp(
-        buffer: &I420Buffer,
-        timestamp_us: i64,
-        timestamp_rtp: u32,
-    ) -> Self {
+    pub fn from_i420(buffer: &I420Buffer, timestamp_us: i64, timestamp_rtp: u32) -> Self {
         let raw = NonNull::new(unsafe {
-            ffi::webrtc_VideoFrame_Create_with_timestamp_rtp(
+            ffi::webrtc_VideoFrame_Create(
                 buffer.as_refcounted_ptr(),
                 ffi::webrtc_VideoRotation_0,
                 timestamp_us,
                 timestamp_rtp,
             )
         })
-        .expect("BUG: webrtc_VideoFrame_Create_with_timestamp_rtp が null を返しました");
+        .expect("BUG: webrtc_VideoFrame_Create が null を返しました");
         Self { raw_unique: raw }
     }
 

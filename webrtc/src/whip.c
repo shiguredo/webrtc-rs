@@ -342,7 +342,7 @@ void* _FakeVideoCapturer_CaptureThread(void* arg) {
 
     int64_t timestamp_us = (now_ms - cap->start_time_ms) * 1000;
     struct webrtc_VideoFrame_unique* frame =
-        webrtc_VideoFrame_Create(buffer, webrtc_VideoRotation_0, timestamp_us);
+        webrtc_VideoFrame_Create(buffer, webrtc_VideoRotation_0, timestamp_us, 0);
     webrtc_I420Buffer_Release(webrtc_I420Buffer_refcounted_get(buffer));
 
     int adapted_width;
@@ -380,7 +380,8 @@ void* _FakeVideoCapturer_CaptureThread(void* arg) {
           scaled, webrtc_VideoRotation_0,
           webrtc_TimestampAligner_TranslateTimestamp(
               webrtc_TimestampAligner_unique_get(cap->timestamp_aligner),
-              timestamp_us, webrtc_TimeMillis() * 1000));
+              timestamp_us, webrtc_TimeMillis() * 1000),
+          0);
       webrtc_I420Buffer_Release(webrtc_I420Buffer_refcounted_get(scaled));
     } else {
       // 翻訳したタイムスタンプに差し替え
@@ -392,7 +393,8 @@ void* _FakeVideoCapturer_CaptureThread(void* arg) {
           webrtc_VideoFrame_video_frame_buffer(
               webrtc_VideoFrame_unique_get(frame));
       webrtc_VideoFrame_unique_delete(frame);
-      frame = webrtc_VideoFrame_Create(buf, webrtc_VideoRotation_0, translated);
+      frame =
+          webrtc_VideoFrame_Create(buf, webrtc_VideoRotation_0, translated, 0);
       webrtc_I420Buffer_Release(webrtc_I420Buffer_refcounted_get(buf));
     }
 

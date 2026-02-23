@@ -22,9 +22,33 @@
 - [UPDATE] `Xxx` / `XxxRef` の API 一貫性を改善する
   - 公開操作メソッド名を揃え、`Xxx` 側は `XxxRef` へ委譲する
   - `Xxx` と `XxxRef` の定義位置を隣接化する
+- [CHANGE] `VideoEncoderFactory` / `VideoDecoderFactory` の `create` を `Ref` 受け取りに統一し、`create_from_ref` を削除する
+- [CHANGE] `RtpCodecCapabilityVector` / `RtpCodecCapabilityVectorRef` の `push` / `set` を `Ref` 受け取りに統一する
+  - `push_ref` を削除する
+- [CHANGE] `SdpVideoFormat` の `is_equal` を所有型 API に統一する
+  - `SdpVideoFormat::is_equal(SdpVideoFormatRef)` に変更する
+  - `SdpVideoFormatRef::is_equal` を削除する
+- [CHANGE] `VideoFrame` 生成 API を `from_i420` に統一する
+  - `VideoFrame::from_i420(buffer, timestamp_us, timestamp_rtp)` に変更する
+  - `VideoFrame::from_i420_with_timestamp_rtp` を削除する
+  - C API を `webrtc_VideoFrame_Create(buffer, rotation, timestamp_us, timestamp_rtp)` に統一する
+  - `webrtc_VideoFrame_Create_with_timestamp_rtp` を削除する
 - [UPDATE] `user_data` の前提チェックを `assert!` に統一する
 - [ADD] `VideoEncoderFactory` / `VideoDecoderFactory` / `VideoEncoder` / `VideoDecoder` の C API / Rust API を追加する
   - callback 構造体ベースで Rust 実装を差し込めるようにする
+- [ADD] custom video codec factory 実装向けの C API / Rust API を追加する
+  - `VideoDecoderDecodedImageCallbackRef::decoded`
+  - `VideoEncoderFactory::get_supported_formats`
+  - `VideoDecoderFactory::get_supported_formats`
+  - `VideoEncoderFactory::create`
+  - `VideoDecoderFactory::create`
+  - `VideoFrame::rtp_timestamp`
+  - `VideoFrameRef::rtp_timestamp`
+  - `VideoFrame::from_i420(buffer, timestamp_us, timestamp_rtp)`
+  - `I420Buffer::y_data_mut` / `u_data_mut` / `v_data_mut`
+  - `SdpVideoFormatRef::as_ptr` (`pub(crate)`)
+  - `VideoFrameRef::as_ptr` (`pub(crate)`)
+  - callback / factory / timestamp / mutable plane の回帰テストを追加する
 - [ADD] `video_error_codes.h` に対応する `VideoCodecStatus` を追加する
   - `VideoEncoder` / `VideoDecoder` の戻り値を `i32` ではなく `VideoCodecStatus` で扱えるようにする
 - [FIX] `I420Buffer` の `width` / `height` 取得を C++ API 呼び出しへ変更する

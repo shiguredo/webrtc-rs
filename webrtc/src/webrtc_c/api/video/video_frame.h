@@ -19,10 +19,6 @@ WEBRTC_DECLARE_UNIQUE(webrtc_VideoFrame);
 struct webrtc_VideoFrame_unique* webrtc_VideoFrame_Create(
     struct webrtc_I420Buffer_refcounted* buffer,
     int rotation,
-    int64_t timestamp_us);
-struct webrtc_VideoFrame_unique* webrtc_VideoFrame_Create_with_timestamp_rtp(
-    struct webrtc_I420Buffer_refcounted* buffer,
-    int rotation,
     int64_t timestamp_us,
     uint32_t timestamp_rtp);
 int webrtc_VideoFrame_width(const struct webrtc_VideoFrame* self);

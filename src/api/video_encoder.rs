@@ -1270,14 +1270,6 @@ impl VideoEncoderFactory {
 
     pub fn create(
         &self,
-        env: &crate::Environment,
-        format: &SdpVideoFormat,
-    ) -> Option<VideoEncoder> {
-        self.create_from_ref(env.as_ref(), format.as_ref())
-    }
-
-    pub fn create_from_ref(
-        &self,
         env: EnvironmentRef<'_>,
         format: SdpVideoFormatRef<'_>,
     ) -> Option<VideoEncoder> {
