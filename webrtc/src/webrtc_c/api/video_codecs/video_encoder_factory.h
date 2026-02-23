@@ -32,6 +32,9 @@ struct webrtc_VideoEncoder_unique* webrtc_VideoEncoderFactory_Create(
     struct webrtc_VideoEncoderFactory* self,
     struct webrtc_Environment* env,
     struct webrtc_SdpVideoFormat* format);
+struct webrtc_SdpVideoFormat_vector*
+webrtc_VideoEncoderFactory_GetSupportedFormats(
+    struct webrtc_VideoEncoderFactory* self);
 
 #if defined(__cplusplus)
 }

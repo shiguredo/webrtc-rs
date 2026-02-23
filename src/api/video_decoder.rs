@@ -1,5 +1,6 @@
 use super::video_codec_common::{
     EncodedImageRef, SdpVideoFormat, SdpVideoFormatRef, VideoCodecStatus, VideoCodecType,
+    VideoFrameRef,
 };
 use crate::{CxxString, EnvironmentRef, Result, ffi};
 use std::marker::PhantomData;
@@ -135,6 +136,15 @@ impl<'a> VideoDecoderDecodedImageCallbackRef<'a> {
     #[allow(dead_code)]
     pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoDecoder_DecodedImageCallback {
         self.raw.as_ptr()
+    }
+
+    pub fn decoded(&self, decoded_image: VideoFrameRef<'_>) {
+        unsafe {
+            ffi::webrtc_VideoDecoder_DecodedImageCallback_Decoded(
+                self.raw.as_ptr(),
+                decoded_image.as_ptr(),
+            )
+        };
     }
 }
 
@@ -486,16 +496,39 @@ impl VideoDecoderFactory {
         env: &crate::Environment,
         format: &SdpVideoFormat,
     ) -> Option<VideoDecoder> {
+        self.create_from_ref(env.as_ref(), format.as_ref())
+    }
+
+    pub fn create_from_ref(
+        &self,
+        env: EnvironmentRef<'_>,
+        format: SdpVideoFormatRef<'_>,
+    ) -> Option<VideoDecoder> {
         let raw = unsafe {
-            ffi::webrtc_VideoDecoderFactory_Create(
-                self.as_ptr(),
-                env.as_ptr(),
-                format.raw().as_ptr(),
-            )
+            ffi::webrtc_VideoDecoderFactory_Create(self.as_ptr(), env.as_ptr(), format.as_ptr())
         };
         Some(VideoDecoder {
             raw_unique: NonNull::new(raw)?,
         })
+    }
+
+    pub fn get_supported_formats(&self) -> Vec<SdpVideoFormat> {
+        let raw_vec = unsafe { ffi::webrtc_VideoDecoderFactory_GetSupportedFormats(self.as_ptr()) };
+        let Some(raw_vec) = NonNull::new(raw_vec) else {
+            return Vec::new();
+        };
+        let size = unsafe { ffi::webrtc_SdpVideoFormat_vector_size(raw_vec.as_ptr()) };
+        let mut formats = Vec::with_capacity(size.max(0) as usize);
+        for i in 0..size {
+            let raw_format = unsafe { ffi::webrtc_SdpVideoFormat_vector_get(raw_vec.as_ptr(), i) };
+            let Some(raw_format) = NonNull::new(raw_format) else {
+                continue;
+            };
+            let format_ref = unsafe { SdpVideoFormatRef::from_raw(raw_format) };
+            formats.push(clone_sdp_video_format(format_ref));
+        }
+        unsafe { ffi::webrtc_SdpVideoFormat_vector_delete(raw_vec.as_ptr()) };
+        formats
     }
 }
 
@@ -503,4 +536,16 @@ impl Drop for VideoDecoderFactory {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoDecoderFactory_unique_delete(self.raw_unique.as_ptr()) };
     }
+}
+
+fn clone_sdp_video_format(mut format: SdpVideoFormatRef<'_>) -> SdpVideoFormat {
+    let name = format
+        .name()
+        .expect("SdpVideoFormatRef::name の取得に失敗しました");
+    let mut out = SdpVideoFormat::new(&name);
+    let mut out_params = out.parameters_mut();
+    for (key, value) in format.parameters_mut().iter() {
+        out_params.set(&key, &value);
+    }
+    out
 }

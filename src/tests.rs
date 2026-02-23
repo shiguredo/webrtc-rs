@@ -163,6 +163,22 @@ fn i420_buffer_and_video_frame() {
 }
 
 #[test]
+fn i420_buffer_mutable_planes_and_video_frame_rtp_timestamp() {
+    let mut buf = I420Buffer::new(4, 4);
+    buf.y_data_mut().fill(0x11);
+    buf.u_data_mut().fill(0x22);
+    buf.v_data_mut().fill(0x33);
+    assert!(buf.y_data().iter().all(|&v| v == 0x11));
+    assert!(buf.u_data().iter().all(|&v| v == 0x22));
+    assert!(buf.v_data().iter().all(|&v| v == 0x33));
+
+    let frame = VideoFrame::from_i420_with_timestamp_rtp(&buf, 12345, 67890);
+    assert_eq!(frame.timestamp_us(), 12345);
+    assert_eq!(frame.rtp_timestamp(), 67890);
+    assert_eq!(frame.as_ref().rtp_timestamp(), 67890);
+}
+
+#[test]
 fn abgr_to_i420_conversion() {
     // 2x2 ピクセル、ABGR = 0xff804020 (B=0x20, G=0x40, R=0x80, A=0xff)
     let pixel = [0x20u8, 0x40, 0x80, 0xff];
@@ -781,6 +797,130 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
     assert!(
         factory.create(&env, &format).is_none(),
         "2 回目の create は None を返す想定です"
+    );
+}
+
+#[test]
+fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
+    let factory = VideoEncoderFactory::new_with_callbacks(VideoEncoderFactoryCallbacks {
+        get_supported_formats: Some(Box::new(|| {
+            let mut h264 = SdpVideoFormat::new("H264");
+            h264.parameters_mut().set("profile-level-id", "42e01f");
+            let mut vp8 = SdpVideoFormat::new("VP8");
+            vp8.parameters_mut().set("x-google-start-bitrate", "300");
+            vec![h264, vp8]
+        })),
+        ..Default::default()
+    });
+
+    let mut formats = factory.get_supported_formats();
+    assert_eq!(formats.len(), 2);
+    assert_eq!(
+        formats[0].name().expect("name の取得に失敗しました"),
+        "H264"
+    );
+    assert_eq!(formats[1].name().expect("name の取得に失敗しました"), "VP8");
+
+    let params: std::collections::HashMap<String, String> = formats
+        .get_mut(0)
+        .expect("先頭フォーマットが存在しません")
+        .parameters_mut()
+        .iter()
+        .collect();
+    assert_eq!(
+        params.get("profile-level-id").map(String::as_str),
+        Some("42e01f")
+    );
+}
+
+#[test]
+fn video_decoder_factory_get_supported_formats_returns_owned_formats() {
+    let factory = VideoDecoderFactory::new_with_callbacks(VideoDecoderFactoryCallbacks {
+        get_supported_formats: Some(Box::new(|| {
+            let mut h264 = SdpVideoFormat::new("H264");
+            h264.parameters_mut().set("packetization-mode", "1");
+            vec![h264]
+        })),
+        ..Default::default()
+    });
+
+    let mut formats = factory.get_supported_formats();
+    assert_eq!(formats.len(), 1);
+    assert_eq!(
+        formats[0].name().expect("name の取得に失敗しました"),
+        "H264"
+    );
+    let params: std::collections::HashMap<String, String> = formats
+        .get_mut(0)
+        .expect("先頭フォーマットが存在しません")
+        .parameters_mut()
+        .iter()
+        .collect();
+    assert_eq!(
+        params.get("packetization-mode").map(String::as_str),
+        Some("1")
+    );
+}
+
+#[test]
+fn video_encoder_factory_create_from_ref_calls_create_callback() {
+    let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let called_clone = called.clone();
+    let factory = VideoEncoderFactory::new_with_callbacks(VideoEncoderFactoryCallbacks {
+        create: Some(Box::new(move |env, format| {
+            called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+            assert!(!env.as_ptr().is_null());
+            assert_eq!(
+                format
+                    .name()
+                    .expect("SdpVideoFormatRef::name に失敗しました"),
+                "H264"
+            );
+            Some(VideoEncoder::new_with_callbacks(
+                VideoEncoderCallbacks::default(),
+            ))
+        })),
+        ..Default::default()
+    });
+
+    let env = Environment::new();
+    let format = SdpVideoFormat::new("H264");
+    let encoder = factory.create_from_ref(env.as_ref(), format.as_ref());
+    assert!(encoder.is_some(), "create_from_ref が None を返しました");
+    assert!(
+        called.load(std::sync::atomic::Ordering::SeqCst),
+        "create callback が呼ばれていません"
+    );
+}
+
+#[test]
+fn video_decoder_factory_create_from_ref_calls_create_callback() {
+    let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let called_clone = called.clone();
+    let factory = VideoDecoderFactory::new_with_callbacks(VideoDecoderFactoryCallbacks {
+        create: Some(Box::new(move |env, format| {
+            called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+            assert!(!env.as_ptr().is_null());
+            assert_eq!(
+                format
+                    .name()
+                    .expect("SdpVideoFormatRef::name に失敗しました"),
+                "H264"
+            );
+            Some(VideoDecoder::new_with_callbacks(
+                VideoDecoderCallbacks::default(),
+            ))
+        })),
+        ..Default::default()
+    });
+
+    let env = Environment::new();
+    let format = SdpVideoFormat::new("H264");
+    let decoder = factory.create_from_ref(env.as_ref(), format.as_ref());
+    assert!(decoder.is_some(), "create_from_ref が None を返しました");
+    assert!(
+        called.load(std::sync::atomic::Ordering::SeqCst),
+        "create callback が呼ばれていません"
     );
 }
 

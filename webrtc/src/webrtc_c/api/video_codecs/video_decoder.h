@@ -6,6 +6,7 @@
 #include "../../common.h"
 #include "../../std.h"
 #include "../video/encoded_image.h"
+#include "../video/video_frame.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -47,6 +48,9 @@ int webrtc_VideoDecoder_Settings_max_render_resolution_width(
     struct webrtc_VideoDecoder_Settings* self);
 int webrtc_VideoDecoder_Settings_max_render_resolution_height(
     struct webrtc_VideoDecoder_Settings* self);
+void webrtc_VideoDecoder_DecodedImageCallback_Decoded(
+    struct webrtc_VideoDecoder_DecodedImageCallback* self,
+    struct webrtc_VideoFrame* decoded_image);
 
 struct webrtc_VideoDecoder_cbs {
   int (*Configure)(struct webrtc_VideoDecoder_Settings* settings,
