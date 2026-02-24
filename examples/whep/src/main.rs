@@ -636,6 +636,7 @@ fn parse_args() -> noargs::Result<Args> {
         .ty("URL")
         .doc("WHEP signaling URL")
         .env("WHEP_URL")
+        .example("https://example.com/whep")
         .take(&mut args)
         .then(|o| o.value().parse())?;
 
@@ -643,6 +644,7 @@ fn parse_args() -> noargs::Result<Args> {
         .short('c')
         .doc("Channel ID")
         .env("WHEP_CHANNEL_ID")
+        .example("channel-id")
         .take(&mut args)
         .then(|o| o.value().parse())?;
 

@@ -11,6 +11,8 @@
 
 ## develop
 
+- [CHANGE] Ubuntu 24.04 LTS arm64 / Ubuntu 22.04 LTS arm64 / Raspberry Pi OS arm64 のクロスコンパイルに対応する
+  - @voluntas
 - [CHANGE] 状態を変更するメソッドのレシーバーを `&mut self` に統一する
   - `set_*` / `add_*` / `push*` / `init*` / `encode*` / `decode*` などの API を対象にする
   - サンプルとテストの呼び出し側も `mut` 前提へ更新する
