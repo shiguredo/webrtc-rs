@@ -75,38 +75,13 @@ jobs:
       - name: Install cargo-shiguredo-sysroot
         run: |
           # shiguredo-sysroot をインストール
-          cargo install shiguredo_sysroot --git https://github.com/melpon/sysroot-rs.git
-      - name: Build sysroot with mmdebstrap
-        run: |
-          # --mode=unshare: user namespaces を使って sudo 不要で実行
-          # --variant=extract: パッケージを展開するのみ（設定スクリプト不実行、sysroot 用途に最適）
-          # --architectures=arm64: ARM64 用パッケージを取得
-          case "${{ matrix.target }}" in
-            ubuntu-24.04_armv8)
-              cargo-shiguredo-sysroot \
-                --arch arm64 \
-                --packages "libc6-dev,libstdc++-13-dev,libx11-dev,libxext-dev" \
-                --repo "http://ports.ubuntu.com/ubuntu-ports|noble,noble-updates,noble-security|main,universe"
-              ;;
-            ubuntu-22.04_armv8)
-              cargo-shiguredo-sysroot \
-                --arch arm64 \
-                --packages "libc6-dev,libstdc++-11-dev,libx11-dev,libxext-dev" \
-                --repo "http://ports.ubuntu.com/ubuntu-ports|jammy,jammy-updates,jammy-security|main,universe"
-              ;;
-            raspberry-pi-os_armv8)
-              # Raspberry Pi OS (64-bit) は Debian Trixie ベース
-              cargo-shiguredo-sysroot \
-                --arch arm64 \
-                --packages "libc6-dev,libstdc++-14-dev,libx11-dev,libxext-dev" \
-                --repo "http://deb.debian.org/debian|trixie,trixie-updates|main" \
-                --repo "https://security.debian.org/debian-security|trixie-security|main"
-              ;;
-          esac
+          cargo install --git https://github.com/shiguredo/cargo-sysroot.git
+      - name: Install sysroot
+        run: cargo shiguredo-sysroot --config sysroot/${{ matrix.target }}.json
       - name: Build for ${{ matrix.target }}
         env:
           WEBRTC_C_TARGET: ${{ matrix.target }}
-          WEBRTC_C_SYSROOT: ${{ github.workspace }}/target/sysroot
+          WEBRTC_C_SYSROOT: ${{ github.workspace }}/target/shiguredo-sysroot/${{ matrix.target }}/sysroot
         run: cargo build --workspace --target aarch64-unknown-linux-gnu
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
