@@ -145,6 +145,24 @@ fn sdp_video_format_with_parameters() {
     }
 
     assert!(fmt.is_equal(other.as_ref()));
+
+    let mut cloned = fmt.clone();
+    assert!(fmt.is_equal(cloned.as_ref()));
+    {
+        let mut params = cloned.parameters_mut();
+        params.set("packetization-mode", "1");
+    }
+    let mut has_packetization_mode = false;
+    for (k, _) in fmt.parameters_mut().iter() {
+        if k == "packetization-mode" {
+            has_packetization_mode = true;
+            break;
+        }
+    }
+    assert!(
+        !has_packetization_mode,
+        "clone への変更が元の SdpVideoFormat に影響しています"
+    );
 }
 
 #[test]

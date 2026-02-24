@@ -46,6 +46,16 @@ impl SdpVideoFormat {
     }
 }
 
+impl Clone for SdpVideoFormat {
+    fn clone(&self) -> Self {
+        let raw = unsafe { ffi::webrtc_SdpVideoFormat_copy(self.raw().as_ptr()) };
+        Self {
+            raw_unique: NonNull::new(raw)
+                .expect("BUG: webrtc_SdpVideoFormat_copy が null を返しました"),
+        }
+    }
+}
+
 pub struct SdpVideoFormatRef<'a> {
     raw: NonNull<ffi::webrtc_SdpVideoFormat>,
     _marker: PhantomData<&'a ffi::webrtc_SdpVideoFormat>,
@@ -76,6 +86,14 @@ impl<'a> SdpVideoFormatRef<'a> {
 
     pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_SdpVideoFormat {
         self.raw.as_ptr()
+    }
+
+    pub fn to_owned(&self) -> SdpVideoFormat {
+        let raw = unsafe { ffi::webrtc_SdpVideoFormat_copy(self.raw.as_ptr()) };
+        SdpVideoFormat {
+            raw_unique: NonNull::new(raw)
+                .expect("BUG: webrtc_SdpVideoFormat_copy が null を返しました"),
+        }
     }
 }
 

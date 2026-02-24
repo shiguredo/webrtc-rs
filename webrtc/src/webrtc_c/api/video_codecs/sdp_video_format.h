@@ -19,6 +19,8 @@ struct webrtc_SdpVideoFormat_unique* webrtc_SdpVideoFormat_new(
     const char* name,
     size_t name_len,
     struct std_map_string_string* parameters);
+struct webrtc_SdpVideoFormat_unique* webrtc_SdpVideoFormat_copy(
+    struct webrtc_SdpVideoFormat* self);
 struct std_string* webrtc_SdpVideoFormat_get_name(
     struct webrtc_SdpVideoFormat* self);
 struct std_map_string_string* webrtc_SdpVideoFormat_get_parameters(

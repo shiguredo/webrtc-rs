@@ -28,6 +28,9 @@
 - [CHANGE] `SdpVideoFormat` の `is_equal` を所有型 API に統一する
   - `SdpVideoFormat::is_equal(SdpVideoFormatRef)` に変更する
   - `SdpVideoFormatRef::is_equal` を削除する
+- [CHANGE] `SdpVideoFormat` の複製経路を C++ 側 copy API に統一する
+  - C API `webrtc_SdpVideoFormat_copy` を追加する
+  - Rust 側で `SdpVideoFormat: Clone` と `SdpVideoFormatRef::to_owned` を追加する
 - [CHANGE] `VideoFrame` 生成 API を `from_i420` に統一する
   - `VideoFrame::from_i420(buffer, timestamp_us, timestamp_rtp)` に変更する
   - `VideoFrame::from_i420_with_timestamp_rtp` を削除する

@@ -517,7 +517,7 @@ impl VideoDecoderFactory {
                 continue;
             };
             let format_ref = unsafe { SdpVideoFormatRef::from_raw(raw_format) };
-            formats.push(clone_sdp_video_format(format_ref));
+            formats.push(format_ref.to_owned());
         }
         unsafe { ffi::webrtc_SdpVideoFormat_vector_delete(raw_vec.as_ptr()) };
         formats
@@ -528,16 +528,4 @@ impl Drop for VideoDecoderFactory {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoDecoderFactory_unique_delete(self.raw_unique.as_ptr()) };
     }
-}
-
-fn clone_sdp_video_format(mut format: SdpVideoFormatRef<'_>) -> SdpVideoFormat {
-    let name = format
-        .name()
-        .expect("SdpVideoFormatRef::name の取得に失敗しました");
-    let mut out = SdpVideoFormat::new(&name);
-    let mut out_params = out.parameters_mut();
-    for (key, value) in format.parameters_mut().iter() {
-        out_params.set(&key, &value);
-    }
-    out
 }
