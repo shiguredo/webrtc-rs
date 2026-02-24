@@ -5,7 +5,12 @@
     "linker": "aarch64-linux-gnu-gcc",
     "cc": "aarch64-linux-gnu-gcc",
     "cxx": "aarch64-linux-gnu-g++",
-    "cflags": [],
+    "cflags": [
+        "-isystem",
+        "$SYSROOT/usr/include/aarch64-linux-gnu",
+        "-isystem",
+        "$SYSROOT/usr/include"
+    ],
     "cxxflags": [],
     "packages": [
         "libc6-dev",
