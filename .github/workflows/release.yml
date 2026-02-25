@@ -6,9 +6,11 @@ on:
       - "*"
 
 jobs:
-  github-release:
+  create-release:
     name: "Create GitHub Release"
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.get_version.outputs.VERSION }}
     steps:
@@ -34,8 +36,125 @@ jobs:
               --notes "Release ${{ steps.get_version.outputs.VERSION }}"
           fi
 
+  # ネイティブビルド
+  build-prebuilt:
+    name: "Build prebuilt (${{ matrix.target }})"
+    needs: create-release
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: ubuntu-24.04_x86_64
+            os: ubuntu-24.04
+            rust_target: x86_64-unknown-linux-gnu
+          - target: ubuntu-22.04_x86_64
+            os: ubuntu-22.04
+            rust_target: x86_64-unknown-linux-gnu
+          - target: macos_arm64
+            os: macos-26
+            rust_target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+      - name: Install build dependencies (Linux native)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential \
+            libclang-dev \
+            libx11-dev
+      - run: rustup update stable
+      - name: Build (native)
+        run: cargo build --features source-build --target ${{ matrix.rust_target }}
+      - name: Package prebuilt artifacts
+        run: |
+          OUT_DIR=$(find target/${{ matrix.rust_target }}/debug/build/shiguredo_webrtc-*/out -maxdepth 0 -type d | head -1)
+          if [ -z "$OUT_DIR" ]; then
+            echo "ERROR: OUT_DIR が見つかりません"
+            exit 1
+          fi
+          echo "OUT_DIR: $OUT_DIR"
+          mkdir -p staging/lib
+          cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
+          cp "$OUT_DIR/bindings.rs" staging/
+          tar czf "libwebrtc_c-${{ matrix.target }}.tar.gz" -C staging .
+      - name: Upload to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" "libwebrtc_c-${{ matrix.target }}.tar.gz" --clobber
+
+  # クロスコンパイル
+  build-prebuilt-cross:
+    name: "Build prebuilt (${{ matrix.target }})"
+    needs: create-release
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: ubuntu-24.04_armv8
+            os: ubuntu-24.04
+            rust_target: aarch64-unknown-linux-gnu
+          - target: ubuntu-22.04_armv8
+            os: ubuntu-24.04
+            rust_target: aarch64-unknown-linux-gnu
+          - target: raspberry-pi-os_armv8
+            os: ubuntu-24.04
+            rust_target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+      - name: Install build dependencies (Linux cross)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential \
+            libclang-dev \
+            clang \
+            python3 \
+            debian-archive-keyring \
+            gcc-aarch64-linux-gnu
+          # cargo-shiguredo-sysroot は独自 apt 設定で sources.list のみ差し替えるため、
+          # Debian の keyring を trusted.gpg.d に配置しないと trixie の署名検証に失敗する。
+          sudo install -Dm644 /usr/share/keyrings/debian-archive-keyring.gpg \
+            /etc/apt/trusted.gpg.d/debian-archive-keyring.gpg
+      - run: rustup update stable
+      - name: Add cross-compile target and build sysroot with shiguredo-sysroot
+        run: |
+          rustup target add aarch64-unknown-linux-gnu
+          cargo install --git https://github.com/shiguredo/cargo-sysroot.git
+          cargo shiguredo-sysroot --config sysroot/${{ matrix.target }}.json
+      - name: Build (cross)
+        env:
+          WEBRTC_C_TARGET: ${{ matrix.target }}
+          WEBRTC_C_SYSROOT: ${{ github.workspace }}/target/shiguredo-sysroot/${{ matrix.target }}/sysroot
+        run: cargo build --features source-build --target ${{ matrix.rust_target }}
+      - name: Package prebuilt artifacts
+        run: |
+          OUT_DIR=$(find target/${{ matrix.rust_target }}/debug/build/shiguredo_webrtc-*/out -maxdepth 0 -type d | head -1)
+          if [ -z "$OUT_DIR" ]; then
+            echo "ERROR: OUT_DIR が見つかりません"
+            exit 1
+          fi
+          echo "OUT_DIR: $OUT_DIR"
+          mkdir -p staging/lib
+          cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
+          cp "$OUT_DIR/bindings.rs" staging/
+          tar czf "libwebrtc_c-${{ matrix.target }}.tar.gz" -C staging .
+      - name: Upload to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" "libwebrtc_c-${{ matrix.target }}.tar.gz" --clobber
+
   publish:
-    needs: github-release
+    needs: [build-prebuilt, build-prebuilt-cross]
+    if: false
     runs-on: ubuntu-24.04
     environment: release
     permissions:
@@ -49,7 +168,7 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
   slack_notify:
-    needs: [github-release, publish]
+    needs: [create-release, build-prebuilt, build-prebuilt-cross, publish]
     runs-on: ubuntu-slim
     if: ${{ !cancelled() }}
     steps:

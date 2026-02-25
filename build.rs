@@ -1,6 +1,6 @@
 use std::env;
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 use std::net::TcpStream;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -18,6 +18,7 @@ fn main() {
     println!("cargo::rerun-if-changed=Cargo.toml");
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-env-changed=CARGO_FEATURE_LOCAL_EXPORT");
+    println!("cargo::rerun-if-env-changed=CARGO_FEATURE_SOURCE_BUILD");
     println!("cargo::rerun-if-env-changed=WEBRTC_C_TARGET");
     println!("cargo::rerun-if-env-changed=WEBRTC_C_SYSROOT");
 
@@ -40,17 +41,111 @@ fn main() {
         webrtc_dir.join("deps.json").display()
     );
 
-    let header = webrtc_dir.join("src").join("webrtc_c.h");
-    let include_dir = webrtc_dir.join("src");
     let target_platform = get_target_platform();
     let out_dir = get_out_dir();
 
-    // CMake でビルド（依存関係のダウンロードも CMakeLists.txt 内で行われる）
-    let lib_path = build_webrtc_c(&webrtc_dir, &target_platform, &out_dir);
-    maybe_export_local_build_dir(&webrtc_dir, &out_dir);
+    let lib_path = if should_use_prebuilt() {
+        let paths = download_prebuilt(&target_platform, &out_dir).unwrap_or_else(|e| {
+            panic!(
+                "prebuilt ライブラリのダウンロードに失敗しました: {}\n\
+                 ソースからビルドする場合は --features source-build を指定してください",
+                e
+            )
+        });
+        paths.lib_path
+    } else {
+        build_from_source(&webrtc_dir, &target_platform, &out_dir)
+    };
 
-    generate_bindings(&header, &include_dir);
     emit_link_directives(&lib_path);
+}
+
+struct PrebuiltPaths {
+    lib_path: PathBuf,
+}
+
+/// prebuilt バイナリを使用するかどうかを判定する
+fn should_use_prebuilt() -> bool {
+    // source-build feature が有効 → ソースビルド
+    if env::var("CARGO_FEATURE_SOURCE_BUILD").is_ok() {
+        return false;
+    }
+    // デフォルトで prebuilt を試みる
+    true
+}
+
+/// ソースからビルドする（CMake + bindgen）
+fn build_from_source(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> PathBuf {
+    let header = webrtc_dir.join("src").join("webrtc_c.h");
+    let include_dir = webrtc_dir.join("src");
+    let lib_path = build_webrtc_c(webrtc_dir, target_platform, out_dir);
+    maybe_export_local_build_dir(webrtc_dir, out_dir);
+    generate_bindings(&header, &include_dir);
+    lib_path
+}
+
+/// prebuilt バイナリをダウンロードして展開する
+fn download_prebuilt(target: &str, out_dir: &Path) -> Result<PrebuiltPaths, String> {
+    let version = env::var("CARGO_PKG_VERSION").map_err(|e| e.to_string())?;
+    let url = format!(
+        "https://github.com/shiguredo/webrtc-rs/releases/download/{}/libwebrtc_c-{}.tar.gz",
+        version, target
+    );
+
+    eprintln!("prebuilt ライブラリをダウンロード中: {}", url);
+
+    let archive_bytes = fetch_url(&url)?;
+
+    // OUT_DIR/prebuilt/ に展開
+    let prebuilt_dir = out_dir.join("prebuilt");
+    extract_tar_gz_from_bytes(&archive_bytes, &prebuilt_dir)?;
+
+    // libwebrtc_c.a を OUT_DIR/lib/ にコピー
+    let lib_dir = out_dir.join("lib");
+    fs::create_dir_all(&lib_dir).map_err(|e| format!("lib ディレクトリ作成に失敗: {}", e))?;
+    let lib_path = lib_dir.join("libwebrtc_c.a");
+    fs::copy(prebuilt_dir.join("lib").join("libwebrtc_c.a"), &lib_path)
+        .map_err(|e| format!("libwebrtc_c.a のコピーに失敗: {}", e))?;
+
+    // bindgen 生成済みの bindings.rs を OUT_DIR/ にコピー
+    // （利用者が libclang-dev をインストールしなくて済むようにするため）
+    fs::copy(
+        prebuilt_dir.join("bindings.rs"),
+        out_dir.join("bindings.rs"),
+    )
+    .map_err(|e| format!("bindings.rs のコピーに失敗: {}", e))?;
+
+    Ok(PrebuiltPaths { lib_path })
+}
+
+/// バイト列から tar.gz を展開する
+fn extract_tar_gz_from_bytes(data: &[u8], dest_dir: &Path) -> Result<(), String> {
+    fs::create_dir_all(dest_dir).map_err(|e| format!("展開先ディレクトリ作成に失敗: {}", e))?;
+    let decoder = flate2::read::GzDecoder::new(Cursor::new(data));
+    let mut archive = tar::Archive::new(decoder);
+    let entries = archive
+        .entries()
+        .map_err(|e| format!("tar エントリ取得に失敗: {}", e))?;
+
+    for entry in entries {
+        let mut entry = entry.map_err(|e| format!("tar エントリ読み込みに失敗: {}", e))?;
+        let path = entry
+            .path()
+            .map_err(|e| format!("tar パス取得に失敗: {}", e))?;
+        if !is_safe_path(&path) {
+            return Err(format!("不正なパスが含まれています: {}", path.display()));
+        }
+        let out_path = dest_dir.join(&*path);
+        if let Some(parent) = out_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("展開先ディレクトリ作成に失敗: {}", e))?;
+        }
+        entry
+            .unpack(&out_path)
+            .map_err(|e| format!("tar 展開に失敗: {}", e))?;
+    }
+
+    Ok(())
 }
 
 /// ターゲットプラットフォーム名を取得する
@@ -217,7 +312,8 @@ fn ensure_cmake(out_dir: &Path) -> PathBuf {
         CMAKE_VERSION, download.archive_name
     );
 
-    download_and_extract_cmake(&url, &archive_path, &base_dir, &download.archive_name);
+    download_and_extract_cmake(&url, &archive_path, &base_dir, &download.archive_name)
+        .unwrap_or_else(|err| panic!("CMake のダウンロードまたは展開に失敗しました : {}", err));
 
     if archive_path.exists() {
         let _ = fs::remove_file(&archive_path);
@@ -267,10 +363,16 @@ fn cmake_download_info(host: &str) -> CmakeDownload {
     }
 }
 
-fn download_and_extract_cmake(url: &str, archive_path: &Path, dest_dir: &Path, archive_name: &str) {
-    fs::create_dir_all(dest_dir).expect("CMake の保存先ディレクトリ作成に失敗しました");
+fn download_and_extract_cmake(
+    url: &str,
+    archive_path: &Path,
+    dest_dir: &Path,
+    archive_name: &str,
+) -> Result<(), String> {
+    fs::create_dir_all(dest_dir)
+        .map_err(|e| format!("CMake の保存先ディレクトリ作成に失敗しました : {}", e))?;
 
-    let archive_bytes = fetch_url(url);
+    let archive_bytes = fetch_url(url)?;
     let tmp_path = archive_path.with_file_name(format!(
         "{}.part",
         archive_path
@@ -279,37 +381,43 @@ fn download_and_extract_cmake(url: &str, archive_path: &Path, dest_dir: &Path, a
             .to_string_lossy()
     ));
     {
-        let mut file = fs::File::create(&tmp_path).expect("CMake アーカイブの作成に失敗しました");
+        let mut file = fs::File::create(&tmp_path)
+            .map_err(|e| format!("CMake アーカイブの作成に失敗しました : {}", e))?;
         file.write_all(&archive_bytes)
-            .expect("CMake アーカイブの書き込みに失敗しました");
+            .map_err(|e| format!("CMake アーカイブの書き込みに失敗しました : {}", e))?;
     }
-    fs::rename(&tmp_path, archive_path).expect("CMake アーカイブの保存に失敗しました");
+    fs::rename(&tmp_path, archive_path)
+        .map_err(|e| format!("CMake アーカイブの保存に失敗しました : {}", e))?;
 
-    verify_sha256(archive_path, archive_name);
+    verify_sha256(archive_path, archive_name)?;
 
     if archive_name.ends_with(".zip") {
         extract_zip(archive_path, dest_dir);
     } else {
         extract_tar_gz(archive_path, dest_dir);
     }
+
+    Ok(())
 }
 
-fn verify_sha256(archive_path: &Path, archive_name: &str) {
+fn verify_sha256(archive_path: &Path, archive_name: &str) -> Result<(), String> {
     let sha_url = format!(
         "https://github.com/Kitware/CMake/releases/download/v{}/cmake-{}-SHA-256.txt",
         CMAKE_VERSION, CMAKE_VERSION
     );
-    let sha_bytes = fetch_url(&sha_url);
+    let sha_bytes = fetch_url(&sha_url)?;
     let sha_text = String::from_utf8_lossy(&sha_bytes);
     let expected = extract_expected_sha256(&sha_text, archive_name);
     let actual = compute_sha256(archive_path);
 
     if expected != actual {
-        panic!(
+        return Err(format!(
             "SHA256 が一致しません。期待値 : {}, 実際 : {}",
             expected, actual
-        );
+        ));
     }
+
+    Ok(())
 }
 
 fn extract_expected_sha256(text: &str, archive_name: &str) -> String {
@@ -414,31 +522,31 @@ fn is_safe_path(path: &Path) -> bool {
     true
 }
 
-fn fetch_url(url: &str) -> Vec<u8> {
+fn fetch_url(url: &str) -> Result<Vec<u8>, String> {
     let mut current = url.to_string();
     for _ in 0..5 {
-        let response = fetch_url_once(&current);
+        let response = fetch_url_once(&current)?;
         if response.is_redirect() {
             let location = response
                 .get_header("Location")
-                .expect("Location ヘッダーがありません");
-            current = resolve_redirect_url(&current, location);
+                .ok_or_else(|| "Location ヘッダーがありません".to_string())?;
+            current = resolve_redirect_url(&current, location)?;
             continue;
         }
         if response.status_code != 200 {
-            panic!(
+            return Err(format!(
                 "HTTP エラー : {} {} ({})",
                 response.status_code, response.reason_phrase, current
-            );
+            ));
         }
-        return response.body;
+        return Ok(response.body);
     }
 
-    panic!("リダイレクトが多すぎます : {}", url);
+    Err(format!("リダイレクトが多すぎます : {}", url))
 }
 
-fn fetch_url_once(url: &str) -> Response {
-    let (scheme, host, port, path) = parse_url(url);
+fn fetch_url_once(url: &str) -> Result<Response, String> {
+    let (scheme, host, port, path) = parse_url(url)?;
     let request = Request::new("GET", &path)
         .header("Host", &host)
         .header("User-Agent", "shiguredo_webrtc-build")
@@ -452,13 +560,13 @@ fn fetch_url_once(url: &str) -> Response {
     }
 }
 
-fn parse_url(url: &str) -> (String, String, u16, String) {
+fn parse_url(url: &str) -> Result<(String, String, u16, String), String> {
     let (scheme, rest) = if let Some(rest) = url.strip_prefix("https://") {
         ("https".to_string(), rest)
     } else if let Some(rest) = url.strip_prefix("http://") {
         ("http".to_string(), rest)
     } else {
-        panic!("URL が不正です : {}", url);
+        return Err(format!("URL が不正です : {}", url));
     };
 
     let (host_port, path) = match rest.find('/') {
@@ -470,7 +578,7 @@ fn parse_url(url: &str) -> (String, String, u16, String) {
         Some(index) => {
             let port: u16 = host_port[index + 1..]
                 .parse()
-                .expect("ポートの解析に失敗しました");
+                .map_err(|e| format!("ポートの解析に失敗しました : {}", e))?;
             (&host_port[..index], port)
         }
         None => {
@@ -479,15 +587,15 @@ fn parse_url(url: &str) -> (String, String, u16, String) {
         }
     };
 
-    (scheme, host.to_string(), port, path.to_string())
+    Ok((scheme, host.to_string(), port, path.to_string()))
 }
 
-fn resolve_redirect_url(current_url: &str, location: &str) -> String {
+fn resolve_redirect_url(current_url: &str, location: &str) -> Result<String, String> {
     if location.starts_with("http://") || location.starts_with("https://") {
-        return location.to_string();
+        return Ok(location.to_string());
     }
 
-    let (scheme, host, port, path) = parse_url(current_url);
+    let (scheme, host, port, path) = parse_url(current_url)?;
     let host_port = if (scheme == "https" && port == 443) || (scheme == "http" && port == 80) {
         host
     } else {
@@ -495,21 +603,22 @@ fn resolve_redirect_url(current_url: &str, location: &str) -> String {
     };
 
     if location.starts_with('/') {
-        return format!("{}://{}{}", scheme, host_port, location);
+        return Ok(format!("{}://{}{}", scheme, host_port, location));
     }
 
     let base = match path.rfind('/') {
         Some(pos) => &path[..=pos],
         None => "/",
     };
-    format!("{}://{}{}{}", scheme, host_port, base, location)
+    Ok(format!("{}://{}{}{}", scheme, host_port, base, location))
 }
 
-fn http_request(host: &str, port: u16, request_bytes: &[u8]) -> Response {
-    let mut stream = TcpStream::connect((host, port)).expect("HTTP 接続に失敗しました");
+fn http_request(host: &str, port: u16, request_bytes: &[u8]) -> Result<Response, String> {
+    let mut stream =
+        TcpStream::connect((host, port)).map_err(|e| format!("HTTP 接続に失敗しました : {}", e))?;
     stream
         .write_all(request_bytes)
-        .expect("HTTP リクエスト送信に失敗しました");
+        .map_err(|e| format!("HTTP リクエスト送信に失敗しました : {}", e))?;
 
     let mut decoder = ResponseDecoder::with_limits(DecoderLimits::unlimited());
     let mut buf = [0u8; 8192];
@@ -517,36 +626,42 @@ fn http_request(host: &str, port: u16, request_bytes: &[u8]) -> Response {
     loop {
         let n = stream
             .read(&mut buf)
-            .expect("HTTP レスポンス受信に失敗しました");
+            .map_err(|e| format!("HTTP レスポンス受信に失敗しました : {}", e))?;
         if n == 0 {
             decoder.mark_eof();
-            if let Some(response) = decoder.decode().expect("HTTP レスポンス解析に失敗しました")
+            if let Some(response) = decoder
+                .decode()
+                .map_err(|e| format!("HTTP レスポンス解析に失敗しました : {}", e))?
             {
-                return response;
+                return Ok(response);
             }
-            panic!("HTTP レスポンスの受信が完了しませんでした");
+            return Err("HTTP レスポンスの受信が完了しませんでした".to_string());
         }
         decoder
             .feed(&buf[..n])
-            .expect("HTTP レスポンス解析に失敗しました");
-        if let Some(response) = decoder.decode().expect("HTTP レスポンス解析に失敗しました")
+            .map_err(|e| format!("HTTP レスポンス解析に失敗しました : {}", e))?;
+        if let Some(response) = decoder
+            .decode()
+            .map_err(|e| format!("HTTP レスポンス解析に失敗しました : {}", e))?
         {
-            return response;
+            return Ok(response);
         }
     }
 }
 
-fn https_request(host: &str, port: u16, request_bytes: &[u8]) -> Response {
-    let config = ClientConfig::with_platform_verifier().expect("TLS 設定の作成に失敗しました");
-    let server_name =
-        ServerName::try_from(host.to_string()).expect("サーバー名の解析に失敗しました");
-    let conn =
-        ClientConnection::new(Arc::new(config), server_name).expect("TLS 接続に失敗しました");
-    let sock = TcpStream::connect((host, port)).expect("HTTPS 接続に失敗しました");
+fn https_request(host: &str, port: u16, request_bytes: &[u8]) -> Result<Response, String> {
+    let config = ClientConfig::with_platform_verifier()
+        .map_err(|e| format!("TLS 設定の作成に失敗しました : {}", e))?;
+    let server_name = ServerName::try_from(host.to_string())
+        .map_err(|e| format!("サーバー名の解析に失敗しました : {}", e))?;
+    let conn = ClientConnection::new(Arc::new(config), server_name)
+        .map_err(|e| format!("TLS 接続に失敗しました : {}", e))?;
+    let sock = TcpStream::connect((host, port))
+        .map_err(|e| format!("HTTPS 接続に失敗しました : {}", e))?;
     let mut tls = StreamOwned::new(conn, sock);
 
     tls.write_all(request_bytes)
-        .expect("HTTPS リクエスト送信に失敗しました");
+        .map_err(|e| format!("HTTPS リクエスト送信に失敗しました : {}", e))?;
 
     let mut decoder = ResponseDecoder::with_limits(DecoderLimits::unlimited());
     let mut buf = [0u8; 8192];
@@ -557,24 +672,26 @@ fn https_request(host: &str, port: u16, request_bytes: &[u8]) -> Response {
                 decoder.mark_eof();
                 if let Some(response) = decoder
                     .decode()
-                    .expect("HTTPS レスポンス解析に失敗しました")
+                    .map_err(|e| format!("HTTPS レスポンス解析に失敗しました : {}", e))?
                 {
-                    return response;
+                    return Ok(response);
                 }
-                panic!("HTTPS レスポンスの受信が完了しませんでした");
+                return Err("HTTPS レスポンスの受信が完了しませんでした".to_string());
             }
             Ok(n) => n,
-            Err(err) => panic!("HTTPS レスポンス受信に失敗しました : {}", err),
+            Err(err) => {
+                return Err(format!("HTTPS レスポンス受信に失敗しました : {}", err));
+            }
         };
 
         decoder
             .feed(&buf[..n])
-            .expect("HTTPS レスポンス解析に失敗しました");
+            .map_err(|e| format!("HTTPS レスポンス解析に失敗しました : {}", e))?;
         if let Some(response) = decoder
             .decode()
-            .expect("HTTPS レスポンス解析に失敗しました")
+            .map_err(|e| format!("HTTPS レスポンス解析に失敗しました : {}", e))?
         {
-            return response;
+            return Ok(response);
         }
     }
 }

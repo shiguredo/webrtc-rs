@@ -832,7 +832,7 @@ checksum = "7f8ecdeadd4177d12e2e4d0ba9940a055e872994a709d2db6d4c1fe66199818a"
 
 [[package]]
 name = "shiguredo_webrtc"
-version = "0.145.1"
+version = "0.145.2-canary.2"
 dependencies = [
  "aws-lc-rs",
  "bindgen",

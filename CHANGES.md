@@ -25,6 +25,9 @@
   - 公開操作メソッド名を揃え、`Xxx` 側は `XxxRef` へ委譲する
   - `Xxx` と `XxxRef` の定義位置を隣接化する
 - [UPDATE] `user_data` の前提チェックを `assert!` に統一する
+- [ADD] リリース時に prebuilt `libwebrtc_c.a` と `bindings.rs` を GitHub Releases に配布し、`cargo build` 時に自動ダウンロードする
+  - `--features source-build` でソースビルドに切り替え可能
+  - @voluntas
 - [ADD] `VideoEncoderFactory` / `VideoDecoderFactory` / `VideoEncoder` / `VideoDecoder` の C API / Rust API を追加する
   - callback 構造体ベースで Rust 実装を差し込めるようにする
 - [ADD] `video_error_codes.h` に対応する `VideoCodecStatus` を追加する
