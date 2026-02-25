@@ -82,7 +82,7 @@ jobs:
         env:
           WEBRTC_C_TARGET: ${{ matrix.target }}
           WEBRTC_C_SYSROOT: ${{ github.workspace }}/target/shiguredo-sysroot/${{ matrix.target }}/sysroot
-        run: cargo build --workspace --target aarch64-unknown-linux-gnu
+        run: cargo build --features source-build --workspace --target aarch64-unknown-linux-gnu
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
