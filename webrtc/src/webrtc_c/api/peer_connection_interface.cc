@@ -66,18 +66,28 @@
 class PeerConnectionObserverImpl : public webrtc::PeerConnectionObserver {
  public:
   explicit PeerConnectionObserverImpl(
-      struct webrtc_PeerConnectionObserver_cbs* observer,
+      const struct webrtc_PeerConnectionObserver_cbs* observer,
       void* user_data)
-      : observer_(observer), user_data_(user_data) {}
+      : user_data_(user_data) {
+    if (observer != nullptr) {
+      observer_ = *observer;
+    }
+  }
+
+  ~PeerConnectionObserverImpl() override {
+    if (observer_.OnDestroy != nullptr) {
+      observer_.OnDestroy(user_data_);
+    }
+  }
 
   void OnSignalingChange(
       webrtc::PeerConnectionInterface::SignalingState new_state) override {}
   void OnDataChannel(webrtc::scoped_refptr<webrtc::DataChannelInterface>
                          data_channel) override {
-    if (observer_->OnDataChannel) {
+    if (observer_.OnDataChannel != nullptr) {
       webrtc::scoped_refptr<webrtc::DataChannelInterface> data_channel_ref(
           data_channel);
-      observer_->OnDataChannel(
+      observer_.OnDataChannel(
           reinterpret_cast<struct webrtc_DataChannelInterface_refcounted*>(
               data_channel_ref.release()),
           user_data_);
@@ -87,8 +97,8 @@ class PeerConnectionObserverImpl : public webrtc::PeerConnectionObserver {
       webrtc::PeerConnectionInterface::IceConnectionState new_state) override {}
   void OnConnectionChange(
       webrtc::PeerConnectionInterface::PeerConnectionState new_state) override {
-    if (observer_->OnConnectionChange) {
-      observer_->OnConnectionChange(
+    if (observer_.OnConnectionChange != nullptr) {
+      observer_.OnConnectionChange(
           static_cast<webrtc_PeerConnectionInterface_PeerConnectionState>(
               new_state),
           user_data_);
@@ -97,8 +107,8 @@ class PeerConnectionObserverImpl : public webrtc::PeerConnectionObserver {
   void OnIceGatheringChange(
       webrtc::PeerConnectionInterface::IceGatheringState new_state) override {}
   void OnIceCandidate(const webrtc::IceCandidate* candidate) override {
-    if (observer_->OnIceCandidate) {
-      observer_->OnIceCandidate(
+    if (observer_.OnIceCandidate != nullptr) {
+      observer_.OnIceCandidate(
           reinterpret_cast<const struct webrtc_IceCandidate*>(candidate),
           user_data_);
     }
@@ -110,10 +120,10 @@ class PeerConnectionObserverImpl : public webrtc::PeerConnectionObserver {
                            const std::string& error_text) override {}
   void OnTrack(webrtc::scoped_refptr<webrtc::RtpTransceiverInterface>
                    transceiver) override {
-    if (observer_->OnTrack) {
+    if (observer_.OnTrack != nullptr) {
       webrtc::scoped_refptr<webrtc::RtpTransceiverInterface> transceiver_ref(
           transceiver);
-      observer_->OnTrack(
+      observer_.OnTrack(
           reinterpret_cast<struct webrtc_RtpTransceiverInterface_refcounted*>(
               transceiver_ref.release()),
           user_data_);
@@ -121,10 +131,10 @@ class PeerConnectionObserverImpl : public webrtc::PeerConnectionObserver {
   }
   void OnRemoveTrack(
       webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) override {
-    if (observer_->OnRemoveTrack) {
+    if (observer_.OnRemoveTrack != nullptr) {
       webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver_ref(
           receiver);
-      observer_->OnRemoveTrack(
+      observer_.OnRemoveTrack(
           reinterpret_cast<struct webrtc_RtpReceiverInterface_refcounted*>(
               receiver_ref.release()),
           user_data_);
@@ -132,7 +142,7 @@ class PeerConnectionObserverImpl : public webrtc::PeerConnectionObserver {
   }
 
  private:
-  struct webrtc_PeerConnectionObserver_cbs* observer_;
+  webrtc_PeerConnectionObserver_cbs observer_{};
   void* user_data_;
 };
 
@@ -162,7 +172,7 @@ class RTCStatsCollectorCallbackImpl : public webrtc::RTCStatsCollectorCallback {
 };
 
 struct webrtc_PeerConnectionObserver* webrtc_PeerConnectionObserver_new(
-    struct webrtc_PeerConnectionObserver_cbs* observer,
+    const struct webrtc_PeerConnectionObserver_cbs* observer,
     void* user_data) {
   auto impl = new PeerConnectionObserverImpl(observer, user_data);
   return reinterpret_cast<struct webrtc_PeerConnectionObserver*>(impl);

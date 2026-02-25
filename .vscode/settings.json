@@ -7,6 +7,6 @@
   "C_Cpp.files.exclude": {
     "**/target/**": true,
     "**/node_modules/**": true,
-    "webrtc/_build/**": true,
+    "**/_build/**": true,
   },
 }

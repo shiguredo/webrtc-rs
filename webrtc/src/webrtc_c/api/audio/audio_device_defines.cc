@@ -10,8 +10,19 @@ namespace {
 
 class AudioTransportImpl : public webrtc::AudioTransport {
  public:
-  AudioTransportImpl(struct webrtc_AudioTransport_cbs* cbs, void* user_data)
-      : cbs_(cbs), user_data_(user_data) {}
+  AudioTransportImpl(const struct webrtc_AudioTransport_cbs* cbs,
+                     void* user_data)
+      : user_data_(user_data) {
+    if (cbs != nullptr) {
+      cbs_ = *cbs;
+    }
+  }
+
+  ~AudioTransportImpl() override {
+    if (cbs_.OnDestroy != nullptr) {
+      cbs_.OnDestroy(user_data_);
+    }
+  }
 
   int32_t RecordedDataIsAvailable(const void* audio_samples,
                                   size_t n_samples,
@@ -41,10 +52,10 @@ class AudioTransportImpl : public webrtc::AudioTransport {
       bool key_pressed,
       uint32_t& new_mic_level,
       std::optional<int64_t> estimated_capture_time_ns) override {
-    if (cbs_ == nullptr || cbs_->RecordedDataIsAvailable == nullptr) {
+    if (cbs_.RecordedDataIsAvailable == nullptr) {
       return 0;
     }
-    return cbs_->RecordedDataIsAvailable(
+    return cbs_.RecordedDataIsAvailable(
         audio_samples, n_samples, n_bytes_per_sample, n_channels,
         samples_per_sec, total_delay_ms, clock_drift, current_mic_level,
         key_pressed ? 1 : 0, &new_mic_level,
@@ -61,13 +72,12 @@ class AudioTransportImpl : public webrtc::AudioTransport {
                            size_t& n_samples_out,
                            int64_t* elapsed_time_ms,
                            int64_t* ntp_time_ms) override {
-    if (cbs_ == nullptr || cbs_->NeedMorePlayData == nullptr) {
+    if (cbs_.NeedMorePlayData == nullptr) {
       return 0;
     }
-    return cbs_->NeedMorePlayData(n_samples, n_bytes_per_sample, n_channels,
-                                  samples_per_sec, audio_samples,
-                                  &n_samples_out, elapsed_time_ms, ntp_time_ms,
-                                  user_data_);
+    return cbs_.NeedMorePlayData(n_samples, n_bytes_per_sample, n_channels,
+                                 samples_per_sec, audio_samples, &n_samples_out,
+                                 elapsed_time_ms, ntp_time_ms, user_data_);
   }
 
   void PullRenderData(int bits_per_sample,
@@ -77,16 +87,16 @@ class AudioTransportImpl : public webrtc::AudioTransport {
                       void* audio_data,
                       int64_t* elapsed_time_ms,
                       int64_t* ntp_time_ms) override {
-    if (cbs_ == nullptr || cbs_->PullRenderData == nullptr) {
+    if (cbs_.PullRenderData == nullptr) {
       return;
     }
-    cbs_->PullRenderData(bits_per_sample, sample_rate, number_of_channels,
-                         number_of_frames, audio_data, elapsed_time_ms,
-                         ntp_time_ms, user_data_);
+    cbs_.PullRenderData(bits_per_sample, sample_rate, number_of_channels,
+                        number_of_frames, audio_data, elapsed_time_ms,
+                        ntp_time_ms, user_data_);
   }
 
  private:
-  struct webrtc_AudioTransport_cbs* cbs_ = nullptr;
+  webrtc_AudioTransport_cbs cbs_{};
   void* user_data_ = nullptr;
 };
 
@@ -95,7 +105,7 @@ class AudioTransportImpl : public webrtc::AudioTransport {
 extern "C" {
 
 struct webrtc_AudioTransport* webrtc_AudioTransport_new(
-    struct webrtc_AudioTransport_cbs* cbs,
+    const struct webrtc_AudioTransport_cbs* cbs,
     void* user_data) {
   auto transport = new AudioTransportImpl(cbs, user_data);
   return reinterpret_cast<struct webrtc_AudioTransport*>(transport);

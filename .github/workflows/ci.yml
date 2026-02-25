@@ -64,166 +64,24 @@ jobs:
           sudo apt-get install -y build-essential \
             libclang-dev \
             clang \
-            mmdebstrap \
             debian-archive-keyring \
             gcc-aarch64-linux-gnu
-      - name: Build sysroot with mmdebstrap
-        run: |
-          # --variant=extract: パッケージを展開するのみ（設定スクリプト不実行、sysroot 用途に最適）
-          # --architectures=arm64: ARM64 用パッケージを取得
-          case "${{ matrix.target }}" in
-            ubuntu-24.04_armv8)
-              sudo mmdebstrap --architectures=arm64 --variant=extract \
-                --include=libc6-dev,libstdc++-13-dev,libx11-dev,libxext-dev \
-                --components=main,universe \
-                noble "${{ github.workspace }}/rootfs" \
-                http://ports.ubuntu.com/ubuntu-ports
-              ;;
-            ubuntu-22.04_armv8)
-              sudo mmdebstrap --architectures=arm64 --variant=extract \
-                --include=libc6-dev,libstdc++-11-dev,libx11-dev,libxext-dev \
-                --components=main,universe \
-                jammy "${{ github.workspace }}/rootfs" \
-                http://ports.ubuntu.com/ubuntu-ports
-              ;;
-            raspberry-pi-os_armv8)
-              # Raspberry Pi OS (64-bit) は Debian Trixie ベース
-              sudo mmdebstrap --architectures=arm64 --variant=extract \
-                --include=libc6-dev,libstdc++-14-dev,libx11-dev,libxext-dev \
-                --components=main \
-                trixie "${{ github.workspace }}/rootfs" \
-                http://deb.debian.org/debian
-              ;;
-          esac
-          # sysroot に不要な /dev を削除（シンボリックリンクループで Cargo のスキャンが失敗するため）
-          sudo rm -rf "${{ github.workspace }}/rootfs/dev"
-          # usrmerge シンボリックリンクを作成（リンカスクリプト内の絶対パス /lib/... を解決するため）
-          sudo ln -sf usr/lib "${{ github.workspace }}/rootfs/lib"
-          # Cargo がワークスペースをスキャンする際に Permission denied にならないようにする
-          sudo chmod -R a+rX "${{ github.workspace }}/rootfs"
+          # cargo-shiguredo-sysroot は独自 apt 設定で sources.list のみ差し替えるため、
+          # Debian の keyring を trusted.gpg.d に配置しないと trixie の署名検証に失敗する。
+          sudo install -Dm644 /usr/share/keyrings/debian-archive-keyring.gpg \
+            /etc/apt/trusted.gpg.d/debian-archive-keyring.gpg
       - run: rustup update stable
       - run: rustup target add aarch64-unknown-linux-gnu
-      # webrtc_c の C++ ビルドは CMakeLists.txt 内で Google の prebuilt Clang を使用する。
-      # Rust のリンクはシステムの clang を使用し、--target と --sysroot で
-      # クロスコンパイル先を指定する。
+      - name: Install cargo-shiguredo-sysroot
+        run: |
+          # shiguredo-sysroot をインストール
+          cargo install --git https://github.com/shiguredo/cargo-sysroot.git
+      - name: Install sysroot
+        run: cargo shiguredo-sysroot --config sysroot/${{ matrix.target }}.json
       - name: Build for ${{ matrix.target }}
         env:
           WEBRTC_C_TARGET: ${{ matrix.target }}
-          WEBRTC_C_SYSROOT: ${{ github.workspace }}/rootfs
-          CC_aarch64_unknown_linux_gnu: clang
-          CFLAGS_aarch64_unknown_linux_gnu: --target=aarch64-linux-gnu --sysroot=${{ github.workspace }}/rootfs
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: clang
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: -C link-arg=--target=aarch64-linux-gnu -C link-arg=--sysroot=${{ github.workspace }}/rootfs
-        run: cargo build --workspace --features source-build --target aarch64-unknown-linux-gnu
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: arm64-binaries-${{ matrix.target }}
-          path: |
-            target/aarch64-unknown-linux-gnu/debug/whip
-            target/aarch64-unknown-linux-gnu/debug/whep
-          retention-days: 1
-
-  verify-linux-arm64:
-    needs: cross-compile
-    strategy:
-      matrix:
-        include:
-          - target: ubuntu-24.04_armv8
-            runner: ubuntu-24.04-arm
-          - target: ubuntu-22.04_armv8
-            runner: ubuntu-22.04-arm
-          - target: raspberry-pi-os_armv8
-            runner:
-              group: Self
-              labels: [self-hosted, linux, ARM64, Raspberry-Pi]
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 10
-    steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: arm64-binaries-${{ matrix.target }}
-
-      - name: Verify binaries
-        run: |
-          chmod +x whip whep
-          file whip
-          file whep
-          ./whip --help
-          ./whep --help
-
-  cross-compile:
-    strategy:
-      matrix:
-        target:
-          - ubuntu-24.04_armv8
-          - ubuntu-22.04_armv8
-          - raspberry-pi-os_armv8
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v6
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          # bindgen がクロスコンパイル時に aarch64 用ヘッダーを参照するために gcc-aarch64-linux-gnu が必要
-          # cc クレートが aarch64-linux-gnu-g++ を探す warning が出るが、
-          # WebRTC は自前の libc++ を使うため g++-aarch64-linux-gnu は不要
-          sudo apt-get install -y build-essential \
-            libclang-dev \
-            clang \
-            mmdebstrap \
-            debian-archive-keyring \
-            gcc-aarch64-linux-gnu
-      - name: Build sysroot with mmdebstrap
-        run: |
-          # --variant=extract: パッケージを展開するのみ（設定スクリプト不実行、sysroot 用途に最適）
-          # --architectures=arm64: ARM64 用パッケージを取得
-          case "${{ matrix.target }}" in
-            ubuntu-24.04_armv8)
-              sudo mmdebstrap --architectures=arm64 --variant=extract \
-                --include=libc6-dev,libstdc++-13-dev,libx11-dev,libxext-dev \
-                --components=main,universe \
-                noble "${{ github.workspace }}/rootfs" \
-                http://ports.ubuntu.com/ubuntu-ports
-              ;;
-            ubuntu-22.04_armv8)
-              sudo mmdebstrap --architectures=arm64 --variant=extract \
-                --include=libc6-dev,libstdc++-11-dev,libx11-dev,libxext-dev \
-                --components=main,universe \
-                jammy "${{ github.workspace }}/rootfs" \
-                http://ports.ubuntu.com/ubuntu-ports
-              ;;
-            raspberry-pi-os_armv8)
-              # Raspberry Pi OS (64-bit) は Debian Trixie ベース
-              sudo mmdebstrap --architectures=arm64 --variant=extract \
-                --include=libc6-dev,libstdc++-14-dev,libx11-dev,libxext-dev \
-                --components=main \
-                trixie "${{ github.workspace }}/rootfs" \
-                http://deb.debian.org/debian
-              ;;
-          esac
-          # sysroot に不要な /dev を削除（シンボリックリンクループで Cargo のスキャンが失敗するため）
-          sudo rm -rf "${{ github.workspace }}/rootfs/dev"
-          # usrmerge シンボリックリンクを作成（リンカスクリプト内の絶対パス /lib/... を解決するため）
-          sudo ln -sf usr/lib "${{ github.workspace }}/rootfs/lib"
-          # Cargo がワークスペースをスキャンする際に Permission denied にならないようにする
-          sudo chmod -R a+rX "${{ github.workspace }}/rootfs"
-      - run: rustup update stable
-      - run: rustup target add aarch64-unknown-linux-gnu
-      # webrtc_c の C++ ビルドは CMakeLists.txt 内で Google の prebuilt Clang を使用する。
-      # Rust のリンクはシステムの clang を使用し、--target と --sysroot で
-      # クロスコンパイル先を指定する。
-      - name: Build for ${{ matrix.target }}
-        env:
-          WEBRTC_C_TARGET: ${{ matrix.target }}
-          WEBRTC_C_SYSROOT: ${{ github.workspace }}/rootfs
-          CC_aarch64_unknown_linux_gnu: clang
-          CFLAGS_aarch64_unknown_linux_gnu: --target=aarch64-linux-gnu --sysroot=${{ github.workspace }}/rootfs
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: clang
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: -C link-arg=--target=aarch64-linux-gnu -C link-arg=--sysroot=${{ github.workspace }}/rootfs
+          WEBRTC_C_SYSROOT: ${{ github.workspace }}/target/shiguredo-sysroot/${{ matrix.target }}/sysroot
         run: cargo build --workspace --target aarch64-unknown-linux-gnu
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -263,18 +121,17 @@ jobs:
           ./whip --help
           ./whep --help
 
-  slack_notify_failed:
+  slack_notify:
     needs: [ci, cross-compile, verify-linux-arm64]
-    timeout-minutes: 20
-    runs-on: ubuntu-24.04
-    if: failure()
+    runs-on: ubuntu-slim
+    if: ${{ !cancelled() }}
     steps:
       - name: Slack Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: shiguredo/github-actions/.github/actions/slack-notify@main
+        with:
+          status: ${{ job.status }}
+          slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
+          slack_channel: sora-rust-sdk
+          notify_mode: failure_and_fixed
         env:
-          SLACK_CHANNEL: sora-rust-sdk
-          SLACK_COLOR: danger
-          SLACK_ICON_EMOJI: ":japanese_ogre:"
-          SLACK_TITLE: "FAILED"
-          SLACK_MESSAGE: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{github.event.head_commit.message }}>
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          GH_TOKEN: ${{ github.token }}

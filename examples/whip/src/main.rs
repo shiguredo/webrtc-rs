@@ -388,7 +388,7 @@ impl SignalingWhip {
         let pc = self.pc.as_ref().ok_or("pc not available")?;
         let mut init = RtpTransceiverInit::new();
         init.set_direction(RtpTransceiverDirection::SendOnly);
-        let transceiver = pc
+        let mut transceiver = pc
             .add_transceiver(MediaType::Audio, &mut init)
             .map_err(|e| format!("add audio transceiver failed: {e}"))?;
 
@@ -437,7 +437,7 @@ impl SignalingWhip {
             .factory()
             .create_video_track(&source, &track_id)
             .map_err(|_| "create video track failed".to_string())?;
-        let transceiver = pc
+        let mut transceiver = pc
             .add_transceiver_with_track(&track, &mut init)
             .map_err(|e| format!("add video transceiver failed: {e}"))?;
         let caps = self
@@ -487,7 +487,7 @@ impl SignalingWhip {
     }
 
     fn create_offer_and_exchange(&mut self) -> Result<(), String> {
-        let pc = self.pc.as_ref().ok_or("pc not available")?;
+        let pc = self.pc.as_mut().ok_or("pc not available")?;
         let mut opts = PeerConnectionOfferAnswerOptions::new();
         opts.set_offer_to_receive_audio(0);
         opts.set_offer_to_receive_video(0);

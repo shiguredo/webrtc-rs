@@ -184,6 +184,41 @@ impl FactoryHolder {
 - `SdpVideoFormat`
   - 映像フォーマット
 
+### 映像コーデック
+
+- `VideoCodecRef` / `VideoCodecType` / `VideoCodecStatus`
+  - 映像コーデック共通型とステータス
+- `VideoFrameType` / `VideoFrameTypeVector` / `VideoFrameTypeVectorRef`
+  - エンコード対象フレーム種別
+- `EncodedImageBuffer` / `EncodedImage` / `EncodedImageRef`
+  - エンコード済み映像データ
+- `CodecSpecificInfo` / `CodecSpecificInfoRef` / `H264PacketizationMode`
+  - コーデック固有情報
+- `VideoEncoder`
+  - カスタム映像エンコーダー
+- `VideoEncoderCallbacks` / `VideoEncoderFactoryCallbacks`
+  - エンコーダー / エンコーダーファクトリーの callback
+- `VideoEncoderEncoderInfo` / `VideoEncoderSettingsRef` / `VideoEncoderRateControlParametersRef`
+  - エンコーダー設定とメタ情報
+- `VideoEncoderEncodedImageCallback` / `VideoEncoderEncodedImageCallbackRef`
+  - エンコード完了 callback
+- `VideoEncoderEncodedImageCallbackCallbacks`
+  - エンコード完了 callback のハンドラー設定
+- `VideoEncoderEncodedImageCallbackResult`
+  - エンコード完了 callback の戻り値
+- `VideoEncoderEncodedImageCallbackResultError`
+  - エンコード完了 callback のエラーコード
+- `VideoEncoderEncodedImageCallbackPtr`
+  - C API 側 callback ポインターのラッパー
+- `VideoDecoder`
+  - カスタム映像デコーダー
+- `VideoDecoderCallbacks` / `VideoDecoderFactoryCallbacks`
+  - デコーダー / デコーダーファクトリーの callback
+- `VideoDecoderDecoderInfo` / `VideoDecoderSettingsRef`
+  - デコーダー設定とメタ情報
+- `VideoDecoderDecodedImageCallbackRef`
+  - デコード完了 callback
+
 ### RTP
 
 - `RtpCapabilities`

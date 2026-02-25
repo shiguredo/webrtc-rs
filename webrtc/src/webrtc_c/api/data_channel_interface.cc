@@ -19,30 +19,40 @@
 
 class DataChannelObserverImpl : public webrtc::DataChannelObserver {
  public:
-  DataChannelObserverImpl(struct webrtc_DataChannelObserver_cbs* cbs,
+  DataChannelObserverImpl(const struct webrtc_DataChannelObserver_cbs* cbs,
                           void* user_data)
-      : cbs_(cbs), user_data_(user_data) {}
+      : user_data_(user_data) {
+    if (cbs != nullptr) {
+      cbs_ = *cbs;
+    }
+  }
+
+  ~DataChannelObserverImpl() override {
+    if (cbs_.OnDestroy != nullptr) {
+      cbs_.OnDestroy(user_data_);
+    }
+  }
 
   void OnStateChange() override {
-    if (cbs_->OnStateChange) {
-      cbs_->OnStateChange(user_data_);
+    if (cbs_.OnStateChange != nullptr) {
+      cbs_.OnStateChange(user_data_);
     }
   }
 
   void OnMessage(const webrtc::DataBuffer& buffer) override {
-    if (cbs_->OnMessage) {
-      cbs_->OnMessage(buffer.data.data<uint8_t>(), buffer.data.size(),
-                      buffer.binary ? 1 : 0, user_data_);
+    if (cbs_.OnMessage != nullptr) {
+      cbs_.OnMessage(buffer.data.data<uint8_t>(), buffer.data.size(),
+                     buffer.binary ? 1 : 0, user_data_);
     }
   }
 
  private:
-  struct webrtc_DataChannelObserver_cbs* cbs_;
+  webrtc_DataChannelObserver_cbs cbs_{};
   void* user_data_;
 };
 
 struct webrtc_DataChannelObserver* webrtc_DataChannelObserver_new(
-    struct webrtc_DataChannelObserver_cbs* cbs,
+    const struct webrtc_DataChannelObserver_cbs* cbs,
     void* user_data) {
   auto impl = new DataChannelObserverImpl(cbs, user_data);
   return reinterpret_cast<struct webrtc_DataChannelObserver*>(impl);
