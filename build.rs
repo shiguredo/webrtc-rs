@@ -19,6 +19,7 @@ fn main() {
     println!("cargo::rerun-if-changed=Cargo.toml");
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-env-changed=CARGO_FEATURE_LOCAL_EXPORT");
+    println!("cargo::rerun-if-env-changed=CARGO_FEATURE_SOURCE_BUILD");
     println!("cargo::rerun-if-env-changed=WEBRTC_C_TARGET");
     println!("cargo::rerun-if-env-changed=WEBRTC_C_SYSROOT");
 

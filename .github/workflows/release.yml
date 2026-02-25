@@ -83,44 +83,28 @@ jobs:
             libx11-dev
 
       - name: Install build dependencies (Linux cross)
-        if: matrix.cross
+        if: runner.os == 'Linux' && matrix.cross
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential \
             libclang-dev \
             clang \
-            multistrap \
             python3 \
             debian-archive-keyring \
             gcc-aarch64-linux-gnu
-
-      - name: Build sysroot with multistrap
-        if: matrix.cross
-        run: |
-          # GPG 鍵を rootfs にコピーしてリポジトリ署名検証を通す
-          mkdir -p ${{ github.workspace }}/rootfs/etc/apt/trusted.gpg.d
-          for keyring in /usr/share/keyrings/ubuntu-archive-keyring.gpg /usr/share/keyrings/debian-archive-keyring.gpg; do
-            [ -f "$keyring" ] && cp "$keyring" ${{ github.workspace }}/rootfs/etc/apt/trusted.gpg.d/
-          done
-          sudo multistrap --no-auth -a arm64 -d ${{ github.workspace }}/rootfs -f multistrap/${{ matrix.target }}.conf
-          # multistrap が作る絶対パスのシンボリックリンクを相対パスに修正
-          find ${{ github.workspace }}/rootfs -type l | while read link; do
-            target=$(readlink "$link")
-            if [ "${target#/}" != "$target" ]; then
-              dir=$(dirname "$link")
-              new_target=$(python3 -c "import os; print(os.path.relpath('${{ github.workspace }}/rootfs$target', '$dir'))")
-              if [ -e "$dir/$new_target" ]; then
-                sudo ln -sf "$new_target" "$link"
-              fi
-            fi
-          done
-          sudo chmod -R a+rX ${{ github.workspace }}/rootfs
+          # cargo-shiguredo-sysroot は独自 apt 設定で sources.list のみ差し替えるため、
+          # Debian の keyring を trusted.gpg.d に配置しないと trixie の署名検証に失敗する。
+          sudo install -Dm644 /usr/share/keyrings/debian-archive-keyring.gpg \
+            /etc/apt/trusted.gpg.d/debian-archive-keyring.gpg
 
       - run: rustup update stable
 
-      - name: Add cross-compile target
-        if: matrix.cross
-        run: rustup target add aarch64-unknown-linux-gnu
+      - name: Add cross-compile target and build sysroot with shiguredo-sysroot
+        if: runner.os == 'Linux' && matrix.cross
+        run: |
+          rustup target add aarch64-unknown-linux-gnu
+          cargo install --git https://github.com/shiguredo/cargo-sysroot.git
+          cargo shiguredo-sysroot --config sysroot/${{ matrix.target }}.json
 
       - name: Build (native)
         if: "!matrix.cross"
@@ -130,11 +114,7 @@ jobs:
         if: matrix.cross
         env:
           WEBRTC_C_TARGET: ${{ matrix.target }}
-          WEBRTC_C_SYSROOT: ${{ github.workspace }}/rootfs
-          CC_aarch64_unknown_linux_gnu: clang
-          CFLAGS_aarch64_unknown_linux_gnu: --target=aarch64-linux-gnu --sysroot=${{ github.workspace }}/rootfs
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: clang
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS: -C link-arg=--target=aarch64-linux-gnu -C link-arg=--sysroot=${{ github.workspace }}/rootfs
+          WEBRTC_C_SYSROOT: ${{ github.workspace }}/target/shiguredo-sysroot/${{ matrix.target }}/sysroot
         run: cargo build --features source-build --target ${{ matrix.rust_target }}
 
       - name: Package prebuilt artifacts
@@ -171,7 +151,7 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
   slack_notify:
-    needs: [github-release, build-prebuilt, publish]
+    needs: [create-release, build-prebuilt, publish]
     runs-on: ubuntu-slim
     if: ${{ !cancelled() }}
     steps:
