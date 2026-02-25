@@ -6,3 +6,5 @@ target/
 # Agents
 .claude/
 .codex/
+
+.cargo/config.toml

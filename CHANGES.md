@@ -11,6 +11,8 @@
 
 ## develop
 
+- [CHANGE] Ubuntu 24.04 LTS arm64 / Ubuntu 22.04 LTS arm64 / Raspberry Pi OS arm64 のクロスコンパイルに対応する
+  - @voluntas
 - [CHANGE] 状態を変更するメソッドのレシーバーを `&mut self` に統一する
   - `set_*` / `add_*` / `push*` / `init*` / `encode*` / `decode*` などの API を対象にする
   - サンプルとテストの呼び出し側も `mut` 前提へ更新する
@@ -37,6 +39,9 @@
   - C API を `webrtc_VideoFrame_Create(buffer, rotation, timestamp_us, timestamp_rtp)` に統一する
   - `webrtc_VideoFrame_Create_with_timestamp_rtp` を削除する
 - [UPDATE] `user_data` の前提チェックを `assert!` に統一する
+- [ADD] リリース時に prebuilt `libwebrtc_c.a` と `bindings.rs` を GitHub Releases に配布し、`cargo build` 時に自動ダウンロードする
+  - `--features source-build` でソースビルドに切り替え可能
+  - @voluntas
 - [ADD] `VideoEncoderFactory` / `VideoDecoderFactory` / `VideoEncoder` / `VideoDecoder` の C API / Rust API を追加する
   - callback 構造体ベースで Rust 実装を差し込めるようにする
 - [ADD] custom video codec factory 実装向けの C API / Rust API を追加する

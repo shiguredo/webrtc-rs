@@ -18,8 +18,6 @@ jobs:
           - ubuntu-22.04
           - macos-26
           - macos-15
-          - ubuntu-24.04-arm
-          - ubuntu-22.04-arm
           # 将来的に対応予定
           # - windows-2025
     runs-on: ${{ matrix.os }}
@@ -34,14 +32,6 @@ jobs:
           sudo apt-get install -y build-essential \
             libclang-dev \
             libx11-dev
-      # ARM64 Linux ではビルドに Clang 21 以上が必要なため、
-      # apt.llvm.org から Clang 21 をインストールし、clang / clang++ として使えるようにシンボリックリンクを作成する
-      - name: Install Clang 21 for ARM64
-        if: runner.os == 'Linux' && runner.arch == 'ARM64'
-        run: |
-          wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 21
-          sudo ln -sf /usr/bin/clang-21 /usr/bin/clang
-          sudo ln -sf /usr/bin/clang++-21 /usr/bin/clang++
       - run: rustup update stable
       # あまり役立っていない感じがするので一旦コメントアウト
       # - uses: shiguredo/github-actions/.github/actions/rust-cache@main
@@ -49,22 +39,99 @@ jobs:
       #     os: ${{ matrix.os }}
       #     toolchain: stable
       - run: cargo fmt --all --check
-      - run: cargo check --workspace
-      - run: cargo test --workspace
-      - run: cargo clippy --workspace -- -D warnings
+      - run: cargo check --workspace --features source-build
+      - run: cargo test --workspace --features source-build
+      - run: cargo clippy --workspace --features source-build -- -D warnings
 
-  slack_notify_failed:
-    needs: [ci]
-    timeout-minutes: 20
+  cross-compile:
+    strategy:
+      matrix:
+        target:
+          - ubuntu-24.04_armv8
+          - ubuntu-22.04_armv8
+          - raspberry-pi-os_armv8
     runs-on: ubuntu-24.04
-    if: failure()
+    timeout-minutes: 30
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          # bindgen がクロスコンパイル時に aarch64 用ヘッダーを参照するために gcc-aarch64-linux-gnu が必要
+          # cc クレートが aarch64-linux-gnu-g++ を探す warning が出るが、
+          # WebRTC は自前の libc++ を使うため g++-aarch64-linux-gnu は不要
+          sudo apt-get install -y build-essential \
+            libclang-dev \
+            clang \
+            debian-archive-keyring \
+            gcc-aarch64-linux-gnu
+          # cargo-shiguredo-sysroot は独自 apt 設定で sources.list のみ差し替えるため、
+          # Debian の keyring を trusted.gpg.d に配置しないと trixie の署名検証に失敗する。
+          sudo install -Dm644 /usr/share/keyrings/debian-archive-keyring.gpg \
+            /etc/apt/trusted.gpg.d/debian-archive-keyring.gpg
+      - run: rustup update stable
+      - run: rustup target add aarch64-unknown-linux-gnu
+      - name: Install cargo-shiguredo-sysroot
+        run: |
+          # shiguredo-sysroot をインストール
+          cargo install --git https://github.com/shiguredo/cargo-sysroot.git
+      - name: Install sysroot
+        run: cargo shiguredo-sysroot --config sysroot/${{ matrix.target }}.json
+      - name: Build for ${{ matrix.target }}
+        env:
+          WEBRTC_C_TARGET: ${{ matrix.target }}
+          WEBRTC_C_SYSROOT: ${{ github.workspace }}/target/shiguredo-sysroot/${{ matrix.target }}/sysroot
+        run: cargo build --features source-build --workspace --target aarch64-unknown-linux-gnu
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-binaries-${{ matrix.target }}
+          path: |
+            target/aarch64-unknown-linux-gnu/debug/whip
+            target/aarch64-unknown-linux-gnu/debug/whep
+          retention-days: 1
+
+  verify-linux-arm64:
+    needs: cross-compile
+    strategy:
+      matrix:
+        include:
+          - target: ubuntu-24.04_armv8
+            runner: ubuntu-24.04-arm
+          - target: ubuntu-22.04_armv8
+            runner: ubuntu-22.04-arm
+          - target: raspberry-pi-os_armv8
+            runner:
+              group: Self
+              labels: [self-hosted, linux, ARM64, Raspberry-Pi]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: arm64-binaries-${{ matrix.target }}
+
+      - name: Verify binaries
+        run: |
+          chmod +x whip whep
+          file whip
+          file whep
+          ./whip --help
+          ./whep --help
+
+  slack_notify:
+    needs: [ci, cross-compile, verify-linux-arm64]
+    runs-on: ubuntu-slim
+    if: ${{ !cancelled() }}
     steps:
       - name: Slack Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: shiguredo/github-actions/.github/actions/slack-notify@main
+        with:
+          status: ${{ job.status }}
+          slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
+          slack_channel: sora-rust-sdk
+          notify_mode: failure_and_fixed
         env:
-          SLACK_CHANNEL: sora-rust-sdk
-          SLACK_COLOR: danger
-          SLACK_ICON_EMOJI: ":japanese_ogre:"
-          SLACK_TITLE: "FAILED"
-          SLACK_MESSAGE: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{github.event.head_commit.message }}>
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          GH_TOKEN: ${{ github.token }}

@@ -1,6 +1,6 @@
 [package]
 name = "shiguredo_webrtc"
-version = "0.145.1"
+version = "0.145.2-canary.2"
 edition = "2024"
 rust-version = "1.88"
 authors = ["Shiguredo Inc."]
@@ -15,6 +15,7 @@ exclude = ["webrtc/_build"]
 [features]
 default = []
 local-export = []
+source-build = []
 
 [dependencies]
 
