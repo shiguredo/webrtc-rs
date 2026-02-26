@@ -1,6 +1,6 @@
 [package]
 name = "shiguredo_webrtc"
-version = "0.145.2-canary.2"
+version = "0.145.2"
 edition = "2024"
 rust-version = "1.88"
 authors = ["Shiguredo Inc."]
@@ -10,7 +10,15 @@ homepage = "https://github.com/shiguredo/webrtc-rs"
 repository = "https://github.com/shiguredo/webrtc-rs"
 readme = "README.md"
 build = "build.rs"
-exclude = ["webrtc/_build"]
+include = [
+    "/src/**",
+    "/webrtc/**",
+    "build.rs",
+    "sysroot/*",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
 
 [features]
 default = []
@@ -30,7 +38,7 @@ rustls = { version = "0.23", default-features = false, features = [
     "aws-lc-rs",
 ] }
 rustls-platform-verifier = "0.6"
-shiguredo_http11 = "2026.1.0-canary.4"
+shiguredo_http11 = "2026.1.0"
 tar = "0.4"
 zip = "0.6"
 

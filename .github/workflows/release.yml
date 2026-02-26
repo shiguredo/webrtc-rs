@@ -69,10 +69,10 @@ jobs:
             libx11-dev
       - run: rustup update stable
       - name: Build (native)
-        run: cargo build --features source-build --target ${{ matrix.rust_target }}
+        run: cargo build --release --features source-build --target ${{ matrix.rust_target }}
       - name: Package prebuilt artifacts
         run: |
-          OUT_DIR=$(find target/${{ matrix.rust_target }}/debug/build/shiguredo_webrtc-*/out -maxdepth 0 -type d | head -1)
+          OUT_DIR=$(find target/${{ matrix.rust_target }}/release/build/shiguredo_webrtc-*/out -maxdepth 0 -type d | head -1)
           if [ -z "$OUT_DIR" ]; then
             echo "ERROR: OUT_DIR が見つかりません"
             exit 1
@@ -134,10 +134,10 @@ jobs:
         env:
           WEBRTC_C_TARGET: ${{ matrix.target }}
           WEBRTC_C_SYSROOT: ${{ github.workspace }}/target/shiguredo-sysroot/${{ matrix.target }}/sysroot
-        run: cargo build --features source-build --target ${{ matrix.rust_target }}
+        run: cargo build --release --features source-build --target ${{ matrix.rust_target }}
       - name: Package prebuilt artifacts
         run: |
-          OUT_DIR=$(find target/${{ matrix.rust_target }}/debug/build/shiguredo_webrtc-*/out -maxdepth 0 -type d | head -1)
+          OUT_DIR=$(find target/${{ matrix.rust_target }}/release/build/shiguredo_webrtc-*/out -maxdepth 0 -type d | head -1)
           if [ -z "$OUT_DIR" ]; then
             echo "ERROR: OUT_DIR が見つかりません"
             exit 1
@@ -154,7 +154,6 @@ jobs:
 
   publish:
     needs: [build-prebuilt, build-prebuilt-cross]
-    if: false
     runs-on: ubuntu-24.04
     environment: release
     permissions:
