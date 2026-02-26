@@ -154,7 +154,6 @@ jobs:
 
   publish:
     needs: [build-prebuilt, build-prebuilt-cross]
-    if: false
     runs-on: ubuntu-24.04
     environment: release
     permissions:
