@@ -11,6 +11,10 @@
 
 ## develop
 
+## 0.145.2
+
+**リリース日**: 2026-02-26
+
 - [CHANGE] Ubuntu 24.04 LTS arm64 / Ubuntu 22.04 LTS arm64 / Raspberry Pi OS arm64 のクロスコンパイルに対応する
   - @voluntas
 - [CHANGE] 状態を変更するメソッドのレシーバーを `&mut self` に統一する

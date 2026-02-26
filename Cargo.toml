@@ -1,6 +1,6 @@
 [package]
 name = "shiguredo_webrtc"
-version = "0.145.2-canary.2"
+version = "0.145.2"
 edition = "2024"
 rust-version = "1.88"
 authors = ["Shiguredo Inc."]
@@ -10,7 +10,15 @@ homepage = "https://github.com/shiguredo/webrtc-rs"
 repository = "https://github.com/shiguredo/webrtc-rs"
 readme = "README.md"
 build = "build.rs"
-exclude = ["webrtc/_build"]
+include = [
+    "/src/**",
+    "/webrtc/**",
+    "build.rs",
+    "sysroot/*",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
 
 [features]
 default = []

@@ -248,6 +248,10 @@ impl FactoryHolder {
   - 送受信方向
 - `RtpTransceiverInit`
   - トランシーバー初期化
+- `RtpCodec`
+  - RTP コーデック情報
+- `Resolution`
+  - 解像度
 - `MediaType`
   - メディア種別 (Audio / Video)
 
@@ -274,6 +278,8 @@ impl FactoryHolder {
   - ICE サーバー設定
 - `IceTransportsType`
   - ICE トランスポートモード
+- `SdpParseError`
+  - SDP パースエラー
 
 ### 統計
 
