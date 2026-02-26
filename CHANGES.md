@@ -50,8 +50,12 @@
 
 ### misc
 
+- [UPDATE] shiguredo_http11 を 2026.1.0 に上げる
+  - @voluntas
 - [UPDATE] README から未使用の `WEBRTC_C_LIB_PATH` 環境変数の記載を削除する
+  - @melpon
 - [UPDATE] CI のキャッシュ設定を調整する
+  - @melpon
 
 ## 0.145.1
 
