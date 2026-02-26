@@ -34,6 +34,8 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 - Ubuntu 22.04 LTS arm64
 - macOS Tahoe 26 arm64
 - macOS Sequoia 15 arm64
+- Raspberry Pi OS (64-bit) arm64
+  - Debian version: 13 (trixie)
 
 ### Ubuntu の対応バージョン
 
@@ -42,6 +44,13 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 ### macOS の対応バージョン
 
 直近の 2 バージョンをサポートします。
+
+### Raspberry Pi OS の対応バージョン
+
+最新 Debian バージョンのみサポートします。
+
+> [!NOTE]
+> Raspberry Pi OS (Legacy) や Raspberry Pi OS (32-bit) はサポート対象外です。
 
 ### 将来対応予定
 
