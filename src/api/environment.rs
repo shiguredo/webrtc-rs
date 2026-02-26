@@ -1,4 +1,5 @@
 use crate::ffi;
+use std::marker::PhantomData;
 use std::ptr::NonNull;
 
 /// webrtc_c の webrtc_Environment を安全に扱うラッパー。
@@ -24,7 +25,12 @@ impl Environment {
 
     /// 生ポインタを取得する。FFI 呼び出し用。
     pub fn as_ptr(&self) -> *mut ffi::webrtc_Environment {
-        self.raw.as_ptr()
+        self.as_ref().as_ptr()
+    }
+
+    pub fn as_ref(&self) -> EnvironmentRef<'_> {
+        // Safety: self.raw は Environment の生存中は常に有効です。
+        unsafe { EnvironmentRef::from_raw(self.raw) }
     }
 }
 
@@ -33,3 +39,27 @@ impl Drop for Environment {
         unsafe { ffi::webrtc_Environment_delete(self.raw.as_ptr()) };
     }
 }
+
+#[allow(dead_code)]
+pub struct EnvironmentRef<'a> {
+    raw: NonNull<ffi::webrtc_Environment>,
+    _marker: PhantomData<&'a ffi::webrtc_Environment>,
+}
+
+impl<'a> EnvironmentRef<'a> {
+    /// # Safety
+    /// `raw` は有効な `webrtc_Environment` を指している必要があります。
+    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_Environment>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_Environment {
+        self.raw.as_ptr()
+    }
+}
+
+unsafe impl<'a> Send for EnvironmentRef<'a> {}

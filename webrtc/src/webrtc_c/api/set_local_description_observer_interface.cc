@@ -23,19 +23,32 @@ class SetLocalDescriptionObserverInterfaceImpl
     : public webrtc::SetLocalDescriptionObserverInterface {
  public:
   SetLocalDescriptionObserverInterfaceImpl(
-      struct webrtc_SetLocalDescriptionObserverInterface_cbs* cbs,
+      const struct webrtc_SetLocalDescriptionObserverInterface_cbs* cbs,
       void* user_data)
-      : cbs_(cbs), user_data_(user_data) {}
+      : user_data_(user_data) {
+    if (cbs != nullptr) {
+      cbs_ = *cbs;
+    }
+  }
+
+  ~SetLocalDescriptionObserverInterfaceImpl() override {
+    if (cbs_.OnDestroy != nullptr) {
+      cbs_.OnDestroy(user_data_);
+    }
+  }
 
   void OnSetLocalDescriptionComplete(webrtc::RTCError error) override {
+    if (cbs_.OnSetLocalDescriptionComplete == nullptr) {
+      return;
+    }
     auto rtc_error = std::make_unique<webrtc::RTCError>(std::move(error));
-    cbs_->OnSetLocalDescriptionComplete(
+    cbs_.OnSetLocalDescriptionComplete(
         reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error.release()),
         user_data_);
   }
 
  private:
-  struct webrtc_SetLocalDescriptionObserverInterface_cbs* cbs_;
+  webrtc_SetLocalDescriptionObserverInterface_cbs cbs_{};
   void* user_data_;
 };
 
@@ -45,7 +58,7 @@ WEBRTC_DEFINE_REFCOUNTED(webrtc_SetLocalDescriptionObserverInterface,
 
 struct webrtc_SetLocalDescriptionObserverInterface_refcounted*
 webrtc_SetLocalDescriptionObserverInterface_make_ref_counted(
-    struct webrtc_SetLocalDescriptionObserverInterface_cbs* cbs,
+    const struct webrtc_SetLocalDescriptionObserverInterface_cbs* cbs,
     void* user_data) {
   auto impl =
       webrtc::make_ref_counted<SetLocalDescriptionObserverInterfaceImpl>(

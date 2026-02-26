@@ -15,6 +15,8 @@ extern "C" {
 WEBRTC_DECLARE_REFCOUNTED(webrtc_I420Buffer);
 struct webrtc_I420Buffer_refcounted* webrtc_I420Buffer_Create(int width,
                                                               int height);
+int webrtc_I420Buffer_width(const struct webrtc_I420Buffer* self);
+int webrtc_I420Buffer_height(const struct webrtc_I420Buffer* self);
 uint8_t* webrtc_I420Buffer_MutableDataY(struct webrtc_I420Buffer* self);
 uint8_t* webrtc_I420Buffer_MutableDataU(struct webrtc_I420Buffer* self);
 uint8_t* webrtc_I420Buffer_MutableDataV(struct webrtc_I420Buffer* self);

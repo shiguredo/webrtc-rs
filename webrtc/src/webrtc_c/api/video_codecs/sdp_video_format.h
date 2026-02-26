@@ -14,6 +14,7 @@ extern "C" {
 // -------------------------
 
 WEBRTC_DECLARE_UNIQUE(webrtc_SdpVideoFormat);
+WEBRTC_DECLARE_VECTOR_NO_DEFAULT_CTOR(webrtc_SdpVideoFormat);
 struct webrtc_SdpVideoFormat_unique* webrtc_SdpVideoFormat_new(
     const char* name,
     size_t name_len,

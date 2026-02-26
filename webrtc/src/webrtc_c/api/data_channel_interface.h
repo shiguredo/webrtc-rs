@@ -47,10 +47,11 @@ struct webrtc_DataChannelObserver_cbs {
                     size_t len,
                     int is_binary,
                     void* user_data);
+  void (*OnDestroy)(void* user_data);
 };
 
 struct webrtc_DataChannelObserver* webrtc_DataChannelObserver_new(
-    struct webrtc_DataChannelObserver_cbs* cbs,
+    const struct webrtc_DataChannelObserver_cbs* cbs,
     void* user_data);
 void webrtc_DataChannelObserver_delete(struct webrtc_DataChannelObserver* self);
 

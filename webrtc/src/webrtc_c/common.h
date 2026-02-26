@@ -61,3 +61,24 @@
       struct type* caps);                                                      \
   void WEBRTC_CONCAT(type, _vector_push_back)(                                 \
       struct WEBRTC_CONCAT(type, _vector) * self, struct type * value);
+
+// -------------------------
+// std::vector<T> (T does not have default constructor)
+// -------------------------
+
+#define WEBRTC_DECLARE_VECTOR_NO_DEFAULT_CTOR(type)                            \
+  struct type;                                                                 \
+  struct WEBRTC_CONCAT(type, _vector);                                         \
+  struct WEBRTC_CONCAT(type, _vector) *                                        \
+      WEBRTC_CONCAT(type, _vector_new)(void);                                  \
+  void WEBRTC_CONCAT(                                                          \
+      type, _vector_delete)(struct WEBRTC_CONCAT(type, _vector) * self);       \
+  struct type* WEBRTC_CONCAT(type, _vector_get)(                               \
+      struct WEBRTC_CONCAT(type, _vector) * self, int index);                  \
+  int WEBRTC_CONCAT(type,                                                      \
+                    _vector_size)(struct WEBRTC_CONCAT(type, _vector) * self); \
+  void WEBRTC_CONCAT(type, _vector_set)(                                       \
+      struct WEBRTC_CONCAT(type, _vector) * self, int index,                   \
+      struct type* caps);                                                      \
+  void WEBRTC_CONCAT(type, _vector_push_back)(                                 \
+      struct WEBRTC_CONCAT(type, _vector) * self, struct type * value);

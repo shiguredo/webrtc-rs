@@ -21,6 +21,14 @@ struct webrtc_I420Buffer_refcounted* webrtc_I420Buffer_Create(int width,
   auto buf = webrtc::I420Buffer::Create(width, height);
   return reinterpret_cast<struct webrtc_I420Buffer_refcounted*>(buf.release());
 }
+int webrtc_I420Buffer_width(const struct webrtc_I420Buffer* self) {
+  auto buf = reinterpret_cast<const webrtc::I420Buffer*>(self);
+  return buf->width();
+}
+int webrtc_I420Buffer_height(const struct webrtc_I420Buffer* self) {
+  auto buf = reinterpret_cast<const webrtc::I420Buffer*>(self);
+  return buf->height();
+}
 uint8_t* webrtc_I420Buffer_MutableDataY(struct webrtc_I420Buffer* self) {
   auto buf = reinterpret_cast<webrtc::I420Buffer*>(self);
   return buf->MutableDataY();

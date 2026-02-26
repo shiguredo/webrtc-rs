@@ -1,0 +1,20 @@
+{
+    // IntelliSense を使用して利用可能な属性を学べます。
+    // 既存の属性の説明をホバーして表示します。
+    // 詳細情報は次を確認してください: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb-dap",
+            "request": "launch",
+            "name": "Debug",
+            "program": "${workspaceRoot}/webrtc-build-c/_build/ubuntu-24.04_x86_64/debug/webrtc_c/whip_c",
+            "args": [],
+            "env": [],
+            "cwd": "${workspaceRoot}",
+            "sourceMap": [
+                ["../../", "${workspaceFolder}/../webrtc-build/_worktree/m145.7632.0.0/"],
+            ],
+        }
+    ]
+}

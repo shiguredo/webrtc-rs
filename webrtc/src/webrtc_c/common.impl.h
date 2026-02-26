@@ -97,3 +97,39 @@
     auto cpp = reinterpret_cast<cpptype*>(value);                         \
     vec->push_back(*cpp);                                                 \
   }
+
+#define WEBRTC_DEFINE_VECTOR_NO_DEFAULT_CTOR(type, cpptype)               \
+  struct WEBRTC_CONCAT(type, _vector) *                                   \
+      WEBRTC_CONCAT(type, _vector_new)(void) {                            \
+    auto vec = new std::vector<cpptype>();                                \
+    return reinterpret_cast<struct WEBRTC_CONCAT(type, _vector)*>(vec);   \
+  }                                                                       \
+  void WEBRTC_CONCAT(                                                     \
+      type, _vector_delete)(struct WEBRTC_CONCAT(type, _vector) * self) { \
+    auto vec = reinterpret_cast<std::vector<cpptype>*>(self);             \
+    delete vec;                                                           \
+  }                                                                       \
+  struct type* WEBRTC_CONCAT(type, _vector_get)(                          \
+      struct WEBRTC_CONCAT(type, _vector) * self, int index) {            \
+    auto vec = reinterpret_cast<std::vector<cpptype>*>(self);             \
+    auto& cpp = (*vec)[index];                                            \
+    return reinterpret_cast<struct type*>(&cpp);                          \
+  }                                                                       \
+  int WEBRTC_CONCAT(                                                      \
+      type, _vector_size)(struct WEBRTC_CONCAT(type, _vector) * self) {   \
+    auto vec = reinterpret_cast<std::vector<cpptype>*>(self);             \
+    return static_cast<int>(vec->size());                                 \
+  }                                                                       \
+  void WEBRTC_CONCAT(type, _vector_set)(                                  \
+      struct WEBRTC_CONCAT(type, _vector) * self, int index,              \
+      struct type* caps) {                                                \
+    auto vec = reinterpret_cast<std::vector<cpptype>*>(self);             \
+    auto cpp = reinterpret_cast<cpptype*>(caps);                          \
+    (*vec)[index] = *cpp;                                                 \
+  }                                                                       \
+  void WEBRTC_CONCAT(type, _vector_push_back)(                            \
+      struct WEBRTC_CONCAT(type, _vector) * self, struct type * value) {  \
+    auto vec = reinterpret_cast<std::vector<cpptype>*>(self);             \
+    auto cpp = reinterpret_cast<cpptype*>(value);                         \
+    vec->push_back(*cpp);                                                 \
+  }

@@ -23,16 +23,19 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 - [webrtc-build](https://github.com/shiguredo-webrtc-build/webrtc-build) でビルドされた libwebrtc を利用
 - C++ の薄い C API ラッパー層と Rust の安全な API 層の 2 層構造
 - `cargo build` だけでビルド
-  - CMake / webrtc-build のダウンロード -> C++ コンパイル -> bindgen
+  - デフォルトでは prebuilt 済みライブラリを GitHub Releases から自動ダウンロード
+  - CMake、libclang、C++ コンパイラなどのインストールは不要
 
 ## サポートプラットフォーム
 
 - Ubuntu 24.04 LTS x86_64
-- Ubuntu 22.04 LTS x86_64
 - Ubuntu 24.04 LTS arm64
+- Ubuntu 22.04 LTS x86_64
 - Ubuntu 22.04 LTS arm64
 - macOS Tahoe 26 arm64
 - macOS Sequoia 15 arm64
+- Raspberry Pi OS (64-bit) arm64
+  - Debian version: 13 (trixie)
 
 ### Ubuntu の対応バージョン
 
@@ -41,6 +44,13 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 ### macOS の対応バージョン
 
 直近の 2 バージョンをサポートします。
+
+### Raspberry Pi OS の対応バージョン
+
+最新 Debian バージョンのみサポートします。
+
+> [!NOTE]
+> Raspberry Pi OS (Legacy) や Raspberry Pi OS (32-bit) はサポート対象外です。
 
 ### 将来対応予定
 
@@ -183,6 +193,41 @@ impl FactoryHolder {
 - `SdpVideoFormat`
   - 映像フォーマット
 
+### 映像コーデック
+
+- `VideoCodecRef` / `VideoCodecType` / `VideoCodecStatus`
+  - 映像コーデック共通型とステータス
+- `VideoFrameType` / `VideoFrameTypeVector` / `VideoFrameTypeVectorRef`
+  - エンコード対象フレーム種別
+- `EncodedImageBuffer` / `EncodedImage` / `EncodedImageRef`
+  - エンコード済み映像データ
+- `CodecSpecificInfo` / `CodecSpecificInfoRef` / `H264PacketizationMode`
+  - コーデック固有情報
+- `VideoEncoder`
+  - カスタム映像エンコーダー
+- `VideoEncoderCallbacks` / `VideoEncoderFactoryCallbacks`
+  - エンコーダー / エンコーダーファクトリーの callback
+- `VideoEncoderEncoderInfo` / `VideoEncoderSettingsRef` / `VideoEncoderRateControlParametersRef`
+  - エンコーダー設定とメタ情報
+- `VideoEncoderEncodedImageCallback` / `VideoEncoderEncodedImageCallbackRef`
+  - エンコード完了 callback
+- `VideoEncoderEncodedImageCallbackCallbacks`
+  - エンコード完了 callback のハンドラー設定
+- `VideoEncoderEncodedImageCallbackResult`
+  - エンコード完了 callback の戻り値
+- `VideoEncoderEncodedImageCallbackResultError`
+  - エンコード完了 callback のエラーコード
+- `VideoEncoderEncodedImageCallbackPtr`
+  - C API 側 callback ポインターのラッパー
+- `VideoDecoder`
+  - カスタム映像デコーダー
+- `VideoDecoderCallbacks` / `VideoDecoderFactoryCallbacks`
+  - デコーダー / デコーダーファクトリーの callback
+- `VideoDecoderDecoderInfo` / `VideoDecoderSettingsRef`
+  - デコーダー設定とメタ情報
+- `VideoDecoderDecodedImageCallbackRef`
+  - デコード完了 callback
+
 ### RTP
 
 - `RtpCapabilities`
@@ -203,6 +248,10 @@ impl FactoryHolder {
   - 送受信方向
 - `RtpTransceiverInit`
   - トランシーバー初期化
+- `RtpCodec`
+  - RTP コーデック情報
+- `Resolution`
+  - 解像度
 - `MediaType`
   - メディア種別 (Audio / Video)
 
@@ -229,6 +278,8 @@ impl FactoryHolder {
   - ICE サーバー設定
 - `IceTransportsType`
   - ICE トランスポートモード
+- `SdpParseError`
+  - SDP パースエラー
 
 ### 統計
 
@@ -267,16 +318,64 @@ impl FactoryHolder {
 - `log` / `rtc_log_format_file`
   - ログ機能
 
-## ビルド要件
+## ビルド
+
+### デフォルト (prebuilt)
+
+デフォルトでは、リリース時に GitHub Actions でビルドされた prebuilt ライブラリ (`libwebrtc_c.a`) と生成済みバインディング (`bindings.rs`) を GitHub Releases から自動ダウンロードします。
+
+**CMake、libclang、C++ コンパイラなどのインストールは不要です。**
+
+必要なもの:
 
 - Rust 1.88 以上
+- Linux の場合: `libx11-dev` (リンク時に必要)
+
+```bash
+# Linux
+sudo apt-get install libx11-dev
+
+# macOS は追加のインストール不要
+```
+
+### ソースビルド
+
+C++ ラッパーのコード変更や、prebuilt が提供されていないプラットフォームでビルドする場合は `source-build` feature を有効にしてください。
+
+```toml
+[dependencies]
+shiguredo_webrtc = { version = "0.145", features = ["source-build"] }
+```
+
+または `cargo build` 時に指定:
+
+```bash
+cargo build --features source-build
+```
+
+ソースビルドでは以下が自動的に行われます:
+
+1. CMake のダウンロード
+2. libwebrtc のダウンロード (webrtc-build の GitHub Releases から)
+3. C++ ラッパーのコンパイル
+4. bindgen によるバインディング生成
+
+ソースビルドに必要なもの:
+
+- Rust 1.88 以上
+- C++ コンパイラ (build-essential)
 - libclang (bindgen が利用)
-- CMake / webrtc-build は build.rs が自動ダウンロード
+- Linux の場合: `libx11-dev`
+
+```bash
+# Linux
+sudo apt-get install build-essential libclang-dev libx11-dev
+
+# macOS は Xcode Command Line Tools があれば OK
+```
 
 ## 環境変数
 
-- `WEBRTC_C_LIB_PATH`
-  - libwebrtc_c.a の絶対パスを直接指定する場合に利用
 - `WEBRTC_C_TARGET`
   - ビルドターゲットを変更する場合に指定 (デフォルトはホスト環境に応じて自動判定)
 
