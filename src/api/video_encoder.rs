@@ -1283,16 +1283,14 @@ impl VideoEncoderFactory {
 
     pub fn get_supported_formats(&self) -> Vec<SdpVideoFormat> {
         let raw_vec = unsafe { ffi::webrtc_VideoEncoderFactory_GetSupportedFormats(self.as_ptr()) };
-        let Some(raw_vec) = NonNull::new(raw_vec) else {
-            return Vec::new();
-        };
+        let raw_vec = NonNull::new(raw_vec)
+            .expect("BUG: webrtc_VideoEncoderFactory_GetSupportedFormats が null を返しました");
         let size = unsafe { ffi::webrtc_SdpVideoFormat_vector_size(raw_vec.as_ptr()) };
         let mut formats = Vec::with_capacity(size.max(0) as usize);
         for i in 0..size {
             let raw_format = unsafe { ffi::webrtc_SdpVideoFormat_vector_get(raw_vec.as_ptr(), i) };
-            let Some(raw_format) = NonNull::new(raw_format) else {
-                continue;
-            };
+            let raw_format = NonNull::new(raw_format)
+                .expect("BUG: webrtc_SdpVideoFormat_vector_get が null を返しました");
             let format_ref = unsafe { SdpVideoFormatRef::from_raw(raw_format) };
             formats.push(format_ref.to_owned());
         }
