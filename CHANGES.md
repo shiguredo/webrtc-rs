@@ -58,7 +58,6 @@
   - @melpon
 - [UPDATE] `user_data` の前提チェックを `assert!` に統一する
   - @melpon
-  - @melpon
 - [ADD] リリース時に prebuilt `libwebrtc_c.a` と `bindings.rs` を GitHub Releases に配布し、`cargo build` 時に自動ダウンロードする
   - `--features source-build` でソースビルドに切り替え可能
   - @voluntas
