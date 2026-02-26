@@ -31,8 +31,8 @@ impl SdpVideoFormat {
         self.as_ref().parameters_mut()
     }
 
-    pub fn is_equal(&self, other: &SdpVideoFormat) -> bool {
-        self.as_ref().is_equal(other.as_ref())
+    pub fn is_equal(&self, other: SdpVideoFormatRef<'_>) -> bool {
+        unsafe { ffi::webrtc_SdpVideoFormat_is_equal(self.raw().as_ptr(), other.raw.as_ptr()) != 0 }
     }
 
     pub fn as_ref(&self) -> SdpVideoFormatRef<'_> {
@@ -43,6 +43,16 @@ impl SdpVideoFormat {
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_SdpVideoFormat> {
         let raw = unsafe { ffi::webrtc_SdpVideoFormat_unique_get(self.raw_unique.as_ptr()) };
         NonNull::new(raw).expect("BUG: webrtc_SdpVideoFormat_unique_get が null を返しました")
+    }
+}
+
+impl Clone for SdpVideoFormat {
+    fn clone(&self) -> Self {
+        let raw = unsafe { ffi::webrtc_SdpVideoFormat_copy(self.raw().as_ptr()) };
+        Self {
+            raw_unique: NonNull::new(raw)
+                .expect("BUG: webrtc_SdpVideoFormat_copy が null を返しました"),
+        }
     }
 }
 
@@ -74,8 +84,16 @@ impl<'a> SdpVideoFormatRef<'a> {
         MapStringString::from_raw(NonNull::new(ptr).expect("BUG: ptr が null"))
     }
 
-    pub fn is_equal(&self, other: SdpVideoFormatRef<'_>) -> bool {
-        unsafe { ffi::webrtc_SdpVideoFormat_is_equal(self.raw.as_ptr(), other.raw.as_ptr()) != 0 }
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_SdpVideoFormat {
+        self.raw.as_ptr()
+    }
+
+    pub fn to_owned(&self) -> SdpVideoFormat {
+        let raw = unsafe { ffi::webrtc_SdpVideoFormat_copy(self.raw.as_ptr()) };
+        SdpVideoFormat {
+            raw_unique: NonNull::new(raw)
+                .expect("BUG: webrtc_SdpVideoFormat_copy が null を返しました"),
+        }
     }
 }
 
@@ -159,6 +177,15 @@ impl I420Buffer {
         unsafe { slice::from_raw_parts(ptr, len) }
     }
 
+    /// Y 平面を可変参照する。
+    pub fn y_data_mut(&mut self) -> &mut [u8] {
+        let raw = self.raw();
+        let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataY(raw.as_ptr()) };
+        let stride = unsafe { ffi::webrtc_I420Buffer_StrideY(raw.as_ptr()) } as usize;
+        let len = stride * self.height() as usize;
+        unsafe { slice::from_raw_parts_mut(ptr, len) }
+    }
+
     /// U 平面を参照する。
     pub fn u_data(&self) -> &[u8] {
         let raw = self.raw();
@@ -168,6 +195,15 @@ impl I420Buffer {
         unsafe { slice::from_raw_parts(ptr, stride * h) }
     }
 
+    /// U 平面を可変参照する。
+    pub fn u_data_mut(&mut self) -> &mut [u8] {
+        let raw = self.raw();
+        let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataU(raw.as_ptr()) };
+        let stride = unsafe { ffi::webrtc_I420Buffer_StrideU(raw.as_ptr()) } as usize;
+        let h = (self.height() as usize).div_ceil(2);
+        unsafe { slice::from_raw_parts_mut(ptr, stride * h) }
+    }
+
     /// V 平面を参照する。
     pub fn v_data(&self) -> &[u8] {
         let raw = self.raw();
@@ -175,6 +211,15 @@ impl I420Buffer {
         let stride = unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) } as usize;
         let h = (self.height() as usize).div_ceil(2);
         unsafe { slice::from_raw_parts(ptr, stride * h) }
+    }
+
+    /// V 平面を可変参照する。
+    pub fn v_data_mut(&mut self) -> &mut [u8] {
+        let raw = self.raw();
+        let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataV(raw.as_ptr()) };
+        let stride = unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) } as usize;
+        let h = (self.height() as usize).div_ceil(2);
+        unsafe { slice::from_raw_parts_mut(ptr, stride * h) }
     }
 
     pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_I420Buffer_refcounted {
@@ -192,12 +237,13 @@ pub struct VideoFrame {
 }
 
 impl VideoFrame {
-    pub fn from_i420(buffer: &I420Buffer, timestamp_us: i64) -> Self {
+    pub fn from_i420(buffer: &I420Buffer, timestamp_us: i64, timestamp_rtp: u32) -> Self {
         let raw = NonNull::new(unsafe {
             ffi::webrtc_VideoFrame_Create(
                 buffer.as_refcounted_ptr(),
                 ffi::webrtc_VideoRotation_0,
                 timestamp_us,
+                timestamp_rtp,
             )
         })
         .expect("BUG: webrtc_VideoFrame_Create が null を返しました");
@@ -214,6 +260,10 @@ impl VideoFrame {
 
     pub fn timestamp_us(&self) -> i64 {
         self.as_ref().timestamp_us()
+    }
+
+    pub fn rtp_timestamp(&self) -> u32 {
+        self.as_ref().rtp_timestamp()
     }
 
     /// I420Buffer を取得する。
@@ -268,12 +318,20 @@ impl<'a> VideoFrameRef<'a> {
         unsafe { ffi::webrtc_VideoFrame_timestamp_us(self.raw.as_ptr()) }
     }
 
+    pub fn rtp_timestamp(&self) -> u32 {
+        unsafe { ffi::webrtc_VideoFrame_timestamp_rtp(self.raw.as_ptr()) }
+    }
+
     pub fn buffer(&self) -> I420Buffer {
         let buf =
             NonNull::new(unsafe { ffi::webrtc_VideoFrame_video_frame_buffer(self.raw.as_ptr()) })
                 .expect("BUG: webrtc_VideoFrame_video_frame_buffer が null を返しました");
         let raw_ref = ScopedRef::<I420BufferHandle>::from_raw(buf);
         I420Buffer { raw_ref }
+    }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoFrame {
+        self.raw.as_ptr()
     }
 }
 

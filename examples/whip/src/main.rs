@@ -254,7 +254,7 @@ fn tick_once(
         shiguredo_webrtc::abgr_to_i420(u32_slice_as_u8_slice(image), width, height)
     {
         let timestamp_us = elapsed_ms * 1000;
-        let frame = shiguredo_webrtc::VideoFrame::from_i420(&buffer, timestamp_us);
+        let frame = shiguredo_webrtc::VideoFrame::from_i420(&buffer, timestamp_us, 0);
         let AdaptFrameResult { applied, size } = source.adapt_frame(width, height, timestamp_us);
         let frame = if applied
             && (size.adapted_width != frame.width() || size.adapted_height != frame.height())
@@ -265,11 +265,13 @@ fn tick_once(
             shiguredo_webrtc::VideoFrame::from_i420(
                 &scaled,
                 timestamp_aligner.translate(timestamp_us, shiguredo_webrtc::time_millis() * 1000),
+                0,
             )
         } else {
             shiguredo_webrtc::VideoFrame::from_i420(
                 &buffer,
                 timestamp_aligner.translate(timestamp_us, shiguredo_webrtc::time_millis() * 1000),
+                0,
             )
         };
         source.on_frame(&frame);
@@ -405,7 +407,7 @@ impl SignalingWhip {
                     .name()
                     .map_err(|e| format!("codec 名の取得に失敗しました : {e}"))?;
                 if name.eq_ignore_ascii_case("opus") {
-                    codecs.push_ref(&cap);
+                    codecs.push(&cap);
                     break;
                 }
             }
@@ -454,7 +456,7 @@ impl SignalingWhip {
                     .map_err(|e| format!("codec 名の取得に失敗しました : {e}"))?
                     .to_ascii_lowercase();
                 if name == "rtx" {
-                    codecs.push_ref(&cap);
+                    codecs.push(&cap);
                     continue;
                 }
                 if let Some(encs) = &self.config.send_encodings {
@@ -475,7 +477,7 @@ impl SignalingWhip {
                         }
                     }
                     if matched {
-                        codecs.push_ref(&cap);
+                        codecs.push(&cap);
                     }
                 }
             }

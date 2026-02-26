@@ -31,6 +31,16 @@ struct webrtc_SdpVideoFormat_unique* webrtc_SdpVideoFormat_new(
   auto fmt = std::make_unique<webrtc::SdpVideoFormat>(n);
   return reinterpret_cast<struct webrtc_SdpVideoFormat_unique*>(fmt.release());
 }
+struct webrtc_SdpVideoFormat_unique* webrtc_SdpVideoFormat_copy(
+    struct webrtc_SdpVideoFormat* self) {
+  auto fmt = reinterpret_cast<webrtc::SdpVideoFormat*>(self);
+  if (fmt == nullptr) {
+    return nullptr;
+  }
+  auto copied = std::make_unique<webrtc::SdpVideoFormat>(*fmt);
+  return reinterpret_cast<struct webrtc_SdpVideoFormat_unique*>(
+      copied.release());
+}
 struct std_string* webrtc_SdpVideoFormat_get_name(
     struct webrtc_SdpVideoFormat* self) {
   auto fmt = reinterpret_cast<webrtc::SdpVideoFormat*>(self);
