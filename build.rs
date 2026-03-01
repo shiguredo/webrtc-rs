@@ -721,7 +721,6 @@ fn emit_link_directives(lib_path: &Path) {
     let lib_dir = lib_path
         .parent()
         .expect("libwebrtc_c.a の親ディレクトリ取得に失敗しました");
-    println!("cargo:rerun-if-changed={}", lib_path.display());
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
     println!("cargo:rustc-link-lib=static=webrtc_c");
 
