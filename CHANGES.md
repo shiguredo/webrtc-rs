@@ -11,6 +11,9 @@
 
 ## develop
 
+- [UPDATE] libwebrtc m146 (m146.7680.0.0) に上げる
+  - @voluntas
+
 ### misc
 
 - [UPDATE] ci.yml を main ブランチとタグでは実行しないようにする
