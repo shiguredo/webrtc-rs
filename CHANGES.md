@@ -11,6 +11,9 @@
 
 ## develop
 
+- [UPDATE] cmake の代わりに shiguredo_cmake を利用する
+  - @melpon
+
 ### misc
 
 - [UPDATE] ci.yml を main ブランチとタグでは実行しないようにする
