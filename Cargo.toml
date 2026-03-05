@@ -29,15 +29,6 @@ source-build = []
 
 [build-dependencies]
 bindgen = "0.72"
-flate2 = "1"
-rustls = { version = "0.23", default-features = false, features = [
-    "std",
-    "tls12",
-    "aws-lc-rs",
-] }
-rustls-platform-verifier = "0.6"
-shiguredo_http11 = "2026.1.0"
-tar = "0.4"
 shiguredo_cmake = "4.2.3"
 
 [workspace]

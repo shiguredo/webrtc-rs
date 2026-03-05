@@ -1,14 +1,6 @@
 use std::env;
 use std::fs;
-use std::io::{Cursor, Read, Write};
-use std::net::TcpStream;
-use std::path::{Component, Path, PathBuf};
-use std::sync::Arc;
-
-use rustls::pki_types::ServerName;
-use rustls::{ClientConfig, ClientConnection, StreamOwned};
-use rustls_platform_verifier::ConfigVerifierExt;
-use shiguredo_http11::{DecoderLimits, Request, Response, ResponseDecoder};
+use std::path::{Path, PathBuf};
 
 fn main() {
     // Cargo.toml か build.rs が更新されたら、依存ライブラリを再ビルドする
@@ -91,11 +83,14 @@ fn download_prebuilt(target: &str, out_dir: &Path) -> Result<PrebuiltPaths, Stri
 
     eprintln!("prebuilt ライブラリをダウンロード中: {}", url);
 
-    let archive_bytes = fetch_url(&url)?;
-
     // OUT_DIR/prebuilt/ に展開
     let prebuilt_dir = out_dir.join("prebuilt");
-    extract_tar_gz_from_bytes(&archive_bytes, &prebuilt_dir)?;
+    let archive_path = out_dir.join("libwebrtc_c.tar.gz");
+    download(&url, &archive_path)?;
+    fs::create_dir_all(&prebuilt_dir)
+        .map_err(|e| format!("展開先ディレクトリ作成に失敗: {}", e))?;
+    extract(&archive_path, &prebuilt_dir)?;
+    let _ = fs::remove_file(&archive_path);
 
     // libwebrtc_c.a を OUT_DIR/lib/ にコピー
     let lib_dir = out_dir.join("lib");
@@ -115,33 +110,32 @@ fn download_prebuilt(target: &str, out_dir: &Path) -> Result<PrebuiltPaths, Stri
     Ok(PrebuiltPaths { lib_path })
 }
 
-/// バイト列から tar.gz を展開する
-fn extract_tar_gz_from_bytes(data: &[u8], dest_dir: &Path) -> Result<(), String> {
-    fs::create_dir_all(dest_dir).map_err(|e| format!("展開先ディレクトリ作成に失敗: {}", e))?;
-    let decoder = flate2::read::GzDecoder::new(Cursor::new(data));
-    let mut archive = tar::Archive::new(decoder);
-    let entries = archive
-        .entries()
-        .map_err(|e| format!("tar エントリ取得に失敗: {}", e))?;
-
-    for entry in entries {
-        let mut entry = entry.map_err(|e| format!("tar エントリ読み込みに失敗: {}", e))?;
-        let path = entry
-            .path()
-            .map_err(|e| format!("tar パス取得に失敗: {}", e))?;
-        if !is_safe_path(&path) {
-            return Err(format!("不正なパスが含まれています: {}", path.display()));
-        }
-        let out_path = dest_dir.join(&*path);
-        if let Some(parent) = out_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("展開先ディレクトリ作成に失敗: {}", e))?;
-        }
-        entry
-            .unpack(&out_path)
-            .map_err(|e| format!("tar 展開に失敗: {}", e))?;
+/// curl を使ってファイルをダウンロードする
+fn download(url: &str, output: &Path) -> Result<(), String> {
+    let status = std::process::Command::new("curl")
+        .args(["-fSL", "--retry", "3", "-o"])
+        .arg(output)
+        .arg(url)
+        .status()
+        .map_err(|e| format!("curl の実行に失敗しました: {}", e))?;
+    if !status.success() {
+        return Err(format!("ダウンロードに失敗しました: {}", url));
     }
+    Ok(())
+}
 
+/// tar を使ってアーカイブを展開する
+fn extract(archive: &Path, dest: &Path) -> Result<(), String> {
+    let status = std::process::Command::new("tar")
+        .arg("xzf")
+        .arg(archive)
+        .arg("-C")
+        .arg(dest)
+        .status()
+        .map_err(|e| format!("tar の実行に失敗しました: {}", e))?;
+    if !status.success() {
+        return Err(format!("展開に失敗しました: {}", archive.display()));
+    }
     Ok(())
 }
 
@@ -275,190 +269,6 @@ fn remove_symlink(link_path: &Path) -> std::io::Result<()> {
 #[cfg(windows)]
 fn remove_symlink(link_path: &Path) -> std::io::Result<()> {
     fs::remove_dir(link_path)
-}
-
-fn is_safe_path(path: &Path) -> bool {
-    for component in path.components() {
-        match component {
-            Component::Prefix(_) | Component::RootDir | Component::ParentDir => return false,
-            _ => {}
-        }
-    }
-    true
-}
-
-fn fetch_url(url: &str) -> Result<Vec<u8>, String> {
-    let mut current = url.to_string();
-    for _ in 0..5 {
-        let response = fetch_url_once(&current)?;
-        if response.is_redirect() {
-            let location = response
-                .get_header("Location")
-                .ok_or_else(|| "Location ヘッダーがありません".to_string())?;
-            current = resolve_redirect_url(&current, location)?;
-            continue;
-        }
-        if response.status_code != 200 {
-            return Err(format!(
-                "HTTP エラー : {} {} ({})",
-                response.status_code, response.reason_phrase, current
-            ));
-        }
-        return Ok(response.body);
-    }
-
-    Err(format!("リダイレクトが多すぎます : {}", url))
-}
-
-fn fetch_url_once(url: &str) -> Result<Response, String> {
-    let (scheme, host, port, path) = parse_url(url)?;
-    let request = Request::new("GET", &path)
-        .header("Host", &host)
-        .header("User-Agent", "shiguredo_webrtc-build")
-        .header("Accept", "*/*")
-        .header("Connection", "close");
-    let request_bytes = request.encode();
-    if scheme == "https" {
-        https_request(&host, port, &request_bytes)
-    } else {
-        http_request(&host, port, &request_bytes)
-    }
-}
-
-fn parse_url(url: &str) -> Result<(String, String, u16, String), String> {
-    let (scheme, rest) = if let Some(rest) = url.strip_prefix("https://") {
-        ("https".to_string(), rest)
-    } else if let Some(rest) = url.strip_prefix("http://") {
-        ("http".to_string(), rest)
-    } else {
-        return Err(format!("URL が不正です : {}", url));
-    };
-
-    let (host_port, path) = match rest.find('/') {
-        Some(index) => (&rest[..index], &rest[index..]),
-        None => (rest, "/"),
-    };
-
-    let (host, port) = match host_port.find(':') {
-        Some(index) => {
-            let port: u16 = host_port[index + 1..]
-                .parse()
-                .map_err(|e| format!("ポートの解析に失敗しました : {}", e))?;
-            (&host_port[..index], port)
-        }
-        None => {
-            let port = if scheme == "https" { 443 } else { 80 };
-            (host_port, port)
-        }
-    };
-
-    Ok((scheme, host.to_string(), port, path.to_string()))
-}
-
-fn resolve_redirect_url(current_url: &str, location: &str) -> Result<String, String> {
-    if location.starts_with("http://") || location.starts_with("https://") {
-        return Ok(location.to_string());
-    }
-
-    let (scheme, host, port, path) = parse_url(current_url)?;
-    let host_port = if (scheme == "https" && port == 443) || (scheme == "http" && port == 80) {
-        host
-    } else {
-        format!("{}:{}", host, port)
-    };
-
-    if location.starts_with('/') {
-        return Ok(format!("{}://{}{}", scheme, host_port, location));
-    }
-
-    let base = match path.rfind('/') {
-        Some(pos) => &path[..=pos],
-        None => "/",
-    };
-    Ok(format!("{}://{}{}{}", scheme, host_port, base, location))
-}
-
-fn http_request(host: &str, port: u16, request_bytes: &[u8]) -> Result<Response, String> {
-    let mut stream =
-        TcpStream::connect((host, port)).map_err(|e| format!("HTTP 接続に失敗しました : {}", e))?;
-    stream
-        .write_all(request_bytes)
-        .map_err(|e| format!("HTTP リクエスト送信に失敗しました : {}", e))?;
-
-    let mut decoder = ResponseDecoder::with_limits(DecoderLimits::unlimited());
-    let mut buf = [0u8; 8192];
-
-    loop {
-        let n = stream
-            .read(&mut buf)
-            .map_err(|e| format!("HTTP レスポンス受信に失敗しました : {}", e))?;
-        if n == 0 {
-            decoder.mark_eof();
-            if let Some(response) = decoder
-                .decode()
-                .map_err(|e| format!("HTTP レスポンス解析に失敗しました : {}", e))?
-            {
-                return Ok(response);
-            }
-            return Err("HTTP レスポンスの受信が完了しませんでした".to_string());
-        }
-        decoder
-            .feed(&buf[..n])
-            .map_err(|e| format!("HTTP レスポンス解析に失敗しました : {}", e))?;
-        if let Some(response) = decoder
-            .decode()
-            .map_err(|e| format!("HTTP レスポンス解析に失敗しました : {}", e))?
-        {
-            return Ok(response);
-        }
-    }
-}
-
-fn https_request(host: &str, port: u16, request_bytes: &[u8]) -> Result<Response, String> {
-    let config = ClientConfig::with_platform_verifier()
-        .map_err(|e| format!("TLS 設定の作成に失敗しました : {}", e))?;
-    let server_name = ServerName::try_from(host.to_string())
-        .map_err(|e| format!("サーバー名の解析に失敗しました : {}", e))?;
-    let conn = ClientConnection::new(Arc::new(config), server_name)
-        .map_err(|e| format!("TLS 接続に失敗しました : {}", e))?;
-    let sock = TcpStream::connect((host, port))
-        .map_err(|e| format!("HTTPS 接続に失敗しました : {}", e))?;
-    let mut tls = StreamOwned::new(conn, sock);
-
-    tls.write_all(request_bytes)
-        .map_err(|e| format!("HTTPS リクエスト送信に失敗しました : {}", e))?;
-
-    let mut decoder = ResponseDecoder::with_limits(DecoderLimits::unlimited());
-    let mut buf = [0u8; 8192];
-
-    loop {
-        let n = match tls.read(&mut buf) {
-            Ok(0) => {
-                decoder.mark_eof();
-                if let Some(response) = decoder
-                    .decode()
-                    .map_err(|e| format!("HTTPS レスポンス解析に失敗しました : {}", e))?
-                {
-                    return Ok(response);
-                }
-                return Err("HTTPS レスポンスの受信が完了しませんでした".to_string());
-            }
-            Ok(n) => n,
-            Err(err) => {
-                return Err(format!("HTTPS レスポンス受信に失敗しました : {}", err));
-            }
-        };
-
-        decoder
-            .feed(&buf[..n])
-            .map_err(|e| format!("HTTPS レスポンス解析に失敗しました : {}", e))?;
-        if let Some(response) = decoder
-            .decode()
-            .map_err(|e| format!("HTTPS レスポンス解析に失敗しました : {}", e))?
-        {
-            return Ok(response);
-        }
-    }
 }
 
 fn generate_bindings(header: &Path, include_dir: &Path) {

@@ -11,6 +11,7 @@
 
 ## develop
 
+
 - [UPDATE] libwebrtc m146 (m146.7680.0.0) に上げる
   - @voluntas
 - [UPDATE] cmake の代わりに shiguredo_cmake を利用する
@@ -18,6 +19,8 @@
 
 ### misc
 
+- [UPDATE] prebuilt ダウンロードに rustls / flate2 / tar クレートの代わりに curl + tar コマンドを利用する
+  - @voluntas
 - [UPDATE] ci.yml を main ブランチとタグでは実行しないようにする
   - @voluntas
 
