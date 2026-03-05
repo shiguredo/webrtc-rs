@@ -11,6 +11,8 @@
 
 ## develop
 
+- [UPDATE] prebuilt ダウンロードに rustls / flate2 / tar クレートの代わりに curl + tar コマンドを利用する
+  - @voluntas
 - [UPDATE] cmake の代わりに shiguredo_cmake を利用する
   - @melpon
 
