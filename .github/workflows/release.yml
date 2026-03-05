@@ -82,10 +82,16 @@ jobs:
           cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
           cp "$OUT_DIR/bindings.rs" staging/
           tar czf "libwebrtc_c-${{ matrix.target }}.tar.gz" -C staging .
+      - name: Generate SHA256 checksum
+        run: shasum -a 256 "libwebrtc_c-${{ matrix.target }}.tar.gz" > "libwebrtc_c-${{ matrix.target }}.tar.gz.sha256"
       - name: Upload to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${GITHUB_REF_NAME}" "libwebrtc_c-${{ matrix.target }}.tar.gz" --clobber
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" \
+            "libwebrtc_c-${{ matrix.target }}.tar.gz" \
+            "libwebrtc_c-${{ matrix.target }}.tar.gz.sha256" \
+            --clobber
 
   # クロスコンパイル
   build-prebuilt-cross:
@@ -147,10 +153,16 @@ jobs:
           cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
           cp "$OUT_DIR/bindings.rs" staging/
           tar czf "libwebrtc_c-${{ matrix.target }}.tar.gz" -C staging .
+      - name: Generate SHA256 checksum
+        run: shasum -a 256 "libwebrtc_c-${{ matrix.target }}.tar.gz" > "libwebrtc_c-${{ matrix.target }}.tar.gz.sha256"
       - name: Upload to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${GITHUB_REF_NAME}" "libwebrtc_c-${{ matrix.target }}.tar.gz" --clobber
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" \
+            "libwebrtc_c-${{ matrix.target }}.tar.gz" \
+            "libwebrtc_c-${{ matrix.target }}.tar.gz.sha256" \
+            --clobber
 
   publish:
     needs: [build-prebuilt, build-prebuilt-cross]
