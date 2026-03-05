@@ -159,12 +159,10 @@ fn compute_sha256(path: &Path) -> Result<String, String> {
             .arg(path)
             .output()
     } else if cfg!(target_os = "windows") {
-        std::process::Command::new("powershell")
-            .args(["-NoProfile", "-Command"])
-            .arg(format!(
-                "(Get-FileHash -Algorithm SHA256 '{}').Hash",
-                path.display()
-            ))
+        std::process::Command::new("certutil")
+            .args(["-hashfile"])
+            .arg(path)
+            .arg("SHA256")
             .output()
     } else {
         std::process::Command::new("sha256sum").arg(path).output()
@@ -177,7 +175,15 @@ fn compute_sha256(path: &Path) -> Result<String, String> {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     if cfg!(target_os = "windows") {
-        Ok(stdout.trim().to_ascii_lowercase())
+        // certutil -hashfile の出力は3行:
+        //   SHA256 hash of <file>:
+        //   <hex hash>
+        //   CertUtil: -hashfile command completed successfully.
+        let lines: Vec<&str> = stdout.lines().collect();
+        if lines.len() < 2 {
+            return Err("certutil の出力のパースに失敗しました".to_string());
+        }
+        Ok(lines[1].trim().replace(' ', "").to_ascii_lowercase())
     } else {
         stdout
             .split_whitespace()
