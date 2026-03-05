@@ -19,6 +19,8 @@
 
 ### misc
 
+- [ADD] prebuilt ダウンロード時に SHA256 チェックサムを検証する
+  - @voluntas
 - [UPDATE] prebuilt ダウンロードに rustls / flate2 / tar クレートの代わりに curl + tar コマンドを利用する
   - @voluntas
 - [UPDATE] ci.yml を main ブランチとタグでは実行しないようにする

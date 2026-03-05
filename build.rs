@@ -76,21 +76,28 @@ fn build_from_source(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -
 /// prebuilt バイナリをダウンロードして展開する
 fn download_prebuilt(target: &str, out_dir: &Path) -> Result<PrebuiltPaths, String> {
     let version = env::var("CARGO_PKG_VERSION").map_err(|e| e.to_string())?;
-    let url = format!(
-        "https://github.com/shiguredo/webrtc-rs/releases/download/{}/libwebrtc_c-{}.tar.gz",
-        version, target
+    let base_url = format!(
+        "https://github.com/shiguredo/webrtc-rs/releases/download/{}",
+        version
     );
+    let archive_name = format!("libwebrtc_c-{}.tar.gz", target);
+    let archive_url = format!("{}/{}", base_url, archive_name);
+    let sha256_url = format!("{}/{}.sha256", base_url, archive_name);
 
-    eprintln!("prebuilt ライブラリをダウンロード中: {}", url);
+    eprintln!("prebuilt ライブラリをダウンロード中: {}", archive_url);
 
     // OUT_DIR/prebuilt/ に展開
     let prebuilt_dir = out_dir.join("prebuilt");
-    let archive_path = out_dir.join("libwebrtc_c.tar.gz");
-    download(&url, &archive_path)?;
+    let archive_path = out_dir.join("prebuilt.tar.gz");
+    let sha256_path = out_dir.join("prebuilt.sha256");
+    download(&archive_url, &archive_path)?;
+    download(&sha256_url, &sha256_path)?;
+    verify_sha256(&archive_path, &sha256_path)?;
     fs::create_dir_all(&prebuilt_dir)
         .map_err(|e| format!("展開先ディレクトリ作成に失敗: {}", e))?;
     extract(&archive_path, &prebuilt_dir)?;
     let _ = fs::remove_file(&archive_path);
+    let _ = fs::remove_file(&sha256_path);
 
     // libwebrtc_c.a を OUT_DIR/lib/ にコピー
     let lib_dir = out_dir.join("lib");
@@ -122,6 +129,62 @@ fn download(url: &str, output: &Path) -> Result<(), String> {
         return Err(format!("ダウンロードに失敗しました: {}", url));
     }
     Ok(())
+}
+
+/// SHA256 チェックサムを検証する
+fn verify_sha256(file_path: &Path, sha256_path: &Path) -> Result<(), String> {
+    let expected = fs::read_to_string(sha256_path)
+        .map_err(|e| format!("SHA256 チェックサムファイルの読み込みに失敗: {}", e))?
+        .split_whitespace()
+        .next()
+        .ok_or("SHA256 チェックサムファイルが空です")?
+        .to_lowercase();
+
+    let actual = compute_sha256(file_path)?;
+    if actual != expected {
+        return Err(format!(
+            "SHA256 チェックサムが一致しません:\n  expected: {}\n  actual:   {}",
+            expected, actual
+        ));
+    }
+    eprintln!("SHA256 チェックサム検証成功: {}", actual);
+    Ok(())
+}
+
+/// ファイルの SHA256 ハッシュを計算する
+fn compute_sha256(path: &Path) -> Result<String, String> {
+    let output = if cfg!(target_os = "macos") {
+        std::process::Command::new("shasum")
+            .args(["-a", "256"])
+            .arg(path)
+            .output()
+    } else if cfg!(target_os = "windows") {
+        std::process::Command::new("powershell")
+            .args(["-NoProfile", "-Command"])
+            .arg(format!(
+                "(Get-FileHash -Algorithm SHA256 '{}').Hash",
+                path.display()
+            ))
+            .output()
+    } else {
+        std::process::Command::new("sha256sum").arg(path).output()
+    }
+    .map_err(|e| format!("SHA256 計算コマンドの実行に失敗: {}", e))?;
+
+    if !output.status.success() {
+        return Err("SHA256 チェックサムの計算に失敗しました".to_string());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if cfg!(target_os = "windows") {
+        Ok(stdout.trim().to_ascii_lowercase())
+    } else {
+        stdout
+            .split_whitespace()
+            .next()
+            .map(|s| s.to_lowercase())
+            .ok_or_else(|| "SHA256 出力のパースに失敗しました".to_string())
+    }
 }
 
 /// tar を使ってアーカイブを展開する
