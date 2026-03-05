@@ -329,13 +329,15 @@ impl FactoryHolder {
 必要なもの:
 
 - Rust 1.88 以上
+- `curl` (prebuilt ダウンロードに使用)
+- `tar` (prebuilt 展開に使用)
 - Linux の場合: `libx11-dev` (リンク時に必要)
 
 ```bash
 # Linux
-sudo apt-get install libx11-dev
+sudo apt-get install curl tar libx11-dev
 
-# macOS は追加のインストール不要
+# macOS は curl と tar がプリインストール済みのため追加インストール不要
 ```
 
 ### ソースビルド
