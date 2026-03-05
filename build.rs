@@ -5,13 +5,10 @@ use std::net::TcpStream;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
-use aws_lc_rs::digest::{Context, SHA256};
 use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, ClientConnection, StreamOwned};
 use rustls_platform_verifier::ConfigVerifierExt;
 use shiguredo_http11::{DecoderLimits, Request, Response, ResponseDecoder};
-
-const CMAKE_VERSION: &str = "4.2.3";
 
 fn main() {
     // Cargo.toml か build.rs が更新されたら、依存ライブラリを再ビルドする
@@ -189,12 +186,11 @@ fn detect_linux_distro() -> String {
     );
 }
 
-/// cmake crate を使って webrtc_c をビルドする
+/// shiguredo_cmake crate を使って webrtc_c をビルドする
 fn build_webrtc_c(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> PathBuf {
-    let mut config = cmake::Config::new(webrtc_dir);
+    let mut config = shiguredo_cmake::Config::new(webrtc_dir);
     let profile = "release";
-    let cmake_path = ensure_cmake(out_dir);
-    set_cmake_env(&cmake_path);
+    shiguredo_cmake::set_cmake_env();
 
     // 配布されている libwebrtc は Release 相当のため、ラッパー側も Release で揃える
     config.profile("Release");
@@ -279,237 +275,6 @@ fn remove_symlink(link_path: &Path) -> std::io::Result<()> {
 #[cfg(windows)]
 fn remove_symlink(link_path: &Path) -> std::io::Result<()> {
     fs::remove_dir(link_path)
-}
-
-fn set_cmake_env(cmake_path: &Path) {
-    // build.rs は単一スレッドで実行される前提のため、安全に環境変数を設定する
-    unsafe {
-        env::set_var("CMAKE", cmake_path);
-    }
-}
-
-struct CmakeDownload {
-    archive_name: String,
-    platform: String,
-    /// アーカイブのルートディレクトリからの相対パス
-    executable_path: String,
-}
-
-fn ensure_cmake(out_dir: &Path) -> PathBuf {
-    let host = env::var("HOST").unwrap_or_default();
-    let download = cmake_download_info(&host);
-    let base_dir = out_dir.join("cmake").join(CMAKE_VERSION);
-    let cmake_root = base_dir.join(format!("cmake-{}-{}", CMAKE_VERSION, download.platform));
-    let cmake_bin = cmake_root.join(&download.executable_path);
-    if cmake_bin.exists() {
-        return cmake_bin;
-    }
-
-    fs::create_dir_all(&base_dir).expect("CMake の保存先ディレクトリ作成に失敗しました");
-    let archive_path = base_dir.join(&download.archive_name);
-    let url = format!(
-        "https://github.com/Kitware/CMake/releases/download/v{}/{}",
-        CMAKE_VERSION, download.archive_name
-    );
-
-    download_and_extract_cmake(&url, &archive_path, &base_dir, &download.archive_name)
-        .unwrap_or_else(|err| panic!("CMake のダウンロードまたは展開に失敗しました : {}", err));
-
-    if archive_path.exists() {
-        let _ = fs::remove_file(&archive_path);
-    }
-
-    if !cmake_bin.exists() {
-        panic!("CMake の展開に失敗しました: {}", cmake_bin.display());
-    }
-
-    cmake_bin
-}
-
-fn cmake_download_info(host: &str) -> CmakeDownload {
-    let is_windows = host.contains("windows");
-    let is_macos = host.contains("apple-darwin") || host.contains("darwin");
-    let is_linux = host.contains("linux");
-    let is_x86_64 = host.contains("x86_64") || host.contains("amd64");
-    let is_arm64 = host.contains("aarch64") || host.contains("arm64");
-
-    match (is_windows, is_macos, is_linux, is_x86_64, is_arm64) {
-        (true, _, _, true, _) => CmakeDownload {
-            archive_name: format!("cmake-{}-windows-x86_64.zip", CMAKE_VERSION),
-            platform: "windows-x86_64".to_string(),
-            executable_path: "bin/cmake.exe".to_string(),
-        },
-        (true, _, _, _, true) => CmakeDownload {
-            archive_name: format!("cmake-{}-windows-arm64.zip", CMAKE_VERSION),
-            platform: "windows-arm64".to_string(),
-            executable_path: "bin/cmake.exe".to_string(),
-        },
-        (false, true, _, _, _) => CmakeDownload {
-            archive_name: format!("cmake-{}-macos-universal.tar.gz", CMAKE_VERSION),
-            platform: "macos-universal".to_string(),
-            executable_path: "CMake.app/Contents/bin/cmake".to_string(),
-        },
-        (false, false, true, true, _) => CmakeDownload {
-            archive_name: format!("cmake-{}-linux-x86_64.tar.gz", CMAKE_VERSION),
-            platform: "linux-x86_64".to_string(),
-            executable_path: "bin/cmake".to_string(),
-        },
-        (false, false, true, _, true) => CmakeDownload {
-            archive_name: format!("cmake-{}-linux-aarch64.tar.gz", CMAKE_VERSION),
-            platform: "linux-aarch64".to_string(),
-            executable_path: "bin/cmake".to_string(),
-        },
-        _ => panic!("サポートされていない実行環境です: {}", host),
-    }
-}
-
-fn download_and_extract_cmake(
-    url: &str,
-    archive_path: &Path,
-    dest_dir: &Path,
-    archive_name: &str,
-) -> Result<(), String> {
-    fs::create_dir_all(dest_dir)
-        .map_err(|e| format!("CMake の保存先ディレクトリ作成に失敗しました : {}", e))?;
-
-    let archive_bytes = fetch_url(url)?;
-    let tmp_path = archive_path.with_file_name(format!(
-        "{}.part",
-        archive_path
-            .file_name()
-            .expect("アーカイブ名の取得に失敗しました")
-            .to_string_lossy()
-    ));
-    {
-        let mut file = fs::File::create(&tmp_path)
-            .map_err(|e| format!("CMake アーカイブの作成に失敗しました : {}", e))?;
-        file.write_all(&archive_bytes)
-            .map_err(|e| format!("CMake アーカイブの書き込みに失敗しました : {}", e))?;
-    }
-    fs::rename(&tmp_path, archive_path)
-        .map_err(|e| format!("CMake アーカイブの保存に失敗しました : {}", e))?;
-
-    verify_sha256(archive_path, archive_name)?;
-
-    if archive_name.ends_with(".zip") {
-        extract_zip(archive_path, dest_dir);
-    } else {
-        extract_tar_gz(archive_path, dest_dir);
-    }
-
-    Ok(())
-}
-
-fn verify_sha256(archive_path: &Path, archive_name: &str) -> Result<(), String> {
-    let sha_url = format!(
-        "https://github.com/Kitware/CMake/releases/download/v{}/cmake-{}-SHA-256.txt",
-        CMAKE_VERSION, CMAKE_VERSION
-    );
-    let sha_bytes = fetch_url(&sha_url)?;
-    let sha_text = String::from_utf8_lossy(&sha_bytes);
-    let expected = extract_expected_sha256(&sha_text, archive_name);
-    let actual = compute_sha256(archive_path);
-
-    if expected != actual {
-        return Err(format!(
-            "SHA256 が一致しません。期待値 : {}, 実際 : {}",
-            expected, actual
-        ));
-    }
-
-    Ok(())
-}
-
-fn extract_expected_sha256(text: &str, archive_name: &str) -> String {
-    for line in text.lines() {
-        let mut parts = line.split_whitespace();
-        let hash = parts.next();
-        let name = parts.next();
-        if let (Some(hash), Some(name)) = (hash, name)
-            && name == archive_name
-        {
-            return hash.to_ascii_lowercase();
-        }
-    }
-
-    panic!("SHA256 の取得に失敗しました : {}", archive_name);
-}
-
-fn compute_sha256(path: &Path) -> String {
-    let mut file = fs::File::open(path).expect("SHA256 計算用ファイルの取得に失敗しました");
-    let mut context = Context::new(&SHA256);
-    let mut buf = [0u8; 8192];
-    loop {
-        let n = file
-            .read(&mut buf)
-            .expect("SHA256 計算用ファイルの読み込みに失敗しました");
-        if n == 0 {
-            break;
-        }
-        context.update(&buf[..n]);
-    }
-    let digest = context.finish();
-    bytes_to_hex_lower(digest.as_ref())
-}
-
-fn bytes_to_hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        out.push(HEX[(byte >> 4) as usize] as char);
-        out.push(HEX[(byte & 0x0f) as usize] as char);
-    }
-    out
-}
-
-fn extract_tar_gz(archive_path: &Path, dest_dir: &Path) {
-    let file = fs::File::open(archive_path).expect("CMake アーカイブの読み込みに失敗しました");
-    let decoder = flate2::read::GzDecoder::new(file);
-    let mut archive = tar::Archive::new(decoder);
-    let entries = archive
-        .entries()
-        .expect("CMake アーカイブのエントリ取得に失敗しました");
-
-    for entry in entries {
-        let mut entry = entry.expect("CMake アーカイブのエントリ取得に失敗しました");
-        let path = entry
-            .path()
-            .expect("CMake アーカイブのパス取得に失敗しました");
-        if !is_safe_path(&path) {
-            panic!("不正なパスが含まれています : {}", path.display());
-        }
-        let out_path = dest_dir.join(&path);
-        if let Some(parent) = out_path.parent() {
-            fs::create_dir_all(parent).expect("展開先ディレクトリ作成に失敗しました");
-        }
-        entry
-            .unpack(&out_path)
-            .expect("CMake アーカイブの展開に失敗しました");
-    }
-}
-
-fn extract_zip(archive_path: &Path, dest_dir: &Path) {
-    let file = fs::File::open(archive_path).expect("CMake アーカイブの読み込みに失敗しました");
-    let mut archive = zip::ZipArchive::new(file).expect("CMake アーカイブの解析に失敗しました");
-
-    for i in 0..archive.len() {
-        let mut file = archive
-            .by_index(i)
-            .expect("CMake アーカイブのエントリ取得に失敗しました");
-        let Some(path) = file.enclosed_name() else {
-            panic!("不正なパスが含まれています");
-        };
-        let out_path = dest_dir.join(path);
-        if file.name().ends_with('/') {
-            fs::create_dir_all(&out_path).expect("展開先ディレクトリ作成に失敗しました");
-            continue;
-        }
-        if let Some(parent) = out_path.parent() {
-            fs::create_dir_all(parent).expect("展開先ディレクトリ作成に失敗しました");
-        }
-        let mut out = fs::File::create(&out_path).expect("展開先ファイルの作成に失敗しました");
-        std::io::copy(&mut file, &mut out).expect("CMake アーカイブの展開に失敗しました");
-    }
 }
 
 fn is_safe_path(path: &Path) -> bool {

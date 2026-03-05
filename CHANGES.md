@@ -13,6 +13,8 @@
 
 - [UPDATE] libwebrtc m146 (m146.7680.0.0) に上げる
   - @voluntas
+- [UPDATE] cmake の代わりに shiguredo_cmake を利用する
+  - @melpon
 
 ### misc
 
