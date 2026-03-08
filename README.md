@@ -205,8 +205,8 @@ impl FactoryHolder {
   - コーデック固有情報
 - `VideoEncoder`
   - カスタム映像エンコーダー
-- `VideoEncoderCallbacks` / `VideoEncoderFactoryCallbacks`
-  - エンコーダー / エンコーダーファクトリーの callback
+- `VideoEncoderCallbacks<T>` / `VideoEncoderFactoryCallbacks<T>`
+  - エンコーダー / エンコーダーファクトリーの callback （ `new_with_callbacks(state, callbacks)` で使用 ）
 - `VideoEncoderEncoderInfo` / `VideoEncoderSettingsRef` / `VideoEncoderRateControlParametersRef`
   - エンコーダー設定とメタ情報
 - `VideoEncoderEncodedImageCallback` / `VideoEncoderEncodedImageCallbackRef`
@@ -221,8 +221,8 @@ impl FactoryHolder {
   - C API 側 callback ポインターのラッパー
 - `VideoDecoder`
   - カスタム映像デコーダー
-- `VideoDecoderCallbacks` / `VideoDecoderFactoryCallbacks`
-  - デコーダー / デコーダーファクトリーの callback
+- `VideoDecoderCallbacks<T>` / `VideoDecoderFactoryCallbacks<T>`
+  - デコーダー / デコーダーファクトリーの callback （ `new_with_callbacks(state, callbacks)` で使用 ）
 - `VideoDecoderDecoderInfo` / `VideoDecoderSettingsRef`
   - デコーダー設定とメタ情報
 - `VideoDecoderDecodedImageCallbackRef`

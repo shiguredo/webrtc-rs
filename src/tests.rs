@@ -761,36 +761,42 @@ fn create_and_set_local_description_observers() {
 fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
     let mut created = false;
 
-    let factory = VideoEncoderFactory::new_with_callbacks(VideoEncoderFactoryCallbacks {
-        create: {
-            Some(Box::new(move |env, format| {
-                assert!(!env.as_ptr().is_null());
-                assert_eq!(
-                    format
-                        .name()
-                        .expect("SdpVideoFormatRef::name に失敗しました"),
-                    "VP8"
-                );
-                if created {
-                    return None;
-                }
-                created = true;
-                let mut encode_count = 0;
-                Some(VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
-                    encode: Some(Box::new(move |_, frame_types| {
-                        let frame_types = frame_types.expect("frame_types が None です");
-                        assert_eq!(frame_types.len(), 2);
-                        assert_eq!(frame_types.get(0), Some(VideoFrameType::Key));
-                        assert_eq!(frame_types.get(1), Some(VideoFrameType::Delta));
-                        encode_count += 1;
-                        VideoCodecStatus::Unknown(encode_count)
-                    })),
-                    ..Default::default()
+    let factory = VideoEncoderFactory::new_with_callbacks(
+        (),
+        VideoEncoderFactoryCallbacks {
+            create: {
+                Some(Box::new(move |_, env, format| {
+                    assert!(!env.as_ptr().is_null());
+                    assert_eq!(
+                        format
+                            .name()
+                            .expect("SdpVideoFormatRef::name に失敗しました"),
+                        "VP8"
+                    );
+                    if created {
+                        return None;
+                    }
+                    created = true;
+                    let mut encode_count = 0;
+                    Some(VideoEncoder::new_with_callbacks(
+                        (),
+                        VideoEncoderCallbacks {
+                            encode: Some(Box::new(move |_, _, frame_types| {
+                                let frame_types = frame_types.expect("frame_types が None です");
+                                assert_eq!(frame_types.len(), 2);
+                                assert_eq!(frame_types.get(0), Some(VideoFrameType::Key));
+                                assert_eq!(frame_types.get(1), Some(VideoFrameType::Delta));
+                                encode_count += 1;
+                                VideoCodecStatus::Unknown(encode_count)
+                            })),
+                            ..Default::default()
+                        },
+                    ))
                 }))
-            }))
+            },
+            ..Default::default()
         },
-        ..Default::default()
-    });
+    );
 
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
@@ -820,16 +826,19 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
 
 #[test]
 fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
-    let factory = VideoEncoderFactory::new_with_callbacks(VideoEncoderFactoryCallbacks {
-        get_supported_formats: Some(Box::new(|| {
-            let mut h264 = SdpVideoFormat::new("H264");
-            h264.parameters_mut().set("profile-level-id", "42e01f");
-            let mut vp8 = SdpVideoFormat::new("VP8");
-            vp8.parameters_mut().set("x-google-start-bitrate", "300");
-            vec![h264, vp8]
-        })),
-        ..Default::default()
-    });
+    let factory = VideoEncoderFactory::new_with_callbacks(
+        (),
+        VideoEncoderFactoryCallbacks {
+            get_supported_formats: Some(Box::new(|_| {
+                let mut h264 = SdpVideoFormat::new("H264");
+                h264.parameters_mut().set("profile-level-id", "42e01f");
+                let mut vp8 = SdpVideoFormat::new("VP8");
+                vp8.parameters_mut().set("x-google-start-bitrate", "300");
+                vec![h264, vp8]
+            })),
+            ..Default::default()
+        },
+    );
 
     let mut formats = factory.get_supported_formats();
     assert_eq!(formats.len(), 2);
@@ -853,14 +862,17 @@ fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
 
 #[test]
 fn video_decoder_factory_get_supported_formats_returns_owned_formats() {
-    let factory = VideoDecoderFactory::new_with_callbacks(VideoDecoderFactoryCallbacks {
-        get_supported_formats: Some(Box::new(|| {
-            let mut h264 = SdpVideoFormat::new("H264");
-            h264.parameters_mut().set("packetization-mode", "1");
-            vec![h264]
-        })),
-        ..Default::default()
-    });
+    let factory = VideoDecoderFactory::new_with_callbacks(
+        (),
+        VideoDecoderFactoryCallbacks {
+            get_supported_formats: Some(Box::new(|_| {
+                let mut h264 = SdpVideoFormat::new("H264");
+                h264.parameters_mut().set("packetization-mode", "1");
+                vec![h264]
+            })),
+            ..Default::default()
+        },
+    );
 
     let mut formats = factory.get_supported_formats();
     assert_eq!(formats.len(), 1);
@@ -884,22 +896,26 @@ fn video_decoder_factory_get_supported_formats_returns_owned_formats() {
 fn video_encoder_factory_create_calls_create_callback() {
     let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let called_clone = called.clone();
-    let factory = VideoEncoderFactory::new_with_callbacks(VideoEncoderFactoryCallbacks {
-        create: Some(Box::new(move |env, format| {
-            called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
-            assert!(!env.as_ptr().is_null());
-            assert_eq!(
-                format
-                    .name()
-                    .expect("SdpVideoFormatRef::name に失敗しました"),
-                "H264"
-            );
-            Some(VideoEncoder::new_with_callbacks(
-                VideoEncoderCallbacks::default(),
-            ))
-        })),
-        ..Default::default()
-    });
+    let factory = VideoEncoderFactory::new_with_callbacks(
+        (),
+        VideoEncoderFactoryCallbacks {
+            create: Some(Box::new(move |_, env, format| {
+                called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+                assert!(!env.as_ptr().is_null());
+                assert_eq!(
+                    format
+                        .name()
+                        .expect("SdpVideoFormatRef::name に失敗しました"),
+                    "H264"
+                );
+                Some(VideoEncoder::new_with_callbacks(
+                    (),
+                    VideoEncoderCallbacks::default(),
+                ))
+            })),
+            ..Default::default()
+        },
+    );
 
     let env = Environment::new();
     let format = SdpVideoFormat::new("H264");
@@ -915,22 +931,26 @@ fn video_encoder_factory_create_calls_create_callback() {
 fn video_decoder_factory_create_calls_create_callback() {
     let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let called_clone = called.clone();
-    let factory = VideoDecoderFactory::new_with_callbacks(VideoDecoderFactoryCallbacks {
-        create: Some(Box::new(move |env, format| {
-            called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
-            assert!(!env.as_ptr().is_null());
-            assert_eq!(
-                format
-                    .name()
-                    .expect("SdpVideoFormatRef::name に失敗しました"),
-                "H264"
-            );
-            Some(VideoDecoder::new_with_callbacks(
-                VideoDecoderCallbacks::default(),
-            ))
-        })),
-        ..Default::default()
-    });
+    let factory = VideoDecoderFactory::new_with_callbacks(
+        (),
+        VideoDecoderFactoryCallbacks {
+            create: Some(Box::new(move |_, env, format| {
+                called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+                assert!(!env.as_ptr().is_null());
+                assert_eq!(
+                    format
+                        .name()
+                        .expect("SdpVideoFormatRef::name に失敗しました"),
+                    "H264"
+                );
+                Some(VideoDecoder::new_with_callbacks(
+                    (),
+                    VideoDecoderCallbacks::default(),
+                ))
+            })),
+            ..Default::default()
+        },
+    );
 
     let env = Environment::new();
     let format = SdpVideoFormat::new("H264");
@@ -970,60 +990,65 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     let state_ptr_for_encode = state_ptr;
     let state_ptr_for_callback = state_ptr;
 
-    let mut encoder = VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
-        register_encode_complete_callback: Some(Box::new(move |callback| {
-            let callback = callback.expect("register 側 callback が None です");
-            let state = unsafe { state_ptr_for_register.get_mut() };
-            state.register_called = true;
-            state.order.push("register");
-            state.callback_ptr =
-                Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_ref(callback) });
-            VideoCodecStatus::Ok
-        })),
-        encode: Some(Box::new(move |_, _| {
-            {
-                let state = unsafe { state_ptr_for_encode.get_mut() };
-                state.encode_called = true;
-                state.order.push("encode");
-            }
+    let mut encoder = VideoEncoder::new_with_callbacks(
+        (),
+        VideoEncoderCallbacks {
+            register_encode_complete_callback: Some(Box::new(move |_, callback| {
+                let callback = callback.expect("register 側 callback が None です");
+                let state = unsafe { state_ptr_for_register.get_mut() };
+                state.register_called = true;
+                state.order.push("register");
+                state.callback_ptr =
+                    Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_ref(callback) });
+                VideoCodecStatus::Ok
+            })),
+            encode: Some(Box::new(move |_, _, _| {
+                {
+                    let state = unsafe { state_ptr_for_encode.get_mut() };
+                    state.encode_called = true;
+                    state.order.push("encode");
+                }
 
-            let callback_ptr = {
-                let state = unsafe { state_ptr_for_encode.get_mut() };
-                state
-                    .callback_ptr
-                    .expect("encode 側 callback_ptr が未設定です")
-            };
+                let callback_ptr = {
+                    let state = unsafe { state_ptr_for_encode.get_mut() };
+                    state
+                        .callback_ptr
+                        .expect("encode 側 callback_ptr が未設定です")
+                };
 
-            let buffer = EncodedImageBuffer::from_bytes(&[1, 2, 3, 4]);
-            let mut image = EncodedImage::new();
-            image.set_encoded_data(&buffer);
-            image.set_rtp_timestamp(12345);
-            image.set_encoded_width(640);
-            image.set_encoded_height(360);
-            image.set_frame_type(VideoFrameType::Key);
-            image.set_qp(31);
+                let buffer = EncodedImageBuffer::from_bytes(&[1, 2, 3, 4]);
+                let mut image = EncodedImage::new();
+                image.set_encoded_data(&buffer);
+                image.set_rtp_timestamp(12345);
+                image.set_encoded_width(640);
+                image.set_encoded_height(360);
+                image.set_frame_type(VideoFrameType::Key);
+                image.set_qp(31);
 
-            let mut codec_specific_info = CodecSpecificInfo::new();
-            codec_specific_info.set_codec_type(VideoCodecType::H264);
-            codec_specific_info.set_end_of_picture(true);
-            codec_specific_info.set_h264_packetization_mode(H264PacketizationMode::SingleNalUnit);
-            codec_specific_info.set_h264_temporal_idx(2);
-            codec_specific_info.set_h264_base_layer_sync(true);
-            codec_specific_info.set_h264_idr_frame(true);
+                let mut codec_specific_info = CodecSpecificInfo::new();
+                codec_specific_info.set_codec_type(VideoCodecType::H264);
+                codec_specific_info.set_end_of_picture(true);
+                codec_specific_info
+                    .set_h264_packetization_mode(H264PacketizationMode::SingleNalUnit);
+                codec_specific_info.set_h264_temporal_idx(2);
+                codec_specific_info.set_h264_base_layer_sync(true);
+                codec_specific_info.set_h264_idr_frame(true);
 
-            let result = unsafe {
-                callback_ptr.on_encoded_image(image.as_ref(), Some(codec_specific_info.as_ref()))
-            };
-            assert_eq!(
-                result.error(),
-                VideoEncoderEncodedImageCallbackResultError::Ok
-            );
-            assert_eq!(result.frame_id(), 9999);
-            assert!(!result.drop_next_frame());
-            VideoCodecStatus::Unknown(88)
-        })),
-        ..Default::default()
-    });
+                let result = unsafe {
+                    callback_ptr
+                        .on_encoded_image(image.as_ref(), Some(codec_specific_info.as_ref()))
+                };
+                assert_eq!(
+                    result.error(),
+                    VideoEncoderEncodedImageCallbackResultError::Ok
+                );
+                assert_eq!(result.frame_id(), 9999);
+                assert!(!result.drop_next_frame());
+                VideoCodecStatus::Unknown(88)
+            })),
+            ..Default::default()
+        },
+    );
 
     let encoded_image_callback = VideoEncoderEncodedImageCallback::new_with_callbacks(
         VideoEncoderEncodedImageCallbackCallbacks {
@@ -1087,28 +1112,34 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
 fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
     let mut created = false;
 
-    let factory = VideoDecoderFactory::new_with_callbacks(VideoDecoderFactoryCallbacks {
-        create: {
-            Some(Box::new(move |env, _| {
-                assert!(!env.as_ptr().is_null());
-                if created {
-                    return None;
-                }
-                created = true;
-                let mut decode_count = 0;
-                Some(VideoDecoder::new_with_callbacks(VideoDecoderCallbacks {
-                    decode: Some(Box::new(move |input, render_time_ms| {
-                        assert!(input.encoded_data().is_none());
-                        assert_eq!(render_time_ms, 456);
-                        decode_count += 1;
-                        VideoCodecStatus::Unknown(decode_count)
-                    })),
-                    ..Default::default()
+    let factory = VideoDecoderFactory::new_with_callbacks(
+        (),
+        VideoDecoderFactoryCallbacks {
+            create: {
+                Some(Box::new(move |_, env, _| {
+                    assert!(!env.as_ptr().is_null());
+                    if created {
+                        return None;
+                    }
+                    created = true;
+                    let mut decode_count = 0;
+                    Some(VideoDecoder::new_with_callbacks(
+                        (),
+                        VideoDecoderCallbacks {
+                            decode: Some(Box::new(move |_, input, render_time_ms| {
+                                assert!(input.encoded_data().is_none());
+                                assert_eq!(render_time_ms, 456);
+                                decode_count += 1;
+                                VideoCodecStatus::Unknown(decode_count)
+                            })),
+                            ..Default::default()
+                        },
+                    ))
                 }))
-            }))
+            },
+            ..Default::default()
         },
-        ..Default::default()
-    });
+    );
 
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
@@ -1139,26 +1170,29 @@ fn custom_video_encoder_init_encode_and_set_rates_callbacks_getters() {
 
     let mut set_rates_called = false;
     let set_rates_called_ptr = BoolPtr(&mut set_rates_called as *mut bool);
-    let mut encoder = VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
-        init_encode: Some(Box::new(move |codec, settings| {
-            assert_eq!(codec.codec_type(), VideoCodecType::Generic);
-            assert_eq!(codec.width(), 0);
-            assert_eq!(codec.height(), 0);
-            assert_eq!(settings.number_of_cores(), 1);
-            assert_eq!(settings.max_payload_size(), 1200);
-            assert!(!settings.loss_notification());
-            assert_eq!(settings.encoder_thread_limit(), None);
-            VideoCodecStatus::Unknown(123)
-        })),
-        set_rates: Some(Box::new(move |parameters| {
-            assert_eq!(parameters.framerate_fps(), 30.0);
-            assert_eq!(parameters.target_bitrate_sum_bps(), 300_000);
-            assert_eq!(parameters.bitrate_sum_bps(), 250_000);
-            assert_eq!(parameters.bandwidth_allocation_bps(), 350_000);
-            set_rates_called_ptr.set_true();
-        })),
-        ..Default::default()
-    });
+    let mut encoder = VideoEncoder::new_with_callbacks(
+        (),
+        VideoEncoderCallbacks {
+            init_encode: Some(Box::new(move |_, codec, settings| {
+                assert_eq!(codec.codec_type(), VideoCodecType::Generic);
+                assert_eq!(codec.width(), 0);
+                assert_eq!(codec.height(), 0);
+                assert_eq!(settings.number_of_cores(), 1);
+                assert_eq!(settings.max_payload_size(), 1200);
+                assert!(!settings.loss_notification());
+                assert_eq!(settings.encoder_thread_limit(), None);
+                VideoCodecStatus::Unknown(123)
+            })),
+            set_rates: Some(Box::new(move |_, parameters| {
+                assert_eq!(parameters.framerate_fps(), 30.0);
+                assert_eq!(parameters.target_bitrate_sum_bps(), 300_000);
+                assert_eq!(parameters.bitrate_sum_bps(), 250_000);
+                assert_eq!(parameters.bandwidth_allocation_bps(), 350_000);
+                set_rates_called_ptr.set_true();
+            })),
+            ..Default::default()
+        },
+    );
 
     assert_eq!(encoder.init_encode(), VideoCodecStatus::Unknown(123));
     encoder.set_rates();
@@ -1169,18 +1203,21 @@ fn custom_video_encoder_init_encode_and_set_rates_callbacks_getters() {
 #[test]
 fn custom_video_decoder_get_decoder_info_name_experiment() {
     let expected = "decoder-info-name-".repeat(128);
-    let decoder = VideoDecoder::new_with_callbacks(VideoDecoderCallbacks {
-        get_decoder_info: Some(Box::new({
-            let expected = expected.clone();
-            move || {
-                let mut info = VideoDecoderDecoderInfo::new();
-                info.set_implementation_name(&expected);
-                info.set_is_hardware_accelerated(false);
-                info
-            }
-        })),
-        ..Default::default()
-    });
+    let decoder = VideoDecoder::new_with_callbacks(
+        (),
+        VideoDecoderCallbacks {
+            get_decoder_info: Some(Box::new({
+                let expected = expected.clone();
+                move |_| {
+                    let mut info = VideoDecoderDecoderInfo::new();
+                    info.set_implementation_name(&expected);
+                    info.set_is_hardware_accelerated(false);
+                    info
+                }
+            })),
+            ..Default::default()
+        },
+    );
 
     for _ in 0..100 {
         let info = decoder.get_decoder_info();

@@ -16,6 +16,12 @@
   - @voluntas
 - [UPDATE] cmake の代わりに shiguredo_cmake を利用する
   - @melpon
+- [CHANGE] ビデオコーデックのコールバック API を状態付き generic 形式に統一する
+  - `VideoEncoder` / `VideoDecoder` / `VideoEncoderFactory` / `VideoDecoderFactory` の `new_with_callbacks` を `new_with_callbacks(state, callbacks)` へ変更する
+  - callback 型を `Video*Callbacks<T>` / `Video*FactoryCallbacks<T>` に変更し、`&mut T` を介して状態を更新できるようにする
+  - `VideoDecoderDecodedImageCallbackPtr` を追加し、デコーダー callback の参照管理を明確化する
+  - 旧 callback API（状態なし版）を削除する
+  - @melpon
 
 ### misc
 
