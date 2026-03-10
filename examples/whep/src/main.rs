@@ -4,13 +4,16 @@ use rustls_platform_verifier::ConfigVerifierExt;
 use shiguredo_http11::{Request, Response, ResponseDecoder, uri::Uri};
 use shiguredo_webrtc::{
     AudioDecoderFactory, AudioDeviceModule, AudioDeviceModuleAudioLayer, AudioEncoderFactory,
-    AudioProcessingBuilder, Environment, I420Buffer, IceServer, IceTransportsType, MediaType,
-    PeerConnection, PeerConnectionDependencies, PeerConnectionFactory,
-    PeerConnectionFactoryDependencies, PeerConnectionObserver, PeerConnectionObserverBuilder,
+    AudioProcessingBuilder, CreateSessionDescriptionObserver,
+    CreateSessionDescriptionObserverHandler, Environment, I420Buffer, IceServer, IceTransportsType,
+    MediaType, PeerConnection, PeerConnectionDependencies, PeerConnectionFactory,
+    PeerConnectionFactoryDependencies, PeerConnectionObserver, PeerConnectionObserverHandler,
     PeerConnectionOfferAnswerOptions, PeerConnectionRtcConfiguration, PeerConnectionState,
-    RtcEventLogFactory, RtpTransceiverDirection, RtpTransceiverInit, SdpType, SessionDescription,
-    SetLocalDescriptionObserver, SetRemoteDescriptionObserver, Thread, VideoDecoderFactory,
-    VideoEncoderFactory, VideoFrameRef, VideoSink, VideoSinkBuilder, VideoSinkWants, VideoTrack,
+    RtcError, RtcEventLogFactory, RtpReceiver, RtpTransceiver, RtpTransceiverDirection,
+    RtpTransceiverInit, SdpType, SessionDescription, SetLocalDescriptionObserver,
+    SetLocalDescriptionObserverHandler, SetRemoteDescriptionObserver,
+    SetRemoteDescriptionObserverHandler, Thread, VideoDecoderFactory, VideoEncoderFactory,
+    VideoFrameRef, VideoSink, VideoSinkHandler, VideoSinkWants, VideoTrack, i420_to_argb,
 };
 use std::fmt::Write as FmtWrite;
 use std::io::{self, Read, Write as IoWrite};
@@ -77,14 +80,22 @@ struct AnsiRenderer {
     sink: VideoSink,
 }
 
+struct AnsiVideoSinkHandler {
+    width: i32,
+    height: i32,
+}
+
+impl VideoSinkHandler for AnsiVideoSinkHandler {
+    fn on_frame(&mut self, frame: VideoFrameRef<'_>) {
+        render_frame(frame, self.width, self.height);
+    }
+}
+
 impl AnsiRenderer {
     fn new() -> Self {
         let width = 80;
         let height = 45;
-        let sink = VideoSinkBuilder::new(move |frame| {
-            render_frame(frame, width, height);
-        })
-        .build();
+        let sink = VideoSink::new_with_handler(Box::new(AnsiVideoSinkHandler { width, height }));
         Self { sink }
     }
 
@@ -105,7 +116,7 @@ fn render_frame(frame: VideoFrameRef, width: i32, height: i32) {
     let mut scaled = I420Buffer::new(width, height);
     scaled.scale_from(&src);
 
-    let image = match shiguredo_webrtc::i420_to_argb(&scaled) {
+    let image = match i420_to_argb(&scaled) {
         Some(image) => image,
         None => return,
     };
@@ -188,6 +199,119 @@ impl VideoState {
     }
 }
 
+struct WhepPeerConnectionObserverHandler {
+    observer_state: Arc<(Mutex<WhepState>, Condvar)>,
+    video_state_track: Arc<Mutex<VideoState>>,
+    video_state_remove: Arc<Mutex<VideoState>>,
+}
+
+impl PeerConnectionObserverHandler for WhepPeerConnectionObserverHandler {
+    fn on_connection_change(&mut self, state: PeerConnectionState) {
+        let (lock, cvar) = &*self.observer_state;
+        let mut guard = lock.lock().unwrap();
+        if matches!(state, PeerConnectionState::Connected) {
+            *guard = WhepState::Connected;
+        } else if matches!(
+            state,
+            PeerConnectionState::Failed | PeerConnectionState::Closed
+        ) {
+            *guard = WhepState::Closed;
+        }
+        cvar.notify_all();
+    }
+
+    fn on_track(&mut self, transceiver: RtpTransceiver) {
+        let receiver = transceiver.receiver();
+        let track = receiver.track();
+        let kind = match track.kind() {
+            Ok(kind) => kind,
+            Err(_) => return,
+        };
+        if kind != "video" {
+            return;
+        }
+        let mut video_track = track.cast_to_video_track();
+        let mut state = self.video_state_track.lock().unwrap();
+        if let Some(current) = state.video_track.as_ref()
+            && current.as_ptr() == video_track.as_ptr()
+        {
+            return;
+        }
+        if let Some(mut track) = state.video_track.take() {
+            track.remove_sink(state.renderer.sink());
+        }
+        let wants = VideoSinkWants::new();
+        video_track.add_or_update_sink(state.renderer.sink(), &wants);
+        state.video_track = Some(video_track);
+    }
+
+    fn on_remove_track(&mut self, receiver: RtpReceiver) {
+        let track = receiver.track();
+        let kind = match track.kind() {
+            Ok(kind) => kind,
+            Err(_) => return,
+        };
+        if kind != "video" {
+            return;
+        }
+        let video_track = track.cast_to_video_track();
+        let mut state = self.video_state_remove.lock().unwrap();
+        if let Some(current) = state.video_track.as_ref()
+            && current.as_ptr() == video_track.as_ptr()
+        {
+            state.detach_sink();
+        }
+    }
+}
+
+struct CreateOfferObserverHandler {
+    tx: std::sync::mpsc::Sender<Result<String, String>>,
+}
+
+impl CreateSessionDescriptionObserverHandler for CreateOfferObserverHandler {
+    fn on_success(&mut self, desc: SessionDescription) {
+        let sdp = desc
+            .to_string()
+            .map_err(|e| format!("offer to_string failed: {e}"));
+        let _ = self.tx.send(sdp);
+    }
+
+    fn on_failure(&mut self, err: RtcError) {
+        let msg = err.message().unwrap_or_else(|_| "unknown".to_string());
+        let _ = self.tx.send(Err(msg));
+    }
+}
+
+struct SetLocalObserverHandler {
+    tx: std::sync::mpsc::Sender<Option<String>>,
+}
+
+impl SetLocalDescriptionObserverHandler for SetLocalObserverHandler {
+    fn on_set_local_description_complete(&mut self, err: RtcError) {
+        let msg = if err.ok() {
+            None
+        } else {
+            Some(err.message().unwrap_or_else(|_| "unknown".to_string()))
+        };
+        let _ = self.tx.send(msg);
+    }
+}
+
+struct SetRemoteObserverHandler {
+    tx: std::sync::mpsc::Sender<Option<String>>,
+}
+
+impl SetRemoteDescriptionObserverHandler for SetRemoteObserverHandler {
+    fn on_set_remote_description_complete(&mut self, err: RtcError) {
+        let msg = if err.ok() {
+            None
+        } else {
+            Some(err.message().unwrap_or_else(|_| "unknown".to_string()))
+        };
+        let _ = self.tx.send(msg);
+    }
+}
+
 /// シンプルな WHEP クライアント。
 pub struct SignalingWhep {
     config: SignalingWhepConfig,
@@ -244,62 +368,12 @@ impl SignalingWhep {
         let observer_state = self.state.clone();
         let video_state_track = self.video_state.clone();
         let video_state_remove = self.video_state.clone();
-        let observer = PeerConnectionObserverBuilder::new()
-            .on_connection_change(move |state| {
-                let (lock, cvar) = &*observer_state;
-                let mut guard = lock.lock().unwrap();
-                if matches!(state, PeerConnectionState::Connected) {
-                    *guard = WhepState::Connected;
-                } else if matches!(
-                    state,
-                    PeerConnectionState::Failed | PeerConnectionState::Closed
-                ) {
-                    *guard = WhepState::Closed;
-                }
-                cvar.notify_all();
-            })
-            .on_track(move |transceiver| {
-                let receiver = transceiver.receiver();
-                let track = receiver.track();
-                let kind = match track.kind() {
-                    Ok(kind) => kind,
-                    Err(_) => return,
-                };
-                if kind != "video" {
-                    return;
-                }
-                let mut video_track = track.cast_to_video_track();
-                let mut state = video_state_track.lock().unwrap();
-                if let Some(current) = state.video_track.as_ref()
-                    && current.as_ptr() == video_track.as_ptr()
-                {
-                    return;
-                }
-                if let Some(mut track) = state.video_track.take() {
-                    track.remove_sink(state.renderer.sink());
-                }
-                let wants = VideoSinkWants::new();
-                video_track.add_or_update_sink(state.renderer.sink(), &wants);
-                state.video_track = Some(video_track);
-            })
-            .on_remove_track(move |receiver| {
-                let track = receiver.track();
-                let kind = match track.kind() {
-                    Ok(kind) => kind,
-                    Err(_) => return,
-                };
-                if kind != "video" {
-                    return;
-                }
-                let video_track = track.cast_to_video_track();
-                let mut state = video_state_remove.lock().unwrap();
-                if let Some(current) = state.video_track.as_ref()
-                    && current.as_ptr() == video_track.as_ptr()
-                {
-                    state.detach_sink();
-                }
-            })
-            .build();
+        let observer =
+            PeerConnectionObserver::new_with_handler(Box::new(WhepPeerConnectionObserverHandler {
+                observer_state,
+                video_state_track,
+                video_state_remove,
+            }));
         // Keep observer alive for the lifetime of the PeerConnection.
         let mut deps = PeerConnectionDependencies::new(&observer);
         // Store observer so it lives as long as SignalingWhep.
@@ -338,19 +412,9 @@ impl SignalingWhep {
         let mut opts = PeerConnectionOfferAnswerOptions::new();
 
         let (offer_tx, offer_rx) = std::sync::mpsc::channel::<Result<String, String>>();
-        let offer_tx_err = offer_tx.clone();
-        let mut offer_obs = shiguredo_webrtc::CreateSessionDescriptionObserver::new(
-            move |desc| {
-                let sdp = desc
-                    .to_string()
-                    .map_err(|e| format!("offer to_string failed: {e}"));
-                let _ = offer_tx.send(sdp);
-            },
-            move |err| {
-                let msg = err.message().unwrap_or_else(|_| "unknown".to_string());
-                let _ = offer_tx_err.send(Err(msg));
-            },
-        );
+        let mut offer_obs = CreateSessionDescriptionObserver::new_with_handler(Box::new(
+            CreateOfferObserverHandler { tx: offer_tx },
+        ));
         pc.create_offer(&mut offer_obs, &mut opts);
         let offer_sdp = offer_rx
             .recv_timeout(Duration::from_secs(5))
@@ -380,14 +444,10 @@ impl SignalingWhep {
         let offer_desc = SessionDescription::new(SdpType::Offer, &offer_sdp)
             .map_err(|e| format!("offer create failed: {e}"))?;
         let (loc_tx, loc_rx) = std::sync::mpsc::channel::<Option<String>>();
-        let loc_obs = SetLocalDescriptionObserver::new(move |err| {
-            let msg = if err.ok() {
-                None
-            } else {
-                Some(err.message().unwrap_or_else(|_| "unknown".to_string()))
-            };
-            let _ = loc_tx.send(msg);
-        });
+        let loc_obs =
+            SetLocalDescriptionObserver::new_with_handler(Box::new(SetLocalObserverHandler {
+                tx: loc_tx,
+            }));
         pc.set_local_description(offer_desc, &loc_obs);
         let loc_res = loc_rx
             .recv_timeout(Duration::from_secs(5))
@@ -399,14 +459,10 @@ impl SignalingWhep {
         let answer = SessionDescription::new(SdpType::Answer, &body.sdp)
             .map_err(|e| format!("answer create failed: {e}"))?;
         let (rem_tx, rem_rx) = std::sync::mpsc::channel::<Option<String>>();
-        let rem_obs = SetRemoteDescriptionObserver::new(move |err| {
-            let msg = if err.ok() {
-                None
-            } else {
-                Some(err.message().unwrap_or_else(|_| "unknown".to_string()))
-            };
-            let _ = rem_tx.send(msg);
-        });
+        let rem_obs =
+            SetRemoteDescriptionObserver::new_with_handler(Box::new(SetRemoteObserverHandler {
+                tx: rem_tx,
+            }));
         pc.set_remote_description(answer, &rem_obs);
         let rem_res = rem_rx
             .recv_timeout(Duration::from_secs(5))

@@ -17,6 +17,11 @@
   - `new_with_callbacks` を `new_with_handler` に変更する
   - `VideoDecoderDecodedImageCallbackPtr` を追加し、decode 完了 callback 登録の受け取り型を `Option<VideoDecoderDecodedImageCallbackPtr>` に統一する
   - @melpon
+- [CHANGE] ほぼ全ての callback API を handler trait 形式に統一する
+  - `VideoSink` / `DataChannelObserver` / `PeerConnectionObserver` / `CreateSessionDescriptionObserver` / `SetLocalDescriptionObserver` / `SetRemoteDescriptionObserver` / `AudioTransport` / `AudioDeviceModule` を対象にする
+  - `*Builder` / `*Callbacks` / closure 直渡し `new(...)` を削除する
+  - `PeerConnection::get_stats(FnOnce)` は変更しない
+  - @melpon
 - [UPDATE] libwebrtc m146 (m146.7680.0.0) に上げる
   - @voluntas
 - [UPDATE] cmake の代わりに shiguredo_cmake を利用する

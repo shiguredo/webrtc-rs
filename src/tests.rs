@@ -277,6 +277,29 @@ fn builtin_audio_factories_create() {
 
 #[test]
 fn audio_device_module_recording_device_name_roundtrip() {
+    struct TestAudioDeviceModuleHandler {
+        name: String,
+        guid: String,
+    }
+
+    impl AudioDeviceModuleHandler for TestAudioDeviceModuleHandler {
+        fn init(&self) -> i32 {
+            0
+        }
+
+        fn recording_devices(&self) -> i16 {
+            1
+        }
+
+        fn recording_device_name(&self, index: u16) -> Option<(String, String)> {
+            if index == 0 {
+                Some((self.name.clone(), self.guid.clone()))
+            } else {
+                None
+            }
+        }
+    }
+
     fn make_ascii_string(len: usize) -> String {
         (0..len).map(|i| (b'a' + (i % 26) as u8) as char).collect()
     }
@@ -285,19 +308,12 @@ fn audio_device_module_recording_device_name_roundtrip() {
     for &len in &lengths {
         let name = make_ascii_string(len);
         let guid = make_ascii_string(64usize.saturating_sub(len));
-        let name_value = name.clone();
-        let guid_value = guid.clone();
         let expected_name = name.clone();
         let expected_guid = guid.clone();
-        let callbacks = AudioDeviceModuleCallbacks {
-            init: Some(Box::new(|| 0)),
-            recording_devices: Some(Box::new(|| 1)),
-            recording_device_name: Some(Box::new(move |_| {
-                Some((name_value.clone(), guid_value.clone()))
-            })),
-            ..Default::default()
-        };
-        let mut adm = AudioDeviceModule::new_with_callbacks(callbacks);
+        let mut adm = AudioDeviceModule::new_with_handler(Box::new(TestAudioDeviceModuleHandler {
+            name,
+            guid,
+        }));
         adm.init().expect("AudioDeviceModule::init が失敗しました");
         assert_eq!(adm.recording_devices(), 1);
         let (got_name, got_guid) = adm
@@ -592,7 +608,7 @@ fn rtp_sender_get_set_parameters() {
         .expect("VideoTrack の生成に失敗しました");
 
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserverBuilder::new().build();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
     let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
         .expect("PeerConnection の生成に失敗しました");
@@ -654,7 +670,7 @@ fn peer_connection_create_and_transceiver() {
 
     // PC 用の構成と observer/dependencies を準備する。
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserverBuilder::new().build();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
 
     // PeerConnection を生成し、取得できることを確認する。
@@ -715,7 +731,7 @@ fn video_track_and_transceiver_with_track() {
 
     // PeerConnection を作成し、トラック付きで transceiver を追加する。
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserverBuilder::new().build();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
     let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
         .expect("PeerConnection の生成に失敗しました");
@@ -742,7 +758,7 @@ fn video_track_and_transceiver_with_track() {
 
 #[test]
 fn peer_connection_observer_and_dependencies() {
-    let observer = PeerConnectionObserverBuilder::new().build();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
     let deps = PeerConnectionDependencies::new(&observer);
     assert!(!deps.as_ptr().is_null());
     drop(deps);
@@ -750,9 +766,9 @@ fn peer_connection_observer_and_dependencies() {
 
 #[test]
 fn create_and_set_local_description_observers() {
-    let _create_obs = CreateSessionDescriptionObserver::new(|_| {}, |_| {});
-    let _set_local = SetLocalDescriptionObserver::new(|_| {});
-    let _set_remote = SetRemoteDescriptionObserver::new(|_| {});
+    let _create_obs = CreateSessionDescriptionObserver::new_with_handler(Box::new(()));
+    let _set_local = SetLocalDescriptionObserver::new_with_handler(Box::new(()));
+    let _set_remote = SetRemoteDescriptionObserver::new_with_handler(Box::new(()));
 }
 
 // VideoEncoderFactory でカスタムエンコーダーを登録して encode を呼び、

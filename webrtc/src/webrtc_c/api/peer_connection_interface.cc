@@ -151,23 +151,23 @@ class RTCStatsCollectorCallbackImpl : public webrtc::RTCStatsCollectorCallback {
   RTCStatsCollectorCallbackImpl(
       struct webrtc_RTCStatsCollectorCallback_cbs* cbs,
       void* user_data)
-      : cbs_(cbs), user_data_(user_data) {}
+      : cbs_(*cbs), user_data_(user_data) {}
 
   void OnStatsDelivered(
       const webrtc::scoped_refptr<const webrtc::RTCStatsReport>& report)
       override {
-    if (cbs_->OnStatsDelivered == nullptr) {
+    if (cbs_.OnStatsDelivered == nullptr) {
       return;
     }
     webrtc::scoped_refptr<const webrtc::RTCStatsReport> report_ref(report);
-    cbs_->OnStatsDelivered(
+    cbs_.OnStatsDelivered(
         reinterpret_cast<const struct webrtc_RTCStatsReport_refcounted*>(
             report_ref.release()),
         user_data_);
   }
 
  private:
-  struct webrtc_RTCStatsCollectorCallback_cbs* cbs_;
+  struct webrtc_RTCStatsCollectorCallback_cbs cbs_{};
   void* user_data_;
 };
 
