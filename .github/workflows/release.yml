@@ -134,7 +134,7 @@ jobs:
       - name: Add cross-compile target and build sysroot with shiguredo-sysroot
         run: |
           rustup target add aarch64-unknown-linux-gnu
-          cargo install --git https://github.com/shiguredo/cargo-sysroot.git
+          cargo install cargo-shiguredo-sysroot
           cargo shiguredo-sysroot --config sysroot/${{ matrix.target }}.json
       - name: Build (cross)
         env:
