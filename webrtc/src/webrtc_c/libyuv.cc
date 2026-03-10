@@ -64,6 +64,23 @@ int libyuv_NV12ToI420(const uint8_t* src_y,
                             dst_stride_v, width, height);
 }
 
+int libyuv_I420ToNV12(const uint8_t* src_y,
+                      int src_stride_y,
+                      const uint8_t* src_u,
+                      int src_stride_u,
+                      const uint8_t* src_v,
+                      int src_stride_v,
+                      uint8_t* dst_y,
+                      int dst_stride_y,
+                      uint8_t* dst_uv,
+                      int dst_stride_uv,
+                      int width,
+                      int height) {
+  return libyuv::I420ToNV12(src_y, src_stride_y, src_u, src_stride_u, src_v,
+                            src_stride_v, dst_y, dst_stride_y, dst_uv,
+                            dst_stride_uv, width, height);
+}
+
 int libyuv_YUY2ToI420(const uint8_t* src_yuy2,
                       int src_stride_yuy2,
                       uint8_t* dst_y,

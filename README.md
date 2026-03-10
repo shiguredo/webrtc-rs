@@ -309,7 +309,7 @@ impl FactoryHolder {
   - イベントログ
 - `TimestampAligner`
   - タイムスタンプ調整
-- `abgr_to_i420` / `i420_to_argb` / `nv12_to_i420` / `yuy2_to_i420`
+- `abgr_to_i420` / `convert_from_i420` / `i420_to_nv12` / `nv12_to_i420` / `yuy2_to_i420`
   - カラーフォーマット変換 (libyuv)
 - `random_bytes` / `random_string`
   - ランダム生成

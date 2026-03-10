@@ -6,14 +6,14 @@ use shiguredo_webrtc::{
     AudioDecoderFactory, AudioDeviceModule, AudioDeviceModuleAudioLayer, AudioEncoderFactory,
     AudioProcessingBuilder, CreateSessionDescriptionObserver,
     CreateSessionDescriptionObserverHandler, Environment, I420Buffer, IceServer, IceTransportsType,
-    MediaType, PeerConnection, PeerConnectionDependencies, PeerConnectionFactory,
+    LibyuvFourcc, MediaType, PeerConnection, PeerConnectionDependencies, PeerConnectionFactory,
     PeerConnectionFactoryDependencies, PeerConnectionObserver, PeerConnectionObserverHandler,
     PeerConnectionOfferAnswerOptions, PeerConnectionRtcConfiguration, PeerConnectionState,
     RtcError, RtcEventLogFactory, RtpReceiver, RtpTransceiver, RtpTransceiverDirection,
     RtpTransceiverInit, SdpType, SessionDescription, SetLocalDescriptionObserver,
     SetLocalDescriptionObserverHandler, SetRemoteDescriptionObserver,
     SetRemoteDescriptionObserverHandler, Thread, VideoDecoderFactory, VideoEncoderFactory,
-    VideoFrameRef, VideoSink, VideoSinkHandler, VideoSinkWants, VideoTrack, i420_to_argb,
+    VideoFrameRef, VideoSink, VideoSinkHandler, VideoSinkWants, VideoTrack, convert_from_i420,
 };
 use std::fmt::Write as FmtWrite;
 use std::io::{self, Read, Write as IoWrite};
@@ -116,7 +116,7 @@ fn render_frame(frame: VideoFrameRef, width: i32, height: i32) {
     let mut scaled = I420Buffer::new(width, height);
     scaled.scale_from(&src);
 
-    let image = match i420_to_argb(&scaled) {
+    let image = match convert_from_i420(&scaled, LibyuvFourcc::Argb) {
         Some(image) => image,
         None => return,
     };

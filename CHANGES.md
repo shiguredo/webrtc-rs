@@ -22,6 +22,10 @@
   - `*Builder` / `*Callbacks` / closure 直渡し `new(...)` を削除する
   - `PeerConnection::get_stats(FnOnce)` は変更しない
   - @melpon
+- [CHANGE] libyuv 変換 API 名を libyuv と 1 対 1 に統一する
+  - `i420_to_argb` を削除し、`convert_from_i420` と `LibyuvFourcc` を追加する
+  - `i420_to_nv12` を追加する
+  - @melpon
 - [UPDATE] libwebrtc m146 (m146.7680.0.0) に上げる
   - @voluntas
 - [UPDATE] cmake の代わりに shiguredo_cmake を利用する

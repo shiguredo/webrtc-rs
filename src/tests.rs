@@ -212,6 +212,43 @@ fn abgr_to_i420_conversion() {
 }
 
 #[test]
+fn convert_from_i420_argb_conversion() {
+    let mut src = I420Buffer::new(2, 2);
+    src.fill_y(0x30);
+    src.fill_uv(0x80, 0x80);
+
+    let dst = convert_from_i420(&src, LibyuvFourcc::Argb)
+        .expect("convert_from_i420(Argb) の変換に失敗しました");
+    assert_eq!(dst.len(), 2 * 2 * 4);
+}
+
+#[test]
+fn i420_to_nv12_round_trip() {
+    let width = 4;
+    let height = 4;
+    let mut src = I420Buffer::new(width, height);
+    for (i, p) in src.y_data_mut().iter_mut().enumerate() {
+        *p = (i as u8).wrapping_mul(3);
+    }
+    for (i, p) in src.u_data_mut().iter_mut().enumerate() {
+        *p = 0x40u8.wrapping_add(i as u8);
+    }
+    for (i, p) in src.v_data_mut().iter_mut().enumerate() {
+        *p = 0x80u8.wrapping_add(i as u8);
+    }
+
+    let nv12 = i420_to_nv12(&src).expect("i420_to_nv12 の変換に失敗しました");
+    let y_size = (width * height) as usize;
+    let (y, uv) = nv12.split_at(y_size);
+    let restored = nv12_to_i420(y, width, uv, width, width, height)
+        .expect("nv12_to_i420 の逆変換に失敗しました");
+
+    assert_eq!(src.y_data(), restored.y_data());
+    assert_eq!(src.u_data(), restored.u_data());
+    assert_eq!(src.v_data(), restored.v_data());
+}
+
+#[test]
 fn logging_functions_are_callable() {
     // severity は 0 にしておく。実際のログ内容は検証しない。
     log::log_to_debug(log::Severity::Info);
