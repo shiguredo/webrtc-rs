@@ -4,15 +4,16 @@ use rustls_platform_verifier::ConfigVerifierExt;
 use shiguredo_http11::{Request, Response, ResponseDecoder, uri::Uri};
 use shiguredo_webrtc::{
     AudioDecoderFactory, AudioDeviceModule, AudioDeviceModuleAudioLayer, AudioEncoderFactory,
-    AudioProcessingBuilder, Environment, I420Buffer, IceServer, IceTransportsType, MediaType,
-    PeerConnection, PeerConnectionDependencies, PeerConnectionFactory,
+    AudioProcessingBuilder, CreateSessionDescriptionObserver,
+    CreateSessionDescriptionObserverHandler, Environment, I420Buffer, IceServer, IceTransportsType,
+    MediaType, PeerConnection, PeerConnectionDependencies, PeerConnectionFactory,
     PeerConnectionFactoryDependencies, PeerConnectionObserver, PeerConnectionObserverHandler,
     PeerConnectionOfferAnswerOptions, PeerConnectionRtcConfiguration, PeerConnectionState,
     RtcError, RtcEventLogFactory, RtpReceiver, RtpTransceiver, RtpTransceiverDirection,
     RtpTransceiverInit, SdpType, SessionDescription, SetLocalDescriptionObserver,
     SetLocalDescriptionObserverHandler, SetRemoteDescriptionObserver,
     SetRemoteDescriptionObserverHandler, Thread, VideoDecoderFactory, VideoEncoderFactory,
-    VideoFrameRef, VideoSink, VideoSinkHandler, VideoSinkWants, VideoTrack,
+    VideoFrameRef, VideoSink, VideoSinkHandler, VideoSinkWants, VideoTrack, i420_to_argb,
 };
 use std::fmt::Write as FmtWrite;
 use std::io::{self, Read, Write as IoWrite};
@@ -115,7 +116,7 @@ fn render_frame(frame: VideoFrameRef, width: i32, height: i32) {
     let mut scaled = I420Buffer::new(width, height);
     scaled.scale_from(&src);
 
-    let image = match shiguredo_webrtc::i420_to_argb(&scaled) {
+    let image = match i420_to_argb(&scaled) {
         Some(image) => image,
         None => return,
     };
@@ -267,7 +268,7 @@ struct CreateOfferObserverHandler {
     tx: std::sync::mpsc::Sender<Result<String, String>>,
 }
 
-impl shiguredo_webrtc::CreateSessionDescriptionObserverHandler for CreateOfferObserverHandler {
+impl CreateSessionDescriptionObserverHandler for CreateOfferObserverHandler {
     fn on_success(&mut self, desc: SessionDescription) {
         let sdp = desc
             .to_string()
@@ -411,9 +412,9 @@ impl SignalingWhep {
         let mut opts = PeerConnectionOfferAnswerOptions::new();
 
         let (offer_tx, offer_rx) = std::sync::mpsc::channel::<Result<String, String>>();
-        let mut offer_obs = shiguredo_webrtc::CreateSessionDescriptionObserver::new_with_handler(
-            Box::new(CreateOfferObserverHandler { tx: offer_tx }),
-        );
+        let mut offer_obs = CreateSessionDescriptionObserver::new_with_handler(Box::new(
+            CreateOfferObserverHandler { tx: offer_tx },
+        ));
         pc.create_offer(&mut offer_obs, &mut opts);
         let offer_sdp = offer_rx
             .recv_timeout(Duration::from_secs(5))

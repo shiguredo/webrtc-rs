@@ -4,16 +4,18 @@ use rustls_platform_verifier::ConfigVerifierExt;
 use shiguredo_http11::{Request, Response, ResponseDecoder, uri::Uri};
 use shiguredo_webrtc::{
     AdaptFrameResult, AdaptedVideoTrackSource, AudioDecoderFactory, AudioDeviceModule,
-    AudioDeviceModuleAudioLayer, AudioEncoderFactory, AudioProcessingBuilder, CxxString,
-    Environment, IceServer, IceTransportsType, MediaType, PeerConnection,
+    AudioDeviceModuleAudioLayer, AudioEncoderFactory, AudioProcessingBuilder,
+    CreateSessionDescriptionObserver, CreateSessionDescriptionObserverHandler, CxxString,
+    Environment, I420Buffer, IceServer, IceTransportsType, MediaType, PeerConnection,
     PeerConnectionDependencies, PeerConnectionFactory, PeerConnectionFactoryDependencies,
     PeerConnectionObserver, PeerConnectionObserverHandler, PeerConnectionOfferAnswerOptions,
     PeerConnectionRtcConfiguration, PeerConnectionState, RtcError, RtcEventLogFactory, RtpCodec,
     RtpCodecCapabilityVector, RtpEncodingParameters, RtpEncodingParametersVector,
     RtpTransceiverDirection, RtpTransceiverInit, SdpType, SessionDescription,
     SetLocalDescriptionObserver, SetLocalDescriptionObserverHandler, SetRemoteDescriptionObserver,
-    SetRemoteDescriptionObserverHandler, Thread, VideoDecoderFactory, VideoEncoderFactory,
-    VideoTrackSource, log,
+    SetRemoteDescriptionObserverHandler, Thread, TimestampAligner, VideoDecoderFactory,
+    VideoEncoderFactory, VideoFrame, VideoTrackSource, abgr_to_i420, log, random_string,
+    thread_sleep_ms, time_millis,
 };
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -105,7 +107,7 @@ impl Default for FakeVideoCapturerConfig {
 
 pub struct FakeVideoCapturer {
     source: AdaptedVideoTrackSource,
-    timestamp_aligner: Option<shiguredo_webrtc::TimestampAligner>,
+    timestamp_aligner: Option<TimestampAligner>,
     image: Vec<u32>,
     width: i32,
     height: i32,
@@ -127,14 +129,14 @@ impl FakeVideoCapturer {
         };
         let fps = if config.fps > 0 { config.fps } else { 30 };
         let source = AdaptedVideoTrackSource::new();
-        let timestamp_aligner = shiguredo_webrtc::TimestampAligner::new();
+        let timestamp_aligner = TimestampAligner::new();
         let video_source = source.cast_to_video_track_source();
         Some(Self {
             image: vec![0u32; (width * height) as usize],
             width,
             height,
             fps,
-            start_time_ms: shiguredo_webrtc::time_millis(),
+            start_time_ms: time_millis(),
             on_tick: config.on_tick,
             video_source,
             source,
@@ -180,7 +182,7 @@ impl FakeVideoCapturer {
                         on_tick.as_ref(),
                     );
                     let sleep_ms = (1000 / fps).saturating_sub(2).max(1);
-                    shiguredo_webrtc::thread_sleep_ms(sleep_ms);
+                    thread_sleep_ms(sleep_ms);
                 }
             });
         match handle {
@@ -210,7 +212,7 @@ impl Drop for FakeVideoCapturer {
 #[allow(clippy::too_many_arguments)]
 fn tick_once(
     source: &mut AdaptedVideoTrackSource,
-    timestamp_aligner: &mut shiguredo_webrtc::TimestampAligner,
+    timestamp_aligner: &mut TimestampAligner,
     image: &mut [u32],
     width: i32,
     height: i32,
@@ -218,7 +220,7 @@ fn tick_once(
     fps: i32,
     on_tick: Option<&Arc<dyn Fn() + Send + Sync>>,
 ) {
-    let elapsed_ms = shiguredo_webrtc::time_millis() - start_time_ms;
+    let elapsed_ms = time_millis() - start_time_ms;
     let radius = (width.min(height)) / 4;
     let center_x = width / 2;
     let center_y = height / 2;
@@ -251,27 +253,24 @@ fn tick_once(
         }
     }
 
-    if let Some(buffer) =
-        shiguredo_webrtc::abgr_to_i420(u32_slice_as_u8_slice(image), width, height)
-    {
+    if let Some(buffer) = abgr_to_i420(u32_slice_as_u8_slice(image), width, height) {
         let timestamp_us = elapsed_ms * 1000;
-        let frame = shiguredo_webrtc::VideoFrame::from_i420(&buffer, timestamp_us, 0);
+        let frame = VideoFrame::from_i420(&buffer, timestamp_us, 0);
         let AdaptFrameResult { applied, size } = source.adapt_frame(width, height, timestamp_us);
         let frame = if applied
             && (size.adapted_width != frame.width() || size.adapted_height != frame.height())
         {
-            let mut scaled =
-                shiguredo_webrtc::I420Buffer::new(size.adapted_width, size.adapted_height);
+            let mut scaled = I420Buffer::new(size.adapted_width, size.adapted_height);
             scaled.scale_from(&buffer);
-            shiguredo_webrtc::VideoFrame::from_i420(
+            VideoFrame::from_i420(
                 &scaled,
-                timestamp_aligner.translate(timestamp_us, shiguredo_webrtc::time_millis() * 1000),
+                timestamp_aligner.translate(timestamp_us, time_millis() * 1000),
                 0,
             )
         } else {
-            shiguredo_webrtc::VideoFrame::from_i420(
+            VideoFrame::from_i420(
                 &buffer,
-                timestamp_aligner.translate(timestamp_us, shiguredo_webrtc::time_millis() * 1000),
+                timestamp_aligner.translate(timestamp_us, time_millis() * 1000),
                 0,
             )
         };
@@ -333,7 +332,7 @@ struct CreateOfferObserverHandler {
     tx: std::sync::mpsc::Sender<Result<String, String>>,
 }
 
-impl shiguredo_webrtc::CreateSessionDescriptionObserverHandler for CreateOfferObserverHandler {
+impl CreateSessionDescriptionObserverHandler for CreateOfferObserverHandler {
     fn on_success(&mut self, desc: SessionDescription) {
         let sdp = desc
             .to_string()
@@ -484,13 +483,13 @@ impl SignalingWhip {
             init.set_send_encodings(encodings);
         }
         let mut stream_ids = init.stream_ids();
-        let stream_id = shiguredo_webrtc::random_string(16);
+        let stream_id = random_string(16);
         stream_ids.push(&CxxString::from_str(&stream_id));
         let source = match &self.config.video_source {
             Some(s) => s.clone(),
             None => return Ok(()),
         };
-        let track_id = shiguredo_webrtc::random_string(16);
+        let track_id = random_string(16);
         let track = self
             .config
             .pc_factory
@@ -553,9 +552,9 @@ impl SignalingWhip {
         opts.set_offer_to_receive_video(0);
 
         let (offer_tx, offer_rx) = std::sync::mpsc::channel::<Result<String, String>>();
-        let mut offer_obs = shiguredo_webrtc::CreateSessionDescriptionObserver::new_with_handler(
-            Box::new(CreateOfferObserverHandler { tx: offer_tx }),
-        );
+        let mut offer_obs = CreateSessionDescriptionObserver::new_with_handler(Box::new(
+            CreateOfferObserverHandler { tx: offer_tx },
+        ));
         pc.create_offer(&mut offer_obs, &mut opts);
         let offer_sdp = offer_rx
             .recv_timeout(Duration::from_secs(5))
