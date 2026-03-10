@@ -215,38 +215,6 @@ pub trait VideoDecoderHandler: Send {
 
 impl VideoDecoderHandler for () {}
 
-impl<T> VideoDecoderHandler for Box<T>
-where
-    T: VideoDecoderHandler + ?Sized,
-{
-    fn configure(&mut self, settings: VideoDecoderSettingsRef<'_>) -> bool {
-        (**self).configure(settings)
-    }
-
-    fn decode(
-        &mut self,
-        input_image: EncodedImageRef<'_>,
-        render_time_ms: i64,
-    ) -> VideoCodecStatus {
-        (**self).decode(input_image, render_time_ms)
-    }
-
-    fn register_decode_complete_callback(
-        &mut self,
-        callback: Option<VideoDecoderDecodedImageCallbackPtr>,
-    ) -> VideoCodecStatus {
-        (**self).register_decode_complete_callback(callback)
-    }
-
-    fn release(&mut self) -> VideoCodecStatus {
-        (**self).release()
-    }
-
-    fn get_decoder_info(&mut self) -> VideoDecoderDecoderInfo {
-        (**self).get_decoder_info()
-    }
-}
-
 pub trait VideoDecoderFactoryHandler: Send {
     fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
         Vec::new()
@@ -262,23 +230,6 @@ pub trait VideoDecoderFactoryHandler: Send {
 }
 
 impl VideoDecoderFactoryHandler for () {}
-
-impl<T> VideoDecoderFactoryHandler for Box<T>
-where
-    T: VideoDecoderFactoryHandler + ?Sized,
-{
-    fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
-        (**self).get_supported_formats()
-    }
-
-    fn create(
-        &mut self,
-        env: EnvironmentRef<'_>,
-        format: SdpVideoFormatRef<'_>,
-    ) -> Option<Box<dyn VideoDecoderHandler>> {
-        (**self).create(env, format)
-    }
-}
 
 struct VideoDecoderCallbackState {
     handler: Box<dyn VideoDecoderHandler>,
@@ -420,12 +371,9 @@ pub struct VideoDecoder {
 }
 
 impl VideoDecoder {
-    pub fn new_with_handler<H>(handler: H) -> Self
-    where
-        H: VideoDecoderHandler + Send + 'static,
-    {
+    pub fn new_with_handler(handler: Box<dyn VideoDecoderHandler>) -> Self {
         let state = Box::new(VideoDecoderCallbackState {
-            handler: Box::new(handler),
+            handler,
         });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_VideoDecoder_cbs {
@@ -497,12 +445,9 @@ impl VideoDecoderFactory {
         Self { raw_unique: raw }
     }
 
-    pub fn new_with_handler<H>(handler: H) -> Self
-    where
-        H: VideoDecoderFactoryHandler + Send + 'static,
-    {
+    pub fn new_with_handler(handler: Box<dyn VideoDecoderFactoryHandler>) -> Self {
         let state = Box::new(VideoDecoderFactoryCallbackState {
-            handler: Box::new(handler),
+            handler,
         });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_VideoDecoderFactory_cbs {

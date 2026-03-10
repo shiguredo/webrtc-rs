@@ -801,8 +801,9 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
         }
     }
 
-    let factory =
-        VideoEncoderFactory::new_with_handler(TestVideoEncoderFactoryHandler { created: false });
+    let factory = VideoEncoderFactory::new_with_handler(Box::new(
+        TestVideoEncoderFactoryHandler { created: false },
+    ));
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
     let mut encoder = factory
@@ -842,7 +843,7 @@ fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
         }
     }
 
-    let factory = VideoEncoderFactory::new_with_handler(TestVideoEncoderFactoryHandler);
+    let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler));
     let mut formats = factory.get_supported_formats();
     assert_eq!(formats.len(), 2);
     assert_eq!(
@@ -874,7 +875,7 @@ fn video_decoder_factory_get_supported_formats_returns_owned_formats() {
         }
     }
 
-    let factory = VideoDecoderFactory::new_with_handler(TestVideoDecoderFactoryHandler);
+    let factory = VideoDecoderFactory::new_with_handler(Box::new(TestVideoDecoderFactoryHandler));
     let mut formats = factory.get_supported_formats();
     assert_eq!(formats.len(), 1);
     assert_eq!(
@@ -917,9 +918,11 @@ fn video_encoder_factory_create_calls_create_callback() {
     }
 
     let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let factory = VideoEncoderFactory::new_with_handler(TestVideoEncoderFactoryHandler {
-        called: called.clone(),
-    });
+    let factory = VideoEncoderFactory::new_with_handler(Box::new(
+        TestVideoEncoderFactoryHandler {
+            called: called.clone(),
+        },
+    ));
     let env = Environment::new();
     let format = SdpVideoFormat::new("H264");
     let encoder = factory.create(env.as_ref(), format.as_ref());
@@ -954,9 +957,11 @@ fn video_decoder_factory_create_calls_create_callback() {
     }
 
     let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let factory = VideoDecoderFactory::new_with_handler(TestVideoDecoderFactoryHandler {
-        called: called.clone(),
-    });
+    let factory = VideoDecoderFactory::new_with_handler(Box::new(
+        TestVideoDecoderFactoryHandler {
+            called: called.clone(),
+        },
+    ));
     let env = Environment::new();
     let format = SdpVideoFormat::new("H264");
     let decoder = factory.create(env.as_ref(), format.as_ref());
@@ -1095,7 +1100,8 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
 
     let mut state = Box::new(State::default());
     let state_ptr = StatePtr((&mut *state) as *mut State);
-    let mut encoder = VideoEncoder::new_with_handler(TestVideoEncoderHandler { state_ptr });
+    let mut encoder =
+        VideoEncoder::new_with_handler(Box::new(TestVideoEncoderHandler { state_ptr }));
     let encoded_image_callback =
         VideoEncoderEncodedImageCallback::new_with_handler(TestEncodedImageCallbackHandler {
             state_ptr,
@@ -1160,8 +1166,9 @@ fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
         }
     }
 
-    let factory =
-        VideoDecoderFactory::new_with_handler(TestVideoDecoderFactoryHandler { created: false });
+    let factory = VideoDecoderFactory::new_with_handler(Box::new(
+        TestVideoDecoderFactoryHandler { created: false },
+    ));
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
     let mut decoder = factory
@@ -1258,9 +1265,9 @@ fn custom_video_encoder_init_encode_and_set_rates_callbacks_getters() {
     }
 
     let mut set_rates_called = false;
-    let mut encoder = VideoEncoder::new_with_handler(TestVideoEncoderHandler {
+    let mut encoder = VideoEncoder::new_with_handler(Box::new(TestVideoEncoderHandler {
         set_rates_called_ptr: BoolPtr(&mut set_rates_called as *mut bool),
-    });
+    }));
 
     assert_eq!(encoder.init_encode(), VideoCodecStatus::Unknown(123));
     encoder.set_rates();
@@ -1283,9 +1290,9 @@ fn custom_video_decoder_get_decoder_info_name_experiment() {
     }
 
     let expected = "decoder-info-name-".repeat(128);
-    let decoder = VideoDecoder::new_with_handler(TestVideoDecoderHandler {
+    let decoder = VideoDecoder::new_with_handler(Box::new(TestVideoDecoderHandler {
         expected: expected.clone(),
-    });
+    }));
 
     for _ in 0..100 {
         let info = decoder.get_decoder_info();
