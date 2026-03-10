@@ -1102,10 +1102,9 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     let state_ptr = StatePtr((&mut *state) as *mut State);
     let mut encoder =
         VideoEncoder::new_with_handler(Box::new(TestVideoEncoderHandler { state_ptr }));
-    let encoded_image_callback =
-        VideoEncoderEncodedImageCallback::new_with_handler(TestEncodedImageCallbackHandler {
-            state_ptr,
-        });
+    let encoded_image_callback = VideoEncoderEncodedImageCallback::new_with_handler(Box::new(
+        TestEncodedImageCallbackHandler { state_ptr },
+    ));
 
     assert_eq!(
         encoder.register_encode_complete_callback(Some(encoded_image_callback.as_ref())),

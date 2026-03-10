@@ -717,30 +717,14 @@ pub trait VideoEncoderEncodedImageCallbackHandler: Send {
 
 impl VideoEncoderEncodedImageCallbackHandler for () {}
 
-impl<T> VideoEncoderEncodedImageCallbackHandler for Box<T>
-where
-    T: VideoEncoderEncodedImageCallbackHandler + ?Sized,
-{
-    fn on_encoded_image(
-        &mut self,
-        encoded_image: EncodedImageRef<'_>,
-        codec_specific_info: Option<CodecSpecificInfoRef<'_>>,
-    ) -> VideoEncoderEncodedImageCallbackResult {
-        (**self).on_encoded_image(encoded_image, codec_specific_info)
-    }
-}
-
 pub struct VideoEncoderEncodedImageCallback {
     raw: NonNull<ffi::webrtc_VideoEncoder_EncodedImageCallback>,
 }
 
 impl VideoEncoderEncodedImageCallback {
-    pub fn new_with_handler<H>(handler: H) -> Self
-    where
-        H: VideoEncoderEncodedImageCallbackHandler + Send + 'static,
-    {
+    pub fn new_with_handler(handler: Box<dyn VideoEncoderEncodedImageCallbackHandler>) -> Self {
         let state = Box::new(VideoEncoderEncodedImageCallbackState {
-            handler: Box::new(handler),
+            handler,
         });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_VideoEncoder_EncodedImageCallback_cbs {
