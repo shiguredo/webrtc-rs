@@ -7,12 +7,13 @@ use shiguredo_webrtc::{
     AudioDeviceModuleAudioLayer, AudioEncoderFactory, AudioProcessingBuilder, CxxString,
     Environment, IceServer, IceTransportsType, MediaType, PeerConnection,
     PeerConnectionDependencies, PeerConnectionFactory, PeerConnectionFactoryDependencies,
-    PeerConnectionObserver, PeerConnectionObserverBuilder, PeerConnectionOfferAnswerOptions,
-    PeerConnectionRtcConfiguration, PeerConnectionState, RtcEventLogFactory, RtpCodec,
+    PeerConnectionObserver, PeerConnectionObserverHandler, PeerConnectionOfferAnswerOptions,
+    PeerConnectionRtcConfiguration, PeerConnectionState, RtcError, RtcEventLogFactory, RtpCodec,
     RtpCodecCapabilityVector, RtpEncodingParameters, RtpEncodingParametersVector,
     RtpTransceiverDirection, RtpTransceiverInit, SdpType, SessionDescription,
-    SetLocalDescriptionObserver, SetRemoteDescriptionObserver, Thread, VideoDecoderFactory,
-    VideoEncoderFactory, VideoTrackSource, log,
+    SetLocalDescriptionObserver, SetLocalDescriptionObserverHandler, SetRemoteDescriptionObserver,
+    SetRemoteDescriptionObserverHandler, Thread, VideoDecoderFactory, VideoEncoderFactory,
+    VideoTrackSource, log,
 };
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -308,6 +309,74 @@ enum WhipState {
     Closed,
 }
 
+struct WhipPeerConnectionObserverHandler {
+    observer_state: Arc<(Mutex<WhipState>, Condvar)>,
+}
+
+impl PeerConnectionObserverHandler for WhipPeerConnectionObserverHandler {
+    fn on_connection_change(&mut self, state: PeerConnectionState) {
+        let (lock, cvar) = &*self.observer_state;
+        let mut guard = lock.lock().unwrap();
+        if matches!(state, PeerConnectionState::Connected) {
+            *guard = WhipState::Connected;
+        } else if matches!(
+            state,
+            PeerConnectionState::Failed | PeerConnectionState::Closed
+        ) {
+            *guard = WhipState::Closed;
+        }
+        cvar.notify_all();
+    }
+}
+
+struct CreateOfferObserverHandler {
+    tx: std::sync::mpsc::Sender<Result<String, String>>,
+}
+
+impl shiguredo_webrtc::CreateSessionDescriptionObserverHandler for CreateOfferObserverHandler {
+    fn on_success(&mut self, desc: SessionDescription) {
+        let sdp = desc
+            .to_string()
+            .map_err(|e| format!("offer to_string failed: {e}"));
+        let _ = self.tx.send(sdp);
+    }
+
+    fn on_failure(&mut self, err: RtcError) {
+        let msg = err.message().unwrap_or_else(|_| "unknown".to_string());
+        let _ = self.tx.send(Err(msg));
+    }
+}
+
+struct SetLocalObserverHandler {
+    tx: std::sync::mpsc::Sender<Option<String>>,
+}
+
+impl SetLocalDescriptionObserverHandler for SetLocalObserverHandler {
+    fn on_set_local_description_complete(&mut self, err: RtcError) {
+        let msg = if err.ok() {
+            None
+        } else {
+            Some(err.message().unwrap_or_else(|_| "unknown".to_string()))
+        };
+        let _ = self.tx.send(msg);
+    }
+}
+
+struct SetRemoteObserverHandler {
+    tx: std::sync::mpsc::Sender<Option<String>>,
+}
+
+impl SetRemoteDescriptionObserverHandler for SetRemoteObserverHandler {
+    fn on_set_remote_description_complete(&mut self, err: RtcError) {
+        let msg = if err.ok() {
+            None
+        } else {
+            Some(err.message().unwrap_or_else(|_| "unknown".to_string()))
+        };
+        let _ = self.tx.send(msg);
+    }
+}
+
 /// シンプルな WHIP クライアント。
 pub struct SignalingWhip {
     config: SignalingWhipConfig,
@@ -356,21 +425,10 @@ impl SignalingWhip {
         self.set_state(WhipState::Connecting);
         let pc_factory = self.config.pc_factory.factory();
         let observer_state = self.state.clone();
-        let observer = PeerConnectionObserverBuilder::new()
-            .on_connection_change(move |state| {
-                let (lock, cvar) = &*observer_state;
-                let mut guard = lock.lock().unwrap();
-                if matches!(state, PeerConnectionState::Connected) {
-                    *guard = WhipState::Connected;
-                } else if matches!(
-                    state,
-                    PeerConnectionState::Failed | PeerConnectionState::Closed
-                ) {
-                    *guard = WhipState::Closed;
-                }
-                cvar.notify_all();
-            })
-            .build();
+        let observer =
+            PeerConnectionObserver::new_with_handler(Box::new(WhipPeerConnectionObserverHandler {
+                observer_state,
+            }));
         // Keep observer alive for the lifetime of the PeerConnection.
         let mut deps = PeerConnectionDependencies::new(&observer);
         // Store observer so it lives as long as SignalingWhip.
@@ -495,18 +553,8 @@ impl SignalingWhip {
         opts.set_offer_to_receive_video(0);
 
         let (offer_tx, offer_rx) = std::sync::mpsc::channel::<Result<String, String>>();
-        let offer_tx_err = offer_tx.clone();
-        let mut offer_obs = shiguredo_webrtc::CreateSessionDescriptionObserver::new(
-            move |desc| {
-                let sdp = desc
-                    .to_string()
-                    .map_err(|e| format!("offer to_string failed: {e}"));
-                let _ = offer_tx.send(sdp);
-            },
-            move |err| {
-                let msg = err.message().unwrap_or_else(|_| "unknown".to_string());
-                let _ = offer_tx_err.send(Err(msg));
-            },
+        let mut offer_obs = shiguredo_webrtc::CreateSessionDescriptionObserver::new_with_handler(
+            Box::new(CreateOfferObserverHandler { tx: offer_tx }),
         );
         pc.create_offer(&mut offer_obs, &mut opts);
         let offer_sdp = offer_rx
@@ -537,14 +585,10 @@ impl SignalingWhip {
         let offer_desc = SessionDescription::new(SdpType::Offer, &offer_sdp)
             .map_err(|e| format!("offer create failed: {e}"))?;
         let (loc_tx, loc_rx) = std::sync::mpsc::channel::<Option<String>>();
-        let loc_obs = SetLocalDescriptionObserver::new(move |err| {
-            let msg = if err.ok() {
-                None
-            } else {
-                Some(err.message().unwrap_or_else(|_| "unknown".to_string()))
-            };
-            let _ = loc_tx.send(msg);
-        });
+        let loc_obs =
+            SetLocalDescriptionObserver::new_with_handler(Box::new(SetLocalObserverHandler {
+                tx: loc_tx,
+            }));
         pc.set_local_description(offer_desc, &loc_obs);
         let loc_res = loc_rx
             .recv_timeout(Duration::from_secs(5))
@@ -556,14 +600,10 @@ impl SignalingWhip {
         let answer = SessionDescription::new(SdpType::Answer, &body.sdp)
             .map_err(|e| format!("answer create failed: {e}"))?;
         let (rem_tx, rem_rx) = std::sync::mpsc::channel::<Option<String>>();
-        let rem_obs = SetRemoteDescriptionObserver::new(move |err| {
-            let msg = if err.ok() {
-                None
-            } else {
-                Some(err.message().unwrap_or_else(|_| "unknown".to_string()))
-            };
-            let _ = rem_tx.send(msg);
-        });
+        let rem_obs =
+            SetRemoteDescriptionObserver::new_with_handler(Box::new(SetRemoteObserverHandler {
+                tx: rem_tx,
+            }));
         pc.set_remote_description(answer, &rem_obs);
         let rem_res = rem_rx
             .recv_timeout(Duration::from_secs(5))

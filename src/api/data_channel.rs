@@ -104,52 +104,16 @@ unsafe impl Sync for DataChannel {}
 // DataChannelObserver
 // -------------------------
 
-#[allow(clippy::type_complexity)]
-struct DataChannelCallbacks {
-    on_state_change: Option<Box<dyn FnMut() + Send + 'static>>,
-    on_message: Option<Box<dyn FnMut(&[u8], bool) + Send + 'static>>,
+pub trait DataChannelObserverHandler: Send {
+    fn on_state_change(&mut self) {}
+    #[expect(unused_variables)]
+    fn on_message(&mut self, data: &[u8], is_binary: bool) {}
 }
 
-/// DataChannelObserver 用のコールバック設定。
-#[allow(clippy::type_complexity)]
-pub struct DataChannelObserverBuilder {
-    on_state_change: Option<Box<dyn FnMut() + Send + 'static>>,
-    on_message: Option<Box<dyn FnMut(&[u8], bool) + Send + 'static>>,
-}
+impl DataChannelObserverHandler for () {}
 
-impl DataChannelObserverBuilder {
-    pub fn new() -> Self {
-        Self {
-            on_state_change: None,
-            on_message: None,
-        }
-    }
-
-    pub fn on_state_change<F>(mut self, on_state_change: F) -> Self
-    where
-        F: FnMut() + Send + 'static,
-    {
-        self.on_state_change = Some(Box::new(on_state_change));
-        self
-    }
-
-    pub fn on_message<F>(mut self, on_message: F) -> Self
-    where
-        F: FnMut(&[u8], bool) + Send + 'static,
-    {
-        self.on_message = Some(Box::new(on_message));
-        self
-    }
-
-    pub fn build(self) -> DataChannelObserver {
-        DataChannelObserver::new(self)
-    }
-}
-
-impl Default for DataChannelObserverBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
+struct DataChannelObserverHandlerState {
+    handler: Box<dyn DataChannelObserverHandler>,
 }
 
 unsafe extern "C" fn dc_observer_on_state_change(user_data: *mut c_void) {
@@ -157,10 +121,8 @@ unsafe extern "C" fn dc_observer_on_state_change(user_data: *mut c_void) {
         !user_data.is_null(),
         "dc_observer_on_state_change: user_data is null"
     );
-    let callbacks = unsafe { &mut *(user_data as *mut DataChannelCallbacks) };
-    if let Some(cb) = callbacks.on_state_change.as_mut() {
-        cb();
-    }
+    let state = unsafe { &mut *(user_data as *mut DataChannelObserverHandlerState) };
+    state.handler.on_state_change();
 }
 
 unsafe extern "C" fn dc_observer_on_message(
@@ -173,11 +135,9 @@ unsafe extern "C" fn dc_observer_on_message(
         !user_data.is_null(),
         "dc_observer_on_message: user_data is null"
     );
-    let callbacks = unsafe { &mut *(user_data as *mut DataChannelCallbacks) };
+    let state = unsafe { &mut *(user_data as *mut DataChannelObserverHandlerState) };
     let slice = unsafe { slice::from_raw_parts(data, len) };
-    if let Some(cb) = callbacks.on_message.as_mut() {
-        cb(slice, is_binary != 0);
-    }
+    state.handler.on_message(slice, is_binary != 0);
 }
 
 unsafe extern "C" fn dc_observer_on_destroy(user_data: *mut c_void) {
@@ -185,7 +145,7 @@ unsafe extern "C" fn dc_observer_on_destroy(user_data: *mut c_void) {
         !user_data.is_null(),
         "dc_observer_on_destroy: user_data is null"
     );
-    let _ = unsafe { Box::from_raw(user_data as *mut DataChannelCallbacks) };
+    let _ = unsafe { Box::from_raw(user_data as *mut DataChannelObserverHandlerState) };
 }
 
 /// DataChannelObserver のラッパー。
@@ -194,39 +154,24 @@ pub struct DataChannelObserver {
 }
 
 impl DataChannelObserver {
-    fn new(handlers: DataChannelObserverBuilder) -> Self {
-        let DataChannelObserverBuilder {
-            on_state_change,
-            on_message,
-        } = handlers;
-        let has_on_state_change = on_state_change.is_some();
-        let has_on_message = on_message.is_some();
-        let callbacks = Box::new(DataChannelCallbacks {
-            on_state_change,
-            on_message,
-        });
-        let user_data = Box::into_raw(callbacks) as *mut c_void;
+    pub fn new_with_handler(handler: Box<dyn DataChannelObserverHandler>) -> Self {
+        let state = Box::new(DataChannelObserverHandlerState { handler });
+        let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_DataChannelObserver_cbs {
-            OnStateChange: if has_on_state_change {
-                Some(dc_observer_on_state_change)
-            } else {
-                None
-            },
-            OnMessage: if has_on_message {
-                Some(dc_observer_on_message)
-            } else {
-                None
-            },
+            OnStateChange: Some(dc_observer_on_state_change),
+            OnMessage: Some(dc_observer_on_message),
             OnDestroy: Some(dc_observer_on_destroy),
         };
-        let raw =
-            match NonNull::new(unsafe { ffi::webrtc_DataChannelObserver_new(&cbs, user_data) }) {
-                Some(raw) => raw,
-                None => {
-                    let _ = unsafe { Box::from_raw(user_data as *mut DataChannelCallbacks) };
-                    panic!("BUG: webrtc_DataChannelObserver_new が null を返しました");
-                }
-            };
+        let raw = match NonNull::new(unsafe {
+            ffi::webrtc_DataChannelObserver_new(&cbs, user_data)
+        }) {
+            Some(raw) => raw,
+            None => {
+                let _ =
+                    unsafe { Box::from_raw(user_data as *mut DataChannelObserverHandlerState) };
+                panic!("BUG: webrtc_DataChannelObserver_new が null を返しました");
+            }
+        };
         Self { raw }
     }
 

@@ -151,7 +151,7 @@ impl FactoryHolder {
   - ICE / 接続設定
 - `PeerConnectionOfferAnswerOptions`
   - Offer/Answer オプション (ICE リスタート、Simulcast レイヤー数など)
-- `PeerConnectionObserver` / `PeerConnectionObserverBuilder`
+- `PeerConnectionObserver` / `PeerConnectionObserverHandler`
   - イベントコールバック
 - `PeerConnectionState`
   - 接続状態
@@ -176,9 +176,9 @@ impl FactoryHolder {
   - 音声デバイスインターフェース
 - `AudioDeviceModuleAudioLayer`
   - 音声デバイスレイヤー種別 (PlatformDefault, Dummy など)
-- `AudioDeviceModuleCallbacks` / `AudioDeviceModuleStats`
-  - カスタム ADM コールバックと統計
-- `AudioTransport` / `AudioTransportRef` / `AudioTransportCallbacks`
+- `AudioDeviceModuleHandler` / `AudioDeviceModuleStats`
+  - カスタム ADM handler と統計
+- `AudioTransport` / `AudioTransportRef` / `AudioTransportHandler`
   - 音声トランスポート
 - `MediaStreamTrack`
   - メディアストリームトラック
@@ -186,7 +186,7 @@ impl FactoryHolder {
   - I420 フォーマットの映像バッファ
 - `VideoFrame` / `VideoFrameRef`
   - 映像フレーム
-- `VideoSink` / `VideoSinkBuilder`
+- `VideoSink` / `VideoSinkHandler`
   - 映像フレームシンク
 - `VideoSinkWants`
   - 映像シンク要求設定
@@ -261,7 +261,7 @@ impl FactoryHolder {
   - 双方向データ転送
 - `DataChannelInit`
   - DataChannel 初期化設定 (ordered, protocol)
-- `DataChannelObserver` / `DataChannelObserverBuilder`
+- `DataChannelObserver` / `DataChannelObserverHandler`
   - データチャネルイベント
 - `DataChannelState`
   - チャネル状態

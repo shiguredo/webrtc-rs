@@ -23,85 +23,82 @@ impl AudioDeviceModule {
     }
 
     /// Rust 側で拡張可能な AudioDeviceModule を生成する。
-    pub fn new_with_callbacks(callbacks: AudioDeviceModuleCallbacks) -> Self {
-        let mut user_data = Box::new(AudioDeviceModuleUserData {
-            callbacks,
-            cbs: ffi::webrtc_AudioDeviceModule_cbs {
-                ActiveAudioLayer: Some(adm_active_audio_layer),
-                RegisterAudioCallback: Some(adm_register_audio_callback),
-                Init: Some(adm_init),
-                Terminate: Some(adm_terminate),
-                Initialized: Some(adm_initialized),
-                PlayoutDevices: Some(adm_playout_devices),
-                InitRecording: Some(adm_init_recording),
-                RecordingDevices: Some(adm_recording_devices),
-                PlayoutDeviceName: Some(adm_playout_device_name),
-                RecordingDeviceName: Some(adm_recording_device_name),
-                SetPlayoutDevice: Some(adm_set_playout_device),
-                SetPlayoutDeviceWithWindowsDeviceType: Some(
-                    adm_set_playout_device_with_windows_device_type,
-                ),
-                SetRecordingDevice: Some(adm_set_recording_device),
-                SetRecordingDeviceWithWindowsDeviceType: Some(
-                    adm_set_recording_device_with_windows_device_type,
-                ),
-                PlayoutIsAvailable: Some(adm_playout_is_available),
-                InitPlayout: Some(adm_init_playout),
-                PlayoutIsInitialized: Some(adm_playout_is_initialized),
-                RecordingIsAvailable: Some(adm_recording_is_available),
-                RecordingIsInitialized: Some(adm_recording_is_initialized),
-                StartPlayout: Some(adm_start_playout),
-                StopPlayout: Some(adm_stop_playout),
-                Playing: Some(adm_playing),
-                StartRecording: Some(adm_start_recording),
-                StopRecording: Some(adm_stop_recording),
-                Recording: Some(adm_recording),
-                InitSpeaker: Some(adm_init_speaker),
-                SpeakerIsInitialized: Some(adm_speaker_is_initialized),
-                InitMicrophone: Some(adm_init_microphone),
-                MicrophoneIsInitialized: Some(adm_microphone_is_initialized),
-                SpeakerVolumeIsAvailable: Some(adm_speaker_volume_is_available),
-                SetSpeakerVolume: Some(adm_set_speaker_volume),
-                SpeakerVolume: Some(adm_speaker_volume),
-                MaxSpeakerVolume: Some(adm_max_speaker_volume),
-                MinSpeakerVolume: Some(adm_min_speaker_volume),
-                MicrophoneVolumeIsAvailable: Some(adm_microphone_volume_is_available),
-                SetMicrophoneVolume: Some(adm_set_microphone_volume),
-                MicrophoneVolume: Some(adm_microphone_volume),
-                MaxMicrophoneVolume: Some(adm_max_microphone_volume),
-                MinMicrophoneVolume: Some(adm_min_microphone_volume),
-                SpeakerMuteIsAvailable: Some(adm_speaker_mute_is_available),
-                SetSpeakerMute: Some(adm_set_speaker_mute),
-                SpeakerMute: Some(adm_speaker_mute),
-                MicrophoneMuteIsAvailable: Some(adm_microphone_mute_is_available),
-                SetMicrophoneMute: Some(adm_set_microphone_mute),
-                MicrophoneMute: Some(adm_microphone_mute),
-                StereoPlayoutIsAvailable: Some(adm_stereo_playout_is_available),
-                SetStereoPlayout: Some(adm_set_stereo_playout),
-                StereoPlayout: Some(adm_stereo_playout),
-                StereoRecordingIsAvailable: Some(adm_stereo_recording_is_available),
-                SetStereoRecording: Some(adm_set_stereo_recording),
-                StereoRecording: Some(adm_stereo_recording),
-                PlayoutDelay: Some(adm_playout_delay),
-                BuiltInAECIsAvailable: Some(adm_built_in_aec_is_available),
-                BuiltInAGCIsAvailable: Some(adm_built_in_agc_is_available),
-                BuiltInNSIsAvailable: Some(adm_built_in_ns_is_available),
-                EnableBuiltInAEC: Some(adm_enable_built_in_aec),
-                EnableBuiltInAGC: Some(adm_enable_built_in_agc),
-                EnableBuiltInNS: Some(adm_enable_built_in_ns),
-                GetPlayoutUnderrunCount: Some(adm_get_playout_underrun_count),
-                GetStats: Some(adm_get_stats),
-                OnDestroy: Some(adm_on_destroy),
-            },
-        });
-        let cbs_ptr = &mut user_data.cbs as *mut ffi::webrtc_AudioDeviceModule_cbs;
-        let user_data_ptr = user_data.as_mut() as *mut AudioDeviceModuleUserData as *mut c_void;
+    pub fn new_with_handler(handler: Box<dyn AudioDeviceModuleHandler>) -> Self {
+        let mut cbs = ffi::webrtc_AudioDeviceModule_cbs {
+            ActiveAudioLayer: Some(adm_active_audio_layer),
+            RegisterAudioCallback: Some(adm_register_audio_callback),
+            Init: Some(adm_init),
+            Terminate: Some(adm_terminate),
+            Initialized: Some(adm_initialized),
+            PlayoutDevices: Some(adm_playout_devices),
+            InitRecording: Some(adm_init_recording),
+            RecordingDevices: Some(adm_recording_devices),
+            PlayoutDeviceName: Some(adm_playout_device_name),
+            RecordingDeviceName: Some(adm_recording_device_name),
+            SetPlayoutDevice: Some(adm_set_playout_device),
+            SetPlayoutDeviceWithWindowsDeviceType: Some(
+                adm_set_playout_device_with_windows_device_type,
+            ),
+            SetRecordingDevice: Some(adm_set_recording_device),
+            SetRecordingDeviceWithWindowsDeviceType: Some(
+                adm_set_recording_device_with_windows_device_type,
+            ),
+            PlayoutIsAvailable: Some(adm_playout_is_available),
+            InitPlayout: Some(adm_init_playout),
+            PlayoutIsInitialized: Some(adm_playout_is_initialized),
+            RecordingIsAvailable: Some(adm_recording_is_available),
+            RecordingIsInitialized: Some(adm_recording_is_initialized),
+            StartPlayout: Some(adm_start_playout),
+            StopPlayout: Some(adm_stop_playout),
+            Playing: Some(adm_playing),
+            StartRecording: Some(adm_start_recording),
+            StopRecording: Some(adm_stop_recording),
+            Recording: Some(adm_recording),
+            InitSpeaker: Some(adm_init_speaker),
+            SpeakerIsInitialized: Some(adm_speaker_is_initialized),
+            InitMicrophone: Some(adm_init_microphone),
+            MicrophoneIsInitialized: Some(adm_microphone_is_initialized),
+            SpeakerVolumeIsAvailable: Some(adm_speaker_volume_is_available),
+            SetSpeakerVolume: Some(adm_set_speaker_volume),
+            SpeakerVolume: Some(adm_speaker_volume),
+            MaxSpeakerVolume: Some(adm_max_speaker_volume),
+            MinSpeakerVolume: Some(adm_min_speaker_volume),
+            MicrophoneVolumeIsAvailable: Some(adm_microphone_volume_is_available),
+            SetMicrophoneVolume: Some(adm_set_microphone_volume),
+            MicrophoneVolume: Some(adm_microphone_volume),
+            MaxMicrophoneVolume: Some(adm_max_microphone_volume),
+            MinMicrophoneVolume: Some(adm_min_microphone_volume),
+            SpeakerMuteIsAvailable: Some(adm_speaker_mute_is_available),
+            SetSpeakerMute: Some(adm_set_speaker_mute),
+            SpeakerMute: Some(adm_speaker_mute),
+            MicrophoneMuteIsAvailable: Some(adm_microphone_mute_is_available),
+            SetMicrophoneMute: Some(adm_set_microphone_mute),
+            MicrophoneMute: Some(adm_microphone_mute),
+            StereoPlayoutIsAvailable: Some(adm_stereo_playout_is_available),
+            SetStereoPlayout: Some(adm_set_stereo_playout),
+            StereoPlayout: Some(adm_stereo_playout),
+            StereoRecordingIsAvailable: Some(adm_stereo_recording_is_available),
+            SetStereoRecording: Some(adm_set_stereo_recording),
+            StereoRecording: Some(adm_stereo_recording),
+            PlayoutDelay: Some(adm_playout_delay),
+            BuiltInAECIsAvailable: Some(adm_built_in_aec_is_available),
+            BuiltInAGCIsAvailable: Some(adm_built_in_agc_is_available),
+            BuiltInNSIsAvailable: Some(adm_built_in_ns_is_available),
+            EnableBuiltInAEC: Some(adm_enable_built_in_aec),
+            EnableBuiltInAGC: Some(adm_enable_built_in_agc),
+            EnableBuiltInNS: Some(adm_enable_built_in_ns),
+            GetPlayoutUnderrunCount: Some(adm_get_playout_underrun_count),
+            GetStats: Some(adm_get_stats),
+            OnDestroy: Some(adm_on_destroy),
+        };
+        let mut state = Box::new(AudioDeviceModuleHandlerState { handler });
+        let user_data_ptr = state.as_mut() as *mut AudioDeviceModuleHandlerState as *mut c_void;
         let raw = NonNull::new(unsafe {
-            ffi::webrtc_CreateAudioDeviceModuleWithCallback(cbs_ptr, user_data_ptr)
+            ffi::webrtc_CreateAudioDeviceModuleWithCallback(&mut cbs, user_data_ptr)
         })
         .expect("BUG: webrtc_CreateAudioDeviceModuleWithCallback が null を返しました");
         let raw_ref = ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw);
-        let _ = Box::into_raw(user_data);
+        let _ = Box::into_raw(state);
         Self { raw_ref }
     }
 
@@ -373,8 +370,8 @@ pub struct AudioTransport {
 }
 
 impl AudioTransport {
-    pub fn new(callbacks: AudioTransportCallbacks) -> Self {
-        let state = Box::new(AudioTransportCallbackState { callbacks });
+    pub fn new_with_handler(handler: Box<dyn AudioTransportHandler>) -> Self {
+        let state = Box::new(AudioTransportHandlerState { handler });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_AudioTransport_cbs {
             RecordedDataIsAvailable: Some(audio_transport_recorded_data_is_available),
@@ -385,7 +382,7 @@ impl AudioTransport {
         let raw = match NonNull::new(unsafe { ffi::webrtc_AudioTransport_new(&cbs, user_data) }) {
             Some(raw) => raw,
             None => {
-                let _ = unsafe { Box::from_raw(user_data as *mut AudioTransportCallbackState) };
+                let _ = unsafe { Box::from_raw(user_data as *mut AudioTransportHandlerState) };
                 panic!("BUG: webrtc_AudioTransport_new が null を返しました");
             }
         };
@@ -491,40 +488,61 @@ impl Drop for AudioTransport {
     }
 }
 
-type RecordedDataIsAvailableCallback = Box<
-    dyn FnMut(
-            *const u8,
-            usize,
-            usize,
-            usize,
-            u32,
-            u32,
-            i32,
-            u32,
-            bool,
-            &mut u32,
-            Option<i64>,
-        ) -> i32
-        + Send
-        + 'static,
->;
-type NeedMorePlayDataCallback = Box<
-    dyn FnMut(usize, usize, usize, u32, *mut u8, &mut usize, *mut i64, *mut i64) -> i32
-        + Send
-        + 'static,
->;
-type PullRenderDataCallback =
-    Box<dyn FnMut(i32, i32, usize, usize, *mut u8, *mut i64, *mut i64) + Send + 'static>;
+pub trait AudioTransportHandler: Send {
+    #[allow(clippy::too_many_arguments)]
+    #[expect(unused_variables)]
+    fn recorded_data_is_available(
+        &mut self,
+        audio_samples: *const u8,
+        n_samples: usize,
+        n_bytes_per_sample: usize,
+        n_channels: usize,
+        samples_per_sec: u32,
+        total_delay_ms: u32,
+        clock_drift: i32,
+        current_mic_level: u32,
+        key_pressed: bool,
+        new_mic_level: &mut u32,
+        estimated_capture_time_ns: Option<i64>,
+    ) -> i32 {
+        0
+    }
 
-#[derive(Default)]
-pub struct AudioTransportCallbacks {
-    pub recorded_data_is_available: Option<RecordedDataIsAvailableCallback>,
-    pub need_more_play_data: Option<NeedMorePlayDataCallback>,
-    pub pull_render_data: Option<PullRenderDataCallback>,
+    #[allow(clippy::too_many_arguments)]
+    #[expect(unused_variables)]
+    fn need_more_play_data(
+        &mut self,
+        n_samples: usize,
+        n_bytes_per_sample: usize,
+        n_channels: usize,
+        samples_per_sec: u32,
+        audio_samples: *mut u8,
+        n_samples_out: &mut usize,
+        elapsed_time_ms: *mut i64,
+        ntp_time_ms: *mut i64,
+    ) -> i32 {
+        0
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[expect(unused_variables)]
+    fn pull_render_data(
+        &mut self,
+        bits_per_sample: i32,
+        sample_rate: i32,
+        number_of_channels: usize,
+        number_of_frames: usize,
+        audio_data: *mut u8,
+        elapsed_time_ms: *mut i64,
+        ntp_time_ms: *mut i64,
+    ) {
+    }
 }
 
-struct AudioTransportCallbackState {
-    callbacks: AudioTransportCallbacks,
+impl AudioTransportHandler for () {}
+
+struct AudioTransportHandlerState {
+    handler: Box<dyn AudioTransportHandler>,
 }
 
 unsafe extern "C" fn audio_transport_on_destroy(user_data: *mut c_void) {
@@ -532,7 +550,7 @@ unsafe extern "C" fn audio_transport_on_destroy(user_data: *mut c_void) {
         !user_data.is_null(),
         "audio_transport_on_destroy: user_data is null"
     );
-    let _ = unsafe { Box::from_raw(user_data as *mut AudioTransportCallbackState) };
+    let _ = unsafe { Box::from_raw(user_data as *mut AudioTransportHandlerState) };
 }
 
 unsafe extern "C" fn audio_transport_recorded_data_is_available(
@@ -549,11 +567,7 @@ unsafe extern "C" fn audio_transport_recorded_data_is_available(
     estimated_capture_time_ns: *const i64,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { &mut *(user_data as *mut AudioTransportCallbackState) };
-    let cb = match state.callbacks.recorded_data_is_available.as_mut() {
-        Some(cb) => cb,
-        None => return 0,
-    };
+    let state = unsafe { &mut *(user_data as *mut AudioTransportHandlerState) };
     if new_mic_level.is_null() {
         return -1;
     }
@@ -563,7 +577,7 @@ unsafe extern "C" fn audio_transport_recorded_data_is_available(
     } else {
         Some(unsafe { *estimated_capture_time_ns })
     };
-    let ret = cb(
+    let ret = state.handler.recorded_data_is_available(
         audio_samples as *const u8,
         n_samples,
         n_bytes_per_sample,
@@ -593,16 +607,12 @@ unsafe extern "C" fn audio_transport_need_more_play_data(
     ntp_time_ms: *mut i64,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { &mut *(user_data as *mut AudioTransportCallbackState) };
-    let cb = match state.callbacks.need_more_play_data.as_mut() {
-        Some(cb) => cb,
-        None => return 0,
-    };
+    let state = unsafe { &mut *(user_data as *mut AudioTransportHandlerState) };
     if n_samples_out.is_null() {
         return -1;
     }
     let mut n_samples_out_value = unsafe { *n_samples_out };
-    let ret = cb(
+    let ret = state.handler.need_more_play_data(
         n_samples,
         n_bytes_per_sample,
         n_channels,
@@ -628,12 +638,8 @@ unsafe extern "C" fn audio_transport_pull_render_data(
     ntp_time_ms: *mut i64,
     user_data: *mut c_void,
 ) {
-    let state = unsafe { &mut *(user_data as *mut AudioTransportCallbackState) };
-    let cb = match state.callbacks.pull_render_data.as_mut() {
-        Some(cb) => cb,
-        None => return,
-    };
-    cb(
+    let state = unsafe { &mut *(user_data as *mut AudioTransportHandlerState) };
+    state.handler.pull_render_data(
         bits_per_sample,
         sample_rate,
         number_of_channels,
@@ -644,22 +650,6 @@ unsafe extern "C" fn audio_transport_pull_render_data(
     );
 }
 
-type AudioLayerCallback = Box<dyn Fn(&mut i32) -> i32 + Send + Sync + 'static>;
-type AudioTransportRegisterCallback =
-    Box<dyn Fn(Option<AudioTransportRef>) -> i32 + Send + Sync + 'static>;
-type NoArgI32Callback = Box<dyn Fn() -> i32 + Send + Sync + 'static>;
-type NoArgBoolCallback = Box<dyn Fn() -> bool + Send + Sync + 'static>;
-type NoArgI16Callback = Box<dyn Fn() -> i16 + Send + Sync + 'static>;
-type BoolOutCallback = Box<dyn Fn(&mut bool) -> i32 + Send + Sync + 'static>;
-type U32OutCallback = Box<dyn Fn(&mut u32) -> i32 + Send + Sync + 'static>;
-type U16OutCallback = Box<dyn Fn(&mut u16) -> i32 + Send + Sync + 'static>;
-type U16ArgI32Callback = Box<dyn Fn(u16) -> i32 + Send + Sync + 'static>;
-type I32ArgI32Callback = Box<dyn Fn(i32) -> i32 + Send + Sync + 'static>;
-type BoolArgI32Callback = Box<dyn Fn(bool) -> i32 + Send + Sync + 'static>;
-type U32ArgI32Callback = Box<dyn Fn(u32) -> i32 + Send + Sync + 'static>;
-type StringPairCallback = Box<dyn Fn(u16) -> Option<(String, String)> + Send + Sync + 'static>;
-type StatsCallback = Box<dyn Fn() -> Option<AudioDeviceModuleStats> + Send + Sync + 'static>;
-
 #[derive(Debug, Clone, Copy, Default)]
 pub struct AudioDeviceModuleStats {
     pub synthesized_samples_duration_s: f64,
@@ -669,74 +659,229 @@ pub struct AudioDeviceModuleStats {
     pub total_samples_count: u64,
 }
 
-/// Rust 側で拡張可能な AudioDeviceModule のコールバック群。
-#[derive(Default)]
-pub struct AudioDeviceModuleCallbacks {
-    pub active_audio_layer: Option<AudioLayerCallback>,
-    pub register_audio_callback: Option<AudioTransportRegisterCallback>,
-    pub init: Option<NoArgI32Callback>,
-    pub terminate: Option<NoArgI32Callback>,
-    pub initialized: Option<NoArgBoolCallback>,
-    pub playout_devices: Option<NoArgI16Callback>,
-    pub recording_devices: Option<NoArgI16Callback>,
-    pub playout_device_name: Option<StringPairCallback>,
-    pub recording_device_name: Option<StringPairCallback>,
-    pub set_playout_device: Option<U16ArgI32Callback>,
-    pub set_playout_device_with_windows_device_type: Option<I32ArgI32Callback>,
-    pub set_recording_device: Option<U16ArgI32Callback>,
-    pub set_recording_device_with_windows_device_type: Option<I32ArgI32Callback>,
-    pub playout_is_available: Option<BoolOutCallback>,
-    pub init_playout: Option<NoArgI32Callback>,
-    pub playout_is_initialized: Option<NoArgBoolCallback>,
-    pub recording_is_available: Option<BoolOutCallback>,
-    pub init_recording: Option<NoArgI32Callback>,
-    pub recording_is_initialized: Option<NoArgBoolCallback>,
-    pub start_playout: Option<NoArgI32Callback>,
-    pub stop_playout: Option<NoArgI32Callback>,
-    pub playing: Option<NoArgBoolCallback>,
-    pub start_recording: Option<NoArgI32Callback>,
-    pub stop_recording: Option<NoArgI32Callback>,
-    pub recording: Option<NoArgBoolCallback>,
-    pub init_speaker: Option<NoArgI32Callback>,
-    pub speaker_is_initialized: Option<NoArgBoolCallback>,
-    pub init_microphone: Option<NoArgI32Callback>,
-    pub microphone_is_initialized: Option<NoArgBoolCallback>,
-    pub speaker_volume_is_available: Option<BoolOutCallback>,
-    pub set_speaker_volume: Option<U32ArgI32Callback>,
-    pub speaker_volume: Option<U32OutCallback>,
-    pub max_speaker_volume: Option<U32OutCallback>,
-    pub min_speaker_volume: Option<U32OutCallback>,
-    pub microphone_volume_is_available: Option<BoolOutCallback>,
-    pub set_microphone_volume: Option<U32ArgI32Callback>,
-    pub microphone_volume: Option<U32OutCallback>,
-    pub max_microphone_volume: Option<U32OutCallback>,
-    pub min_microphone_volume: Option<U32OutCallback>,
-    pub speaker_mute_is_available: Option<BoolOutCallback>,
-    pub set_speaker_mute: Option<BoolArgI32Callback>,
-    pub speaker_mute: Option<BoolOutCallback>,
-    pub microphone_mute_is_available: Option<BoolOutCallback>,
-    pub set_microphone_mute: Option<BoolArgI32Callback>,
-    pub microphone_mute: Option<BoolOutCallback>,
-    pub stereo_playout_is_available: Option<BoolOutCallback>,
-    pub set_stereo_playout: Option<BoolArgI32Callback>,
-    pub stereo_playout: Option<BoolOutCallback>,
-    pub stereo_recording_is_available: Option<BoolOutCallback>,
-    pub set_stereo_recording: Option<BoolArgI32Callback>,
-    pub stereo_recording: Option<BoolOutCallback>,
-    pub playout_delay: Option<U16OutCallback>,
-    pub built_in_aec_is_available: Option<NoArgBoolCallback>,
-    pub built_in_agc_is_available: Option<NoArgBoolCallback>,
-    pub built_in_ns_is_available: Option<NoArgBoolCallback>,
-    pub enable_built_in_aec: Option<BoolArgI32Callback>,
-    pub enable_built_in_agc: Option<BoolArgI32Callback>,
-    pub enable_built_in_ns: Option<BoolArgI32Callback>,
-    pub get_playout_underrun_count: Option<NoArgI32Callback>,
-    pub get_stats: Option<StatsCallback>,
+pub trait AudioDeviceModuleHandler: Send + Sync {
+    fn active_audio_layer(&self, audio_layer: &mut i32) -> i32 {
+        *audio_layer = 0;
+        0
+    }
+    #[expect(unused_variables)]
+    fn register_audio_callback(&self, audio_transport: Option<AudioTransportRef>) -> i32 {
+        0
+    }
+    fn init(&self) -> i32 {
+        0
+    }
+    fn terminate(&self) -> i32 {
+        0
+    }
+    fn initialized(&self) -> bool {
+        false
+    }
+    fn playout_devices(&self) -> i16 {
+        0
+    }
+    fn recording_devices(&self) -> i16 {
+        0
+    }
+    #[expect(unused_variables)]
+    fn playout_device_name(&self, index: u16) -> Option<(String, String)> {
+        Some((String::new(), String::new()))
+    }
+    #[expect(unused_variables)]
+    fn recording_device_name(&self, index: u16) -> Option<(String, String)> {
+        Some((String::new(), String::new()))
+    }
+    #[expect(unused_variables)]
+    fn set_playout_device(&self, index: u16) -> i32 {
+        0
+    }
+    #[expect(unused_variables)]
+    fn set_playout_device_with_windows_device_type(&self, device: i32) -> i32 {
+        0
+    }
+    #[expect(unused_variables)]
+    fn set_recording_device(&self, index: u16) -> i32 {
+        0
+    }
+    #[expect(unused_variables)]
+    fn set_recording_device_with_windows_device_type(&self, device: i32) -> i32 {
+        0
+    }
+    fn playout_is_available(&self, available: &mut bool) -> i32 {
+        *available = false;
+        0
+    }
+    fn init_playout(&self) -> i32 {
+        0
+    }
+    fn playout_is_initialized(&self) -> bool {
+        true
+    }
+    fn recording_is_available(&self, available: &mut bool) -> i32 {
+        *available = false;
+        0
+    }
+    fn init_recording(&self) -> i32 {
+        0
+    }
+    fn recording_is_initialized(&self) -> bool {
+        true
+    }
+    fn start_playout(&self) -> i32 {
+        0
+    }
+    fn stop_playout(&self) -> i32 {
+        0
+    }
+    fn playing(&self) -> bool {
+        false
+    }
+    fn start_recording(&self) -> i32 {
+        0
+    }
+    fn stop_recording(&self) -> i32 {
+        0
+    }
+    fn recording(&self) -> bool {
+        false
+    }
+    fn init_speaker(&self) -> i32 {
+        0
+    }
+    fn speaker_is_initialized(&self) -> bool {
+        true
+    }
+    fn init_microphone(&self) -> i32 {
+        0
+    }
+    fn microphone_is_initialized(&self) -> bool {
+        true
+    }
+    fn speaker_volume_is_available(&self, available: &mut bool) -> i32 {
+        *available = false;
+        0
+    }
+    #[expect(unused_variables)]
+    fn set_speaker_volume(&self, volume: u32) -> i32 {
+        0
+    }
+    fn speaker_volume(&self, volume: &mut u32) -> i32 {
+        *volume = 0;
+        0
+    }
+    fn max_speaker_volume(&self, volume: &mut u32) -> i32 {
+        *volume = 0;
+        0
+    }
+    fn min_speaker_volume(&self, volume: &mut u32) -> i32 {
+        *volume = 0;
+        0
+    }
+    fn microphone_volume_is_available(&self, available: &mut bool) -> i32 {
+        *available = false;
+        0
+    }
+    #[expect(unused_variables)]
+    fn set_microphone_volume(&self, volume: u32) -> i32 {
+        0
+    }
+    fn microphone_volume(&self, volume: &mut u32) -> i32 {
+        *volume = 0;
+        0
+    }
+    fn max_microphone_volume(&self, volume: &mut u32) -> i32 {
+        *volume = 0;
+        0
+    }
+    fn min_microphone_volume(&self, volume: &mut u32) -> i32 {
+        *volume = 0;
+        0
+    }
+    fn speaker_mute_is_available(&self, available: &mut bool) -> i32 {
+        *available = false;
+        0
+    }
+    #[expect(unused_variables)]
+    fn set_speaker_mute(&self, enable: bool) -> i32 {
+        0
+    }
+    fn speaker_mute(&self, enabled: &mut bool) -> i32 {
+        *enabled = false;
+        0
+    }
+    fn microphone_mute_is_available(&self, available: &mut bool) -> i32 {
+        *available = false;
+        0
+    }
+    #[expect(unused_variables)]
+    fn set_microphone_mute(&self, enable: bool) -> i32 {
+        0
+    }
+    fn microphone_mute(&self, enabled: &mut bool) -> i32 {
+        *enabled = false;
+        0
+    }
+    fn stereo_playout_is_available(&self, available: &mut bool) -> i32 {
+        *available = false;
+        0
+    }
+    #[expect(unused_variables)]
+    fn set_stereo_playout(&self, enable: bool) -> i32 {
+        0
+    }
+    fn stereo_playout(&self, enabled: &mut bool) -> i32 {
+        *enabled = false;
+        0
+    }
+    fn stereo_recording_is_available(&self, available: &mut bool) -> i32 {
+        *available = false;
+        0
+    }
+    #[expect(unused_variables)]
+    fn set_stereo_recording(&self, enable: bool) -> i32 {
+        0
+    }
+    fn stereo_recording(&self, enabled: &mut bool) -> i32 {
+        *enabled = false;
+        0
+    }
+    fn playout_delay(&self, delay_ms: &mut u16) -> i32 {
+        *delay_ms = 0;
+        0
+    }
+    fn built_in_aec_is_available(&self) -> bool {
+        false
+    }
+    fn built_in_agc_is_available(&self) -> bool {
+        false
+    }
+    fn built_in_ns_is_available(&self) -> bool {
+        false
+    }
+    #[expect(unused_variables)]
+    fn enable_built_in_aec(&self, enable: bool) -> i32 {
+        -1
+    }
+    #[expect(unused_variables)]
+    fn enable_built_in_agc(&self, enable: bool) -> i32 {
+        -1
+    }
+    #[expect(unused_variables)]
+    fn enable_built_in_ns(&self, enable: bool) -> i32 {
+        -1
+    }
+    fn get_playout_underrun_count(&self) -> i32 {
+        -1
+    }
+    fn get_stats(&self) -> Option<AudioDeviceModuleStats> {
+        None
+    }
 }
 
-struct AudioDeviceModuleUserData {
-    callbacks: AudioDeviceModuleCallbacks,
-    cbs: ffi::webrtc_AudioDeviceModule_cbs,
+impl AudioDeviceModuleHandler for () {}
+
+struct AudioDeviceModuleHandlerState {
+    handler: Box<dyn AudioDeviceModuleHandler>,
 }
 
 fn bool_to_i32(value: bool) -> i32 {
@@ -759,8 +904,8 @@ fn write_c_string(dest: &mut [c_char], value: &str) {
     }
 }
 
-unsafe fn adm_user_data(user_data: *mut c_void) -> &'static AudioDeviceModuleUserData {
-    unsafe { &*(user_data as *const AudioDeviceModuleUserData) }
+unsafe fn adm_state(user_data: *mut c_void) -> &'static AudioDeviceModuleHandlerState {
+    unsafe { &*(user_data as *const AudioDeviceModuleHandlerState) }
 }
 
 fn write_i32(out: *mut i32, value: i32) {
@@ -791,20 +936,13 @@ fn write_u16(out: *mut u16, value: u16) {
 }
 
 unsafe extern "C" fn adm_active_audio_layer(audio_layer: *mut i32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.active_audio_layer.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_i32(audio_layer, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = if audio_layer.is_null() {
         0
     } else {
         unsafe { *audio_layer }
     };
-    let ret = cb(&mut value);
+    let ret = state.handler.active_audio_layer(&mut value);
     write_i32(audio_layer, value);
     ret
 }
@@ -813,53 +951,42 @@ unsafe extern "C" fn adm_register_audio_callback(
     audio_transport: *mut ffi::webrtc_AudioTransport,
     user_data: *mut c_void,
 ) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.register_audio_callback.as_ref() {
-        Some(cb) => cb,
-        None => return 0,
-    };
+    let state = unsafe { adm_state(user_data) };
     let transport = AudioTransportRef::from_raw(audio_transport);
-    cb(transport)
+    state.handler.register_audio_callback(transport)
 }
 
 unsafe extern "C" fn adm_init(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks.init.as_ref().map_or(0, |cb| cb())
+    let state = unsafe { adm_state(user_data) };
+    state.handler.init()
 }
 
 unsafe extern "C" fn adm_terminate(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks.terminate.as_ref().map_or(0, |cb| cb())
+    let state = unsafe { adm_state(user_data) };
+    state.handler.terminate()
 }
 
 unsafe extern "C" fn adm_initialized(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .initialized
-        .as_ref()
-        .map_or(0, |cb| bool_to_i32(cb()))
+    let state = unsafe { adm_state(user_data) };
+    bool_to_i32(state.handler.initialized())
 }
 
 unsafe extern "C" fn adm_playout_devices(user_data: *mut c_void) -> i16 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks.playout_devices.as_ref().map_or(0, |cb| cb())
+    let state = unsafe { adm_state(user_data) };
+    state.handler.playout_devices()
 }
 
 unsafe extern "C" fn adm_recording_devices(user_data: *mut c_void) -> i16 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .recording_devices
-        .as_ref()
-        .map_or(0, |cb| cb())
+    let state = unsafe { adm_state(user_data) };
+    state.handler.recording_devices()
 }
 
 fn handle_device_name(
-    cb: &StringPairCallback,
-    index: u16,
+    device_info: Option<(String, String)>,
     name: *mut c_char,
     guid: *mut c_char,
 ) -> i32 {
-    let (name_value, guid_value) = match cb(index) {
+    let (name_value, guid_value) = match device_info {
         Some(value) => value,
         None => return -1,
     };
@@ -879,12 +1006,8 @@ unsafe extern "C" fn adm_playout_device_name(
     guid: *mut c_char,
     user_data: *mut c_void,
 ) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.playout_device_name.as_ref() {
-        Some(cb) => cb,
-        None => return 0,
-    };
-    handle_device_name(cb, index, name, guid)
+    let state = unsafe { adm_state(user_data) };
+    handle_device_name(state.handler.playout_device_name(index), name, guid)
 }
 
 unsafe extern "C" fn adm_recording_device_name(
@@ -893,240 +1016,165 @@ unsafe extern "C" fn adm_recording_device_name(
     guid: *mut c_char,
     user_data: *mut c_void,
 ) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.recording_device_name.as_ref() {
-        Some(cb) => cb,
-        None => return 0,
-    };
-    handle_device_name(cb, index, name, guid)
+    let state = unsafe { adm_state(user_data) };
+    handle_device_name(state.handler.recording_device_name(index), name, guid)
 }
 
 unsafe extern "C" fn adm_set_playout_device(index: u16, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .set_playout_device
-        .as_ref()
-        .map_or(0, |cb| cb(index))
+    let state = unsafe { adm_state(user_data) };
+    state.handler.set_playout_device(index)
 }
 
 unsafe extern "C" fn adm_set_playout_device_with_windows_device_type(
     device: i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .set_playout_device_with_windows_device_type
-        .as_ref()
-        .map_or(0, |cb| cb(device))
+    let state = unsafe { adm_state(user_data) };
+    state
+        .handler
+        .set_playout_device_with_windows_device_type(device)
 }
 
 unsafe extern "C" fn adm_set_recording_device(index: u16, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .set_recording_device
-        .as_ref()
-        .map_or(0, |cb| cb(index))
+    let state = unsafe { adm_state(user_data) };
+    state.handler.set_recording_device(index)
 }
 
 unsafe extern "C" fn adm_set_recording_device_with_windows_device_type(
     device: i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .set_recording_device_with_windows_device_type
-        .as_ref()
-        .map_or(0, |cb| cb(device))
+    let state = unsafe { adm_state(user_data) };
+    state
+        .handler
+        .set_recording_device_with_windows_device_type(device)
 }
 
 unsafe extern "C" fn adm_playout_is_available(available: *mut i32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.playout_is_available.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_i32(available, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = cb(&mut value);
+    let ret = state.handler.playout_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_init_playout(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks.init_playout.as_ref().map_or(0, |cb| cb())
+    let state = unsafe { adm_state(user_data) };
+    state.handler.init_playout()
 }
 
 unsafe extern "C" fn adm_playout_is_initialized(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .playout_is_initialized
-        .as_ref()
-        .map_or(1, |cb| bool_to_i32(cb()))
+    let state = unsafe { adm_state(user_data) };
+    bool_to_i32(state.handler.playout_is_initialized())
 }
 
 unsafe extern "C" fn adm_recording_is_available(
     available: *mut i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.recording_is_available.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_i32(available, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = cb(&mut value);
+    let ret = state.handler.recording_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_init_recording(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks.init_recording.as_ref().map_or(0, |cb| cb())
+    let state = unsafe { adm_state(user_data) };
+    state.handler.init_recording()
 }
 
 unsafe extern "C" fn adm_recording_is_initialized(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .recording_is_initialized
-        .as_ref()
-        .map_or(1, |cb| bool_to_i32(cb()))
+    let state = unsafe { adm_state(user_data) };
+    bool_to_i32(state.handler.recording_is_initialized())
 }
 
 unsafe extern "C" fn adm_start_playout(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks.start_playout.as_ref().map_or(0, |cb| cb())
+    let state = unsafe { adm_state(user_data) };
+    state.handler.start_playout()
 }
 
 unsafe extern "C" fn adm_stop_playout(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks.stop_playout.as_ref().map_or(0, |cb| cb())
+    let state = unsafe { adm_state(user_data) };
+    state.handler.stop_playout()
 }
 
 unsafe extern "C" fn adm_playing(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .playing
-        .as_ref()
-        .map_or(0, |cb| bool_to_i32(cb()))
+    let state = unsafe { adm_state(user_data) };
+    bool_to_i32(state.handler.playing())
 }
 
 unsafe extern "C" fn adm_start_recording(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks.start_recording.as_ref().map_or(0, |cb| cb())
+    let state = unsafe { adm_state(user_data) };
+    state.handler.start_recording()
 }
 
 unsafe extern "C" fn adm_stop_recording(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks.stop_recording.as_ref().map_or(0, |cb| cb())
+    let state = unsafe { adm_state(user_data) };
+    state.handler.stop_recording()
 }
 
 unsafe extern "C" fn adm_recording(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .recording
-        .as_ref()
-        .map_or(0, |cb| bool_to_i32(cb()))
+    let state = unsafe { adm_state(user_data) };
+    bool_to_i32(state.handler.recording())
 }
 
 unsafe extern "C" fn adm_init_speaker(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks.init_speaker.as_ref().map_or(0, |cb| cb())
+    let state = unsafe { adm_state(user_data) };
+    state.handler.init_speaker()
 }
 
 unsafe extern "C" fn adm_speaker_is_initialized(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .speaker_is_initialized
-        .as_ref()
-        .map_or(1, |cb| bool_to_i32(cb()))
+    let state = unsafe { adm_state(user_data) };
+    bool_to_i32(state.handler.speaker_is_initialized())
 }
 
 unsafe extern "C" fn adm_init_microphone(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks.init_microphone.as_ref().map_or(0, |cb| cb())
+    let state = unsafe { adm_state(user_data) };
+    state.handler.init_microphone()
 }
 
 unsafe extern "C" fn adm_microphone_is_initialized(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .microphone_is_initialized
-        .as_ref()
-        .map_or(1, |cb| bool_to_i32(cb()))
+    let state = unsafe { adm_state(user_data) };
+    bool_to_i32(state.handler.microphone_is_initialized())
 }
 
 unsafe extern "C" fn adm_speaker_volume_is_available(
     available: *mut i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.speaker_volume_is_available.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_i32(available, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = cb(&mut value);
+    let ret = state.handler.speaker_volume_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_set_speaker_volume(volume: u32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .set_speaker_volume
-        .as_ref()
-        .map_or(0, |cb| cb(volume))
+    let state = unsafe { adm_state(user_data) };
+    state.handler.set_speaker_volume(volume)
 }
 
 unsafe extern "C" fn adm_speaker_volume(volume: *mut u32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.speaker_volume.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_u32(volume, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = 0;
-    let ret = cb(&mut value);
+    let ret = state.handler.speaker_volume(&mut value);
     write_u32(volume, value);
     ret
 }
 
 unsafe extern "C" fn adm_max_speaker_volume(volume: *mut u32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.max_speaker_volume.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_u32(volume, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = 0;
-    let ret = cb(&mut value);
+    let ret = state.handler.max_speaker_volume(&mut value);
     write_u32(volume, value);
     ret
 }
 
 unsafe extern "C" fn adm_min_speaker_volume(volume: *mut u32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.min_speaker_volume.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_u32(volume, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = 0;
-    let ret = cb(&mut value);
+    let ret = state.handler.min_speaker_volume(&mut value);
     write_u32(volume, value);
     ret
 }
@@ -1135,69 +1183,38 @@ unsafe extern "C" fn adm_microphone_volume_is_available(
     available: *mut i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.microphone_volume_is_available.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_i32(available, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = cb(&mut value);
+    let ret = state.handler.microphone_volume_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_set_microphone_volume(volume: u32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .set_microphone_volume
-        .as_ref()
-        .map_or(0, |cb| cb(volume))
+    let state = unsafe { adm_state(user_data) };
+    state.handler.set_microphone_volume(volume)
 }
 
 unsafe extern "C" fn adm_microphone_volume(volume: *mut u32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.microphone_volume.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_u32(volume, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = 0;
-    let ret = cb(&mut value);
+    let ret = state.handler.microphone_volume(&mut value);
     write_u32(volume, value);
     ret
 }
 
 unsafe extern "C" fn adm_max_microphone_volume(volume: *mut u32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.max_microphone_volume.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_u32(volume, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = 0;
-    let ret = cb(&mut value);
+    let ret = state.handler.max_microphone_volume(&mut value);
     write_u32(volume, value);
     ret
 }
 
 unsafe extern "C" fn adm_min_microphone_volume(volume: *mut u32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.min_microphone_volume.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_u32(volume, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = 0;
-    let ret = cb(&mut value);
+    let ret = state.handler.min_microphone_volume(&mut value);
     write_u32(volume, value);
     ret
 }
@@ -1206,39 +1223,22 @@ unsafe extern "C" fn adm_speaker_mute_is_available(
     available: *mut i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.speaker_mute_is_available.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_i32(available, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = cb(&mut value);
+    let ret = state.handler.speaker_mute_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_set_speaker_mute(enable: i32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .set_speaker_mute
-        .as_ref()
-        .map_or(0, |cb| cb(bool_from_i32(enable)))
+    let state = unsafe { adm_state(user_data) };
+    state.handler.set_speaker_mute(bool_from_i32(enable))
 }
 
 unsafe extern "C" fn adm_speaker_mute(enabled: *mut i32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.speaker_mute.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_i32(enabled, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = cb(&mut value);
+    let ret = state.handler.speaker_mute(&mut value);
     write_i32(enabled, bool_to_i32(value));
     ret
 }
@@ -1247,39 +1247,22 @@ unsafe extern "C" fn adm_microphone_mute_is_available(
     available: *mut i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.microphone_mute_is_available.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_i32(available, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = cb(&mut value);
+    let ret = state.handler.microphone_mute_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_set_microphone_mute(enable: i32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .set_microphone_mute
-        .as_ref()
-        .map_or(0, |cb| cb(bool_from_i32(enable)))
+    let state = unsafe { adm_state(user_data) };
+    state.handler.set_microphone_mute(bool_from_i32(enable))
 }
 
 unsafe extern "C" fn adm_microphone_mute(enabled: *mut i32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.microphone_mute.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_i32(enabled, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = cb(&mut value);
+    let ret = state.handler.microphone_mute(&mut value);
     write_i32(enabled, bool_to_i32(value));
     ret
 }
@@ -1288,39 +1271,22 @@ unsafe extern "C" fn adm_stereo_playout_is_available(
     available: *mut i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.stereo_playout_is_available.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_i32(available, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = cb(&mut value);
+    let ret = state.handler.stereo_playout_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_set_stereo_playout(enable: i32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .set_stereo_playout
-        .as_ref()
-        .map_or(0, |cb| cb(bool_from_i32(enable)))
+    let state = unsafe { adm_state(user_data) };
+    state.handler.set_stereo_playout(bool_from_i32(enable))
 }
 
 unsafe extern "C" fn adm_stereo_playout(enabled: *mut i32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.stereo_playout.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_i32(enabled, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = cb(&mut value);
+    let ret = state.handler.stereo_playout(&mut value);
     write_i32(enabled, bool_to_i32(value));
     ret
 }
@@ -1329,124 +1295,75 @@ unsafe extern "C" fn adm_stereo_recording_is_available(
     available: *mut i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.stereo_recording_is_available.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_i32(available, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = cb(&mut value);
+    let ret = state.handler.stereo_recording_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_set_stereo_recording(enable: i32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .set_stereo_recording
-        .as_ref()
-        .map_or(0, |cb| cb(bool_from_i32(enable)))
+    let state = unsafe { adm_state(user_data) };
+    state.handler.set_stereo_recording(bool_from_i32(enable))
 }
 
 unsafe extern "C" fn adm_stereo_recording(enabled: *mut i32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.stereo_recording.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_i32(enabled, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = cb(&mut value);
+    let ret = state.handler.stereo_recording(&mut value);
     write_i32(enabled, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_playout_delay(delay_ms: *mut u16, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.playout_delay.as_ref() {
-        Some(cb) => cb,
-        None => {
-            write_u16(delay_ms, 0);
-            return 0;
-        }
-    };
+    let state = unsafe { adm_state(user_data) };
     let mut value = 0u16;
-    let ret = cb(&mut value);
+    let ret = state.handler.playout_delay(&mut value);
     write_u16(delay_ms, value);
     ret
 }
 
 unsafe extern "C" fn adm_built_in_aec_is_available(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .built_in_aec_is_available
-        .as_ref()
-        .map_or(0, |cb| bool_to_i32(cb()))
+    let state = unsafe { adm_state(user_data) };
+    bool_to_i32(state.handler.built_in_aec_is_available())
 }
 
 unsafe extern "C" fn adm_built_in_agc_is_available(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .built_in_agc_is_available
-        .as_ref()
-        .map_or(0, |cb| bool_to_i32(cb()))
+    let state = unsafe { adm_state(user_data) };
+    bool_to_i32(state.handler.built_in_agc_is_available())
 }
 
 unsafe extern "C" fn adm_built_in_ns_is_available(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .built_in_ns_is_available
-        .as_ref()
-        .map_or(0, |cb| bool_to_i32(cb()))
+    let state = unsafe { adm_state(user_data) };
+    bool_to_i32(state.handler.built_in_ns_is_available())
 }
 
 unsafe extern "C" fn adm_enable_built_in_aec(enable: i32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .enable_built_in_aec
-        .as_ref()
-        .map_or(-1, |cb| cb(bool_from_i32(enable)))
+    let state = unsafe { adm_state(user_data) };
+    state.handler.enable_built_in_aec(bool_from_i32(enable))
 }
 
 unsafe extern "C" fn adm_enable_built_in_agc(enable: i32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .enable_built_in_agc
-        .as_ref()
-        .map_or(-1, |cb| cb(bool_from_i32(enable)))
+    let state = unsafe { adm_state(user_data) };
+    state.handler.enable_built_in_agc(bool_from_i32(enable))
 }
 
 unsafe extern "C" fn adm_enable_built_in_ns(enable: i32, user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .enable_built_in_ns
-        .as_ref()
-        .map_or(-1, |cb| cb(bool_from_i32(enable)))
+    let state = unsafe { adm_state(user_data) };
+    state.handler.enable_built_in_ns(bool_from_i32(enable))
 }
 
 unsafe extern "C" fn adm_get_playout_underrun_count(user_data: *mut c_void) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    data.callbacks
-        .get_playout_underrun_count
-        .as_ref()
-        .map_or(-1, |cb| cb())
+    let state = unsafe { adm_state(user_data) };
+    state.handler.get_playout_underrun_count()
 }
 
 unsafe extern "C" fn adm_get_stats(
     out_stats: *mut ffi::webrtc_AudioDeviceModule_Stats,
     user_data: *mut c_void,
 ) -> i32 {
-    let data = unsafe { adm_user_data(user_data) };
-    let cb = match data.callbacks.get_stats.as_ref() {
-        Some(cb) => cb,
-        None => return 0,
-    };
-    let stats = match cb() {
+    let state = unsafe { adm_state(user_data) };
+    let stats = match state.handler.get_stats() {
         Some(stats) => stats,
         None => return 0,
     };
@@ -1468,6 +1385,6 @@ unsafe extern "C" fn adm_get_stats(
 unsafe extern "C" fn adm_on_destroy(user_data: *mut c_void) {
     assert!(!user_data.is_null(), "adm_on_destroy: user_data is null");
     unsafe {
-        let _ = Box::from_raw(user_data as *mut AudioDeviceModuleUserData);
+        let _ = Box::from_raw(user_data as *mut AudioDeviceModuleHandlerState);
     }
 }
