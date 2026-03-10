@@ -185,21 +185,24 @@ impl VideoDecoderDecodedImageCallbackPtr {
 unsafe impl Send for VideoDecoderDecodedImageCallbackPtr {}
 
 pub trait VideoDecoderHandler: Send {
-    fn configure(&mut self, _settings: VideoDecoderSettingsRef<'_>) -> bool {
+    #[expect(unused_variables)]
+    fn configure(&mut self, settings: VideoDecoderSettingsRef<'_>) -> bool {
         true
     }
 
+    #[expect(unused_variables)]
     fn decode(
         &mut self,
-        _input_image: EncodedImageRef<'_>,
-        _render_time_ms: i64,
+        input_image: EncodedImageRef<'_>,
+        render_time_ms: i64,
     ) -> VideoCodecStatus {
         VideoCodecStatus::Ok
     }
 
+    #[expect(unused_variables)]
     fn register_decode_complete_callback(
         &mut self,
-        _callback: Option<VideoDecoderDecodedImageCallbackPtr>,
+        callback: Option<VideoDecoderDecodedImageCallbackPtr>,
     ) -> VideoCodecStatus {
         VideoCodecStatus::Ok
     }
@@ -220,10 +223,11 @@ pub trait VideoDecoderFactoryHandler: Send {
         Vec::new()
     }
 
+    #[expect(unused_variables)]
     fn create(
         &mut self,
-        _env: EnvironmentRef<'_>,
-        _format: SdpVideoFormatRef<'_>,
+        env: EnvironmentRef<'_>,
+        format: SdpVideoFormatRef<'_>,
     ) -> Option<Box<dyn VideoDecoderHandler>> {
         None
     }

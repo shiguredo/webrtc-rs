@@ -706,10 +706,11 @@ impl Drop for CodecSpecificInfo {
 unsafe impl Send for CodecSpecificInfo {}
 
 pub trait VideoEncoderEncodedImageCallbackHandler: Send {
+    #[expect(unused_variables)]
     fn on_encoded_image(
         &mut self,
-        _encoded_image: EncodedImageRef<'_>,
-        _codec_specific_info: Option<CodecSpecificInfoRef<'_>>,
+        encoded_image: EncodedImageRef<'_>,
+        codec_specific_info: Option<CodecSpecificInfoRef<'_>>,
     ) -> VideoEncoderEncodedImageCallbackResult {
         VideoEncoderEncodedImageCallbackResult::new(VideoEncoderEncodedImageCallbackResultError::Ok)
     }
@@ -810,25 +811,28 @@ impl<'a> VideoEncoderEncodedImageCallbackRef<'a> {
 unsafe impl<'a> Send for VideoEncoderEncodedImageCallbackRef<'a> {}
 
 pub trait VideoEncoderHandler: Send {
+    #[expect(unused_variables)]
     fn init_encode(
         &mut self,
-        _codec_settings: VideoCodecRef<'_>,
-        _settings: VideoEncoderSettingsRef<'_>,
+        codec_settings: VideoCodecRef<'_>,
+        settings: VideoEncoderSettingsRef<'_>,
     ) -> VideoCodecStatus {
         VideoCodecStatus::Ok
     }
 
+    #[expect(unused_variables)]
     fn encode(
         &mut self,
-        _frame: VideoFrameRef<'_>,
-        _frame_types: Option<VideoFrameTypeVectorRef<'_>>,
+        frame: VideoFrameRef<'_>,
+        frame_types: Option<VideoFrameTypeVectorRef<'_>>,
     ) -> VideoCodecStatus {
         VideoCodecStatus::Ok
     }
 
+    #[expect(unused_variables)]
     fn register_encode_complete_callback(
         &mut self,
-        _callback: Option<VideoEncoderEncodedImageCallbackRef<'_>>,
+        callback: Option<VideoEncoderEncodedImageCallbackRef<'_>>,
     ) -> VideoCodecStatus {
         VideoCodecStatus::Ok
     }
@@ -837,7 +841,8 @@ pub trait VideoEncoderHandler: Send {
         VideoCodecStatus::Ok
     }
 
-    fn set_rates(&mut self, _parameters: VideoEncoderRateControlParametersRef<'_>) {}
+    #[expect(unused_variables)]
+    fn set_rates(&mut self, parameters: VideoEncoderRateControlParametersRef<'_>) {}
 
     fn get_encoder_info(&mut self) -> VideoEncoderEncoderInfo {
         VideoEncoderEncoderInfo::new()
@@ -851,10 +856,11 @@ pub trait VideoEncoderFactoryHandler: Send {
         Vec::new()
     }
 
+    #[expect(unused_variables)]
     fn create(
         &mut self,
-        _env: EnvironmentRef<'_>,
-        _format: SdpVideoFormatRef<'_>,
+        env: EnvironmentRef<'_>,
+        format: SdpVideoFormatRef<'_>,
     ) -> Option<Box<dyn VideoEncoderHandler>> {
         None
     }
