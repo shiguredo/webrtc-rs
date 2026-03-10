@@ -205,14 +205,14 @@ impl FactoryHolder {
   - コーデック固有情報
 - `VideoEncoder`
   - カスタム映像エンコーダー
-- `VideoEncoderCallbacks` / `VideoEncoderFactoryCallbacks`
-  - エンコーダー / エンコーダーファクトリーの callback
+- `VideoEncoderHandler` / `VideoEncoderFactoryHandler`
+  - エンコーダー / エンコーダーファクトリーの handler trait
 - `VideoEncoderEncoderInfo` / `VideoEncoderSettingsRef` / `VideoEncoderRateControlParametersRef`
   - エンコーダー設定とメタ情報
 - `VideoEncoderEncodedImageCallback` / `VideoEncoderEncodedImageCallbackRef`
   - エンコード完了 callback
-- `VideoEncoderEncodedImageCallbackCallbacks`
-  - エンコード完了 callback のハンドラー設定
+- `VideoEncoderEncodedImageCallbackHandler`
+  - エンコード完了 callback の handler trait
 - `VideoEncoderEncodedImageCallbackResult`
   - エンコード完了 callback の戻り値
 - `VideoEncoderEncodedImageCallbackResultError`
@@ -221,11 +221,11 @@ impl FactoryHolder {
   - C API 側 callback ポインターのラッパー
 - `VideoDecoder`
   - カスタム映像デコーダー
-- `VideoDecoderCallbacks` / `VideoDecoderFactoryCallbacks`
-  - デコーダー / デコーダーファクトリーの callback
+- `VideoDecoderHandler` / `VideoDecoderFactoryHandler`
+  - デコーダー / デコーダーファクトリーの handler trait
 - `VideoDecoderDecoderInfo` / `VideoDecoderSettingsRef`
   - デコーダー設定とメタ情報
-- `VideoDecoderDecodedImageCallbackRef`
+- `VideoDecoderDecodedImageCallbackRef` / `VideoDecoderDecodedImageCallbackPtr`
   - デコード完了 callback
 
 ### RTP

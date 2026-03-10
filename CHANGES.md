@@ -12,6 +12,11 @@
 ## develop
 
 
+- [CHANGE] VideoEncoder / VideoDecoder / factory の callback API を handler trait 形式に変更する
+  - `VideoEncoderHandler` / `VideoDecoderHandler` / `VideoEncoderFactoryHandler` / `VideoDecoderFactoryHandler` / `VideoEncoderEncodedImageCallbackHandler` を追加する
+  - `new_with_callbacks` を `new_with_handler` に変更する
+  - `VideoDecoderDecodedImageCallbackPtr` を追加し、decode 完了 callback 登録の受け取り型を `Option<VideoDecoderDecodedImageCallbackPtr>` に統一する
+  - @melpon
 - [UPDATE] libwebrtc m146 (m146.7680.0.0) に上げる
   - @voluntas
 - [UPDATE] cmake の代わりに shiguredo_cmake を利用する
