@@ -13,7 +13,8 @@ use shiguredo_webrtc::{
     RtpTransceiverInit, SdpType, SessionDescription, SetLocalDescriptionObserver,
     SetLocalDescriptionObserverHandler, SetRemoteDescriptionObserver,
     SetRemoteDescriptionObserverHandler, Thread, VideoDecoderFactory, VideoEncoderFactory,
-    VideoFrameRef, VideoSink, VideoSinkHandler, VideoSinkWants, VideoTrack, i420_to_argb,
+    VideoFrameRef, VideoSink, VideoSinkHandler, VideoSinkWants, VideoTrack, LibyuvFourcc,
+    convert_from_i420,
 };
 use std::fmt::Write as FmtWrite;
 use std::io::{self, Read, Write as IoWrite};
@@ -116,7 +117,7 @@ fn render_frame(frame: VideoFrameRef, width: i32, height: i32) {
     let mut scaled = I420Buffer::new(width, height);
     scaled.scale_from(&src);
 
-    let image = match i420_to_argb(&scaled) {
+    let image = match convert_from_i420(&scaled, LibyuvFourcc::Argb) {
         Some(image) => image,
         None => return,
     };
