@@ -372,9 +372,7 @@ pub struct VideoDecoder {
 
 impl VideoDecoder {
     pub fn new_with_handler(handler: Box<dyn VideoDecoderHandler>) -> Self {
-        let state = Box::new(VideoDecoderCallbackState {
-            handler,
-        });
+        let state = Box::new(VideoDecoderCallbackState { handler });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_VideoDecoder_cbs {
             Configure: Some(video_decoder_configure),
@@ -446,9 +444,7 @@ impl VideoDecoderFactory {
     }
 
     pub fn new_with_handler(handler: Box<dyn VideoDecoderFactoryHandler>) -> Self {
-        let state = Box::new(VideoDecoderFactoryCallbackState {
-            handler,
-        });
+        let state = Box::new(VideoDecoderFactoryCallbackState { handler });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_VideoDecoderFactory_cbs {
             GetSupportedFormats: Some(video_decoder_factory_get_supported_formats),

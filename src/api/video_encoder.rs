@@ -723,9 +723,7 @@ pub struct VideoEncoderEncodedImageCallback {
 
 impl VideoEncoderEncodedImageCallback {
     pub fn new_with_handler(handler: Box<dyn VideoEncoderEncodedImageCallbackHandler>) -> Self {
-        let state = Box::new(VideoEncoderEncodedImageCallbackState {
-            handler,
-        });
+        let state = Box::new(VideoEncoderEncodedImageCallbackState { handler });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_VideoEncoder_EncodedImageCallback_cbs {
             OnEncodedImage: Some(video_encoder_encoded_image_callback_on_encoded_image),
@@ -1154,9 +1152,7 @@ impl VideoEncoderFactory {
     }
 
     pub fn new_with_handler(handler: Box<dyn VideoEncoderFactoryHandler>) -> Self {
-        let state = Box::new(VideoEncoderFactoryCallbackState {
-            handler,
-        });
+        let state = Box::new(VideoEncoderFactoryCallbackState { handler });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_VideoEncoderFactory_cbs {
             GetSupportedFormats: Some(video_encoder_factory_get_supported_formats),

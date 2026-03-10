@@ -801,9 +801,9 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
         }
     }
 
-    let factory = VideoEncoderFactory::new_with_handler(Box::new(
-        TestVideoEncoderFactoryHandler { created: false },
-    ));
+    let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler {
+        created: false,
+    }));
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
     let mut encoder = factory
@@ -918,11 +918,9 @@ fn video_encoder_factory_create_calls_create_callback() {
     }
 
     let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let factory = VideoEncoderFactory::new_with_handler(Box::new(
-        TestVideoEncoderFactoryHandler {
-            called: called.clone(),
-        },
-    ));
+    let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler {
+        called: called.clone(),
+    }));
     let env = Environment::new();
     let format = SdpVideoFormat::new("H264");
     let encoder = factory.create(env.as_ref(), format.as_ref());
@@ -957,11 +955,9 @@ fn video_decoder_factory_create_calls_create_callback() {
     }
 
     let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let factory = VideoDecoderFactory::new_with_handler(Box::new(
-        TestVideoDecoderFactoryHandler {
-            called: called.clone(),
-        },
-    ));
+    let factory = VideoDecoderFactory::new_with_handler(Box::new(TestVideoDecoderFactoryHandler {
+        called: called.clone(),
+    }));
     let env = Environment::new();
     let format = SdpVideoFormat::new("H264");
     let decoder = factory.create(env.as_ref(), format.as_ref());
@@ -1165,9 +1161,9 @@ fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
         }
     }
 
-    let factory = VideoDecoderFactory::new_with_handler(Box::new(
-        TestVideoDecoderFactoryHandler { created: false },
-    ));
+    let factory = VideoDecoderFactory::new_with_handler(Box::new(TestVideoDecoderFactoryHandler {
+        created: false,
+    }));
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
     let mut decoder = factory
