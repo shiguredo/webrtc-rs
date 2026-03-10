@@ -1409,11 +1409,7 @@ impl PeerConnection {
         };
         let user_data = Box::into_raw(state) as *mut c_void;
         unsafe {
-            ffi::webrtc_PeerConnectionInterface_GetStats(
-                self.raw_ref.as_ptr(),
-                &mut cbs,
-                user_data,
-            )
+            ffi::webrtc_PeerConnectionInterface_GetStats(self.raw_ref.as_ptr(), &mut cbs, user_data)
         };
     }
 

@@ -167,8 +167,7 @@ impl DataChannelObserver {
         }) {
             Some(raw) => raw,
             None => {
-                let _ =
-                    unsafe { Box::from_raw(user_data as *mut DataChannelObserverHandlerState) };
+                let _ = unsafe { Box::from_raw(user_data as *mut DataChannelObserverHandlerState) };
                 panic!("BUG: webrtc_DataChannelObserver_new が null を返しました");
             }
         };

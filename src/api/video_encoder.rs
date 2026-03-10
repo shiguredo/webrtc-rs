@@ -1169,8 +1169,7 @@ impl VideoEncoderFactory {
         let raw_unique = match NonNull::new(raw) {
             Some(raw_unique) => raw_unique,
             None => {
-                let _ =
-                    unsafe { Box::from_raw(user_data as *mut VideoEncoderFactoryHandlerState) };
+                let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderFactoryHandlerState) };
                 panic!("BUG: webrtc_VideoEncoderFactory_new が null を返しました");
             }
         };
