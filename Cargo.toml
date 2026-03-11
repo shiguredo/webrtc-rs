@@ -1,6 +1,6 @@
 [package]
 name = "shiguredo_webrtc"
-version = "0.146.0-canary.0"
+version = "0.146.0-canary.1"
 edition = "2024"
 rust-version = "1.88"
 authors = ["Shiguredo Inc."]
