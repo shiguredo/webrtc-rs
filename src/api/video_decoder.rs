@@ -113,6 +113,10 @@ impl<'a> VideoDecoderSettingsRef<'a> {
     pub fn max_render_resolution_height(&self) -> i32 {
         unsafe { ffi::webrtc_VideoDecoder_Settings_max_render_resolution_height(self.raw.as_ptr()) }
     }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoDecoder_Settings {
+        self.raw.as_ptr()
+    }
 }
 
 unsafe impl<'a> Send for VideoDecoderSettingsRef<'a> {}
@@ -405,19 +409,34 @@ impl VideoDecoder {
         std::mem::ManuallyDrop::new(self).raw_unique.as_ptr()
     }
 
-    pub fn configure(&mut self) -> bool {
-        unsafe { ffi::webrtc_VideoDecoder_Configure(self.as_ptr(), std::ptr::null_mut()) != 0 }
+    pub fn configure(&mut self, settings: VideoDecoderSettingsRef<'_>) -> bool {
+        unsafe { ffi::webrtc_VideoDecoder_Configure(self.as_ptr(), settings.as_ptr()) != 0 }
     }
 
     pub fn decode(
         &mut self,
-        input_image: Option<EncodedImageRef<'_>>,
+        input_image: EncodedImageRef<'_>,
         render_time_ms: i64,
     ) -> VideoCodecStatus {
-        let input_image =
-            input_image.map_or(std::ptr::null_mut(), |input_image| input_image.as_ptr());
-        let value =
-            unsafe { ffi::webrtc_VideoDecoder_Decode(self.as_ptr(), input_image, render_time_ms) };
+        let value = unsafe {
+            ffi::webrtc_VideoDecoder_Decode(self.as_ptr(), input_image.as_ptr(), render_time_ms)
+        };
+        VideoCodecStatus::from_raw(value)
+    }
+
+    pub fn register_decode_complete_callback(
+        &mut self,
+        callback: Option<VideoDecoderDecodedImageCallbackPtr>,
+    ) -> VideoCodecStatus {
+        let callback = callback.map_or(std::ptr::null_mut(), |callback| callback.raw.as_ptr());
+        let value = unsafe {
+            ffi::webrtc_VideoDecoder_RegisterDecodeCompleteCallback(self.as_ptr(), callback)
+        };
+        VideoCodecStatus::from_raw(value)
+    }
+
+    pub fn release(&mut self) -> VideoCodecStatus {
+        let value = unsafe { ffi::webrtc_VideoDecoder_Release(self.as_ptr()) };
         VideoCodecStatus::from_raw(value)
     }
 
@@ -429,11 +448,42 @@ impl VideoDecoder {
     }
 }
 
+impl VideoDecoderHandler for VideoDecoder {
+    fn configure(&mut self, settings: VideoDecoderSettingsRef<'_>) -> bool {
+        VideoDecoder::configure(self, settings)
+    }
+
+    fn decode(
+        &mut self,
+        input_image: EncodedImageRef<'_>,
+        render_time_ms: i64,
+    ) -> VideoCodecStatus {
+        VideoDecoder::decode(self, input_image, render_time_ms)
+    }
+
+    fn register_decode_complete_callback(
+        &mut self,
+        callback: Option<VideoDecoderDecodedImageCallbackPtr>,
+    ) -> VideoCodecStatus {
+        VideoDecoder::register_decode_complete_callback(self, callback)
+    }
+
+    fn release(&mut self) -> VideoCodecStatus {
+        VideoDecoder::release(self)
+    }
+
+    fn get_decoder_info(&mut self) -> VideoDecoderDecoderInfo {
+        VideoDecoder::get_decoder_info(self)
+    }
+}
+
 impl Drop for VideoDecoder {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoDecoder_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
+
+unsafe impl Send for VideoDecoder {}
 
 /// webrtc::VideoDecoderFactory のラッパー。
 pub struct VideoDecoderFactory {
@@ -510,3 +560,5 @@ impl Drop for VideoDecoderFactory {
         unsafe { ffi::webrtc_VideoDecoderFactory_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
+
+unsafe impl Send for VideoDecoderFactory {}

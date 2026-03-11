@@ -122,27 +122,36 @@ fn session_description_to_string() {
 
 #[test]
 fn sdp_video_format_with_parameters() {
-    let mut fmt = SdpVideoFormat::new("VP8");
-    {
-        let mut params = fmt.parameters_mut();
-        params.set("profile-id", "0");
-        params.set("level", "3.1");
-        assert_eq!(params.len(), 2);
+    let mut fmt = SdpVideoFormat::new_with_parameters(
+        "VP8",
+        &std::collections::HashMap::from([
+            (String::from("profile-id"), String::from("0")),
+            (String::from("level"), String::from("3.1")),
+        ]),
+        &[ScalabilityMode::L1T1, ScalabilityMode::L1T2],
+    );
+    let params = fmt.parameters_mut();
+    assert_eq!(params.len(), 2);
 
-        let mut found = std::collections::HashMap::new();
-        for (k, v) in params.iter() {
-            found.insert(k, v);
-        }
-        assert_eq!(found.get("profile-id").map(String::as_str), Some("0"));
-        assert_eq!(found.get("level").map(String::as_str), Some("3.1"));
+    let mut found = std::collections::HashMap::new();
+    for (k, v) in params.iter() {
+        found.insert(k, v);
     }
+    assert_eq!(found.get("profile-id").map(String::as_str), Some("0"));
+    assert_eq!(found.get("level").map(String::as_str), Some("3.1"));
+    assert_eq!(
+        fmt.scalability_modes(),
+        vec![ScalabilityMode::L1T1, ScalabilityMode::L1T2]
+    );
 
-    let mut other = SdpVideoFormat::new("VP8");
-    {
-        let mut params = other.parameters_mut();
-        params.set("profile-id", "0");
-        params.set("level", "3.1");
-    }
+    let other = SdpVideoFormat::new_with_parameters(
+        "VP8",
+        &std::collections::HashMap::from([
+            (String::from("profile-id"), String::from("0")),
+            (String::from("level"), String::from("3.1")),
+        ]),
+        &[ScalabilityMode::L1T1, ScalabilityMode::L1T2],
+    );
 
     assert!(fmt.is_equal(other.as_ref()));
 
@@ -162,6 +171,22 @@ fn sdp_video_format_with_parameters() {
     assert!(
         !has_packetization_mode,
         "clone への変更が元の SdpVideoFormat に影響しています"
+    );
+}
+
+#[test]
+fn sdp_video_format_new_has_empty_scalability_modes() {
+    let fmt = SdpVideoFormat::new("VP8");
+    assert!(fmt.scalability_modes().is_empty());
+}
+
+#[test]
+fn scalability_mode_round_trip() {
+    let mode = ScalabilityMode::L2T2;
+    assert_eq!(
+        mode.as_str()
+            .expect("ScalabilityMode の文字列化に失敗しました"),
+        "L2T2"
     );
 }
 
@@ -870,11 +895,11 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
     frame_types.push(VideoFrameType::Delta);
 
     assert_eq!(
-        encoder.encode_with_frame_types(&frame, Some(frame_types.as_ref())),
+        encoder.encode(frame.as_ref(), Some(frame_types.as_ref())),
         VideoCodecStatus::NoOutput
     );
     assert_eq!(
-        encoder.encode_with_frame_types(&frame, Some(frame_types.as_ref())),
+        encoder.encode(frame.as_ref(), Some(frame_types.as_ref())),
         VideoCodecStatus::Unknown(2)
     );
     assert!(
@@ -1162,7 +1187,10 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
 
     let buffer = I420Buffer::new(2, 2);
     let frame = VideoFrame::from_i420(&buffer, 123, 0);
-    assert_eq!(encoder.encode(&frame), VideoCodecStatus::Unknown(88));
+    assert_eq!(
+        encoder.encode(frame.as_ref(), None),
+        VideoCodecStatus::Unknown(88)
+    );
 
     assert!(state.register_called, "register が呼ばれていません");
     assert!(state.encode_called, "encode が呼ばれていません");
@@ -1222,9 +1250,16 @@ fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
     let mut decoder = factory
         .create(env.as_ref(), format.as_ref())
         .expect("custom decoder の作成に失敗しました");
+    let image = EncodedImage::new();
 
-    assert_eq!(decoder.decode(None, 456), VideoCodecStatus::NoOutput);
-    assert_eq!(decoder.decode(None, 456), VideoCodecStatus::Unknown(2));
+    assert_eq!(
+        decoder.decode(image.as_ref(), 456),
+        VideoCodecStatus::NoOutput
+    );
+    assert_eq!(
+        decoder.decode(image.as_ref(), 456),
+        VideoCodecStatus::Unknown(2)
+    );
     assert!(
         factory.create(env.as_ref(), format.as_ref()).is_none(),
         "2 回目の create は None を返す想定です"
@@ -1269,57 +1304,6 @@ fn video_decoder_handler_register_decode_complete_callback_accepts_none_and_some
     );
     assert!(handler.called_with_none);
     assert!(handler.called_with_some);
-}
-
-// set_rates callback の呼び出しを確認するテスト
-#[test]
-fn custom_video_encoder_init_encode_and_set_rates_callbacks_getters() {
-    struct BoolPtr(*mut bool);
-    unsafe impl Send for BoolPtr {}
-    impl BoolPtr {
-        fn set_true(&self) {
-            unsafe {
-                *self.0 = true;
-            }
-        }
-    }
-
-    struct TestVideoEncoderHandler {
-        set_rates_called_ptr: BoolPtr,
-    }
-    impl VideoEncoderHandler for TestVideoEncoderHandler {
-        fn init_encode(
-            &mut self,
-            codec: VideoCodecRef<'_>,
-            settings: VideoEncoderSettingsRef<'_>,
-        ) -> VideoCodecStatus {
-            assert_eq!(codec.codec_type(), VideoCodecType::Generic);
-            assert_eq!(codec.width(), 0);
-            assert_eq!(codec.height(), 0);
-            assert_eq!(settings.number_of_cores(), 1);
-            assert_eq!(settings.max_payload_size(), 1200);
-            assert!(!settings.loss_notification());
-            assert_eq!(settings.encoder_thread_limit(), None);
-            VideoCodecStatus::Unknown(123)
-        }
-
-        fn set_rates(&mut self, parameters: VideoEncoderRateControlParametersRef<'_>) {
-            assert_eq!(parameters.framerate_fps(), 30.0);
-            assert_eq!(parameters.target_bitrate_sum_bps(), 300_000);
-            assert_eq!(parameters.bitrate_sum_bps(), 250_000);
-            assert_eq!(parameters.bandwidth_allocation_bps(), 350_000);
-            self.set_rates_called_ptr.set_true();
-        }
-    }
-
-    let mut set_rates_called = false;
-    let mut encoder = VideoEncoder::new_with_handler(Box::new(TestVideoEncoderHandler {
-        set_rates_called_ptr: BoolPtr(&mut set_rates_called as *mut bool),
-    }));
-
-    assert_eq!(encoder.init_encode(), VideoCodecStatus::Unknown(123));
-    encoder.set_rates();
-    assert!(set_rates_called, "set_rates callback が呼ばれませんでした");
 }
 
 // implementation_name() が解放済みの値を返していることがあったので、その回帰テストを行う

@@ -1,8 +1,150 @@
 use crate::ref_count::{EncodedImageBufferHandle, I420BufferHandle};
-use crate::{CxxStringRef, MapStringString, Result, ScopedRef, ffi};
+use crate::{CxxString, CxxStringRef, MapStringString, Result, ScopedRef, ffi};
+use std::collections::HashMap;
+use std::fmt;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::slice;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ScalabilityMode {
+    L1T1,
+    L1T2,
+    L1T3,
+    L2T1,
+    L2T1h,
+    L2T1Key,
+    L2T2,
+    L2T2h,
+    L2T2Key,
+    L2T2KeyShift,
+    L2T3,
+    L2T3h,
+    L2T3Key,
+    L3T1,
+    L3T1h,
+    L3T1Key,
+    L3T2,
+    L3T2h,
+    L3T2Key,
+    L3T3,
+    L3T3h,
+    L3T3Key,
+    S2T1,
+    S2T1h,
+    S2T2,
+    S2T2h,
+    S2T3,
+    S2T3h,
+    S3T1,
+    S3T1h,
+    S3T2,
+    S3T2h,
+    S3T3,
+    S3T3h,
+}
+
+impl ScalabilityMode {
+    pub fn as_str(self) -> Result<String> {
+        let raw = unsafe { ffi::webrtc_ScalabilityModeToString(self.to_raw()) };
+        let raw =
+            NonNull::new(raw).expect("BUG: webrtc_ScalabilityModeToString が null を返しました");
+        CxxString::from_unique(raw).to_string()
+    }
+
+    fn from_raw(value: ffi::webrtc_ScalabilityMode) -> Option<Self> {
+        match value {
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L1T1 => Some(Self::L1T1),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L1T2 => Some(Self::L1T2),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L1T3 => Some(Self::L1T3),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T1 => Some(Self::L2T1),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T1h => Some(Self::L2T1h),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T1_KEY => {
+                Some(Self::L2T1Key)
+            }
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2 => Some(Self::L2T2),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2h => Some(Self::L2T2h),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2_KEY => {
+                Some(Self::L2T2Key)
+            }
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2_KEY_SHIFT => {
+                Some(Self::L2T2KeyShift)
+            }
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T3 => Some(Self::L2T3),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T3h => Some(Self::L2T3h),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T3_KEY => {
+                Some(Self::L2T3Key)
+            }
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T1 => Some(Self::L3T1),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T1h => Some(Self::L3T1h),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T1_KEY => {
+                Some(Self::L3T1Key)
+            }
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T2 => Some(Self::L3T2),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T2h => Some(Self::L3T2h),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T2_KEY => {
+                Some(Self::L3T2Key)
+            }
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T3 => Some(Self::L3T3),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T3h => Some(Self::L3T3h),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T3_KEY => {
+                Some(Self::L3T3Key)
+            }
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T1 => Some(Self::S2T1),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T1h => Some(Self::S2T1h),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T2 => Some(Self::S2T2),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T2h => Some(Self::S2T2h),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T3 => Some(Self::S2T3),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T3h => Some(Self::S2T3h),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T1 => Some(Self::S3T1),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T1h => Some(Self::S3T1h),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T2 => Some(Self::S3T2),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T2h => Some(Self::S3T2h),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T3 => Some(Self::S3T3),
+            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T3h => Some(Self::S3T3h),
+            _ => None,
+        }
+    }
+
+    fn to_raw(self) -> ffi::webrtc_ScalabilityMode {
+        match self {
+            Self::L1T1 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L1T1,
+            Self::L1T2 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L1T2,
+            Self::L1T3 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L1T3,
+            Self::L2T1 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T1,
+            Self::L2T1h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T1h,
+            Self::L2T1Key => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T1_KEY,
+            Self::L2T2 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2,
+            Self::L2T2h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2h,
+            Self::L2T2Key => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2_KEY,
+            Self::L2T2KeyShift => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2_KEY_SHIFT,
+            Self::L2T3 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T3,
+            Self::L2T3h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T3h,
+            Self::L2T3Key => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T3_KEY,
+            Self::L3T1 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T1,
+            Self::L3T1h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T1h,
+            Self::L3T1Key => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T1_KEY,
+            Self::L3T2 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T2,
+            Self::L3T2h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T2h,
+            Self::L3T2Key => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T2_KEY,
+            Self::L3T3 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T3,
+            Self::L3T3h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T3h,
+            Self::L3T3Key => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T3_KEY,
+            Self::S2T1 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T1,
+            Self::S2T1h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T1h,
+            Self::S2T2 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T2,
+            Self::S2T2h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T2h,
+            Self::S2T3 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T3,
+            Self::S2T3h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T3h,
+            Self::S3T1 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T1,
+            Self::S3T1h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T1h,
+            Self::S3T2 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T2,
+            Self::S3T2h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T2h,
+            Self::S3T3 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T3,
+            Self::S3T3h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T3h,
+        }
+    }
+}
 
 pub struct SdpVideoFormat {
     raw_unique: NonNull<ffi::webrtc_SdpVideoFormat_unique>,
@@ -10,17 +152,44 @@ pub struct SdpVideoFormat {
 
 impl SdpVideoFormat {
     pub fn new(name: &str) -> Self {
-        let raw = unsafe {
-            ffi::webrtc_SdpVideoFormat_new(
-                name.as_ptr() as *const _,
-                name.len(),
-                std::ptr::null_mut(),
-            )
-        };
+        let raw = unsafe { ffi::webrtc_SdpVideoFormat_new(name.as_ptr() as *const _, name.len()) };
         Self {
             raw_unique: NonNull::new(raw)
                 .expect("BUG: webrtc_SdpVideoFormat_new が null を返しました"),
         }
+    }
+
+    pub fn new_with_parameters(
+        name: &str,
+        parameters: &HashMap<String, String>,
+        scalability_modes: &[ScalabilityMode],
+    ) -> Self {
+        let raw_modes = scalability_modes
+            .iter()
+            .copied()
+            .map(ScalabilityMode::to_raw)
+            .collect::<Vec<_>>();
+        let raw = unsafe {
+            ffi::webrtc_SdpVideoFormat_new_with_parameters(
+                name.as_ptr() as *const _,
+                name.len(),
+                std::ptr::null_mut(),
+                if raw_modes.is_empty() {
+                    std::ptr::null()
+                } else {
+                    raw_modes.as_ptr()
+                },
+                raw_modes.len(),
+            )
+        };
+        let mut format = Self {
+            raw_unique: NonNull::new(raw)
+                .expect("BUG: webrtc_SdpVideoFormat_new_with_parameters が null を返しました"),
+        };
+        for (key, value) in parameters {
+            format.parameters_mut().set(key.as_str(), value.as_str());
+        }
+        format
     }
 
     pub fn name(&self) -> Result<String> {
@@ -33,6 +202,10 @@ impl SdpVideoFormat {
 
     pub fn is_equal(&self, other: SdpVideoFormatRef<'_>) -> bool {
         unsafe { ffi::webrtc_SdpVideoFormat_is_equal(self.raw().as_ptr(), other.raw.as_ptr()) != 0 }
+    }
+
+    pub fn scalability_modes(&self) -> Vec<ScalabilityMode> {
+        self.as_ref().scalability_modes()
     }
 
     pub fn as_ref(&self) -> SdpVideoFormatRef<'_> {
@@ -82,6 +255,27 @@ impl<'a> SdpVideoFormatRef<'a> {
     pub fn parameters_mut(&mut self) -> MapStringString<'a> {
         let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(self.raw.as_ptr()) };
         MapStringString::from_raw(NonNull::new(ptr).expect("BUG: ptr が null"))
+    }
+
+    pub fn scalability_modes(&self) -> Vec<ScalabilityMode> {
+        let len =
+            unsafe { ffi::webrtc_SdpVideoFormat_get_scalability_modes_size(self.raw.as_ptr()) };
+        if len == 0 {
+            return Vec::new();
+        }
+        let mut raw_modes = vec![ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L1T1; len];
+        let copied = unsafe {
+            ffi::webrtc_SdpVideoFormat_copy_scalability_modes(
+                self.raw.as_ptr(),
+                raw_modes.as_mut_ptr(),
+                raw_modes.len(),
+            )
+        };
+        raw_modes
+            .into_iter()
+            .take(copied)
+            .filter_map(ScalabilityMode::from_raw)
+            .collect()
     }
 
     pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_SdpVideoFormat {
@@ -478,6 +672,17 @@ pub enum VideoCodecType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParseVideoCodecTypeError;
+
+impl fmt::Display for ParseVideoCodecTypeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("invalid video codec type")
+    }
+}
+
+impl std::error::Error for ParseVideoCodecTypeError {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VideoCodecStatus {
     TargetBitrateOvershoot,
     OkRequestKeyframe,
@@ -551,6 +756,18 @@ impl VideoCodecStatus {
 }
 
 impl VideoCodecType {
+    pub fn as_str(self) -> Option<&'static str> {
+        match self {
+            Self::Generic => Some("Generic"),
+            Self::Vp8 => Some("VP8"),
+            Self::Vp9 => Some("VP9"),
+            Self::Av1 => Some("AV1"),
+            Self::H264 => Some("H264"),
+            Self::H265 => Some("H265"),
+            Self::Unknown(_) => None,
+        }
+    }
+
     pub(crate) fn from_raw(value: i32) -> Self {
         if value == unsafe { ffi::webrtc_VideoCodecType_Generic } {
             Self::Generic
@@ -579,6 +796,30 @@ impl VideoCodecType {
             Self::H265 => unsafe { ffi::webrtc_VideoCodecType_H265 },
             Self::Unknown(v) => v,
         }
+    }
+}
+
+impl TryFrom<&str> for VideoCodecType {
+    type Error = ParseVideoCodecTypeError;
+
+    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+        match value {
+            "Generic" => Ok(Self::Generic),
+            "VP8" => Ok(Self::Vp8),
+            "VP9" => Ok(Self::Vp9),
+            "AV1" => Ok(Self::Av1),
+            "H264" => Ok(Self::H264),
+            "H265" => Ok(Self::H265),
+            _ => Err(ParseVideoCodecTypeError),
+        }
+    }
+}
+
+impl std::str::FromStr for VideoCodecType {
+    type Err = ParseVideoCodecTypeError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Self::try_from(s)
     }
 }
 
@@ -619,6 +860,10 @@ impl<'a> VideoCodecRef<'a> {
 
     pub fn max_framerate(&self) -> u32 {
         unsafe { ffi::webrtc_VideoCodec_max_framerate(self.raw.as_ptr()) }
+    }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoCodec {
+        self.raw.as_ptr()
     }
 }
 

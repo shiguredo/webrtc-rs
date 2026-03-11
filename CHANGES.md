@@ -11,6 +11,12 @@
 
 ## develop
 
+- [CHANGE] VideoEncoder / VideoDecoder の API を handler と 1 対 1 に統一する
+  - `VideoEncoder::init_encode` / `encode` / `set_rates` を handler と同じ引数に統一する
+  - `VideoDecoder::configure` / `decode` を handler と同じ引数に統一する
+  - `VideoEncoder::init_encode()` / `VideoEncoder::set_rates()` / `VideoDecoder::configure()` の 0 引数 API を削除する
+  - `webrtc_GetDefaultVideoFormats` と `get_default_video_formats` を削除し、`webrtc-c` の独自 convenience API をなくす
+  - @melpon
 - [CHANGE] VideoEncoder / VideoDecoder / factory の callback API を handler trait 形式に変更する
   - `VideoEncoderHandler` / `VideoDecoderHandler` / `VideoEncoderFactoryHandler` / `VideoDecoderFactoryHandler` / `VideoEncoderEncodedImageCallbackHandler` を追加する
   - `new_with_callbacks` を `new_with_handler` に変更する
@@ -24,6 +30,16 @@
 - [CHANGE] libyuv 変換 API 名を libyuv と 1 対 1 に統一する
   - `i420_to_argb` を削除し、`convert_from_i420` と `LibyuvFourcc` を追加する
   - `i420_to_nv12` を追加する
+  - @melpon
+- [ADD] `SdpVideoFormat` の parameters / scalability modes を扱う API を追加する
+  - `ScalabilityMode` 型を追加する
+  - `SdpVideoFormat::new_with_parameters` と `SdpVideoFormat::scalability_modes` を追加する
+  - `SdpVideoFormatRef::scalability_modes` を追加する
+  - @melpon
+- [ADD] `VideoCodecType` の文字列変換 API を追加する
+  - `VideoCodecType::as_str`
+  - `TryFrom<&str> for VideoCodecType`
+  - `FromStr for VideoCodecType`
   - @melpon
 - [UPDATE] libwebrtc m146 (m146.7680.0.0) に上げる
   - @voluntas

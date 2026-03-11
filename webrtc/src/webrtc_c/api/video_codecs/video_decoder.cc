@@ -14,6 +14,7 @@
 
 #include "../../common.impl.h"
 #include "../../std.h"
+#include "../video/video_frame.h"
 
 namespace {
 
@@ -228,6 +229,26 @@ int32_t webrtc_VideoDecoder_Decode(struct webrtc_VideoDecoder* self,
   }
   webrtc::EncodedImage default_input_image;
   return decoder->Decode(default_input_image, render_time_ms);
+}
+
+int32_t webrtc_VideoDecoder_RegisterDecodeCompleteCallback(
+    struct webrtc_VideoDecoder* self,
+    struct webrtc_VideoDecoder_DecodedImageCallback* callback) {
+  if (self == nullptr) {
+    return -1;
+  }
+  auto decoder = reinterpret_cast<webrtc::VideoDecoder*>(self);
+  auto decoded_image_callback =
+      reinterpret_cast<webrtc::DecodedImageCallback*>(callback);
+  return decoder->RegisterDecodeCompleteCallback(decoded_image_callback);
+}
+
+int32_t webrtc_VideoDecoder_Release(struct webrtc_VideoDecoder* self) {
+  if (self == nullptr) {
+    return -1;
+  }
+  auto decoder = reinterpret_cast<webrtc::VideoDecoder*>(self);
+  return decoder->Release();
 }
 
 struct webrtc_VideoDecoder_DecoderInfo_unique*

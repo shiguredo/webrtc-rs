@@ -144,7 +144,8 @@ extern const int
 extern const int webrtc_PeerConnectionInterface_PeerConnectionState_kFailed;
 extern const int webrtc_PeerConnectionInterface_PeerConnectionState_kClosed;
 typedef int webrtc_PeerConnectionInterface_IceConnectionState;
-extern const int webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionNew;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionNew;
 extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionChecking;
 extern const int
@@ -160,7 +161,8 @@ extern const int
 extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionMax;
 typedef int webrtc_PeerConnectionInterface_IceGatheringState;
-extern const int webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringNew;
+extern const int
+    webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringNew;
 extern const int
     webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringGathering;
 extern const int
