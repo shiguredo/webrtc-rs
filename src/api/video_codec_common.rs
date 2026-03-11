@@ -1,7 +1,6 @@
 use crate::ref_count::{EncodedImageBufferHandle, I420BufferHandle};
-use crate::{CxxString, CxxStringRef, MapStringString, Result, ScopedRef, ffi};
+use crate::{CxxString, CxxStringRef, Error, MapStringString, Result, ScopedRef, ffi};
 use std::collections::HashMap;
-use std::fmt;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::slice;
@@ -662,17 +661,6 @@ pub enum VideoCodecType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ParseVideoCodecTypeError;
-
-impl fmt::Display for ParseVideoCodecTypeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("invalid video codec type")
-    }
-}
-
-impl std::error::Error for ParseVideoCodecTypeError {}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VideoCodecStatus {
     TargetBitrateOvershoot,
     OkRequestKeyframe,
@@ -790,9 +778,9 @@ impl VideoCodecType {
 }
 
 impl TryFrom<&str> for VideoCodecType {
-    type Error = ParseVideoCodecTypeError;
+    type Error = Error;
 
-    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &str) -> Result<Self> {
         match value {
             "Generic" => Ok(Self::Generic),
             "VP8" => Ok(Self::Vp8),
@@ -800,15 +788,15 @@ impl TryFrom<&str> for VideoCodecType {
             "AV1" => Ok(Self::Av1),
             "H264" => Ok(Self::H264),
             "H265" => Ok(Self::H265),
-            _ => Err(ParseVideoCodecTypeError),
+            _ => Err(Error::InvalidVideoCodecType(value.to_string())),
         }
     }
 }
 
 impl std::str::FromStr for VideoCodecType {
-    type Err = ParseVideoCodecTypeError;
+    type Err = Error;
 
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         Self::try_from(s)
     }
 }
