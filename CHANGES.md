@@ -11,12 +11,6 @@
 
 ## develop
 
-- [ADD] PeerConnectionObserverHandler に `on_standardized_ice_connection_change` / `on_ice_gathering_change` / `on_ice_candidate_error` コールバックを追加する
-  - `IceConnectionState` / `IceGatheringState` / `IceCandidateError` 型を追加する
-  - @voluntas
-- [ADD] DtlsTransportInterface と PeerConnection の ICE/DTLS 関連 C API を追加する
-  - @voluntas
-
 - [CHANGE] VideoEncoder / VideoDecoder / factory の callback API を handler trait 形式に変更する
   - `VideoEncoderHandler` / `VideoDecoderHandler` / `VideoEncoderFactoryHandler` / `VideoDecoderFactoryHandler` / `VideoEncoderEncodedImageCallbackHandler` を追加する
   - `new_with_callbacks` を `new_with_handler` に変更する
@@ -35,6 +29,11 @@
   - @voluntas
 - [UPDATE] cmake の代わりに shiguredo_cmake を利用する
   - @melpon
+- [ADD] PeerConnectionObserverHandler に `on_standardized_ice_connection_change` / `on_ice_gathering_change` / `on_ice_candidate_error` コールバックを追加する
+  - `IceConnectionState` / `IceGatheringState` / `IceCandidateError` 型を追加する
+  - @voluntas
+- [ADD] DtlsTransportInterface と PeerConnection の ICE/DTLS 関連 C API を追加する
+  - @voluntas
 
 ### misc
 
