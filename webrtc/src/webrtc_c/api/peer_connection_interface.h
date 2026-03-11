@@ -6,6 +6,7 @@
 #include "../rtc_base/thread.h"
 #include "../std.h"
 #include "data_channel_interface.h"
+#include "dtls_transport_interface.h"
 #include "jsep.h"
 #include "media_stream_interface.h"
 #include "rtc_error.h"
@@ -62,6 +63,14 @@ extern const int webrtc_PeerConnectionInterface_IceTransportsType_kRelay;
 void webrtc_PeerConnectionInterface_RTCConfiguration_set_type(
     struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
     webrtc_PeerConnectionInterface_IceTransportsType type);
+typedef int webrtc_PeerConnectionInterface_SdpSemantics;
+extern const int webrtc_PeerConnectionInterface_SdpSemantics_kUnifiedPlan;
+void webrtc_PeerConnectionInterface_RTCConfiguration_set_sdp_semantics(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    webrtc_PeerConnectionInterface_SdpSemantics sdp_semantics);
+void webrtc_PeerConnectionInterface_RTCConfiguration_set_enable_gcm_crypto_suites(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    int enable_gcm_crypto_suites);
 struct webrtc_PeerConnectionDependencies;
 struct webrtc_PeerConnectionDependencies* webrtc_PeerConnectionDependencies_new(
     struct webrtc_PeerConnectionObserver* observer);
@@ -115,6 +124,11 @@ void webrtc_PeerConnectionInterface_SetConfiguration(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_PeerConnectionInterface_RTCConfiguration* config,
     struct webrtc_RTCError_unique** out_rtc_error);
+struct webrtc_DtlsTransportInterface_refcounted*
+webrtc_PeerConnectionInterface_LookupDtlsTransportByMid(
+    struct webrtc_PeerConnectionInterface* self,
+    const char* mid,
+    size_t mid_len);
 
 void webrtc_PeerConnectionInterface_GetStats(
     struct webrtc_PeerConnectionInterface* self,
@@ -129,6 +143,28 @@ extern const int
     webrtc_PeerConnectionInterface_PeerConnectionState_kDisconnected;
 extern const int webrtc_PeerConnectionInterface_PeerConnectionState_kFailed;
 extern const int webrtc_PeerConnectionInterface_PeerConnectionState_kClosed;
+typedef int webrtc_PeerConnectionInterface_IceConnectionState;
+extern const int webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionNew;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionChecking;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionConnected;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionCompleted;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionFailed;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionDisconnected;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionClosed;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionMax;
+typedef int webrtc_PeerConnectionInterface_IceGatheringState;
+extern const int webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringNew;
+extern const int
+    webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringGathering;
+extern const int
+    webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringComplete;
 
 struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions*
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_new();
@@ -186,12 +222,23 @@ struct webrtc_PeerConnectionObserver_cbs {
   //                    << webrtc::PeerConnectionInterface::AsString(new_state);
   // }
   // void OnDataChannel(webrtc::scoped_refptr<webrtc::DataChannelInterface> data_channel) override {}
-  // void OnStandardizedIceConnectionChange(webrtc::PeerConnectionInterface::IceConnectionState new_state) override {}
+  void (*OnStandardizedIceConnectionChange)(
+      webrtc_PeerConnectionInterface_IceConnectionState new_state,
+      void* user_data);
   void (*OnConnectionChange)(
       webrtc_PeerConnectionInterface_PeerConnectionState new_state,
       void* user_data);
   void (*OnIceCandidate)(const struct webrtc_IceCandidate* candidate,
                          void* user_data);
+  void (*OnIceCandidateError)(const char* address,
+                              size_t address_len,
+                              int port,
+                              const char* url,
+                              size_t url_len,
+                              int error_code,
+                              const char* error_text,
+                              size_t error_text_len,
+                              void* user_data);
   void (*OnTrack)(struct webrtc_RtpTransceiverInterface_refcounted* transceiver,
                   void* user_data);
   void (*OnRemoveTrack)(struct webrtc_RtpReceiverInterface_refcounted* receiver,
@@ -200,7 +247,9 @@ struct webrtc_PeerConnectionObserver_cbs {
       struct webrtc_DataChannelInterface_refcounted* data_channel,
       void* user_data);
   void (*OnDestroy)(void* user_data);
-  // void OnIceGatheringChange(webrtc::PeerConnectionInterface::IceGatheringState new_state) override {}
+  void (*OnIceGatheringChange)(
+      webrtc_PeerConnectionInterface_IceGatheringState new_state,
+      void* user_data);
   // void OnIceCandidate(const webrtc::IceCandidate* candidate) override {}
   // void OnIceCandidateError(const std::string& address, int port, const std::string& url, int error_code, const std::string& error_text) override {}
   // void OnTrack(webrtc::scoped_refptr<webrtc::RtpTransceiverInterface> transceiver) override {}

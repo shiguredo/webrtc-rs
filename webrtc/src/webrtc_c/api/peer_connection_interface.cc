@@ -44,6 +44,7 @@
 #include "audio_codecs/audio_decoder_factory.h"
 #include "audio_codecs/audio_encoder_factory.h"
 #include "data_channel_interface.h"
+#include "dtls_transport_interface.h"
 #include "jsep.h"
 #include "media_stream_interface.h"
 #include "rtc_error.h"
@@ -94,7 +95,14 @@ class PeerConnectionObserverImpl : public webrtc::PeerConnectionObserver {
     }
   }
   void OnStandardizedIceConnectionChange(
-      webrtc::PeerConnectionInterface::IceConnectionState new_state) override {}
+      webrtc::PeerConnectionInterface::IceConnectionState new_state) override {
+    if (observer_.OnStandardizedIceConnectionChange != nullptr) {
+      observer_.OnStandardizedIceConnectionChange(
+          static_cast<webrtc_PeerConnectionInterface_IceConnectionState>(
+              new_state),
+          user_data_);
+    }
+  }
   void OnConnectionChange(
       webrtc::PeerConnectionInterface::PeerConnectionState new_state) override {
     if (observer_.OnConnectionChange != nullptr) {
@@ -105,7 +113,14 @@ class PeerConnectionObserverImpl : public webrtc::PeerConnectionObserver {
     }
   }
   void OnIceGatheringChange(
-      webrtc::PeerConnectionInterface::IceGatheringState new_state) override {}
+      webrtc::PeerConnectionInterface::IceGatheringState new_state) override {
+    if (observer_.OnIceGatheringChange != nullptr) {
+      observer_.OnIceGatheringChange(
+          static_cast<webrtc_PeerConnectionInterface_IceGatheringState>(
+              new_state),
+          user_data_);
+    }
+  }
   void OnIceCandidate(const webrtc::IceCandidate* candidate) override {
     if (observer_.OnIceCandidate != nullptr) {
       observer_.OnIceCandidate(
@@ -117,7 +132,14 @@ class PeerConnectionObserverImpl : public webrtc::PeerConnectionObserver {
                            int port,
                            const std::string& url,
                            int error_code,
-                           const std::string& error_text) override {}
+                           const std::string& error_text) override {
+    if (observer_.OnIceCandidateError != nullptr) {
+      observer_.OnIceCandidateError(address.c_str(), address.size(), port,
+                                    url.c_str(), url.size(), error_code,
+                                    error_text.c_str(), error_text.size(),
+                                    user_data_);
+    }
+  }
   void OnTrack(webrtc::scoped_refptr<webrtc::RtpTransceiverInterface>
                    transceiver) override {
     if (observer_.OnTrack != nullptr) {
@@ -263,6 +285,25 @@ void webrtc_PeerConnectionInterface_RTCConfiguration_set_type(
           self);
   config->type =
       static_cast<webrtc::PeerConnectionInterface::IceTransportsType>(type);
+}
+extern const int webrtc_PeerConnectionInterface_SdpSemantics_kUnifiedPlan =
+    static_cast<int>(webrtc::SdpSemantics::kUnifiedPlan);
+void webrtc_PeerConnectionInterface_RTCConfiguration_set_sdp_semantics(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    webrtc_PeerConnectionInterface_SdpSemantics sdp_semantics) {
+  auto config =
+      reinterpret_cast<webrtc::PeerConnectionInterface::RTCConfiguration*>(
+          self);
+  config->sdp_semantics = static_cast<webrtc::SdpSemantics>(sdp_semantics);
+}
+void webrtc_PeerConnectionInterface_RTCConfiguration_set_enable_gcm_crypto_suites(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    int enable_gcm_crypto_suites) {
+  auto config =
+      reinterpret_cast<webrtc::PeerConnectionInterface::RTCConfiguration*>(
+          self);
+  config->crypto_options.srtp.enable_gcm_crypto_suites =
+      enable_gcm_crypto_suites != 0;
 }
 struct webrtc_PeerConnectionDependencies* webrtc_PeerConnectionDependencies_new(
     struct webrtc_PeerConnectionObserver* observer) {
@@ -471,6 +512,23 @@ void webrtc_PeerConnectionInterface_SetConfiguration(
   }
 }
 
+struct webrtc_DtlsTransportInterface_refcounted*
+webrtc_PeerConnectionInterface_LookupDtlsTransportByMid(
+    struct webrtc_PeerConnectionInterface* self,
+    const char* mid,
+    size_t mid_len) {
+  if (self == nullptr || mid == nullptr) {
+    return nullptr;
+  }
+  auto pc = reinterpret_cast<webrtc::PeerConnectionInterface*>(self);
+  auto transport = pc->LookupDtlsTransportByMid(std::string(mid, mid_len));
+  if (transport == nullptr) {
+    return nullptr;
+  }
+  return reinterpret_cast<struct webrtc_DtlsTransportInterface_refcounted*>(
+      transport.release());
+}
+
 void webrtc_PeerConnectionInterface_GetStats(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_RTCStatsCollectorCallback_cbs* cbs,
@@ -632,6 +690,39 @@ extern const int webrtc_PeerConnectionInterface_PeerConnectionState_kFailed =
     (int)webrtc::PeerConnectionInterface::PeerConnectionState::kFailed;
 extern const int webrtc_PeerConnectionInterface_PeerConnectionState_kClosed =
     (int)webrtc::PeerConnectionInterface::PeerConnectionState::kClosed;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionNew =
+        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionNew;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionChecking =
+        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionChecking;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionConnected =
+        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionConnected;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionCompleted =
+        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionCompleted;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionFailed =
+        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionFailed;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionDisconnected =
+        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionDisconnected;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionClosed =
+        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionClosed;
+extern const int
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionMax =
+        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionMax;
+extern const int
+    webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringNew =
+        (int)webrtc::PeerConnectionInterface::IceGatheringState::kIceGatheringNew;
+extern const int
+    webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringGathering =
+        (int)webrtc::PeerConnectionInterface::IceGatheringState::kIceGatheringGathering;
+extern const int
+    webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringComplete =
+        (int)webrtc::PeerConnectionInterface::IceGatheringState::kIceGatheringComplete;
 }
 
 // -------------------------
