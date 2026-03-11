@@ -12,6 +12,7 @@ pub enum Error {
     SdpParseError(SdpParseError),
     InvalidSdp,
     InvalidIceCandidate,
+    InvalidVideoCodecType(String),
     OutOfIndex(usize),
 }
 
@@ -42,6 +43,9 @@ impl fmt::Display for Error {
             }
             Error::InvalidSdp => f.write_str("不正な SDP です"),
             Error::InvalidIceCandidate => f.write_str("不正な ICE candidate です"),
+            Error::InvalidVideoCodecType(codec_type) => {
+                write!(f, "不正な VideoCodecType です: {}", codec_type)
+            }
             Error::OutOfIndex(index) => write!(f, "インデックス {} が範囲外です", index),
         }
     }

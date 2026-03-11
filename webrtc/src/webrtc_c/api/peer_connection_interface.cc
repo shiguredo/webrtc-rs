@@ -134,10 +134,9 @@ class PeerConnectionObserverImpl : public webrtc::PeerConnectionObserver {
                            int error_code,
                            const std::string& error_text) override {
     if (observer_.OnIceCandidateError != nullptr) {
-      observer_.OnIceCandidateError(address.c_str(), address.size(), port,
-                                    url.c_str(), url.size(), error_code,
-                                    error_text.c_str(), error_text.size(),
-                                    user_data_);
+      observer_.OnIceCandidateError(
+          address.c_str(), address.size(), port, url.c_str(), url.size(),
+          error_code, error_text.c_str(), error_text.size(), user_data_);
     }
   }
   void OnTrack(webrtc::scoped_refptr<webrtc::RtpTransceiverInterface>
@@ -691,38 +690,46 @@ extern const int webrtc_PeerConnectionInterface_PeerConnectionState_kFailed =
 extern const int webrtc_PeerConnectionInterface_PeerConnectionState_kClosed =
     (int)webrtc::PeerConnectionInterface::PeerConnectionState::kClosed;
 extern const int
-    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionNew =
-        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionNew;
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionNew = (int)
+        webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionNew;
 extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionChecking =
-        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionChecking;
+        (int)webrtc::PeerConnectionInterface::IceConnectionState::
+            kIceConnectionChecking;
 extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionConnected =
-        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionConnected;
+        (int)webrtc::PeerConnectionInterface::IceConnectionState::
+            kIceConnectionConnected;
 extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionCompleted =
-        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionCompleted;
+        (int)webrtc::PeerConnectionInterface::IceConnectionState::
+            kIceConnectionCompleted;
 extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionFailed =
-        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionFailed;
+        (int)webrtc::PeerConnectionInterface::IceConnectionState::
+            kIceConnectionFailed;
 extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionDisconnected =
-        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionDisconnected;
+        (int)webrtc::PeerConnectionInterface::IceConnectionState::
+            kIceConnectionDisconnected;
 extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionClosed =
-        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionClosed;
+        (int)webrtc::PeerConnectionInterface::IceConnectionState::
+            kIceConnectionClosed;
 extern const int
-    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionMax =
-        (int)webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionMax;
+    webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionMax = (int)
+        webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionMax;
 extern const int
-    webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringNew =
-        (int)webrtc::PeerConnectionInterface::IceGatheringState::kIceGatheringNew;
+    webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringNew = (int)
+        webrtc::PeerConnectionInterface::IceGatheringState::kIceGatheringNew;
 extern const int
     webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringGathering =
-        (int)webrtc::PeerConnectionInterface::IceGatheringState::kIceGatheringGathering;
+        (int)webrtc::PeerConnectionInterface::IceGatheringState::
+            kIceGatheringGathering;
 extern const int
     webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringComplete =
-        (int)webrtc::PeerConnectionInterface::IceGatheringState::kIceGatheringComplete;
+        (int)webrtc::PeerConnectionInterface::IceGatheringState::
+            kIceGatheringComplete;
 }
 
 // -------------------------

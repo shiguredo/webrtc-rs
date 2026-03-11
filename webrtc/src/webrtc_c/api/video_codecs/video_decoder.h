@@ -76,6 +76,10 @@ int webrtc_VideoDecoder_Configure(
 int32_t webrtc_VideoDecoder_Decode(struct webrtc_VideoDecoder* self,
                                    struct webrtc_EncodedImage* input_image,
                                    int64_t render_time_ms);
+int32_t webrtc_VideoDecoder_RegisterDecodeCompleteCallback(
+    struct webrtc_VideoDecoder* self,
+    struct webrtc_VideoDecoder_DecodedImageCallback* callback);
+int32_t webrtc_VideoDecoder_Release(struct webrtc_VideoDecoder* self);
 struct webrtc_VideoDecoder_DecoderInfo_unique*
 webrtc_VideoDecoder_GetDecoderInfo(struct webrtc_VideoDecoder* self);
 

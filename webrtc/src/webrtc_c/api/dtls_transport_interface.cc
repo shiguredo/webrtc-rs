@@ -26,6 +26,7 @@ webrtc_DtlsTransportState webrtc_DtlsTransportInterface_state(
     return webrtc_DtlsTransportState_kClosed;
   }
   auto transport = reinterpret_cast<webrtc::DtlsTransportInterface*>(self);
-  return static_cast<webrtc_DtlsTransportState>(transport->Information().state());
+  return static_cast<webrtc_DtlsTransportState>(
+      transport->Information().state());
 }
 }

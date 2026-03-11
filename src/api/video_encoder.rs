@@ -1,6 +1,6 @@
 use super::video_codec_common::{
     EncodedImageRef, SdpVideoFormat, SdpVideoFormatRef, VideoCodecRef, VideoCodecStatus,
-    VideoCodecType, VideoFrame, VideoFrameRef, VideoFrameTypeVectorRef,
+    VideoCodecType, VideoFrameRef, VideoFrameTypeVectorRef,
 };
 use crate::{CxxString, EnvironmentRef, Result, ffi};
 use std::marker::PhantomData;
@@ -109,6 +109,10 @@ impl<'a> VideoEncoderSettingsRef<'a> {
         }
         Some(unsafe { ffi::webrtc_VideoEncoder_Settings_encoder_thread_limit(self.raw.as_ptr()) })
     }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoEncoder_Settings {
+        self.raw.as_ptr()
+    }
 }
 
 unsafe impl<'a> Send for VideoEncoderSettingsRef<'a> {}
@@ -148,6 +152,10 @@ impl<'a> VideoEncoderRateControlParametersRef<'a> {
                 self.raw.as_ptr(),
             )
         }
+    }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoEncoder_RateControlParameters {
+        self.raw.as_ptr()
     }
 }
 
@@ -1088,31 +1096,30 @@ impl VideoEncoder {
         std::mem::ManuallyDrop::new(self).raw_unique.as_ptr()
     }
 
-    pub fn init_encode(&mut self) -> VideoCodecStatus {
+    pub fn init_encode(
+        &mut self,
+        codec_settings: VideoCodecRef<'_>,
+        settings: VideoEncoderSettingsRef<'_>,
+    ) -> VideoCodecStatus {
         let value = unsafe {
             ffi::webrtc_VideoEncoder_InitEncode(
                 self.as_ptr(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
+                codec_settings.as_ptr(),
+                settings.as_ptr(),
             )
         };
         VideoCodecStatus::from_raw(value)
     }
 
-    pub fn encode(&mut self, frame: &VideoFrame) -> VideoCodecStatus {
-        self.encode_with_frame_types(frame, None)
-    }
-
-    pub fn encode_with_frame_types(
+    pub fn encode(
         &mut self,
-        frame: &VideoFrame,
+        frame: VideoFrameRef<'_>,
         frame_types: Option<VideoFrameTypeVectorRef<'_>>,
     ) -> VideoCodecStatus {
         let frame_types =
             frame_types.map_or(std::ptr::null_mut(), |frame_types| frame_types.as_ptr());
-        let value = unsafe {
-            ffi::webrtc_VideoEncoder_Encode(self.as_ptr(), frame.raw().as_ptr(), frame_types)
-        };
+        let value =
+            unsafe { ffi::webrtc_VideoEncoder_Encode(self.as_ptr(), frame.as_ptr(), frame_types) };
         VideoCodecStatus::from_raw(value)
     }
 
@@ -1127,8 +1134,13 @@ impl VideoEncoder {
         VideoCodecStatus::from_raw(value)
     }
 
-    pub fn set_rates(&mut self) {
-        unsafe { ffi::webrtc_VideoEncoder_SetRates(self.as_ptr(), std::ptr::null_mut()) };
+    pub fn set_rates(&mut self, parameters: VideoEncoderRateControlParametersRef<'_>) {
+        unsafe { ffi::webrtc_VideoEncoder_SetRates(self.as_ptr(), parameters.as_ptr()) };
+    }
+
+    pub fn release(&mut self) -> VideoCodecStatus {
+        let value = unsafe { ffi::webrtc_VideoEncoder_Release(self.as_ptr()) };
+        VideoCodecStatus::from_raw(value)
     }
 
     pub fn get_encoder_info(&self) -> VideoEncoderEncoderInfo {
@@ -1139,11 +1151,50 @@ impl VideoEncoder {
     }
 }
 
+impl VideoEncoderHandler for VideoEncoder {
+    fn init_encode(
+        &mut self,
+        codec_settings: VideoCodecRef<'_>,
+        settings: VideoEncoderSettingsRef<'_>,
+    ) -> VideoCodecStatus {
+        VideoEncoder::init_encode(self, codec_settings, settings)
+    }
+
+    fn encode(
+        &mut self,
+        frame: VideoFrameRef<'_>,
+        frame_types: Option<VideoFrameTypeVectorRef<'_>>,
+    ) -> VideoCodecStatus {
+        VideoEncoder::encode(self, frame, frame_types)
+    }
+
+    fn register_encode_complete_callback(
+        &mut self,
+        callback: Option<VideoEncoderEncodedImageCallbackRef<'_>>,
+    ) -> VideoCodecStatus {
+        VideoEncoder::register_encode_complete_callback(self, callback)
+    }
+
+    fn release(&mut self) -> VideoCodecStatus {
+        VideoEncoder::release(self)
+    }
+
+    fn set_rates(&mut self, parameters: VideoEncoderRateControlParametersRef<'_>) {
+        VideoEncoder::set_rates(self, parameters);
+    }
+
+    fn get_encoder_info(&mut self) -> VideoEncoderEncoderInfo {
+        VideoEncoder::get_encoder_info(self)
+    }
+}
+
 impl Drop for VideoEncoder {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoEncoder_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
+
+unsafe impl Send for VideoEncoder {}
 
 /// webrtc::VideoEncoderFactory のラッパー。
 pub struct VideoEncoderFactory {
@@ -1220,3 +1271,5 @@ impl Drop for VideoEncoderFactory {
         unsafe { ffi::webrtc_VideoEncoderFactory_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
+
+unsafe impl Send for VideoEncoderFactory {}

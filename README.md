@@ -197,6 +197,8 @@ impl FactoryHolder {
 
 - `VideoCodecRef` / `VideoCodecType` / `VideoCodecStatus`
   - 映像コーデック共通型とステータス
+- `ScalabilityMode`
+  - スケーラビリティーモード
 - `VideoFrameType` / `VideoFrameTypeVector` / `VideoFrameTypeVectorRef`
   - エンコード対象フレーム種別
 - `EncodedImageBuffer` / `EncodedImage` / `EncodedImageRef`
