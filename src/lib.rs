@@ -1,5 +1,10 @@
 pub mod ffi;
 
+/// クレートのバージョンを返す
+pub fn version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
 mod api;
 mod cxxstd;
 mod error;

@@ -29,6 +29,8 @@
   - @voluntas
 - [UPDATE] cmake の代わりに shiguredo_cmake を利用する
   - @melpon
+- [ADD] `version()` 関数を追加する
+  - @voluntas
 - [ADD] PeerConnectionObserverHandler に `on_standardized_ice_connection_change` / `on_ice_gathering_change` / `on_ice_candidate_error` コールバックを追加する
   - `IceConnectionState` / `IceGatheringState` / `IceCandidateError` 型を追加する
   - @voluntas
