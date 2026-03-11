@@ -12,7 +12,7 @@ use crate::{
     VideoEncoderFactory, VideoTrack, VideoTrackSource, ffi,
 };
 use std::marker::PhantomData;
-use std::os::raw::c_void;
+use std::os::raw::{c_char, c_void};
 use std::ptr::NonNull;
 
 /// PeerConnectionFactoryDependencies のラッパー。
@@ -784,15 +784,158 @@ impl PeerConnectionState {
     }
 }
 
+/// IceConnectionState のラッパー。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IceConnectionState {
+    New,
+    Checking,
+    Connected,
+    Completed,
+    Failed,
+    Disconnected,
+    Closed,
+    Max,
+    Unknown(i32),
+}
+
+impl IceConnectionState {
+    pub fn from_int(v: i32) -> Self {
+        unsafe {
+            if v == ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionNew {
+                IceConnectionState::New
+            } else if v
+                == ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionChecking
+            {
+                IceConnectionState::Checking
+            } else if v
+                == ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionConnected
+            {
+                IceConnectionState::Connected
+            } else if v
+                == ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionCompleted
+            {
+                IceConnectionState::Completed
+            } else if v
+                == ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionFailed
+            {
+                IceConnectionState::Failed
+            } else if v
+                == ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionDisconnected
+            {
+                IceConnectionState::Disconnected
+            } else if v
+                == ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionClosed
+            {
+                IceConnectionState::Closed
+            } else if v == ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionMax
+            {
+                IceConnectionState::Max
+            } else {
+                IceConnectionState::Unknown(v)
+            }
+        }
+    }
+
+    pub fn to_int(self) -> i32 {
+        match self {
+            IceConnectionState::New => unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionNew
+            },
+            IceConnectionState::Checking => unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionChecking
+            },
+            IceConnectionState::Connected => unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionConnected
+            },
+            IceConnectionState::Completed => unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionCompleted
+            },
+            IceConnectionState::Failed => unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionFailed
+            },
+            IceConnectionState::Disconnected => unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionDisconnected
+            },
+            IceConnectionState::Closed => unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionClosed
+            },
+            IceConnectionState::Max => unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionMax
+            },
+            IceConnectionState::Unknown(v) => v,
+        }
+    }
+}
+
+/// IceGatheringState のラッパー。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IceGatheringState {
+    New,
+    Gathering,
+    Complete,
+    Unknown(i32),
+}
+
+impl IceGatheringState {
+    pub fn from_int(v: i32) -> Self {
+        unsafe {
+            if v == ffi::webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringNew {
+                IceGatheringState::New
+            } else if v
+                == ffi::webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringGathering
+            {
+                IceGatheringState::Gathering
+            } else if v
+                == ffi::webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringComplete
+            {
+                IceGatheringState::Complete
+            } else {
+                IceGatheringState::Unknown(v)
+            }
+        }
+    }
+
+    pub fn to_int(self) -> i32 {
+        match self {
+            IceGatheringState::New => unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringNew
+            },
+            IceGatheringState::Gathering => unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringGathering
+            },
+            IceGatheringState::Complete => unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringComplete
+            },
+            IceGatheringState::Unknown(v) => v,
+        }
+    }
+}
+
+/// ICE candidate エラー情報。
+#[derive(Debug, Clone)]
+pub struct IceCandidateError {
+    pub address: String,
+    pub port: i32,
+    pub url: String,
+    pub error_code: i32,
+    pub error_text: String,
+}
+
 pub trait PeerConnectionObserverHandler: Send {
     #[expect(unused_variables)]
     fn on_connection_change(&mut self, new_state: PeerConnectionState) {}
+    #[expect(unused_variables)]
+    fn on_standardized_ice_connection_change(&mut self, new_state: IceConnectionState) {}
+    #[expect(unused_variables)]
+    fn on_ice_gathering_change(&mut self, new_state: IceGatheringState) {}
     #[expect(unused_variables)]
     fn on_track(&mut self, transceiver: RtpTransceiver) {}
     #[expect(unused_variables)]
     fn on_remove_track(&mut self, receiver: RtpReceiver) {}
     #[expect(unused_variables)]
     fn on_ice_candidate(&mut self, candidate: IceCandidateRef<'_>) {}
+    #[expect(unused_variables)]
+    fn on_ice_candidate_error(&mut self, error: IceCandidateError) {}
     #[expect(unused_variables)]
     fn on_data_channel(&mut self, data_channel: DataChannel) {}
 }
@@ -809,6 +952,65 @@ unsafe extern "C" fn observer_on_connection_change(new_state: i32, user_data: *m
     state
         .handler
         .on_connection_change(PeerConnectionState::from_int(new_state));
+}
+
+unsafe extern "C" fn observer_on_standardized_ice_connection_change(
+    new_state: i32,
+    user_data: *mut c_void,
+) {
+    assert!(!user_data.is_null());
+    let state = unsafe { &mut *(user_data as *mut PeerConnectionObserverHandlerState) };
+    state
+        .handler
+        .on_standardized_ice_connection_change(IceConnectionState::from_int(new_state));
+}
+
+unsafe extern "C" fn observer_on_ice_gathering_change(new_state: i32, user_data: *mut c_void) {
+    assert!(!user_data.is_null());
+    let state = unsafe { &mut *(user_data as *mut PeerConnectionObserverHandlerState) };
+    state
+        .handler
+        .on_ice_gathering_change(IceGatheringState::from_int(new_state));
+}
+
+unsafe extern "C" fn observer_on_ice_candidate_error(
+    address: *const c_char,
+    address_len: usize,
+    port: i32,
+    url: *const c_char,
+    url_len: usize,
+    error_code: i32,
+    error_text: *const c_char,
+    error_text_len: usize,
+    user_data: *mut c_void,
+) {
+    assert!(!user_data.is_null());
+    let state = unsafe { &mut *(user_data as *mut PeerConnectionObserverHandlerState) };
+    let address = unsafe {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            address as *const u8,
+            address_len,
+        ))
+    }
+    .to_string();
+    let url = unsafe {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(url as *const u8, url_len))
+    }
+    .to_string();
+    let error_text = unsafe {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            error_text as *const u8,
+            error_text_len,
+        ))
+    }
+    .to_string();
+    state.handler.on_ice_candidate_error(IceCandidateError {
+        address,
+        port,
+        url,
+        error_code,
+        error_text,
+    });
 }
 
 unsafe extern "C" fn observer_on_track(
@@ -883,12 +1085,15 @@ impl PeerConnectionObserver {
         let state = Box::new(PeerConnectionObserverHandlerState { handler });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_PeerConnectionObserver_cbs {
+            OnStandardizedIceConnectionChange: Some(observer_on_standardized_ice_connection_change),
             OnConnectionChange: Some(observer_on_connection_change),
             OnIceCandidate: Some(observer_on_ice_candidate),
+            OnIceCandidateError: Some(observer_on_ice_candidate_error),
             OnTrack: Some(observer_on_track),
             OnRemoveTrack: Some(observer_on_remove_track),
             OnDataChannel: Some(observer_on_data_channel),
             OnDestroy: Some(observer_on_destroy),
+            OnIceGatheringChange: Some(observer_on_ice_gathering_change),
         };
         let raw = match NonNull::new(unsafe {
             ffi::webrtc_PeerConnectionObserver_new(&cbs, user_data)
