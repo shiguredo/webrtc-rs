@@ -52,96 +52,100 @@ impl ScalabilityMode {
         CxxString::from_unique(raw).to_string()
     }
 
-    fn from_raw(value: ffi::webrtc_ScalabilityMode) -> Option<Self> {
-        match value {
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L1T1 => Some(Self::L1T1),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L1T2 => Some(Self::L1T2),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L1T3 => Some(Self::L1T3),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T1 => Some(Self::L2T1),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T1h => Some(Self::L2T1h),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T1_KEY => {
-                Some(Self::L2T1Key)
+    fn from_raw(value: i32) -> Option<Self> {
+        unsafe {
+            match value {
+                x if x == ffi::webrtc_ScalabilityMode_L1T1 => Some(Self::L1T1),
+                x if x == ffi::webrtc_ScalabilityMode_L1T2 => Some(Self::L1T2),
+                x if x == ffi::webrtc_ScalabilityMode_L1T3 => Some(Self::L1T3),
+                x if x == ffi::webrtc_ScalabilityMode_L2T1 => Some(Self::L2T1),
+                x if x == ffi::webrtc_ScalabilityMode_L2T1h => Some(Self::L2T1h),
+                x if x == ffi::webrtc_ScalabilityMode_L2T1_KEY => {
+                    Some(Self::L2T1Key)
+                }
+                x if x == ffi::webrtc_ScalabilityMode_L2T2 => Some(Self::L2T2),
+                x if x == ffi::webrtc_ScalabilityMode_L2T2h => Some(Self::L2T2h),
+                x if x == ffi::webrtc_ScalabilityMode_L2T2_KEY => {
+                    Some(Self::L2T2Key)
+                }
+                x if x == ffi::webrtc_ScalabilityMode_L2T2_KEY_SHIFT => {
+                    Some(Self::L2T2KeyShift)
+                }
+                x if x == ffi::webrtc_ScalabilityMode_L2T3 => Some(Self::L2T3),
+                x if x == ffi::webrtc_ScalabilityMode_L2T3h => Some(Self::L2T3h),
+                x if x == ffi::webrtc_ScalabilityMode_L2T3_KEY => {
+                    Some(Self::L2T3Key)
+                }
+                x if x == ffi::webrtc_ScalabilityMode_L3T1 => Some(Self::L3T1),
+                x if x == ffi::webrtc_ScalabilityMode_L3T1h => Some(Self::L3T1h),
+                x if x == ffi::webrtc_ScalabilityMode_L3T1_KEY => {
+                    Some(Self::L3T1Key)
+                }
+                x if x == ffi::webrtc_ScalabilityMode_L3T2 => Some(Self::L3T2),
+                x if x == ffi::webrtc_ScalabilityMode_L3T2h => Some(Self::L3T2h),
+                x if x == ffi::webrtc_ScalabilityMode_L3T2_KEY => {
+                    Some(Self::L3T2Key)
+                }
+                x if x == ffi::webrtc_ScalabilityMode_L3T3 => Some(Self::L3T3),
+                x if x == ffi::webrtc_ScalabilityMode_L3T3h => Some(Self::L3T3h),
+                x if x == ffi::webrtc_ScalabilityMode_L3T3_KEY => {
+                    Some(Self::L3T3Key)
+                }
+                x if x == ffi::webrtc_ScalabilityMode_S2T1 => Some(Self::S2T1),
+                x if x == ffi::webrtc_ScalabilityMode_S2T1h => Some(Self::S2T1h),
+                x if x == ffi::webrtc_ScalabilityMode_S2T2 => Some(Self::S2T2),
+                x if x == ffi::webrtc_ScalabilityMode_S2T2h => Some(Self::S2T2h),
+                x if x == ffi::webrtc_ScalabilityMode_S2T3 => Some(Self::S2T3),
+                x if x == ffi::webrtc_ScalabilityMode_S2T3h => Some(Self::S2T3h),
+                x if x == ffi::webrtc_ScalabilityMode_S3T1 => Some(Self::S3T1),
+                x if x == ffi::webrtc_ScalabilityMode_S3T1h => Some(Self::S3T1h),
+                x if x == ffi::webrtc_ScalabilityMode_S3T2 => Some(Self::S3T2),
+                x if x == ffi::webrtc_ScalabilityMode_S3T2h => Some(Self::S3T2h),
+                x if x == ffi::webrtc_ScalabilityMode_S3T3 => Some(Self::S3T3),
+                x if x == ffi::webrtc_ScalabilityMode_S3T3h => Some(Self::S3T3h),
+                _ => None,
             }
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2 => Some(Self::L2T2),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2h => Some(Self::L2T2h),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2_KEY => {
-                Some(Self::L2T2Key)
-            }
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2_KEY_SHIFT => {
-                Some(Self::L2T2KeyShift)
-            }
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T3 => Some(Self::L2T3),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T3h => Some(Self::L2T3h),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T3_KEY => {
-                Some(Self::L2T3Key)
-            }
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T1 => Some(Self::L3T1),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T1h => Some(Self::L3T1h),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T1_KEY => {
-                Some(Self::L3T1Key)
-            }
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T2 => Some(Self::L3T2),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T2h => Some(Self::L3T2h),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T2_KEY => {
-                Some(Self::L3T2Key)
-            }
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T3 => Some(Self::L3T3),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T3h => Some(Self::L3T3h),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T3_KEY => {
-                Some(Self::L3T3Key)
-            }
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T1 => Some(Self::S2T1),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T1h => Some(Self::S2T1h),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T2 => Some(Self::S2T2),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T2h => Some(Self::S2T2h),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T3 => Some(Self::S2T3),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T3h => Some(Self::S2T3h),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T1 => Some(Self::S3T1),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T1h => Some(Self::S3T1h),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T2 => Some(Self::S3T2),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T2h => Some(Self::S3T2h),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T3 => Some(Self::S3T3),
-            x if x == ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T3h => Some(Self::S3T3h),
-            _ => None,
         }
     }
 
-    fn to_raw(self) -> ffi::webrtc_ScalabilityMode {
-        match self {
-            Self::L1T1 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L1T1,
-            Self::L1T2 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L1T2,
-            Self::L1T3 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L1T3,
-            Self::L2T1 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T1,
-            Self::L2T1h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T1h,
-            Self::L2T1Key => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T1_KEY,
-            Self::L2T2 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2,
-            Self::L2T2h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2h,
-            Self::L2T2Key => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2_KEY,
-            Self::L2T2KeyShift => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T2_KEY_SHIFT,
-            Self::L2T3 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T3,
-            Self::L2T3h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T3h,
-            Self::L2T3Key => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L2T3_KEY,
-            Self::L3T1 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T1,
-            Self::L3T1h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T1h,
-            Self::L3T1Key => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T1_KEY,
-            Self::L3T2 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T2,
-            Self::L3T2h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T2h,
-            Self::L3T2Key => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T2_KEY,
-            Self::L3T3 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T3,
-            Self::L3T3h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T3h,
-            Self::L3T3Key => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L3T3_KEY,
-            Self::S2T1 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T1,
-            Self::S2T1h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T1h,
-            Self::S2T2 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T2,
-            Self::S2T2h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T2h,
-            Self::S2T3 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T3,
-            Self::S2T3h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S2T3h,
-            Self::S3T1 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T1,
-            Self::S3T1h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T1h,
-            Self::S3T2 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T2,
-            Self::S3T2h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T2h,
-            Self::S3T3 => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T3,
-            Self::S3T3h => ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_S3T3h,
+    fn to_raw(self) -> i32 {
+        unsafe {
+            match self {
+                Self::L1T1 => ffi::webrtc_ScalabilityMode_L1T1,
+                Self::L1T2 => ffi::webrtc_ScalabilityMode_L1T2,
+                Self::L1T3 => ffi::webrtc_ScalabilityMode_L1T3,
+                Self::L2T1 => ffi::webrtc_ScalabilityMode_L2T1,
+                Self::L2T1h => ffi::webrtc_ScalabilityMode_L2T1h,
+                Self::L2T1Key => ffi::webrtc_ScalabilityMode_L2T1_KEY,
+                Self::L2T2 => ffi::webrtc_ScalabilityMode_L2T2,
+                Self::L2T2h => ffi::webrtc_ScalabilityMode_L2T2h,
+                Self::L2T2Key => ffi::webrtc_ScalabilityMode_L2T2_KEY,
+                Self::L2T2KeyShift => ffi::webrtc_ScalabilityMode_L2T2_KEY_SHIFT,
+                Self::L2T3 => ffi::webrtc_ScalabilityMode_L2T3,
+                Self::L2T3h => ffi::webrtc_ScalabilityMode_L2T3h,
+                Self::L2T3Key => ffi::webrtc_ScalabilityMode_L2T3_KEY,
+                Self::L3T1 => ffi::webrtc_ScalabilityMode_L3T1,
+                Self::L3T1h => ffi::webrtc_ScalabilityMode_L3T1h,
+                Self::L3T1Key => ffi::webrtc_ScalabilityMode_L3T1_KEY,
+                Self::L3T2 => ffi::webrtc_ScalabilityMode_L3T2,
+                Self::L3T2h => ffi::webrtc_ScalabilityMode_L3T2h,
+                Self::L3T2Key => ffi::webrtc_ScalabilityMode_L3T2_KEY,
+                Self::L3T3 => ffi::webrtc_ScalabilityMode_L3T3,
+                Self::L3T3h => ffi::webrtc_ScalabilityMode_L3T3h,
+                Self::L3T3Key => ffi::webrtc_ScalabilityMode_L3T3_KEY,
+                Self::S2T1 => ffi::webrtc_ScalabilityMode_S2T1,
+                Self::S2T1h => ffi::webrtc_ScalabilityMode_S2T1h,
+                Self::S2T2 => ffi::webrtc_ScalabilityMode_S2T2,
+                Self::S2T2h => ffi::webrtc_ScalabilityMode_S2T2h,
+                Self::S2T3 => ffi::webrtc_ScalabilityMode_S2T3,
+                Self::S2T3h => ffi::webrtc_ScalabilityMode_S2T3h,
+                Self::S3T1 => ffi::webrtc_ScalabilityMode_S3T1,
+                Self::S3T1h => ffi::webrtc_ScalabilityMode_S3T1h,
+                Self::S3T2 => ffi::webrtc_ScalabilityMode_S3T2,
+                Self::S3T2h => ffi::webrtc_ScalabilityMode_S3T2h,
+                Self::S3T3 => ffi::webrtc_ScalabilityMode_S3T3,
+                Self::S3T3h => ffi::webrtc_ScalabilityMode_S3T3h,
+            }
         }
     }
 }
@@ -263,7 +267,7 @@ impl<'a> SdpVideoFormatRef<'a> {
         if len == 0 {
             return Vec::new();
         }
-        let mut raw_modes = vec![ffi::webrtc_ScalabilityMode_webrtc_ScalabilityMode_L1T1; len];
+        let mut raw_modes = vec![unsafe { ffi::webrtc_ScalabilityMode_L1T1 }; len];
         let copied = unsafe {
             ffi::webrtc_SdpVideoFormat_copy_scalability_modes(
                 self.raw.as_ptr(),
