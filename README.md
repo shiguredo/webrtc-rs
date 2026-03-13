@@ -77,7 +77,7 @@ shiguredo_webrtc = "0.146"
 ```rust
 use shiguredo_webrtc::{
     AudioDecoderFactory, AudioDeviceModule, AudioDeviceModuleAudioLayer,
-    AudioEncoderFactory, AudioProcessingBuilder, Environment,
+    AudioEncoderFactory, AudioProcessingBuilder, ConnectionContext, Environment,
     PeerConnectionFactory, PeerConnectionFactoryDependencies,
     RtcEventLogFactory, Thread, VideoDecoderFactory, VideoEncoderFactory,
 };
@@ -85,6 +85,7 @@ use std::sync::Arc;
 
 pub struct FactoryHolder {
     factory: PeerConnectionFactory,
+    connection_context: ConnectionContext,
     _network: Thread,
     _worker: Thread,
     _signaling: Thread,
@@ -122,9 +123,11 @@ impl FactoryHolder {
         deps.set_audio_processing_builder(apb);
         deps.enable_media();
 
-        let factory = PeerConnectionFactory::create_modular(&mut deps).ok()?;
+        let (factory, connection_context) =
+            PeerConnectionFactory::create_modular_with_context(&mut deps).ok()?;
         Some(Arc::new(Self {
             factory,
+            connection_context,
             _network: network,
             _worker: worker,
             _signaling: signaling,
@@ -150,8 +153,10 @@ impl FactoryHolder {
   - `set_proxy(...)` で TURN 用の HTTP Proxy を設定
 - `PeerConnectionRtcConfiguration`
   - ICE / 接続設定
+- `ConnectionContext`
+  - `default_network_manager()` / `default_socket_factory()` を取得
 - `NetworkManagerRef` / `PacketSocketFactoryRef`
-  - `PeerConnectionFactory::default_network_manager()` / `default_socket_factory()` で取得
+  - `ConnectionContext::default_network_manager()` / `default_socket_factory()` で取得
 - `PeerConnectionOfferAnswerOptions`
   - Offer/Answer オプション (ICE リスタート、Simulcast レイヤー数など)
 - `PeerConnectionObserver` / `PeerConnectionObserverHandler`

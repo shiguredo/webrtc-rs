@@ -4,9 +4,7 @@
 #include <stddef.h>
 #include <exception>
 #include <memory>
-#include <mutex>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -15,6 +13,7 @@
 #include <api/audio/audio_processing.h>
 #include <api/audio_codecs/audio_decoder_factory.h>
 #include <api/audio_codecs/audio_encoder_factory.h>
+#include <api/create_modular_peer_connection_factory.h>
 #include <api/audio_options.h>
 #include <api/data_channel_interface.h>
 #include <api/enable_media.h>
@@ -938,78 +937,6 @@ void webrtc_EnableMedia(
 
 namespace {
 
-// PeerConnectionFactoryInterface の public API からは ConnectionContext にアクセスできない。
-// そのため、生成時に取得した ConnectionContext を raw pointer キーで保持しておき、
-// C API の default_network_manager/default_socket_factory から取り出す。
-//
-// 寿命管理はさらにトリッキーで、C API から factory の破棄通知を受け取れない。
-// ここでは C API の AddRef/Release ラッパーで外部参照数を追跡し、
-// 最後の Release で map エントリを削除して context も解放する。
-struct FactoryContextEntry {
-  webrtc::scoped_refptr<webrtc::ConnectionContext> context;
-  size_t external_ref_count = 0;
-};
-
-std::mutex& FactoryContextMutex() {
-  static std::mutex mutex;
-  return mutex;
-}
-
-std::unordered_map<webrtc::PeerConnectionFactoryInterface*,
-                   FactoryContextEntry>&
-FactoryContextMap() {
-  static std::unordered_map<webrtc::PeerConnectionFactoryInterface*,
-                            FactoryContextEntry>
-      map;
-  return map;
-}
-
-void RegisterFactoryContext(
-    webrtc::PeerConnectionFactoryInterface* factory,
-    webrtc::scoped_refptr<webrtc::ConnectionContext> context) {
-  std::lock_guard<std::mutex> lock(FactoryContextMutex());
-  FactoryContextEntry entry;
-  entry.context = std::move(context);
-  entry.external_ref_count = 1;
-  FactoryContextMap()[factory] = std::move(entry);
-}
-
-void AddFactoryExternalRef(webrtc::PeerConnectionFactoryInterface* factory) {
-  std::lock_guard<std::mutex> lock(FactoryContextMutex());
-  auto it = FactoryContextMap().find(factory);
-  if (it != FactoryContextMap().end()) {
-    ++it->second.external_ref_count;
-  }
-}
-
-bool ReleaseFactoryExternalRef(
-    webrtc::PeerConnectionFactoryInterface* factory) {
-  std::lock_guard<std::mutex> lock(FactoryContextMutex());
-  auto it = FactoryContextMap().find(factory);
-  if (it == FactoryContextMap().end()) {
-    return false;
-  }
-  if (it->second.external_ref_count > 0) {
-    --it->second.external_ref_count;
-  }
-  return it->second.external_ref_count == 0;
-}
-
-void UnregisterFactoryContext(webrtc::PeerConnectionFactoryInterface* factory) {
-  std::lock_guard<std::mutex> lock(FactoryContextMutex());
-  FactoryContextMap().erase(factory);
-}
-
-webrtc::scoped_refptr<webrtc::ConnectionContext> FindFactoryContext(
-    webrtc::PeerConnectionFactoryInterface* factory) {
-  std::lock_guard<std::mutex> lock(FactoryContextMutex());
-  auto it = FactoryContextMap().find(factory);
-  if (it == FactoryContextMap().end()) {
-    return nullptr;
-  }
-  return it->second.context;
-}
-
 class PeerConnectionFactoryWithContext : public webrtc::PeerConnectionFactory {
  public:
   explicit PeerConnectionFactoryWithContext(
@@ -1048,9 +975,6 @@ CreateModularPeerConnectionFactoryWithContext(
   using result_type =
       std::pair<webrtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface>,
                 webrtc::scoped_refptr<webrtc::ConnectionContext>>;
-  if (dependencies.signaling_thread == nullptr) {
-    return result_type(nullptr, nullptr);
-  }
   return dependencies.signaling_thread->BlockingCall([&dependencies]() {
     auto factory =
         PeerConnectionFactoryWithContext::Create(std::move(dependencies));
@@ -1067,33 +991,30 @@ CreateModularPeerConnectionFactoryWithContext(
 }  // namespace
 
 extern "C" {
-
-struct webrtc_PeerConnectionFactoryInterface*
-webrtc_PeerConnectionFactoryInterface_refcounted_get(
-    struct webrtc_PeerConnectionFactoryInterface_refcounted* p) {
-  return reinterpret_cast<struct webrtc_PeerConnectionFactoryInterface*>(p);
-}
-
-void webrtc_PeerConnectionFactoryInterface_AddRef(
-    struct webrtc_PeerConnectionFactoryInterface* p) {
-  auto self = reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(p);
-  self->AddRef();
-  AddFactoryExternalRef(self);
-}
-
-void webrtc_PeerConnectionFactoryInterface_Release(
-    struct webrtc_PeerConnectionFactoryInterface* p) {
-  auto self = reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(p);
-  const bool should_unregister = ReleaseFactoryExternalRef(self);
-  self->Release();
-  if (should_unregister) {
-    UnregisterFactoryContext(self);
-  }
-}
+WEBRTC_DEFINE_REFCOUNTED(webrtc_PeerConnectionFactoryInterface,
+                         webrtc::PeerConnectionFactoryInterface);
 
 struct webrtc_PeerConnectionFactoryInterface_refcounted*
 webrtc_CreateModularPeerConnectionFactory(
     struct webrtc_PeerConnectionFactoryDependencies* dependencies) {
+  auto deps = reinterpret_cast<webrtc::PeerConnectionFactoryDependencies*>(
+      dependencies);
+  auto factory = webrtc::CreateModularPeerConnectionFactory(std::move(*deps));
+  if (factory == nullptr) {
+    return nullptr;
+  }
+  return reinterpret_cast<struct webrtc_PeerConnectionFactoryInterface_refcounted*>(
+      factory.release());
+}
+
+struct webrtc_PeerConnectionFactoryInterface_refcounted*
+webrtc_CreateModularPeerConnectionFactoryWithContext(
+    struct webrtc_PeerConnectionFactoryDependencies* dependencies,
+    struct webrtc_ConnectionContext_refcounted** out_context) {
+  if (out_context == nullptr) {
+    return nullptr;
+  }
+  *out_context = nullptr;
   auto deps = reinterpret_cast<webrtc::PeerConnectionFactoryDependencies*>(
       dependencies);
   auto p = CreateModularPeerConnectionFactoryWithContext(std::move(*deps));
@@ -1102,38 +1023,10 @@ webrtc_CreateModularPeerConnectionFactory(
   if (factory == nullptr || context == nullptr) {
     return nullptr;
   }
-  auto* raw_factory = factory.release();
-  RegisterFactoryContext(raw_factory, std::move(context));
-  return reinterpret_cast<
-      struct webrtc_PeerConnectionFactoryInterface_refcounted*>(raw_factory);
-}
-
-struct webrtc_NetworkManager*
-webrtc_PeerConnectionFactoryInterface_default_network_manager(
-    struct webrtc_PeerConnectionFactoryInterface* self) {
-  auto* factory =
-      reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
-  auto context = FindFactoryContext(factory);
-  if (context == nullptr) {
-    return nullptr;
-  }
-  auto* network_manager = context->signaling_thread()->BlockingCall(
-      [context]() { return context->default_network_manager(); });
-  return reinterpret_cast<struct webrtc_NetworkManager*>(network_manager);
-}
-
-struct webrtc_PacketSocketFactory*
-webrtc_PeerConnectionFactoryInterface_default_socket_factory(
-    struct webrtc_PeerConnectionFactoryInterface* self) {
-  auto* factory =
-      reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
-  auto context = FindFactoryContext(factory);
-  if (context == nullptr) {
-    return nullptr;
-  }
-  auto* socket_factory = context->signaling_thread()->BlockingCall(
-      [context]() { return context->default_socket_factory(); });
-  return reinterpret_cast<struct webrtc_PacketSocketFactory*>(socket_factory);
+  *out_context = reinterpret_cast<struct webrtc_ConnectionContext_refcounted*>(
+      context.release());
+  return reinterpret_cast<struct webrtc_PeerConnectionFactoryInterface_refcounted*>(
+      factory.release());
 }
 
 void webrtc_PeerConnectionFactoryInterface_CreatePeerConnectionOrError(

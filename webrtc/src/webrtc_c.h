@@ -30,6 +30,7 @@
 #include "webrtc_c/api/video_codecs/video_decoder.h"
 #include "webrtc_c/api/video_codecs/video_codec.h"
 #include "webrtc_c/modules/video_coding/include/video_codec_interface.h"
+#include "webrtc_c/pc/connection_context.h"
 #include "webrtc_c/api/video_codecs/sdp_video_format.h"
 #include "webrtc_c/api/video_codecs/video_encoder.h"
 #include "webrtc_c/api/video_codecs/video_decoder_factory.h"

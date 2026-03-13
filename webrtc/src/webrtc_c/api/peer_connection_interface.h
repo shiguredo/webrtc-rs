@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 #include "../common.h"
+#include "../pc/connection_context.h"
 #include "../rtc_base/thread.h"
 #include "../std.h"
 #include "data_channel_interface.h"
@@ -330,12 +331,10 @@ WEBRTC_DECLARE_REFCOUNTED(webrtc_PeerConnectionFactoryInterface);
 struct webrtc_PeerConnectionFactoryInterface_refcounted*
 webrtc_CreateModularPeerConnectionFactory(
     struct webrtc_PeerConnectionFactoryDependencies* dependencies);
-struct webrtc_NetworkManager*
-webrtc_PeerConnectionFactoryInterface_default_network_manager(
-    struct webrtc_PeerConnectionFactoryInterface* self);
-struct webrtc_PacketSocketFactory*
-webrtc_PeerConnectionFactoryInterface_default_socket_factory(
-    struct webrtc_PeerConnectionFactoryInterface* self);
+struct webrtc_PeerConnectionFactoryInterface_refcounted*
+webrtc_CreateModularPeerConnectionFactoryWithContext(
+    struct webrtc_PeerConnectionFactoryDependencies* dependencies,
+    struct webrtc_ConnectionContext_refcounted** out_context);
 
 void webrtc_PeerConnectionFactoryInterface_CreatePeerConnectionOrError(
     struct webrtc_PeerConnectionFactoryInterface* self,

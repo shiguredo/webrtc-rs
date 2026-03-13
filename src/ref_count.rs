@@ -377,6 +377,22 @@ impl RefCountedHandle for PeerConnectionFactoryHandle {
     }
 }
 
+pub(crate) struct ConnectionContextHandle;
+impl RefCountedHandle for ConnectionContextHandle {
+    type Refcounted = ffi::webrtc_ConnectionContext_refcounted;
+    type Raw = ffi::webrtc_ConnectionContext;
+
+    unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
+        unsafe { ffi::webrtc_ConnectionContext_refcounted_get(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *mut Self::Raw) {
+        unsafe { ffi::webrtc_ConnectionContext_AddRef(raw) };
+    }
+    unsafe fn release(raw: *mut Self::Raw) {
+        unsafe { ffi::webrtc_ConnectionContext_Release(raw) };
+    }
+}
+
 pub(crate) struct DataChannelHandle;
 impl RefCountedHandle for DataChannelHandle {
     type Refcounted = ffi::webrtc_DataChannelInterface_refcounted;

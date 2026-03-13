@@ -428,16 +428,16 @@ fn peer_connection_factory_and_capabilities() {
     deps.enable_media();
 
     // Factory を生成し、オプションと RTP 能力を取得する。
-    let mut factory = PeerConnectionFactory::create_modular(&mut deps)
-        .expect("PeerConnectionFactory の生成に失敗しました");
+    let (mut factory, context) = PeerConnectionFactory::create_modular_with_context(&mut deps)
+        .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
     let mut opts = PeerConnectionFactoryOptions::new();
     opts.set_disable_encryption(false);
     let dtls12 = unsafe { ffi::webrtc_SSL_PROTOCOL_DTLS_12 };
     opts.set_ssl_max_version(dtls12);
     factory.set_options(&opts);
 
-    let network_manager = factory.default_network_manager();
-    let socket_factory = factory.default_socket_factory();
+    let network_manager = context.default_network_manager();
+    let socket_factory = context.default_socket_factory();
     assert!(!network_manager.as_ptr().is_null());
     assert!(!socket_factory.as_ptr().is_null());
 
@@ -451,6 +451,7 @@ fn peer_connection_factory_and_capabilities() {
     }
 
     drop(caps);
+    drop(context);
     drop(factory);
     drop(deps);
     network.stop();
@@ -479,6 +480,47 @@ fn rtc_configuration_and_ice_server() {
     let len_before = owned.len();
     owned.push(&server);
     assert_eq!(owned.len(), len_before + 1);
+}
+
+#[test]
+fn create_modular_with_context_returns_default_network_objects() {
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+
+    let mut deps = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps.set_network_thread(&network);
+    deps.set_worker_thread(&worker);
+    deps.set_signaling_thread(&signaling);
+    deps.set_audio_encoder_factory(&enc);
+    deps.set_audio_decoder_factory(&dec);
+    deps.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps.set_audio_device_module(&adm);
+    deps.enable_media();
+
+    let (factory, context) = PeerConnectionFactory::create_modular_with_context(&mut deps)
+        .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
+    let network_manager = context.default_network_manager();
+    let socket_factory = context.default_socket_factory();
+    assert!(!network_manager.as_ptr().is_null());
+    assert!(!socket_factory.as_ptr().is_null());
+    assert!(!factory.as_ptr().is_null());
+
+    drop(context);
+    drop(factory);
+    drop(deps);
+    network.stop();
+    worker.stop();
+    signaling.stop();
 }
 
 #[test]
@@ -777,11 +819,12 @@ fn peer_connection_create_with_proxy_allocator() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
-        .expect("PeerConnectionFactory の生成に失敗しました");
+    let (factory, context) =
+        PeerConnectionFactory::create_modular_with_context(&mut deps_factory)
+            .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
 
-    let network_manager = factory.default_network_manager();
-    let socket_factory = factory.default_socket_factory();
+    let network_manager = context.default_network_manager();
+    let socket_factory = context.default_socket_factory();
     assert!(!network_manager.as_ptr().is_null());
     assert!(!socket_factory.as_ptr().is_null());
 
@@ -803,6 +846,7 @@ fn peer_connection_create_with_proxy_allocator() {
 
     drop(pc);
     drop(pc_deps);
+    drop(context);
     drop(factory);
     drop(deps_factory);
     network.stop();
