@@ -586,6 +586,7 @@ version = "0.146.0-canary.3"
 dependencies = [
  "bindgen",
  "shiguredo_cmake",
+ "shiguredo_toml",
 ]
 
 [[package]]

@@ -2,6 +2,34 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Cargo.toml から外部依存ライブラリの情報を取得する
+fn get_webrtc_build_metadata() -> (String, String) {
+    let cargo_toml = shiguredo_toml::from_str(include_str!("Cargo.toml"))
+        .expect("Cargo.toml のパースに失敗しました");
+    let metadata = shiguredo_toml::Value::Table(cargo_toml);
+    let webrtc_build = metadata
+        .get("package")
+        .and_then(|v| v.get("metadata"))
+        .and_then(|v| v.get("external-dependencies"))
+        .and_then(|v| v.get("webrtc-build"))
+        .expect(
+            "Cargo.toml に [package.metadata.external-dependencies.webrtc-build] が見つかりません",
+        );
+
+    let version = webrtc_build
+        .get("version")
+        .and_then(|v| v.as_str())
+        .expect("webrtc-build.version が見つかりません")
+        .to_string();
+    let base_url = webrtc_build
+        .get("base-url")
+        .and_then(|v| v.as_str())
+        .expect("webrtc-build.base-url が見つかりません")
+        .to_string();
+
+    (version, base_url)
+}
+
 fn main() {
     // Cargo.toml か build.rs が更新されたら、依存ライブラリを再ビルドする
     println!("cargo::rerun-if-changed=Cargo.toml");
@@ -24,10 +52,6 @@ fn main() {
     println!(
         "cargo:rerun-if-changed={}",
         webrtc_dir.join("CMakeLists.txt").display()
-    );
-    println!(
-        "cargo:rerun-if-changed={}",
-        webrtc_dir.join("deps.json").display()
     );
 
     let target_platform = get_target_platform();
@@ -259,9 +283,14 @@ fn build_webrtc_c(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> P
     config.profile("Release");
     config.out_dir(out_dir.join("_build").join(target_platform).join(profile));
 
+    // Cargo.toml から WebRTC ビルド情報を取得して CMake に渡す
+    let (webrtc_build_version, webrtc_base_url) = get_webrtc_build_metadata();
+
     // ターゲットプラットフォームを設定（CMakeLists.txt 内で自動検出もされるが明示的に指定）
     config
         .define("WEBRTC_C_TARGET", target_platform)
+        .define("WEBRTC_BUILD_VERSION", &webrtc_build_version)
+        .define("WEBRTC_BASE_URL", &webrtc_base_url)
         .define("CMAKE_BUILD_TYPE", "Release")
         .define("CMAKE_EXPORT_COMPILE_COMMANDS", "ON");
 
