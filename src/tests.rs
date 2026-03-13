@@ -819,9 +819,8 @@ fn peer_connection_create_with_proxy_allocator() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let (factory, context) =
-        PeerConnectionFactory::create_modular_with_context(&mut deps_factory)
-            .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
+    let (factory, context) = PeerConnectionFactory::create_modular_with_context(&mut deps_factory)
+        .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
 
     let network_manager = context.default_network_manager();
     let socket_factory = context.default_socket_factory();
