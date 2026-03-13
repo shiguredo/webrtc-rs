@@ -13,8 +13,8 @@
 #include <api/audio/audio_processing.h>
 #include <api/audio_codecs/audio_decoder_factory.h>
 #include <api/audio_codecs/audio_encoder_factory.h>
-#include <api/create_modular_peer_connection_factory.h>
 #include <api/audio_options.h>
+#include <api/create_modular_peer_connection_factory.h>
 #include <api/data_channel_interface.h>
 #include <api/enable_media.h>
 #include <api/environment/environment_factory.h>
@@ -50,6 +50,7 @@
 #include <rtc_base/thread.h>
 
 #include "../common.impl.h"
+#include "../pc/connection_context.h"
 #include "../rtc_base/thread.h"
 #include "../std.h"
 #include "audio/audio_processing.h"
@@ -1008,7 +1009,8 @@ webrtc_CreateModularPeerConnectionFactory(
   if (factory == nullptr) {
     return nullptr;
   }
-  return reinterpret_cast<struct webrtc_PeerConnectionFactoryInterface_refcounted*>(
+  return reinterpret_cast<
+      struct webrtc_PeerConnectionFactoryInterface_refcounted*>(
       factory.release());
 }
 
@@ -1030,7 +1032,8 @@ webrtc_CreateModularPeerConnectionFactoryWithContext(
   }
   *out_context = reinterpret_cast<struct webrtc_ConnectionContext_refcounted*>(
       context.release());
-  return reinterpret_cast<struct webrtc_PeerConnectionFactoryInterface_refcounted*>(
+  return reinterpret_cast<
+      struct webrtc_PeerConnectionFactoryInterface_refcounted*>(
       factory.release());
 }
 
