@@ -31,6 +31,13 @@
   - `i420_to_argb` を削除し、`convert_from_i420` と `LibyuvFourcc` を追加する
   - `i420_to_nv12` を追加する
   - @melpon
+- [ADD] TURN 用 HTTP Proxy 設定 API を追加する
+  - `PeerConnectionDependencies::set_proxy(...)` を追加する
+  - `NetworkManagerRef` / `PacketSocketFactoryRef` を追加する
+  - `ConnectionContext` を追加する
+  - `PeerConnectionFactory::create_modular_with_context(...)` を追加する
+  - `ConnectionContext::default_network_manager()` / `default_socket_factory()` を追加する
+  - @melpon
 - [ADD] `SdpVideoFormat` の parameters / scalability modes を扱う API を追加する
   - `ScalabilityMode` 型を追加する
   - `SdpVideoFormat::new_with_parameters` と `SdpVideoFormat::scalability_modes` を追加する

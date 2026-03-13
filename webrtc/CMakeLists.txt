@@ -358,6 +358,7 @@ add_library(webrtc_c
     src/webrtc_c/modules/video_coding/include/video_codec_interface.cc
     src/webrtc_c/libyuv.cc
     src/webrtc_c/media/base/adapted_video_track_source.cc
+    src/webrtc_c/pc/connection_context.cc
     src/webrtc_c/rtc_base/crypto_random.cc
     src/webrtc_c/rtc_base/logging.cc
     src/webrtc_c/rtc_base/ssl_adapter.cc

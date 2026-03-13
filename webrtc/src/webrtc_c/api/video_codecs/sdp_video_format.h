@@ -47,8 +47,7 @@ extern const int webrtc_ScalabilityMode_S3T2;
 extern const int webrtc_ScalabilityMode_S3T2h;
 extern const int webrtc_ScalabilityMode_S3T3;
 extern const int webrtc_ScalabilityMode_S3T3h;
-struct std_string_unique* webrtc_ScalabilityModeToString(
-    int mode);
+struct std_string_unique* webrtc_ScalabilityModeToString(int mode);
 
 WEBRTC_DECLARE_UNIQUE(webrtc_SdpVideoFormat);
 WEBRTC_DECLARE_VECTOR_NO_DEFAULT_CTOR(webrtc_SdpVideoFormat);

@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 #include "../common.h"
+#include "../pc/connection_context.h"
 #include "../rtc_base/thread.h"
 #include "../std.h"
 #include "data_channel_interface.h"
@@ -35,6 +36,8 @@ struct webrtc_PeerConnectionObserver;
 struct webrtc_CreateSessionDescriptionObserver;
 struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions;
 struct webrtc_PeerConnectionInterface_RTCConfiguration;
+struct webrtc_NetworkManager;
+struct webrtc_PacketSocketFactory;
 struct webrtc_PeerConnectionInterface_RTCConfiguration*
 webrtc_PeerConnectionInterface_RTCConfiguration_new();
 void webrtc_PeerConnectionInterface_RTCConfiguration_delete(
@@ -76,6 +79,19 @@ struct webrtc_PeerConnectionDependencies* webrtc_PeerConnectionDependencies_new(
     struct webrtc_PeerConnectionObserver* observer);
 void webrtc_PeerConnectionDependencies_delete(
     struct webrtc_PeerConnectionDependencies* self);
+void webrtc_PeerConnectionDependencies_set_proxy(
+    struct webrtc_PeerConnectionDependencies* self,
+    struct webrtc_NetworkManager* network_manager,
+    struct webrtc_PacketSocketFactory* socket_factory,
+    const char* proxy_host,
+    size_t proxy_host_len,
+    int proxy_port,
+    const char* proxy_username,
+    size_t proxy_username_len,
+    const char* proxy_password,
+    size_t proxy_password_len,
+    const char* proxy_agent,
+    size_t proxy_agent_len);
 void webrtc_PeerConnectionInterface_CreateDataChannelOrError(
     struct webrtc_PeerConnectionInterface* self,
     const char* label,
@@ -315,6 +331,10 @@ WEBRTC_DECLARE_REFCOUNTED(webrtc_PeerConnectionFactoryInterface);
 struct webrtc_PeerConnectionFactoryInterface_refcounted*
 webrtc_CreateModularPeerConnectionFactory(
     struct webrtc_PeerConnectionFactoryDependencies* dependencies);
+struct webrtc_PeerConnectionFactoryInterface_refcounted*
+webrtc_CreateModularPeerConnectionFactoryWithContext(
+    struct webrtc_PeerConnectionFactoryDependencies* dependencies,
+    struct webrtc_ConnectionContext_refcounted** out_context);
 
 void webrtc_PeerConnectionFactoryInterface_CreatePeerConnectionOrError(
     struct webrtc_PeerConnectionFactoryInterface* self,
