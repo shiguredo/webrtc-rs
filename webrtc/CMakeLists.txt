@@ -362,6 +362,7 @@ add_library(webrtc_c
     src/webrtc_c/rtc_base/crypto_random.cc
     src/webrtc_c/rtc_base/logging.cc
     src/webrtc_c/rtc_base/ssl_adapter.cc
+    src/webrtc_c/rtc_base/ssl_certificate.cc
     src/webrtc_c/rtc_base/thread.cc
     src/webrtc_c/rtc_base/time_utils.cc
     src/webrtc_c/rtc_base/timestamp_aligner.cc

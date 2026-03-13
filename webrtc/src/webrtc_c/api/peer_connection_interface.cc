@@ -46,12 +46,12 @@
 #include <rtc_base/network.h>
 #include <rtc_base/proxy_info_revive.h>
 #include <rtc_base/socket_address.h>
-#include <rtc_base/ssl_certificate.h>
 #include <rtc_base/ssl_stream_adapter.h>
 #include <rtc_base/thread.h>
 
 #include "../common.impl.h"
 #include "../pc/connection_context.h"
+#include "../rtc_base/ssl_certificate.h"
 #include "../rtc_base/thread.h"
 #include "../std.h"
 #include "audio/audio_processing.h"
@@ -304,6 +304,22 @@ void webrtc_PeerConnectionInterface_IceServer_set_password(
   server->password =
       password != nullptr ? std::string(password, password_len) : std::string();
 }
+extern const int webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicySecure =
+    static_cast<int>(
+        webrtc::PeerConnectionInterface::TlsCertPolicy::kTlsCertPolicySecure);
+extern const int
+    webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicyInsecureNoCheck =
+        static_cast<int>(webrtc::PeerConnectionInterface::TlsCertPolicy::
+                             kTlsCertPolicyInsecureNoCheck);
+void webrtc_PeerConnectionInterface_IceServer_set_tls_cert_policy(
+    struct webrtc_PeerConnectionInterface_IceServer* self,
+    webrtc_PeerConnectionInterface_TlsCertPolicy tls_cert_policy) {
+  auto server =
+      reinterpret_cast<webrtc::PeerConnectionInterface::IceServer*>(self);
+  server->tls_cert_policy =
+      static_cast<webrtc::PeerConnectionInterface::TlsCertPolicy>(
+          tls_cert_policy);
+}
 struct webrtc_PeerConnectionInterface_IceServer_vector*
 webrtc_PeerConnectionInterface_RTCConfiguration_get_servers(
     struct webrtc_PeerConnectionInterface_RTCConfiguration* self) {
@@ -404,59 +420,18 @@ void webrtc_PeerConnectionDependencies_set_proxy(
   deps->allocator->set_proxy(agent, pi);
 }
 
-// Rust 側のコールバック関数を webrtc::SSLCertificateVerifier として橋渡しするクラス。
-// VerifyChain() が呼ばれると、証明書チェーンを DER バイト列に変換してコールバックに渡す。
-class SSLCertificateVerifierImpl : public webrtc::SSLCertificateVerifier {
- public:
-  SSLCertificateVerifierImpl(
-      webrtc_SSLCertificateVerifier_VerifyChainCallback callback,
-      void* user_data)
-      : callback_(callback), user_data_(user_data) {}
-
-  bool VerifyChain(const webrtc::SSLCertChain& chain) override {
-    const size_t count = chain.GetSize();
-    if (count == 0) {
-      return false;
-    }
-
-    std::vector<webrtc::Buffer> der_buffers(count);
-    std::vector<webrtc_SSLCertificateDer> certs(count);
-    for (size_t i = 0; i < count; ++i) {
-      chain.Get(i).ToDER(&der_buffers[i]);
-      certs[i].data = der_buffers[i].data();
-      certs[i].size = der_buffers[i].size();
-    }
-
-    return callback_(certs.data(), count, user_data_) != 0;
-  }
-
- private:
-  webrtc_SSLCertificateVerifier_VerifyChainCallback callback_;
-  void* user_data_;
-};
-
 void webrtc_PeerConnectionDependencies_set_tls_cert_verifier(
     struct webrtc_PeerConnectionDependencies* self,
-    webrtc_SSLCertificateVerifier_VerifyChainCallback callback,
-    void* user_data) {
+    struct webrtc_SSLCertificateVerifier_unique* tls_cert_verifier) {
   auto deps = reinterpret_cast<webrtc::PeerConnectionDependencies*>(self);
+  if (tls_cert_verifier == nullptr) {
+    deps->tls_cert_verifier = nullptr;
+    return;
+  }
+  auto verifier = reinterpret_cast<webrtc::SSLCertificateVerifier*>(
+      webrtc_SSLCertificateVerifier_unique_get(tls_cert_verifier));
   deps->tls_cert_verifier =
-      std::make_unique<SSLCertificateVerifierImpl>(callback, user_data);
-}
-
-// IceServer::tls_cert_policy の定数値
-const int webrtc_TlsCertPolicy_kTlsCertPolicySecure =
-    static_cast<int>(webrtc::PeerConnectionInterface::kTlsCertPolicySecure);
-const int webrtc_TlsCertPolicy_kTlsCertPolicyInsecureNoCheck = static_cast<int>(
-    webrtc::PeerConnectionInterface::kTlsCertPolicyInsecureNoCheck);
-
-void webrtc_PeerConnectionInterface_IceServer_set_tls_cert_policy(
-    struct webrtc_PeerConnectionInterface_IceServer* self,
-    webrtc_TlsCertPolicy policy) {
-  auto server =
-      reinterpret_cast<webrtc::PeerConnectionInterface::IceServer*>(self);
-  server->tls_cert_policy =
-      static_cast<webrtc::PeerConnectionInterface::TlsCertPolicy>(policy);
+      std::move(std::unique_ptr<webrtc::SSLCertificateVerifier>(verifier));
 }
 
 void webrtc_PeerConnectionInterface_CreateDataChannelOrError(

@@ -25,6 +25,7 @@ pub use libyuv::{
 };
 pub use ref_count::{RefCountedHandle, ScopedRef};
 pub use rtc_base::{
+    SSLCertChainRef, SSLCertificateRef, SSLCertificateVerifier, SSLCertificateVerifierHandler,
     Thread, TimestampAligner, log, random_bytes, random_string, rtc_log_format_file,
     thread_sleep_ms, time_millis,
 };

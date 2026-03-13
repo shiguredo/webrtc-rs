@@ -9,8 +9,8 @@ use crate::{
     AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit, Error, IceCandidate,
     IceCandidateRef, MediaStreamTrack, MediaType, RTCStatsReport, Result, RtcError,
     RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender, RtpTransceiver,
-    RtpTransceiverInit, ScopedRef, SessionDescription, StringVector, Thread, VideoDecoderFactory,
-    VideoEncoderFactory, VideoTrack, VideoTrackSource, ffi,
+    RtpTransceiverInit, SSLCertificateVerifier, ScopedRef, SessionDescription, StringVector,
+    Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack, VideoTrackSource, ffi,
 };
 use std::marker::PhantomData;
 use std::os::raw::{c_char, c_void};
@@ -473,13 +473,40 @@ impl IceTransportsType {
     }
 }
 
-/// TURN-TLS の TLS 証明書検証ポリシー。
+/// TlsCertPolicy のラッパー。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TlsCertPolicy {
-    /// デフォルト。TLS 証明書を検証する。
     Secure,
-    /// TLS 証明書の検証をスキップする。
     InsecureNoCheck,
+    Unknown(i32),
+}
+
+impl TlsCertPolicy {
+    pub fn from_int(value: i32) -> Self {
+        unsafe {
+            if value == ffi::webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicySecure {
+                TlsCertPolicy::Secure
+            } else if value
+                == ffi::webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicyInsecureNoCheck
+            {
+                TlsCertPolicy::InsecureNoCheck
+            } else {
+                TlsCertPolicy::Unknown(value)
+            }
+        }
+    }
+
+    pub fn to_int(self) -> i32 {
+        match self {
+            TlsCertPolicy::Secure => unsafe {
+                ffi::webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicySecure
+            },
+            TlsCertPolicy::InsecureNoCheck => unsafe {
+                ffi::webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicyInsecureNoCheck
+            },
+            TlsCertPolicy::Unknown(v) => v,
+        }
+    }
 }
 
 /// PeerConnectionInterface::IceServer のラッパー。
@@ -512,8 +539,8 @@ impl IceServer {
         self.as_ref().set_password(password);
     }
 
-    pub fn set_tls_cert_policy(&mut self, policy: TlsCertPolicy) {
-        self.as_ref().set_tls_cert_policy(policy);
+    pub fn set_tls_cert_policy(&mut self, tls_cert_policy: TlsCertPolicy) {
+        self.as_ref().set_tls_cert_policy(tls_cert_policy);
     }
 
     pub fn as_ref(&self) -> IceServerRef<'_> {
@@ -576,17 +603,11 @@ impl<'a> IceServerRef<'a> {
         }
     }
 
-    pub fn set_tls_cert_policy(&mut self, policy: TlsCertPolicy) {
-        let raw_policy = match policy {
-            TlsCertPolicy::Secure => unsafe { ffi::webrtc_TlsCertPolicy_kTlsCertPolicySecure },
-            TlsCertPolicy::InsecureNoCheck => unsafe {
-                ffi::webrtc_TlsCertPolicy_kTlsCertPolicyInsecureNoCheck
-            },
-        };
+    pub fn set_tls_cert_policy(&mut self, tls_cert_policy: TlsCertPolicy) {
         unsafe {
             ffi::webrtc_PeerConnectionInterface_IceServer_set_tls_cert_policy(
                 self.raw.as_ptr(),
-                raw_policy,
+                tls_cert_policy.to_int(),
             );
         }
     }
@@ -1256,8 +1277,6 @@ unsafe impl Send for PeerConnectionObserver {}
 /// PeerConnectionDependencies のラッパー。
 pub struct PeerConnectionDependencies {
     raw: NonNull<ffi::webrtc_PeerConnectionDependencies>,
-    /// TLS cert verifier のコールバックデータ。Drop 時に解放する。
-    _tls_cert_verifier_data: Option<*mut c_void>,
 }
 
 impl PeerConnectionDependencies {
@@ -1265,34 +1284,11 @@ impl PeerConnectionDependencies {
         let raw =
             NonNull::new(unsafe { ffi::webrtc_PeerConnectionDependencies_new(observer.as_ptr()) })
                 .expect("BUG: webrtc_PeerConnectionDependencies_new が null を返しました");
-        Self {
-            raw,
-            _tls_cert_verifier_data: None,
-        }
+        Self { raw }
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionDependencies {
         self.raw.as_ptr()
-    }
-
-    /// TURN-TLS の証明書検証コールバックを設定する。
-    ///
-    /// コールバックには DER エンコードされた証明書チェーンがスライスとして渡される。
-    /// `true` を返すと検証成功、`false` を返すと検証失敗として扱われる。
-    pub fn set_tls_cert_verifier<F>(&mut self, callback: F)
-    where
-        F: Fn(&[&[u8]]) -> bool + Send + 'static,
-    {
-        let boxed: Box<dyn Fn(&[&[u8]]) -> bool + Send + 'static> = Box::new(callback);
-        let user_data = Box::into_raw(Box::new(boxed)) as *mut c_void;
-        self._tls_cert_verifier_data = Some(user_data);
-        unsafe {
-            ffi::webrtc_PeerConnectionDependencies_set_tls_cert_verifier(
-                self.raw.as_ptr(),
-                Some(tls_cert_verifier_trampoline),
-                user_data,
-            );
-        }
     }
 
     #[expect(clippy::too_many_arguments)]
@@ -1323,38 +1319,19 @@ impl PeerConnectionDependencies {
             );
         }
     }
+
+    pub fn set_tls_cert_verifier(&mut self, tls_cert_verifier: SSLCertificateVerifier) {
+        let raw = tls_cert_verifier.into_raw();
+        unsafe {
+            ffi::webrtc_PeerConnectionDependencies_set_tls_cert_verifier(self.raw.as_ptr(), raw);
+        }
+    }
 }
 
 impl Drop for PeerConnectionDependencies {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_PeerConnectionDependencies_delete(self.raw.as_ptr()) };
-        if let Some(user_data) = self._tls_cert_verifier_data.take() {
-            unsafe {
-                drop(Box::from_raw(
-                    user_data as *mut Box<dyn Fn(&[&[u8]]) -> bool + Send + 'static>,
-                ));
-            }
-        }
     }
-}
-
-unsafe extern "C" fn tls_cert_verifier_trampoline(
-    certs: *const ffi::webrtc_SSLCertificateDer,
-    certs_count: usize,
-    user_data: *mut c_void,
-) -> std::os::raw::c_int {
-    assert!(
-        !user_data.is_null(),
-        "tls_cert_verifier_trampoline: user_data is null"
-    );
-    let callback =
-        unsafe { &*(user_data as *const Box<dyn Fn(&[&[u8]]) -> bool + Send + 'static>) };
-    let certs_slice = unsafe { std::slice::from_raw_parts(certs, certs_count) };
-    let der_slices: Vec<&[u8]> = certs_slice
-        .iter()
-        .map(|cert| unsafe { std::slice::from_raw_parts(cert.data, cert.size) })
-        .collect();
-    if callback(&der_slices) { 1 } else { 0 }
 }
 
 struct PeerConnectionStatsCallbackState {

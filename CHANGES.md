@@ -11,10 +11,6 @@
 
 ## develop
 
-- [ADD] TURN-TLS の TLS 証明書検証を Rust 側に移譲するための C ラッパーを追加する
-  - `webrtc_PeerConnectionDependencies_set_tls_cert_verifier()` で SSLCertificateVerifier コールバックを設定する
-  - `webrtc_PeerConnectionInterface_IceServer_set_tls_cert_policy()` で IceServer 単位の TLS 証明書ポリシーを設定する
-  - @voluntas
 - [CHANGE] VideoEncoder / VideoDecoder の API を handler と 1 対 1 に統一する
   - `VideoEncoder::init_encode` / `encode` / `set_rates` を handler と同じ引数に統一する
   - `VideoDecoder::configure` / `decode` を handler と同じ引数に統一する
@@ -63,6 +59,11 @@
   - @voluntas
 - [ADD] DtlsTransportInterface と PeerConnection の ICE/DTLS 関連 C API を追加する
   - @voluntas
+- [ADD] TLS 証明書検証向け C API / Rust API を追加する
+  - `TlsCertPolicy` と `IceServer::set_tls_cert_policy` を追加する
+  - `SSLCertificateRef` / `SSLCertChainRef` と `SSLCertificateVerifier` を追加する
+  - `PeerConnectionDependencies::set_tls_cert_verifier` を追加する
+  - @melpon @voluntas
 
 ### misc
 
