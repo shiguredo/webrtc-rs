@@ -91,8 +91,8 @@ WEBRTC_DEFINE_VECTOR_NO_DEFAULT_CTOR(webrtc_SdpVideoFormat,
                                      webrtc::SdpVideoFormat);
 
 struct std_string_unique* webrtc_ScalabilityModeToString(int mode) {
-  auto mode_string = std::make_unique<std::string>(
-      webrtc::ScalabilityModeToString(
+  auto mode_string =
+      std::make_unique<std::string>(webrtc::ScalabilityModeToString(
           static_cast<webrtc::ScalabilityMode>(mode)));
   return reinterpret_cast<struct std_string_unique*>(mode_string.release());
 }

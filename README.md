@@ -147,8 +147,11 @@ impl FactoryHolder {
   - ファクトリオプション (暗号化無効化、SSL バージョン設定)
 - `PeerConnectionDependencies`
   - PeerConnection の依存関係設定
+  - `set_proxy(...)` で TURN 用の HTTP Proxy を設定
 - `PeerConnectionRtcConfiguration`
   - ICE / 接続設定
+- `NetworkManagerRef` / `PacketSocketFactoryRef`
+  - `PeerConnectionFactory::default_network_manager()` / `default_socket_factory()` で取得
 - `PeerConnectionOfferAnswerOptions`
   - Offer/Answer オプション (ICE リスタート、Simulcast レイヤー数など)
 - `PeerConnectionObserver` / `PeerConnectionObserverHandler`

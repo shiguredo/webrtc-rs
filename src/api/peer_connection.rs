@@ -291,6 +291,26 @@ impl PeerConnectionFactory {
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionFactoryInterface {
         self.raw_ref.as_ptr()
     }
+
+    pub fn default_network_manager(&self) -> NetworkManagerRef<'_> {
+        let raw = NonNull::new(unsafe {
+            ffi::webrtc_PeerConnectionFactoryInterface_default_network_manager(self.as_ptr())
+        })
+        .expect(
+            "BUG: webrtc_PeerConnectionFactoryInterface_default_network_manager が null を返しました",
+        );
+        NetworkManagerRef::from_raw(raw)
+    }
+
+    pub fn default_socket_factory(&self) -> PacketSocketFactoryRef<'_> {
+        let raw = NonNull::new(unsafe {
+            ffi::webrtc_PeerConnectionFactoryInterface_default_socket_factory(self.as_ptr())
+        })
+        .expect(
+            "BUG: webrtc_PeerConnectionFactoryInterface_default_socket_factory が null を返しました",
+        );
+        PacketSocketFactoryRef::from_raw(raw)
+    }
 }
 
 unsafe impl Send for PeerConnectionFactory {}
@@ -298,6 +318,46 @@ unsafe impl Send for PeerConnectionFactory {}
 // アクセスするためスレッドセーフに使用できる。
 // ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/pc/peer_connection_factory_proxy.h;l=32-59;drc=ef55be496e45889ace33ace4b05094ca19cb499b
 unsafe impl Sync for PeerConnectionFactory {}
+
+/// rtc::NetworkManager への借用ラッパー。
+#[derive(Clone, Copy)]
+pub struct NetworkManagerRef<'a> {
+    raw: NonNull<ffi::webrtc_NetworkManager>,
+    _marker: PhantomData<&'a PeerConnectionFactory>,
+}
+
+impl<'a> NetworkManagerRef<'a> {
+    pub fn from_raw(raw: NonNull<ffi::webrtc_NetworkManager>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_NetworkManager {
+        self.raw.as_ptr()
+    }
+}
+
+/// rtc::PacketSocketFactory への借用ラッパー。
+#[derive(Clone, Copy)]
+pub struct PacketSocketFactoryRef<'a> {
+    raw: NonNull<ffi::webrtc_PacketSocketFactory>,
+    _marker: PhantomData<&'a PeerConnectionFactory>,
+}
+
+impl<'a> PacketSocketFactoryRef<'a> {
+    pub fn from_raw(raw: NonNull<ffi::webrtc_PacketSocketFactory>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_PacketSocketFactory {
+        self.raw.as_ptr()
+    }
+}
 
 /// PeerConnectionInterface::RTCConfiguration のラッパー。
 pub struct PeerConnectionRtcConfiguration {
@@ -1136,6 +1196,35 @@ impl PeerConnectionDependencies {
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionDependencies {
         self.raw.as_ptr()
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    pub fn set_proxy(
+        &mut self,
+        network_manager: NetworkManagerRef<'_>,
+        socket_factory: PacketSocketFactoryRef<'_>,
+        proxy_host: &str,
+        proxy_port: u16,
+        proxy_username: &str,
+        proxy_password: &str,
+        proxy_agent: &str,
+    ) {
+        unsafe {
+            ffi::webrtc_PeerConnectionDependencies_set_proxy(
+                self.raw.as_ptr(),
+                network_manager.as_ptr(),
+                socket_factory.as_ptr(),
+                proxy_host.as_ptr() as *const c_char,
+                proxy_host.len(),
+                proxy_port as i32,
+                proxy_username.as_ptr() as *const c_char,
+                proxy_username.len(),
+                proxy_password.as_ptr() as *const c_char,
+                proxy_password.len(),
+                proxy_agent.as_ptr() as *const c_char,
+                proxy_agent.len(),
+            );
+        }
     }
 }
 

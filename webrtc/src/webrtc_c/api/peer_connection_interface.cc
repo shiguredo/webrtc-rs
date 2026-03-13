@@ -2,8 +2,11 @@
 
 #include <stdarg.h>
 #include <stddef.h>
+#include <exception>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -13,13 +16,14 @@
 #include <api/audio_codecs/audio_decoder_factory.h>
 #include <api/audio_codecs/audio_encoder_factory.h>
 #include <api/audio_options.h>
-#include <api/create_modular_peer_connection_factory.h>
 #include <api/data_channel_interface.h>
 #include <api/enable_media.h>
+#include <api/environment/environment_factory.h>
 #include <api/jsep.h>
 #include <api/make_ref_counted.h>
 #include <api/media_stream_interface.h>
 #include <api/media_types.h>
+#include <api/packet_socket_factory.h>
 #include <api/peer_connection_interface.h>
 #include <api/rtc_error.h>
 #include <api/rtc_event_log/rtc_event_log_factory_interface.h>
@@ -33,7 +37,16 @@
 #include <api/stats/rtc_stats_report.h>
 #include <api/video_codecs/video_decoder_factory.h>
 #include <api/video_codecs/video_encoder_factory.h>
+#include <p2p/client/basic_port_allocator.h>
+#include <pc/connection_context.h>
 #include <pc/media_factory.h>
+#include <pc/peer_connection_factory.h>
+#include <pc/peer_connection_factory_proxy.h>
+#include <rtc_base/checks.h>
+#include <rtc_base/crypt_string_revive.h>
+#include <rtc_base/network.h>
+#include <rtc_base/proxy_info_revive.h>
+#include <rtc_base/socket_address.h>
 #include <rtc_base/ssl_stream_adapter.h>
 #include <rtc_base/thread.h>
 
@@ -192,6 +205,33 @@ class RTCStatsCollectorCallbackImpl : public webrtc::RTCStatsCollectorCallback {
   void* user_data_;
 };
 
+class RawCryptString : public webrtc::revive::CryptStringImpl {
+ public:
+  explicit RawCryptString(const std::string& str) : str_(str) {}
+
+  size_t GetLength() const override { return str_.size(); }
+
+  void CopyTo(char* dest, bool nullterminate) const override {
+    for (size_t i = 0; i < str_.size(); ++i) {
+      *dest++ = str_[i];
+    }
+    if (nullterminate) {
+      *dest = '\0';
+    }
+  }
+
+  std::string UrlEncode() const override { throw std::exception(); }
+
+  CryptStringImpl* Copy() const override { return new RawCryptString(str_); }
+
+  void CopyRawTo(std::vector<unsigned char>* dest) const override {
+    dest->assign(str_.begin(), str_.end());
+  }
+
+ private:
+  std::string str_;
+};
+
 struct webrtc_PeerConnectionObserver* webrtc_PeerConnectionObserver_new(
     const struct webrtc_PeerConnectionObserver_cbs* observer,
     void* user_data) {
@@ -314,6 +354,48 @@ void webrtc_PeerConnectionDependencies_delete(
     struct webrtc_PeerConnectionDependencies* self) {
   auto deps = reinterpret_cast<webrtc::PeerConnectionDependencies*>(self);
   delete deps;
+}
+void webrtc_PeerConnectionDependencies_set_proxy(
+    struct webrtc_PeerConnectionDependencies* self,
+    struct webrtc_NetworkManager* network_manager,
+    struct webrtc_PacketSocketFactory* socket_factory,
+    const char* proxy_host,
+    size_t proxy_host_len,
+    int proxy_port,
+    const char* proxy_username,
+    size_t proxy_username_len,
+    const char* proxy_password,
+    size_t proxy_password_len,
+    const char* proxy_agent,
+    size_t proxy_agent_len) {
+  auto deps = reinterpret_cast<webrtc::PeerConnectionDependencies*>(self);
+  auto* nm = reinterpret_cast<webrtc::NetworkManager*>(network_manager);
+  auto* sf = reinterpret_cast<webrtc::PacketSocketFactory*>(socket_factory);
+  RTC_CHECK(nm != nullptr);
+  RTC_CHECK(sf != nullptr);
+
+  deps->allocator = std::make_unique<webrtc::BasicPortAllocator>(
+      webrtc::CreateEnvironment(), nm, sf);
+
+  webrtc::revive::ProxyInfo pi;
+  pi.type = webrtc::revive::PROXY_HTTPS;
+  const std::string host = proxy_host != nullptr
+                               ? std::string(proxy_host, proxy_host_len)
+                               : std::string();
+  pi.address = webrtc::SocketAddress(host, proxy_port);
+
+  if (proxy_username != nullptr && proxy_username_len != 0) {
+    pi.username = std::string(proxy_username, proxy_username_len);
+  }
+  if (proxy_password != nullptr && proxy_password_len != 0) {
+    pi.password = webrtc::revive::CryptString(
+        RawCryptString(std::string(proxy_password, proxy_password_len)));
+  }
+
+  const std::string agent = proxy_agent != nullptr
+                                ? std::string(proxy_agent, proxy_agent_len)
+                                : std::string();
+  deps->allocator->set_proxy(agent, pi);
 }
 
 void webrtc_PeerConnectionInterface_CreateDataChannelOrError(
@@ -854,19 +936,204 @@ void webrtc_EnableMedia(
 // webrtc::PeerConnectionFactoryInterface
 // -------------------------
 
+namespace {
+
+// PeerConnectionFactoryInterface の public API からは ConnectionContext にアクセスできない。
+// そのため、生成時に取得した ConnectionContext を raw pointer キーで保持しておき、
+// C API の default_network_manager/default_socket_factory から取り出す。
+//
+// 寿命管理はさらにトリッキーで、C API から factory の破棄通知を受け取れない。
+// ここでは C API の AddRef/Release ラッパーで外部参照数を追跡し、
+// 最後の Release で map エントリを削除して context も解放する。
+struct FactoryContextEntry {
+  webrtc::scoped_refptr<webrtc::ConnectionContext> context;
+  size_t external_ref_count = 0;
+};
+
+std::mutex& FactoryContextMutex() {
+  static std::mutex mutex;
+  return mutex;
+}
+
+std::unordered_map<webrtc::PeerConnectionFactoryInterface*,
+                   FactoryContextEntry>&
+FactoryContextMap() {
+  static std::unordered_map<webrtc::PeerConnectionFactoryInterface*,
+                            FactoryContextEntry>
+      map;
+  return map;
+}
+
+void RegisterFactoryContext(
+    webrtc::PeerConnectionFactoryInterface* factory,
+    webrtc::scoped_refptr<webrtc::ConnectionContext> context) {
+  std::lock_guard<std::mutex> lock(FactoryContextMutex());
+  FactoryContextEntry entry;
+  entry.context = std::move(context);
+  entry.external_ref_count = 1;
+  FactoryContextMap()[factory] = std::move(entry);
+}
+
+void AddFactoryExternalRef(webrtc::PeerConnectionFactoryInterface* factory) {
+  std::lock_guard<std::mutex> lock(FactoryContextMutex());
+  auto it = FactoryContextMap().find(factory);
+  if (it != FactoryContextMap().end()) {
+    ++it->second.external_ref_count;
+  }
+}
+
+bool ReleaseFactoryExternalRef(
+    webrtc::PeerConnectionFactoryInterface* factory) {
+  std::lock_guard<std::mutex> lock(FactoryContextMutex());
+  auto it = FactoryContextMap().find(factory);
+  if (it == FactoryContextMap().end()) {
+    return false;
+  }
+  if (it->second.external_ref_count > 0) {
+    --it->second.external_ref_count;
+  }
+  return it->second.external_ref_count == 0;
+}
+
+void UnregisterFactoryContext(webrtc::PeerConnectionFactoryInterface* factory) {
+  std::lock_guard<std::mutex> lock(FactoryContextMutex());
+  FactoryContextMap().erase(factory);
+}
+
+webrtc::scoped_refptr<webrtc::ConnectionContext> FindFactoryContext(
+    webrtc::PeerConnectionFactoryInterface* factory) {
+  std::lock_guard<std::mutex> lock(FactoryContextMutex());
+  auto it = FactoryContextMap().find(factory);
+  if (it == FactoryContextMap().end()) {
+    return nullptr;
+  }
+  return it->second.context;
+}
+
+class PeerConnectionFactoryWithContext : public webrtc::PeerConnectionFactory {
+ public:
+  explicit PeerConnectionFactoryWithContext(
+      webrtc::PeerConnectionFactoryDependencies dependencies)
+      : PeerConnectionFactoryWithContext(
+            webrtc::ConnectionContext::Create(webrtc::CreateEnvironment(),
+                                              &dependencies),
+            &dependencies) {}
+
+  PeerConnectionFactoryWithContext(
+      webrtc::scoped_refptr<webrtc::ConnectionContext> context,
+      webrtc::PeerConnectionFactoryDependencies* dependencies)
+      : conn_context_(context),
+        webrtc::PeerConnectionFactory(webrtc::CreateEnvironment(),
+                                      context,
+                                      dependencies) {}
+
+  static webrtc::scoped_refptr<PeerConnectionFactoryWithContext> Create(
+      webrtc::PeerConnectionFactoryDependencies dependencies) {
+    return webrtc::make_ref_counted<PeerConnectionFactoryWithContext>(
+        std::move(dependencies));
+  }
+
+  webrtc::scoped_refptr<webrtc::ConnectionContext> GetContext() const {
+    return conn_context_;
+  }
+
+ private:
+  webrtc::scoped_refptr<webrtc::ConnectionContext> conn_context_;
+};
+
+std::pair<webrtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface>,
+          webrtc::scoped_refptr<webrtc::ConnectionContext>>
+CreateModularPeerConnectionFactoryWithContext(
+    webrtc::PeerConnectionFactoryDependencies dependencies) {
+  using result_type =
+      std::pair<webrtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface>,
+                webrtc::scoped_refptr<webrtc::ConnectionContext>>;
+  if (dependencies.signaling_thread == nullptr) {
+    return result_type(nullptr, nullptr);
+  }
+  return dependencies.signaling_thread->BlockingCall([&dependencies]() {
+    auto factory =
+        PeerConnectionFactoryWithContext::Create(std::move(dependencies));
+    if (factory == nullptr) {
+      return result_type(nullptr, nullptr);
+    }
+    auto context = factory->GetContext();
+    auto proxy = webrtc::PeerConnectionFactoryProxy::Create(
+        factory->signaling_thread(), factory->worker_thread(), factory);
+    return result_type(proxy, context);
+  });
+}
+
+}  // namespace
+
 extern "C" {
-WEBRTC_DEFINE_REFCOUNTED(webrtc_PeerConnectionFactoryInterface,
-                         webrtc::PeerConnectionFactoryInterface);
+
+struct webrtc_PeerConnectionFactoryInterface*
+webrtc_PeerConnectionFactoryInterface_refcounted_get(
+    struct webrtc_PeerConnectionFactoryInterface_refcounted* p) {
+  return reinterpret_cast<struct webrtc_PeerConnectionFactoryInterface*>(p);
+}
+
+void webrtc_PeerConnectionFactoryInterface_AddRef(
+    struct webrtc_PeerConnectionFactoryInterface* p) {
+  auto self = reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(p);
+  self->AddRef();
+  AddFactoryExternalRef(self);
+}
+
+void webrtc_PeerConnectionFactoryInterface_Release(
+    struct webrtc_PeerConnectionFactoryInterface* p) {
+  auto self = reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(p);
+  const bool should_unregister = ReleaseFactoryExternalRef(self);
+  self->Release();
+  if (should_unregister) {
+    UnregisterFactoryContext(self);
+  }
+}
 
 struct webrtc_PeerConnectionFactoryInterface_refcounted*
 webrtc_CreateModularPeerConnectionFactory(
     struct webrtc_PeerConnectionFactoryDependencies* dependencies) {
   auto deps = reinterpret_cast<webrtc::PeerConnectionFactoryDependencies*>(
       dependencies);
-  auto factory = webrtc::CreateModularPeerConnectionFactory(std::move(*deps));
+  auto p = CreateModularPeerConnectionFactoryWithContext(std::move(*deps));
+  auto factory = p.first;
+  auto context = p.second;
+  if (factory == nullptr || context == nullptr) {
+    return nullptr;
+  }
+  auto* raw_factory = factory.release();
+  RegisterFactoryContext(raw_factory, std::move(context));
   return reinterpret_cast<
-      struct webrtc_PeerConnectionFactoryInterface_refcounted*>(
-      factory.release());
+      struct webrtc_PeerConnectionFactoryInterface_refcounted*>(raw_factory);
+}
+
+struct webrtc_NetworkManager*
+webrtc_PeerConnectionFactoryInterface_default_network_manager(
+    struct webrtc_PeerConnectionFactoryInterface* self) {
+  auto* factory =
+      reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
+  auto context = FindFactoryContext(factory);
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto* network_manager = context->signaling_thread()->BlockingCall(
+      [context]() { return context->default_network_manager(); });
+  return reinterpret_cast<struct webrtc_NetworkManager*>(network_manager);
+}
+
+struct webrtc_PacketSocketFactory*
+webrtc_PeerConnectionFactoryInterface_default_socket_factory(
+    struct webrtc_PeerConnectionFactoryInterface* self) {
+  auto* factory =
+      reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
+  auto context = FindFactoryContext(factory);
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto* socket_factory = context->signaling_thread()->BlockingCall(
+      [context]() { return context->default_socket_factory(); });
+  return reinterpret_cast<struct webrtc_PacketSocketFactory*>(socket_factory);
 }
 
 void webrtc_PeerConnectionFactoryInterface_CreatePeerConnectionOrError(

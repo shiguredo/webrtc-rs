@@ -11,6 +11,12 @@
 
 ## develop
 
+- [ADD] TURN 用 HTTP Proxy 設定 API を追加する
+  - `PeerConnectionFactory::default_network_manager()` / `default_socket_factory()` を追加する
+  - `NetworkManagerRef` / `PacketSocketFactoryRef` を追加する
+  - `PeerConnectionDependencies::set_proxy(...)` を追加する
+  - C API に `webrtc_PeerConnectionFactoryInterface_default_network_manager` / `webrtc_PeerConnectionFactoryInterface_default_socket_factory` / `webrtc_PeerConnectionDependencies_set_proxy` を追加する
+  - @melpon
 - [CHANGE] VideoEncoder / VideoDecoder の API を handler と 1 対 1 に統一する
   - `VideoEncoder::init_encode` / `encode` / `set_rates` を handler と同じ引数に統一する
   - `VideoDecoder::configure` / `decode` を handler と同じ引数に統一する
