@@ -354,6 +354,11 @@ void webrtc_PeerConnectionDependencies_delete(
   auto deps = reinterpret_cast<webrtc::PeerConnectionDependencies*>(self);
   delete deps;
 }
+// この関数は C ラッパーの方針である「libwebrtc の薄いラッパーに徹する」からは逸脱して複合的な処理を行っている。
+// これは、この機能が元々の libwebrtc から削除されたのを shiguredo-webrtc-build で無理やり復活させた機能であるため、
+// 薄いラッパーに徹することによるメリットが少ないと判断したためである。
+// この部分を薄いラッパーに徹するのであれば、復活させた webrtc::revive::ProxyInfo などを Rust 側に公開することになるが、
+// おそらく他の場所で利用することは無いため、この関数内で完結させる方針にした。
 void webrtc_PeerConnectionDependencies_set_proxy(
     struct webrtc_PeerConnectionDependencies* self,
     struct webrtc_NetworkManager* network_manager,
