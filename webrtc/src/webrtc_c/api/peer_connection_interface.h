@@ -92,6 +92,44 @@ void webrtc_PeerConnectionDependencies_set_proxy(
     size_t proxy_password_len,
     const char* proxy_agent,
     size_t proxy_agent_len);
+
+// -------------------------
+// webrtc::SSLCertificateVerifier (コールバックベースの TLS 証明書検証)
+// -------------------------
+
+// 証明書チェーン内の各証明書を表す構造体。
+// DER エンコードされたバイト列へのポインタとそのサイズを保持する。
+struct webrtc_SSLCertificateDer {
+  const uint8_t* data;
+  size_t size;
+};
+
+// Rust 側から提供されるコールバック関数の型。
+// certs は DER エンコードされた証明書の配列（リーフが先頭）、
+// certs_count はその要素数。
+// 検証成功時は 1、失敗時は 0 を返す。
+typedef int (*webrtc_SSLCertificateVerifier_VerifyChainCallback)(
+    const struct webrtc_SSLCertificateDer* certs,
+    size_t certs_count,
+    void* user_data);
+
+// コールバック関数を SSLCertificateVerifier として
+// PeerConnectionDependencies に設定する。
+void webrtc_PeerConnectionDependencies_set_tls_cert_verifier(
+    struct webrtc_PeerConnectionDependencies* self,
+    webrtc_SSLCertificateVerifier_VerifyChainCallback callback,
+    void* user_data);
+
+// -------------------------
+// IceServer::tls_cert_policy
+// -------------------------
+
+typedef int webrtc_TlsCertPolicy;
+extern const int webrtc_TlsCertPolicy_kTlsCertPolicySecure;
+extern const int webrtc_TlsCertPolicy_kTlsCertPolicyInsecureNoCheck;
+void webrtc_PeerConnectionInterface_IceServer_set_tls_cert_policy(
+    struct webrtc_PeerConnectionInterface_IceServer* self,
+    webrtc_TlsCertPolicy policy);
 void webrtc_PeerConnectionInterface_CreateDataChannelOrError(
     struct webrtc_PeerConnectionInterface* self,
     const char* label,
