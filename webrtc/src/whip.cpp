@@ -1073,8 +1073,7 @@ class SignalingWhip : public webrtc::RefCountInterface,
   }
   void OnIceGatheringChange(
       webrtc::PeerConnectionInterface::IceGatheringState new_state) override {}
-  void OnIceCandidate(const webrtc::IceCandidate* candidate) override {
-  }
+  void OnIceCandidate(const webrtc::IceCandidate* candidate) override {}
   void OnIceCandidateError(const std::string& address,
                            int port,
                            const std::string& url,

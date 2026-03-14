@@ -60,7 +60,8 @@ void webrtc_PeerConnectionInterface_IceServer_set_password(
     const char* password,
     size_t password_len);
 typedef int webrtc_PeerConnectionInterface_TlsCertPolicy;
-extern const int webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicySecure;
+extern const int
+    webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicySecure;
 extern const int
     webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicyInsecureNoCheck;
 void webrtc_PeerConnectionInterface_IceServer_set_tls_cert_policy(

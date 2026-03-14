@@ -46,7 +46,8 @@ class SSLCertificateVerifierImpl : public webrtc::SSLCertificateVerifier {
 }  // namespace
 
 extern "C" {
-WEBRTC_DEFINE_UNIQUE(webrtc_SSLCertificateVerifier, webrtc::SSLCertificateVerifier);
+WEBRTC_DEFINE_UNIQUE(webrtc_SSLCertificateVerifier,
+                     webrtc::SSLCertificateVerifier);
 
 struct std_string_unique* webrtc_SSLCertificate_ToPEMString(
     const struct webrtc_SSLCertificate* self) {

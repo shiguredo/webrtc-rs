@@ -304,9 +304,10 @@ void webrtc_PeerConnectionInterface_IceServer_set_password(
   server->password =
       password != nullptr ? std::string(password, password_len) : std::string();
 }
-extern const int webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicySecure =
-    static_cast<int>(
-        webrtc::PeerConnectionInterface::TlsCertPolicy::kTlsCertPolicySecure);
+extern const int
+    webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicySecure =
+        static_cast<int>(webrtc::PeerConnectionInterface::TlsCertPolicy::
+                             kTlsCertPolicySecure);
 extern const int
     webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicyInsecureNoCheck =
         static_cast<int>(webrtc::PeerConnectionInterface::TlsCertPolicy::
