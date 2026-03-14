@@ -9,8 +9,8 @@ use crate::{
     AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit, Error, IceCandidate,
     IceCandidateRef, MediaStreamTrack, MediaType, RTCStatsReport, Result, RtcError,
     RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender, RtpTransceiver,
-    RtpTransceiverInit, ScopedRef, SessionDescription, StringVector, Thread, VideoDecoderFactory,
-    VideoEncoderFactory, VideoTrack, VideoTrackSource, ffi,
+    RtpTransceiverInit, SSLCertificateVerifier, ScopedRef, SessionDescription, StringVector,
+    Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack, VideoTrackSource, ffi,
 };
 use std::marker::PhantomData;
 use std::os::raw::{c_char, c_void};
@@ -473,6 +473,42 @@ impl IceTransportsType {
     }
 }
 
+/// TlsCertPolicy のラッパー。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TlsCertPolicy {
+    Secure,
+    InsecureNoCheck,
+    Unknown(i32),
+}
+
+impl TlsCertPolicy {
+    pub fn from_int(value: i32) -> Self {
+        unsafe {
+            if value == ffi::webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicySecure {
+                TlsCertPolicy::Secure
+            } else if value
+                == ffi::webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicyInsecureNoCheck
+            {
+                TlsCertPolicy::InsecureNoCheck
+            } else {
+                TlsCertPolicy::Unknown(value)
+            }
+        }
+    }
+
+    pub fn to_int(self) -> i32 {
+        match self {
+            TlsCertPolicy::Secure => unsafe {
+                ffi::webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicySecure
+            },
+            TlsCertPolicy::InsecureNoCheck => unsafe {
+                ffi::webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicyInsecureNoCheck
+            },
+            TlsCertPolicy::Unknown(v) => v,
+        }
+    }
+}
+
 /// PeerConnectionInterface::IceServer のラッパー。
 pub struct IceServer {
     raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>,
@@ -501,6 +537,10 @@ impl IceServer {
 
     pub fn set_password(&mut self, password: &str) {
         self.as_ref().set_password(password);
+    }
+
+    pub fn set_tls_cert_policy(&mut self, tls_cert_policy: TlsCertPolicy) {
+        self.as_ref().set_tls_cert_policy(tls_cert_policy);
     }
 
     pub fn as_ref(&self) -> IceServerRef<'_> {
@@ -559,6 +599,15 @@ impl<'a> IceServerRef<'a> {
                 self.raw.as_ptr(),
                 password.as_ptr() as *const _,
                 password.len(),
+            );
+        }
+    }
+
+    pub fn set_tls_cert_policy(&mut self, tls_cert_policy: TlsCertPolicy) {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_IceServer_set_tls_cert_policy(
+                self.raw.as_ptr(),
+                tls_cert_policy.to_int(),
             );
         }
     }
@@ -1268,6 +1317,13 @@ impl PeerConnectionDependencies {
                 proxy_agent.as_ptr() as *const c_char,
                 proxy_agent.len(),
             );
+        }
+    }
+
+    pub fn set_tls_cert_verifier(&mut self, tls_cert_verifier: SSLCertificateVerifier) {
+        let raw = tls_cert_verifier.into_raw();
+        unsafe {
+            ffi::webrtc_PeerConnectionDependencies_set_tls_cert_verifier(self.raw.as_ptr(), raw);
         }
     }
 }

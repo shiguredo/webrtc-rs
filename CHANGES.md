@@ -59,6 +59,11 @@
   - @voluntas
 - [ADD] DtlsTransportInterface と PeerConnection の ICE/DTLS 関連 C API を追加する
   - @voluntas
+- [ADD] TLS 証明書検証向け C API / Rust API を追加する
+  - `TlsCertPolicy` と `IceServer::set_tls_cert_policy` を追加する
+  - `SSLCertificateRef` / `SSLCertChainRef` と `SSLCertificateVerifier` を追加する
+  - `PeerConnectionDependencies::set_tls_cert_verifier` を追加する
+  - @melpon @voluntas
 
 ### misc
 

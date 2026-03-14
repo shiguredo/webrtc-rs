@@ -1,5 +1,9 @@
 use super::*;
 use std::ptr::NonNull;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use std::time::Duration;
 
 #[test]
@@ -466,6 +470,7 @@ fn rtc_configuration_and_ice_server() {
     let mut server = IceServer::new();
     server.set_username("user");
     server.set_password("pass");
+    server.set_tls_cert_policy(TlsCertPolicy::InsecureNoCheck);
     server.add_url("stun:192.0.2.1:3478");
 
     {
@@ -480,6 +485,22 @@ fn rtc_configuration_and_ice_server() {
     let len_before = owned.len();
     owned.push(&server);
     assert_eq!(owned.len(), len_before + 1);
+}
+
+#[test]
+fn tls_cert_policy_round_trip() {
+    assert_eq!(
+        TlsCertPolicy::from_int(TlsCertPolicy::Secure.to_int()),
+        TlsCertPolicy::Secure
+    );
+    assert_eq!(
+        TlsCertPolicy::from_int(TlsCertPolicy::InsecureNoCheck.to_int()),
+        TlsCertPolicy::InsecureNoCheck
+    );
+    assert_eq!(
+        TlsCertPolicy::from_int(123456),
+        TlsCertPolicy::Unknown(123456)
+    );
 }
 
 #[test]
@@ -928,6 +949,39 @@ fn peer_connection_observer_and_dependencies() {
     let deps = PeerConnectionDependencies::new(&observer);
     assert!(!deps.as_ptr().is_null());
     drop(deps);
+}
+
+#[test]
+fn peer_connection_dependencies_set_tls_cert_verifier() {
+    struct TestVerifier {
+        dropped: Arc<AtomicBool>,
+    }
+
+    impl SSLCertificateVerifierHandler for TestVerifier {
+        fn verify_chain(&mut self, _chain: SSLCertChainRef<'_>) -> bool {
+            true
+        }
+    }
+
+    impl Drop for TestVerifier {
+        fn drop(&mut self) {
+            self.dropped.store(true, Ordering::SeqCst);
+        }
+    }
+
+    let dropped = Arc::new(AtomicBool::new(false));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let mut deps = PeerConnectionDependencies::new(&observer);
+    let verifier = SSLCertificateVerifier::new_with_handler(Box::new(TestVerifier {
+        dropped: dropped.clone(),
+    }));
+    deps.set_tls_cert_verifier(verifier);
+
+    drop(deps);
+    assert!(
+        dropped.load(Ordering::SeqCst),
+        "SSLCertificateVerifierHandler が解放されていません"
+    );
 }
 
 #[test]

@@ -51,6 +51,7 @@
 
 #include "../common.impl.h"
 #include "../pc/connection_context.h"
+#include "../rtc_base/ssl_certificate.h"
 #include "../rtc_base/thread.h"
 #include "../std.h"
 #include "audio/audio_processing.h"
@@ -303,6 +304,22 @@ void webrtc_PeerConnectionInterface_IceServer_set_password(
   server->password =
       password != nullptr ? std::string(password, password_len) : std::string();
 }
+extern const int webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicySecure =
+    static_cast<int>(
+        webrtc::PeerConnectionInterface::TlsCertPolicy::kTlsCertPolicySecure);
+extern const int
+    webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicyInsecureNoCheck =
+        static_cast<int>(webrtc::PeerConnectionInterface::TlsCertPolicy::
+                             kTlsCertPolicyInsecureNoCheck);
+void webrtc_PeerConnectionInterface_IceServer_set_tls_cert_policy(
+    struct webrtc_PeerConnectionInterface_IceServer* self,
+    webrtc_PeerConnectionInterface_TlsCertPolicy tls_cert_policy) {
+  auto server =
+      reinterpret_cast<webrtc::PeerConnectionInterface::IceServer*>(self);
+  server->tls_cert_policy =
+      static_cast<webrtc::PeerConnectionInterface::TlsCertPolicy>(
+          tls_cert_policy);
+}
 struct webrtc_PeerConnectionInterface_IceServer_vector*
 webrtc_PeerConnectionInterface_RTCConfiguration_get_servers(
     struct webrtc_PeerConnectionInterface_RTCConfiguration* self) {
@@ -401,6 +418,20 @@ void webrtc_PeerConnectionDependencies_set_proxy(
                                 ? std::string(proxy_agent, proxy_agent_len)
                                 : std::string();
   deps->allocator->set_proxy(agent, pi);
+}
+
+void webrtc_PeerConnectionDependencies_set_tls_cert_verifier(
+    struct webrtc_PeerConnectionDependencies* self,
+    struct webrtc_SSLCertificateVerifier_unique* tls_cert_verifier) {
+  auto deps = reinterpret_cast<webrtc::PeerConnectionDependencies*>(self);
+  if (tls_cert_verifier == nullptr) {
+    deps->tls_cert_verifier = nullptr;
+    return;
+  }
+  auto verifier = reinterpret_cast<webrtc::SSLCertificateVerifier*>(
+      webrtc_SSLCertificateVerifier_unique_get(tls_cert_verifier));
+  deps->tls_cert_verifier =
+      std::move(std::unique_ptr<webrtc::SSLCertificateVerifier>(verifier));
 }
 
 void webrtc_PeerConnectionInterface_CreateDataChannelOrError(

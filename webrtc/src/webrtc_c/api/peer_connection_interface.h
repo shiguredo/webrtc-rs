@@ -4,6 +4,7 @@
 
 #include "../common.h"
 #include "../pc/connection_context.h"
+#include "../rtc_base/ssl_certificate.h"
 #include "../rtc_base/thread.h"
 #include "../std.h"
 #include "data_channel_interface.h"
@@ -58,6 +59,13 @@ void webrtc_PeerConnectionInterface_IceServer_set_password(
     struct webrtc_PeerConnectionInterface_IceServer* self,
     const char* password,
     size_t password_len);
+typedef int webrtc_PeerConnectionInterface_TlsCertPolicy;
+extern const int webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicySecure;
+extern const int
+    webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicyInsecureNoCheck;
+void webrtc_PeerConnectionInterface_IceServer_set_tls_cert_policy(
+    struct webrtc_PeerConnectionInterface_IceServer* self,
+    webrtc_PeerConnectionInterface_TlsCertPolicy tls_cert_policy);
 struct webrtc_PeerConnectionInterface_IceServer_vector*
 webrtc_PeerConnectionInterface_RTCConfiguration_get_servers(
     struct webrtc_PeerConnectionInterface_RTCConfiguration* self);
@@ -92,6 +100,9 @@ void webrtc_PeerConnectionDependencies_set_proxy(
     size_t proxy_password_len,
     const char* proxy_agent,
     size_t proxy_agent_len);
+void webrtc_PeerConnectionDependencies_set_tls_cert_verifier(
+    struct webrtc_PeerConnectionDependencies* self,
+    struct webrtc_SSLCertificateVerifier_unique* tls_cert_verifier);
 void webrtc_PeerConnectionInterface_CreateDataChannelOrError(
     struct webrtc_PeerConnectionInterface* self,
     const char* label,
