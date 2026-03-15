@@ -147,7 +147,7 @@ impl FactoryHolder {
 - `PeerConnectionFactoryDependencies`
   - ファクトリの依存関係設定
 - `PeerConnectionFactoryOptions`
-  - ファクトリオプション (暗号化無効化、SSL バージョン設定)
+  - ファクトリオプション (暗号化無効化)
 - `PeerConnectionDependencies`
   - PeerConnection の依存関係設定
   - `set_proxy(...)` で TURN 用の HTTP Proxy を設定
@@ -163,6 +163,14 @@ impl FactoryHolder {
   - イベントコールバック
 - `PeerConnectionState`
   - 接続状態
+- `IceConnectionState`
+  - ICE 接続状態
+- `IceGatheringState`
+  - ICE 収集状態
+- `IceCandidateError`
+  - ICE 候補エラー
+- `TlsCertPolicy`
+  - TLS 証明書ポリシー (Secure, InsecureNoCheck)
 - `CreateSessionDescriptionObserver`
   - SDP 生成コールバック
 - `SetLocalDescriptionObserver`
@@ -296,6 +304,15 @@ impl FactoryHolder {
 - `RTCStatsReport`
   - 統計レポート
 
+### SSL/TLS
+
+- `SSLCertificateVerifier` / `SSLCertificateVerifierHandler`
+  - TLS 証明書のカスタム検証
+- `SSLCertificateRef`
+  - SSL 証明書の参照
+- `SSLCertChainRef`
+  - SSL 証明書チェーンの参照
+
 ### エラー
 
 - `RtcError`
@@ -325,8 +342,12 @@ impl FactoryHolder {
   - ランダム生成
 - `time_millis` / `thread_sleep_ms`
   - 時間ユーティリティ
-- `log` / `rtc_log_format_file`
-  - ログ機能
+- `version`
+  - クレートのバージョン取得
+- `log` / `log::Severity`
+  - ログ機能 (`log_to_debug`, `enable_timestamps`, `enable_threads`, `print`)
+- `rtc_log_verbose!` / `rtc_log_info!` / `rtc_log_warning!` / `rtc_log_error!`
+  - ログ出力マクロ
 
 ## ビルド
 
