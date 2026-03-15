@@ -3,15 +3,18 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <memory>
+#include <optional>
 #include <string>
 
 // WebRTC
 #include <api/video/encoded_image.h>
+#include <api/video/video_frame.h>
 #include <api/video_codecs/video_decoder.h>
 #include <modules/video_coding/include/video_error_codes.h>
 
 #include "../../common.impl.h"
 #include "../../std.h"
+#include "../video/video_frame.h"
 
 namespace {
 
@@ -180,6 +183,17 @@ int webrtc_VideoDecoder_Settings_max_render_resolution_height(
   return settings->max_render_resolution().Height();
 }
 
+void webrtc_VideoDecoder_DecodedImageCallback_Decoded(
+    struct webrtc_VideoDecoder_DecodedImageCallback* self,
+    struct webrtc_VideoFrame* decoded_image) {
+  if (self == nullptr || decoded_image == nullptr) {
+    return;
+  }
+  auto callback = reinterpret_cast<webrtc::DecodedImageCallback*>(self);
+  auto frame = reinterpret_cast<webrtc::VideoFrame*>(decoded_image);
+  callback->Decoded(*frame, std::nullopt, std::nullopt);
+}
+
 struct webrtc_VideoDecoder_unique* webrtc_VideoDecoder_new(
     const struct webrtc_VideoDecoder_cbs* cbs,
     void* user_data) {
@@ -215,6 +229,26 @@ int32_t webrtc_VideoDecoder_Decode(struct webrtc_VideoDecoder* self,
   }
   webrtc::EncodedImage default_input_image;
   return decoder->Decode(default_input_image, render_time_ms);
+}
+
+int32_t webrtc_VideoDecoder_RegisterDecodeCompleteCallback(
+    struct webrtc_VideoDecoder* self,
+    struct webrtc_VideoDecoder_DecodedImageCallback* callback) {
+  if (self == nullptr) {
+    return -1;
+  }
+  auto decoder = reinterpret_cast<webrtc::VideoDecoder*>(self);
+  auto decoded_image_callback =
+      reinterpret_cast<webrtc::DecodedImageCallback*>(callback);
+  return decoder->RegisterDecodeCompleteCallback(decoded_image_callback);
+}
+
+int32_t webrtc_VideoDecoder_Release(struct webrtc_VideoDecoder* self) {
+  if (self == nullptr) {
+    return -1;
+  }
+  auto decoder = reinterpret_cast<webrtc::VideoDecoder*>(self);
+  return decoder->Release();
 }
 
 struct webrtc_VideoDecoder_DecoderInfo_unique*

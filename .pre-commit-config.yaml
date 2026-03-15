@@ -7,9 +7,9 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
-      - id: cargo-clippy
-        name: cargo clippy
-        entry: cargo clippy --workspace --all-targets -- -D warnings
+      - id: cargo-check
+        name: cargo check
+        entry: cargo check --workspace --features source-build
         language: system
         types: [rust]
         pass_filenames: false

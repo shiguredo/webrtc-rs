@@ -1,5 +1,10 @@
 pub mod ffi;
 
+/// クレートのバージョンを返す
+pub fn version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
 mod api;
 mod cxxstd;
 mod error;
@@ -15,9 +20,12 @@ pub use cxxstd::{
     CxxString, CxxStringRef, MapStringString, MapStringStringIter, StringVector, StringVectorRef,
 };
 pub use error::{Error, Result};
-pub use libyuv::{abgr_to_i420, i420_to_argb, nv12_to_i420, yuy2_to_i420};
+pub use libyuv::{
+    LibyuvFourcc, abgr_to_i420, convert_from_i420, i420_to_nv12, nv12_to_i420, yuy2_to_i420,
+};
 pub use ref_count::{RefCountedHandle, ScopedRef};
 pub use rtc_base::{
+    SSLCertChainRef, SSLCertificateRef, SSLCertificateVerifier, SSLCertificateVerifierHandler,
     Thread, TimestampAligner, log, random_bytes, random_string, rtc_log_format_file,
     thread_sleep_ms, time_millis,
 };

@@ -1,6 +1,6 @@
 use super::video_codec_common::{
     EncodedImageRef, SdpVideoFormat, SdpVideoFormatRef, VideoCodecRef, VideoCodecStatus,
-    VideoCodecType, VideoFrame, VideoFrameRef, VideoFrameTypeVectorRef,
+    VideoCodecType, VideoFrameRef, VideoFrameTypeVectorRef,
 };
 use crate::{CxxString, EnvironmentRef, Result, ffi};
 use std::marker::PhantomData;
@@ -109,6 +109,10 @@ impl<'a> VideoEncoderSettingsRef<'a> {
         }
         Some(unsafe { ffi::webrtc_VideoEncoder_Settings_encoder_thread_limit(self.raw.as_ptr()) })
     }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoEncoder_Settings {
+        self.raw.as_ptr()
+    }
 }
 
 unsafe impl<'a> Send for VideoEncoderSettingsRef<'a> {}
@@ -148,6 +152,10 @@ impl<'a> VideoEncoderRateControlParametersRef<'a> {
                 self.raw.as_ptr(),
             )
         }
+    }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoEncoder_RateControlParameters {
+        self.raw.as_ptr()
     }
 }
 
@@ -705,42 +713,26 @@ impl Drop for CodecSpecificInfo {
 
 unsafe impl Send for CodecSpecificInfo {}
 
-type VideoEncoderEncodedImageCallbackFn = Box<
-    dyn for<'a> FnMut(
-            EncodedImageRef<'a>,
-            Option<CodecSpecificInfoRef<'a>>,
-        ) -> VideoEncoderEncodedImageCallbackResult
-        + Send
-        + 'static,
->;
-
-#[derive(Default)]
-pub struct VideoEncoderEncodedImageCallbackCallbacks {
-    pub on_encoded_image: Option<VideoEncoderEncodedImageCallbackFn>,
-}
-
-impl VideoEncoderEncodedImageCallbackCallbacks {
-    fn with_defaults(mut self) -> Self {
-        if self.on_encoded_image.is_none() {
-            self.on_encoded_image = Some(Box::new(|_, _| {
-                VideoEncoderEncodedImageCallbackResult::new(
-                    VideoEncoderEncodedImageCallbackResultError::Ok,
-                )
-            }));
-        }
-        self
+pub trait VideoEncoderEncodedImageCallbackHandler: Send {
+    #[expect(unused_variables)]
+    fn on_encoded_image(
+        &mut self,
+        encoded_image: EncodedImageRef<'_>,
+        codec_specific_info: Option<CodecSpecificInfoRef<'_>>,
+    ) -> VideoEncoderEncodedImageCallbackResult {
+        VideoEncoderEncodedImageCallbackResult::new(VideoEncoderEncodedImageCallbackResultError::Ok)
     }
 }
+
+impl VideoEncoderEncodedImageCallbackHandler for () {}
 
 pub struct VideoEncoderEncodedImageCallback {
     raw: NonNull<ffi::webrtc_VideoEncoder_EncodedImageCallback>,
 }
 
 impl VideoEncoderEncodedImageCallback {
-    pub fn new_with_callbacks(callbacks: VideoEncoderEncodedImageCallbackCallbacks) -> Self {
-        let state = Box::new(VideoEncoderEncodedImageCallbackState {
-            callbacks: callbacks.with_defaults(),
-        });
+    pub fn new_with_handler(handler: Box<dyn VideoEncoderEncodedImageCallbackHandler>) -> Self {
+        let state = Box::new(VideoEncoderEncodedImageHandlerState { handler });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_VideoEncoder_EncodedImageCallback_cbs {
             OnEncodedImage: Some(video_encoder_encoded_image_callback_on_encoded_image),
@@ -751,7 +743,7 @@ impl VideoEncoderEncodedImageCallback {
             Some(raw) => raw,
             None => {
                 let _ = unsafe {
-                    Box::from_raw(user_data as *mut VideoEncoderEncodedImageCallbackState)
+                    Box::from_raw(user_data as *mut VideoEncoderEncodedImageHandlerState)
                 };
                 panic!("BUG: webrtc_VideoEncoder_EncodedImageCallback_new が null を返しました");
             }
@@ -826,97 +818,74 @@ impl<'a> VideoEncoderEncodedImageCallbackRef<'a> {
 
 unsafe impl<'a> Send for VideoEncoderEncodedImageCallbackRef<'a> {}
 
-type VideoEncoderInitEncodeCallback = Box<
-    dyn for<'a> FnMut(VideoCodecRef<'a>, VideoEncoderSettingsRef<'a>) -> VideoCodecStatus
-        + Send
-        + 'static,
->;
-type VideoEncoderEncodeCallback = Box<
-    dyn for<'a> FnMut(VideoFrameRef<'a>, Option<VideoFrameTypeVectorRef<'a>>) -> VideoCodecStatus
-        + Send
-        + 'static,
->;
-type VideoEncoderRegisterEncodeCompleteCallback = Box<
-    dyn for<'a> FnMut(Option<VideoEncoderEncodedImageCallbackRef<'a>>) -> VideoCodecStatus
-        + Send
-        + 'static,
->;
-type VideoEncoderReleaseCallback = Box<dyn FnMut() -> VideoCodecStatus + Send + 'static>;
-type VideoEncoderSetRatesCallback =
-    Box<dyn for<'a> FnMut(VideoEncoderRateControlParametersRef<'a>) + Send + 'static>;
-type VideoEncoderGetEncoderInfoCallback =
-    Box<dyn FnMut() -> VideoEncoderEncoderInfo + Send + 'static>;
+pub trait VideoEncoderHandler: Send {
+    #[expect(unused_variables)]
+    fn init_encode(
+        &mut self,
+        codec_settings: VideoCodecRef<'_>,
+        settings: VideoEncoderSettingsRef<'_>,
+    ) -> VideoCodecStatus {
+        VideoCodecStatus::Ok
+    }
 
-#[derive(Default)]
-pub struct VideoEncoderCallbacks {
-    pub init_encode: Option<VideoEncoderInitEncodeCallback>,
-    pub encode: Option<VideoEncoderEncodeCallback>,
-    pub register_encode_complete_callback: Option<VideoEncoderRegisterEncodeCompleteCallback>,
-    pub release: Option<VideoEncoderReleaseCallback>,
-    pub set_rates: Option<VideoEncoderSetRatesCallback>,
-    pub get_encoder_info: Option<VideoEncoderGetEncoderInfoCallback>,
-}
+    #[expect(unused_variables)]
+    fn encode(
+        &mut self,
+        frame: VideoFrameRef<'_>,
+        frame_types: Option<VideoFrameTypeVectorRef<'_>>,
+    ) -> VideoCodecStatus {
+        VideoCodecStatus::Ok
+    }
 
-impl VideoEncoderCallbacks {
-    fn with_defaults(mut self) -> Self {
-        if self.init_encode.is_none() {
-            self.init_encode = Some(Box::new(|_, _| VideoCodecStatus::Ok));
-        }
-        if self.encode.is_none() {
-            self.encode = Some(Box::new(|_, _| VideoCodecStatus::Ok));
-        }
-        if self.register_encode_complete_callback.is_none() {
-            self.register_encode_complete_callback = Some(Box::new(|_| VideoCodecStatus::Ok));
-        }
-        if self.release.is_none() {
-            self.release = Some(Box::new(|| VideoCodecStatus::Ok));
-        }
-        if self.set_rates.is_none() {
-            self.set_rates = Some(Box::new(|_| {}));
-        }
-        if self.get_encoder_info.is_none() {
-            self.get_encoder_info = Some(Box::new(VideoEncoderEncoderInfo::new));
-        }
-        self
+    #[expect(unused_variables)]
+    fn register_encode_complete_callback(
+        &mut self,
+        callback: Option<VideoEncoderEncodedImageCallbackRef<'_>>,
+    ) -> VideoCodecStatus {
+        VideoCodecStatus::Ok
+    }
+
+    fn release(&mut self) -> VideoCodecStatus {
+        VideoCodecStatus::Ok
+    }
+
+    #[expect(unused_variables)]
+    fn set_rates(&mut self, parameters: VideoEncoderRateControlParametersRef<'_>) {}
+
+    fn get_encoder_info(&mut self) -> VideoEncoderEncoderInfo {
+        VideoEncoderEncoderInfo::new()
     }
 }
 
-type VideoEncoderFactoryGetSupportedFormatsCallback =
-    Box<dyn FnMut() -> Vec<SdpVideoFormat> + Send + 'static>;
-type VideoEncoderFactoryCreateCallback = Box<
-    dyn for<'a> FnMut(EnvironmentRef<'a>, SdpVideoFormatRef<'a>) -> Option<VideoEncoder>
-        + Send
-        + 'static,
->;
+impl VideoEncoderHandler for () {}
 
-#[derive(Default)]
-pub struct VideoEncoderFactoryCallbacks {
-    pub get_supported_formats: Option<VideoEncoderFactoryGetSupportedFormatsCallback>,
-    pub create: Option<VideoEncoderFactoryCreateCallback>,
-}
+pub trait VideoEncoderFactoryHandler: Send {
+    fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+        Vec::new()
+    }
 
-impl VideoEncoderFactoryCallbacks {
-    fn with_defaults(mut self) -> Self {
-        if self.get_supported_formats.is_none() {
-            self.get_supported_formats = Some(Box::new(Vec::new));
-        }
-        if self.create.is_none() {
-            self.create = Some(Box::new(|_, _| None));
-        }
-        self
+    #[expect(unused_variables)]
+    fn create(
+        &mut self,
+        env: EnvironmentRef<'_>,
+        format: SdpVideoFormatRef<'_>,
+    ) -> Option<Box<dyn VideoEncoderHandler>> {
+        None
     }
 }
 
-struct VideoEncoderCallbackState {
-    callbacks: VideoEncoderCallbacks,
+impl VideoEncoderFactoryHandler for () {}
+
+struct VideoEncoderHandlerState {
+    handler: Box<dyn VideoEncoderHandler>,
 }
 
-struct VideoEncoderEncodedImageCallbackState {
-    callbacks: VideoEncoderEncodedImageCallbackCallbacks,
+struct VideoEncoderEncodedImageHandlerState {
+    handler: Box<dyn VideoEncoderEncodedImageCallbackHandler>,
 }
 
-struct VideoEncoderFactoryCallbackState {
-    callbacks: VideoEncoderFactoryCallbacks,
+struct VideoEncoderFactoryHandlerState {
+    handler: Box<dyn VideoEncoderFactoryHandler>,
 }
 
 unsafe extern "C" fn video_encoder_on_destroy(user_data: *mut c_void) {
@@ -924,7 +893,7 @@ unsafe extern "C" fn video_encoder_on_destroy(user_data: *mut c_void) {
         !user_data.is_null(),
         "video_encoder_on_destroy: user_data is null"
     );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderCallbackState) };
+    let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderHandlerState) };
 }
 
 unsafe extern "C" fn video_encoder_encoded_image_callback_on_destroy(user_data: *mut c_void) {
@@ -932,7 +901,7 @@ unsafe extern "C" fn video_encoder_encoded_image_callback_on_destroy(user_data: 
         !user_data.is_null(),
         "video_encoder_encoded_image_callback_on_destroy: user_data is null"
     );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderEncodedImageCallbackState) };
+    let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderEncodedImageHandlerState) };
 }
 
 unsafe extern "C" fn video_encoder_encoded_image_callback_on_encoded_image(
@@ -944,18 +913,15 @@ unsafe extern "C" fn video_encoder_encoded_image_callback_on_encoded_image(
         !user_data.is_null(),
         "video_encoder_encoded_image_callback_on_encoded_image: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoEncoderEncodedImageCallbackState) };
-    let cb = state
-        .callbacks
-        .on_encoded_image
-        .as_mut()
-        .expect("video_encoder_encoded_image_callback_on_encoded_image: callback is None");
+    let state = unsafe { &mut *(user_data as *mut VideoEncoderEncodedImageHandlerState) };
     let encoded_image = NonNull::new(encoded_image)
         .expect("video_encoder_encoded_image_callback_on_encoded_image: encoded_image is null");
     let encoded_image = unsafe { EncodedImageRef::from_raw(encoded_image) };
     let codec_specific_info =
         NonNull::new(codec_specific_info).map(|v| unsafe { CodecSpecificInfoRef::from_raw(v) });
-    let result = cb(encoded_image, codec_specific_info);
+    let result = state
+        .handler
+        .on_encoded_image(encoded_image, codec_specific_info);
     result.into_raw_unique()
 }
 
@@ -968,18 +934,13 @@ unsafe extern "C" fn video_encoder_init_encode(
         !user_data.is_null(),
         "video_encoder_init_encode: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoEncoderCallbackState) };
-    let cb = state
-        .callbacks
-        .init_encode
-        .as_mut()
-        .expect("video_encoder_init_encode: callback is None");
+    let state = unsafe { &mut *(user_data as *mut VideoEncoderHandlerState) };
     let codec_settings =
         NonNull::new(codec_settings).expect("video_encoder_init_encode: codec_settings is null");
     let settings = NonNull::new(settings).expect("video_encoder_init_encode: settings is null");
     let codec_settings = unsafe { VideoCodecRef::from_raw(codec_settings) };
     let settings = unsafe { VideoEncoderSettingsRef::from_raw(settings) };
-    cb(codec_settings, settings).to_raw()
+    state.handler.init_encode(codec_settings, settings).to_raw()
 }
 
 unsafe extern "C" fn video_encoder_encode(
@@ -991,17 +952,12 @@ unsafe extern "C" fn video_encoder_encode(
         !user_data.is_null(),
         "video_encoder_encode: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoEncoderCallbackState) };
-    let cb = state
-        .callbacks
-        .encode
-        .as_mut()
-        .expect("video_encoder_encode: callback is None");
+    let state = unsafe { &mut *(user_data as *mut VideoEncoderHandlerState) };
     let frame = NonNull::new(frame).expect("video_encoder_encode: frame is null");
     let frame = unsafe { VideoFrameRef::from_raw(frame) };
     let frame_types = NonNull::new(frame_types)
         .map(|frame_types| unsafe { VideoFrameTypeVectorRef::from_raw(frame_types) });
-    cb(frame, frame_types).to_raw()
+    state.handler.encode(frame, frame_types).to_raw()
 }
 
 unsafe extern "C" fn video_encoder_register_encode_complete_callback(
@@ -1012,15 +968,13 @@ unsafe extern "C" fn video_encoder_register_encode_complete_callback(
         !user_data.is_null(),
         "video_encoder_register_encode_complete_callback: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoEncoderCallbackState) };
-    let cb = state
-        .callbacks
-        .register_encode_complete_callback
-        .as_mut()
-        .expect("video_encoder_register_encode_complete_callback: callback is None");
+    let state = unsafe { &mut *(user_data as *mut VideoEncoderHandlerState) };
     let callback = NonNull::new(callback)
         .map(|callback| unsafe { VideoEncoderEncodedImageCallbackRef::from_raw(callback) });
-    cb(callback).to_raw()
+    state
+        .handler
+        .register_encode_complete_callback(callback)
+        .to_raw()
 }
 
 unsafe extern "C" fn video_encoder_release(user_data: *mut c_void) -> i32 {
@@ -1028,13 +982,8 @@ unsafe extern "C" fn video_encoder_release(user_data: *mut c_void) -> i32 {
         !user_data.is_null(),
         "video_encoder_release: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoEncoderCallbackState) };
-    let cb = state
-        .callbacks
-        .release
-        .as_mut()
-        .expect("video_encoder_release: callback is None");
-    cb().to_raw()
+    let state = unsafe { &mut *(user_data as *mut VideoEncoderHandlerState) };
+    state.handler.release().to_raw()
 }
 
 unsafe extern "C" fn video_encoder_set_rates(
@@ -1045,15 +994,10 @@ unsafe extern "C" fn video_encoder_set_rates(
         !user_data.is_null(),
         "video_encoder_set_rates: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoEncoderCallbackState) };
-    let cb = state
-        .callbacks
-        .set_rates
-        .as_mut()
-        .expect("video_encoder_set_rates: callback is None");
+    let state = unsafe { &mut *(user_data as *mut VideoEncoderHandlerState) };
     let parameters = NonNull::new(parameters).expect("video_encoder_set_rates: parameters is null");
     let parameters = unsafe { VideoEncoderRateControlParametersRef::from_raw(parameters) };
-    cb(parameters);
+    state.handler.set_rates(parameters);
 }
 
 unsafe extern "C" fn video_encoder_get_encoder_info(
@@ -1063,13 +1007,8 @@ unsafe extern "C" fn video_encoder_get_encoder_info(
         !user_data.is_null(),
         "video_encoder_get_encoder_info: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoEncoderCallbackState) };
-    let cb = state
-        .callbacks
-        .get_encoder_info
-        .as_mut()
-        .expect("video_encoder_get_encoder_info: callback is None");
-    cb().into_raw()
+    let state = unsafe { &mut *(user_data as *mut VideoEncoderHandlerState) };
+    state.handler.get_encoder_info().into_raw()
 }
 
 unsafe extern "C" fn video_encoder_factory_on_destroy(user_data: *mut c_void) {
@@ -1077,7 +1016,7 @@ unsafe extern "C" fn video_encoder_factory_on_destroy(user_data: *mut c_void) {
         !user_data.is_null(),
         "video_encoder_factory_on_destroy: user_data is null"
     );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderFactoryCallbackState) };
+    let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderFactoryHandlerState) };
 }
 
 unsafe extern "C" fn video_encoder_factory_get_supported_formats(
@@ -1088,13 +1027,8 @@ unsafe extern "C" fn video_encoder_factory_get_supported_formats(
         !user_data.is_null(),
         "video_encoder_factory_get_supported_formats: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoEncoderFactoryCallbackState) };
-    let cb = state
-        .callbacks
-        .get_supported_formats
-        .as_mut()
-        .expect("video_encoder_factory_get_supported_formats: callback is None");
-    let formats = cb();
+    let state = unsafe { &mut *(user_data as *mut VideoEncoderFactoryHandlerState) };
+    let formats = state.handler.get_supported_formats();
     let vec = empty();
     if vec.is_null() {
         return std::ptr::null_mut();
@@ -1114,18 +1048,13 @@ unsafe extern "C" fn video_encoder_factory_create(
         !user_data.is_null(),
         "video_encoder_factory_create: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoEncoderFactoryCallbackState) };
-    let cb = state
-        .callbacks
-        .create
-        .as_mut()
-        .expect("video_encoder_factory_create: callback is None");
+    let state = unsafe { &mut *(user_data as *mut VideoEncoderFactoryHandlerState) };
     let env = NonNull::new(env).expect("video_encoder_factory_create: env is null");
     let format = NonNull::new(format).expect("video_encoder_factory_create: format is null");
     let env = unsafe { EnvironmentRef::from_raw(env) };
     let format = unsafe { SdpVideoFormatRef::from_raw(format) };
-    match cb(env, format) {
-        Some(encoder) => encoder.into_raw(),
+    match state.handler.create(env, format) {
+        Some(handler) => VideoEncoder::new_with_handler(handler).into_raw(),
         None => std::ptr::null_mut(),
     }
 }
@@ -1136,10 +1065,8 @@ pub struct VideoEncoder {
 }
 
 impl VideoEncoder {
-    pub fn new_with_callbacks(callbacks: VideoEncoderCallbacks) -> Self {
-        let state = Box::new(VideoEncoderCallbackState {
-            callbacks: callbacks.with_defaults(),
-        });
+    pub fn new_with_handler(handler: Box<dyn VideoEncoderHandler>) -> Self {
+        let state = Box::new(VideoEncoderHandlerState { handler });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_VideoEncoder_cbs {
             InitEncode: Some(video_encoder_init_encode),
@@ -1154,7 +1081,7 @@ impl VideoEncoder {
         let raw_unique = match NonNull::new(raw) {
             Some(raw_unique) => raw_unique,
             None => {
-                let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderCallbackState) };
+                let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderHandlerState) };
                 panic!("BUG: webrtc_VideoEncoder_new が null を返しました");
             }
         };
@@ -1169,31 +1096,30 @@ impl VideoEncoder {
         std::mem::ManuallyDrop::new(self).raw_unique.as_ptr()
     }
 
-    pub fn init_encode(&mut self) -> VideoCodecStatus {
+    pub fn init_encode(
+        &mut self,
+        codec_settings: VideoCodecRef<'_>,
+        settings: VideoEncoderSettingsRef<'_>,
+    ) -> VideoCodecStatus {
         let value = unsafe {
             ffi::webrtc_VideoEncoder_InitEncode(
                 self.as_ptr(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
+                codec_settings.as_ptr(),
+                settings.as_ptr(),
             )
         };
         VideoCodecStatus::from_raw(value)
     }
 
-    pub fn encode(&mut self, frame: &VideoFrame) -> VideoCodecStatus {
-        self.encode_with_frame_types(frame, None)
-    }
-
-    pub fn encode_with_frame_types(
+    pub fn encode(
         &mut self,
-        frame: &VideoFrame,
+        frame: VideoFrameRef<'_>,
         frame_types: Option<VideoFrameTypeVectorRef<'_>>,
     ) -> VideoCodecStatus {
         let frame_types =
             frame_types.map_or(std::ptr::null_mut(), |frame_types| frame_types.as_ptr());
-        let value = unsafe {
-            ffi::webrtc_VideoEncoder_Encode(self.as_ptr(), frame.raw().as_ptr(), frame_types)
-        };
+        let value =
+            unsafe { ffi::webrtc_VideoEncoder_Encode(self.as_ptr(), frame.as_ptr(), frame_types) };
         VideoCodecStatus::from_raw(value)
     }
 
@@ -1208,8 +1134,13 @@ impl VideoEncoder {
         VideoCodecStatus::from_raw(value)
     }
 
-    pub fn set_rates(&mut self) {
-        unsafe { ffi::webrtc_VideoEncoder_SetRates(self.as_ptr(), std::ptr::null_mut()) };
+    pub fn set_rates(&mut self, parameters: VideoEncoderRateControlParametersRef<'_>) {
+        unsafe { ffi::webrtc_VideoEncoder_SetRates(self.as_ptr(), parameters.as_ptr()) };
+    }
+
+    pub fn release(&mut self) -> VideoCodecStatus {
+        let value = unsafe { ffi::webrtc_VideoEncoder_Release(self.as_ptr()) };
+        VideoCodecStatus::from_raw(value)
     }
 
     pub fn get_encoder_info(&self) -> VideoEncoderEncoderInfo {
@@ -1220,11 +1151,50 @@ impl VideoEncoder {
     }
 }
 
+impl VideoEncoderHandler for VideoEncoder {
+    fn init_encode(
+        &mut self,
+        codec_settings: VideoCodecRef<'_>,
+        settings: VideoEncoderSettingsRef<'_>,
+    ) -> VideoCodecStatus {
+        VideoEncoder::init_encode(self, codec_settings, settings)
+    }
+
+    fn encode(
+        &mut self,
+        frame: VideoFrameRef<'_>,
+        frame_types: Option<VideoFrameTypeVectorRef<'_>>,
+    ) -> VideoCodecStatus {
+        VideoEncoder::encode(self, frame, frame_types)
+    }
+
+    fn register_encode_complete_callback(
+        &mut self,
+        callback: Option<VideoEncoderEncodedImageCallbackRef<'_>>,
+    ) -> VideoCodecStatus {
+        VideoEncoder::register_encode_complete_callback(self, callback)
+    }
+
+    fn release(&mut self) -> VideoCodecStatus {
+        VideoEncoder::release(self)
+    }
+
+    fn set_rates(&mut self, parameters: VideoEncoderRateControlParametersRef<'_>) {
+        VideoEncoder::set_rates(self, parameters);
+    }
+
+    fn get_encoder_info(&mut self) -> VideoEncoderEncoderInfo {
+        VideoEncoder::get_encoder_info(self)
+    }
+}
+
 impl Drop for VideoEncoder {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoEncoder_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
+
+unsafe impl Send for VideoEncoder {}
 
 /// webrtc::VideoEncoderFactory のラッパー。
 pub struct VideoEncoderFactory {
@@ -1238,10 +1208,8 @@ impl VideoEncoderFactory {
         Self { raw_unique: raw }
     }
 
-    pub fn new_with_callbacks(callbacks: VideoEncoderFactoryCallbacks) -> Self {
-        let state = Box::new(VideoEncoderFactoryCallbackState {
-            callbacks: callbacks.with_defaults(),
-        });
+    pub fn new_with_handler(handler: Box<dyn VideoEncoderFactoryHandler>) -> Self {
+        let state = Box::new(VideoEncoderFactoryHandlerState { handler });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_VideoEncoderFactory_cbs {
             GetSupportedFormats: Some(video_encoder_factory_get_supported_formats),
@@ -1252,8 +1220,7 @@ impl VideoEncoderFactory {
         let raw_unique = match NonNull::new(raw) {
             Some(raw_unique) => raw_unique,
             None => {
-                let _ =
-                    unsafe { Box::from_raw(user_data as *mut VideoEncoderFactoryCallbackState) };
+                let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderFactoryHandlerState) };
                 panic!("BUG: webrtc_VideoEncoderFactory_new が null を返しました");
             }
         };
@@ -1270,19 +1237,32 @@ impl VideoEncoderFactory {
 
     pub fn create(
         &self,
-        env: &crate::Environment,
-        format: &SdpVideoFormat,
+        env: EnvironmentRef<'_>,
+        format: SdpVideoFormatRef<'_>,
     ) -> Option<VideoEncoder> {
         let raw = unsafe {
-            ffi::webrtc_VideoEncoderFactory_Create(
-                self.as_ptr(),
-                env.as_ptr(),
-                format.raw().as_ptr(),
-            )
+            ffi::webrtc_VideoEncoderFactory_Create(self.as_ptr(), env.as_ptr(), format.as_ptr())
         };
         Some(VideoEncoder {
             raw_unique: NonNull::new(raw)?,
         })
+    }
+
+    pub fn get_supported_formats(&self) -> Vec<SdpVideoFormat> {
+        let raw_vec = unsafe { ffi::webrtc_VideoEncoderFactory_GetSupportedFormats(self.as_ptr()) };
+        let raw_vec = NonNull::new(raw_vec)
+            .expect("BUG: webrtc_VideoEncoderFactory_GetSupportedFormats が null を返しました");
+        let size = unsafe { ffi::webrtc_SdpVideoFormat_vector_size(raw_vec.as_ptr()) };
+        let mut formats = Vec::with_capacity(size.max(0) as usize);
+        for i in 0..size {
+            let raw_format = unsafe { ffi::webrtc_SdpVideoFormat_vector_get(raw_vec.as_ptr(), i) };
+            let raw_format = NonNull::new(raw_format)
+                .expect("BUG: webrtc_SdpVideoFormat_vector_get が null を返しました");
+            let format_ref = unsafe { SdpVideoFormatRef::from_raw(raw_format) };
+            formats.push(format_ref.to_owned());
+        }
+        unsafe { ffi::webrtc_SdpVideoFormat_vector_delete(raw_vec.as_ptr()) };
+        formats
     }
 }
 
@@ -1291,3 +1271,5 @@ impl Drop for VideoEncoderFactory {
         unsafe { ffi::webrtc_VideoEncoderFactory_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
+
+unsafe impl Send for VideoEncoderFactory {}

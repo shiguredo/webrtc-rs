@@ -379,6 +379,14 @@ int32_t webrtc_VideoEncoder_RegisterEncodeCompleteCallback(
   return encoder->RegisterEncodeCompleteCallback(encoded_image_callback);
 }
 
+int32_t webrtc_VideoEncoder_Release(struct webrtc_VideoEncoder* self) {
+  if (self == nullptr) {
+    return -1;
+  }
+  auto encoder = reinterpret_cast<webrtc::VideoEncoder*>(self);
+  return encoder->Release();
+}
+
 void webrtc_VideoEncoder_SetRates(
     struct webrtc_VideoEncoder* self,
     struct webrtc_VideoEncoder_RateControlParameters* parameters) {

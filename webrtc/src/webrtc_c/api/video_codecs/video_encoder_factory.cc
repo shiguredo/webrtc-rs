@@ -106,6 +106,18 @@ struct webrtc_VideoEncoder_unique* webrtc_VideoEncoderFactory_Create(
       encoder.release());
 }
 
+struct webrtc_SdpVideoFormat_vector*
+webrtc_VideoEncoderFactory_GetSupportedFormats(
+    struct webrtc_VideoEncoderFactory* self) {
+  if (self == nullptr) {
+    return nullptr;
+  }
+  auto factory = reinterpret_cast<webrtc::VideoEncoderFactory*>(self);
+  auto formats = factory->GetSupportedFormats();
+  auto vec = new std::vector<webrtc::SdpVideoFormat>(formats);
+  return reinterpret_cast<struct webrtc_SdpVideoFormat_vector*>(vec);
+}
+
 struct webrtc_VideoEncoderFactory_unique*
 webrtc_CreateBuiltinVideoEncoderFactory() {
   auto factory = webrtc::CreateBuiltinVideoEncoderFactory();

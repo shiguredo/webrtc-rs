@@ -60,7 +60,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 ## バージョニング
 
 - メジャーバージョンは常に 0
-- マイナーバージョンは libwebrtc の m バージョンと一致 (例: 0.145.x は m145)
+- マイナーバージョンは libwebrtc の m バージョンと一致 (例: 0.146.x は m146)
 - パッチバージョンは同一 m バージョン内での変更時にインクリメント
 
 ## 使い方
@@ -69,7 +69,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 
 ```toml
 [dependencies]
-shiguredo_webrtc = "0.145"
+shiguredo_webrtc = "0.146"
 ```
 
 ### PeerConnectionFactory の生成
@@ -77,7 +77,7 @@ shiguredo_webrtc = "0.145"
 ```rust
 use shiguredo_webrtc::{
     AudioDecoderFactory, AudioDeviceModule, AudioDeviceModuleAudioLayer,
-    AudioEncoderFactory, AudioProcessingBuilder, Environment,
+    AudioEncoderFactory, AudioProcessingBuilder, ConnectionContext, Environment,
     PeerConnectionFactory, PeerConnectionFactoryDependencies,
     RtcEventLogFactory, Thread, VideoDecoderFactory, VideoEncoderFactory,
 };
@@ -85,6 +85,7 @@ use std::sync::Arc;
 
 pub struct FactoryHolder {
     factory: PeerConnectionFactory,
+    connection_context: ConnectionContext,
     _network: Thread,
     _worker: Thread,
     _signaling: Thread,
@@ -122,9 +123,11 @@ impl FactoryHolder {
         deps.set_audio_processing_builder(apb);
         deps.enable_media();
 
-        let factory = PeerConnectionFactory::create_modular(&mut deps).ok()?;
+        let (factory, connection_context) =
+            PeerConnectionFactory::create_modular_with_context(&mut deps).ok()?;
         Some(Arc::new(Self {
             factory,
+            connection_context,
             _network: network,
             _worker: worker,
             _signaling: signaling,
@@ -147,11 +150,16 @@ impl FactoryHolder {
   - ファクトリオプション (暗号化無効化、SSL バージョン設定)
 - `PeerConnectionDependencies`
   - PeerConnection の依存関係設定
+  - `set_proxy(...)` で TURN 用の HTTP Proxy を設定
 - `PeerConnectionRtcConfiguration`
   - ICE / 接続設定
+- `ConnectionContext`
+  - `default_network_manager()` / `default_socket_factory()` を取得
+- `NetworkManagerRef` / `PacketSocketFactoryRef`
+  - `ConnectionContext::default_network_manager()` / `default_socket_factory()` で取得
 - `PeerConnectionOfferAnswerOptions`
   - Offer/Answer オプション (ICE リスタート、Simulcast レイヤー数など)
-- `PeerConnectionObserver` / `PeerConnectionObserverBuilder`
+- `PeerConnectionObserver` / `PeerConnectionObserverHandler`
   - イベントコールバック
 - `PeerConnectionState`
   - 接続状態
@@ -176,9 +184,9 @@ impl FactoryHolder {
   - 音声デバイスインターフェース
 - `AudioDeviceModuleAudioLayer`
   - 音声デバイスレイヤー種別 (PlatformDefault, Dummy など)
-- `AudioDeviceModuleCallbacks` / `AudioDeviceModuleStats`
-  - カスタム ADM コールバックと統計
-- `AudioTransport` / `AudioTransportRef` / `AudioTransportCallbacks`
+- `AudioDeviceModuleHandler` / `AudioDeviceModuleStats`
+  - カスタム ADM handler と統計
+- `AudioTransport` / `AudioTransportRef` / `AudioTransportHandler`
   - 音声トランスポート
 - `MediaStreamTrack`
   - メディアストリームトラック
@@ -186,7 +194,7 @@ impl FactoryHolder {
   - I420 フォーマットの映像バッファ
 - `VideoFrame` / `VideoFrameRef`
   - 映像フレーム
-- `VideoSink` / `VideoSinkBuilder`
+- `VideoSink` / `VideoSinkHandler`
   - 映像フレームシンク
 - `VideoSinkWants`
   - 映像シンク要求設定
@@ -197,6 +205,8 @@ impl FactoryHolder {
 
 - `VideoCodecRef` / `VideoCodecType` / `VideoCodecStatus`
   - 映像コーデック共通型とステータス
+- `ScalabilityMode`
+  - スケーラビリティーモード
 - `VideoFrameType` / `VideoFrameTypeVector` / `VideoFrameTypeVectorRef`
   - エンコード対象フレーム種別
 - `EncodedImageBuffer` / `EncodedImage` / `EncodedImageRef`
@@ -205,14 +215,14 @@ impl FactoryHolder {
   - コーデック固有情報
 - `VideoEncoder`
   - カスタム映像エンコーダー
-- `VideoEncoderCallbacks` / `VideoEncoderFactoryCallbacks`
-  - エンコーダー / エンコーダーファクトリーの callback
+- `VideoEncoderHandler` / `VideoEncoderFactoryHandler`
+  - エンコーダー / エンコーダーファクトリーの handler trait
 - `VideoEncoderEncoderInfo` / `VideoEncoderSettingsRef` / `VideoEncoderRateControlParametersRef`
   - エンコーダー設定とメタ情報
 - `VideoEncoderEncodedImageCallback` / `VideoEncoderEncodedImageCallbackRef`
   - エンコード完了 callback
-- `VideoEncoderEncodedImageCallbackCallbacks`
-  - エンコード完了 callback のハンドラー設定
+- `VideoEncoderEncodedImageCallbackHandler`
+  - エンコード完了 callback の handler trait
 - `VideoEncoderEncodedImageCallbackResult`
   - エンコード完了 callback の戻り値
 - `VideoEncoderEncodedImageCallbackResultError`
@@ -221,11 +231,11 @@ impl FactoryHolder {
   - C API 側 callback ポインターのラッパー
 - `VideoDecoder`
   - カスタム映像デコーダー
-- `VideoDecoderCallbacks` / `VideoDecoderFactoryCallbacks`
-  - デコーダー / デコーダーファクトリーの callback
+- `VideoDecoderHandler` / `VideoDecoderFactoryHandler`
+  - デコーダー / デコーダーファクトリーの handler trait
 - `VideoDecoderDecoderInfo` / `VideoDecoderSettingsRef`
   - デコーダー設定とメタ情報
-- `VideoDecoderDecodedImageCallbackRef`
+- `VideoDecoderDecodedImageCallbackRef` / `VideoDecoderDecodedImageCallbackPtr`
   - デコード完了 callback
 
 ### RTP
@@ -261,7 +271,7 @@ impl FactoryHolder {
   - 双方向データ転送
 - `DataChannelInit`
   - DataChannel 初期化設定 (ordered, protocol)
-- `DataChannelObserver` / `DataChannelObserverBuilder`
+- `DataChannelObserver` / `DataChannelObserverHandler`
   - データチャネルイベント
 - `DataChannelState`
   - チャネル状態
@@ -309,7 +319,7 @@ impl FactoryHolder {
   - イベントログ
 - `TimestampAligner`
   - タイムスタンプ調整
-- `abgr_to_i420` / `i420_to_argb` / `nv12_to_i420` / `yuy2_to_i420`
+- `abgr_to_i420` / `convert_from_i420` / `i420_to_nv12` / `nv12_to_i420` / `yuy2_to_i420`
   - カラーフォーマット変換 (libyuv)
 - `random_bytes` / `random_string`
   - ランダム生成
@@ -329,13 +339,15 @@ impl FactoryHolder {
 必要なもの:
 
 - Rust 1.88 以上
+- `curl` (prebuilt ダウンロードに使用)
+- `tar` (prebuilt 展開に使用)
 - Linux の場合: `libx11-dev` (リンク時に必要)
 
 ```bash
 # Linux
-sudo apt-get install libx11-dev
+sudo apt-get install curl tar libx11-dev
 
-# macOS は追加のインストール不要
+# macOS は curl と tar がプリインストール済みのため追加インストール不要
 ```
 
 ### ソースビルド

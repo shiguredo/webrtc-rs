@@ -122,6 +122,7 @@ int32_t webrtc_VideoEncoder_Encode(
 int32_t webrtc_VideoEncoder_RegisterEncodeCompleteCallback(
     struct webrtc_VideoEncoder* self,
     struct webrtc_VideoEncoder_EncodedImageCallback* callback);
+int32_t webrtc_VideoEncoder_Release(struct webrtc_VideoEncoder* self);
 void webrtc_VideoEncoder_SetRates(
     struct webrtc_VideoEncoder* self,
     struct webrtc_VideoEncoder_RateControlParameters* parameters);

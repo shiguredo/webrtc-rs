@@ -1333,8 +1333,7 @@ int main() {
   }
 
   struct SignalingWhepConfig* config = SignalingWhepConfig_create();
-  SignalingWhepConfig_set_signaling_url(config,
-                                        "http://192.0.2.1/whep");
+  SignalingWhepConfig_set_signaling_url(config, "http://192.0.2.1/whep");
   SignalingWhepConfig_set_channel_id(config, "sora");
   SignalingWhepConfig_set_pc_factory(config, factory->factory);
   struct SignalingWhep* whep = SignalingWhep_Create(config);

@@ -1,17 +1,34 @@
 use std::env;
 use std::fs;
-use std::io::{Cursor, Read, Write};
-use std::net::TcpStream;
-use std::path::{Component, Path, PathBuf};
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
 
-use aws_lc_rs::digest::{Context, SHA256};
-use rustls::pki_types::ServerName;
-use rustls::{ClientConfig, ClientConnection, StreamOwned};
-use rustls_platform_verifier::ConfigVerifierExt;
-use shiguredo_http11::{DecoderLimits, Request, Response, ResponseDecoder};
+/// Cargo.toml から外部依存ライブラリの情報を取得する
+fn get_webrtc_build_metadata() -> (String, String) {
+    let cargo_toml = shiguredo_toml::from_str(include_str!("Cargo.toml"))
+        .expect("Cargo.toml のパースに失敗しました");
+    let metadata = shiguredo_toml::Value::Table(cargo_toml);
+    let webrtc_build = metadata
+        .get("package")
+        .and_then(|v| v.get("metadata"))
+        .and_then(|v| v.get("external-dependencies"))
+        .and_then(|v| v.get("webrtc-build"))
+        .expect(
+            "Cargo.toml に [package.metadata.external-dependencies.webrtc-build] が見つかりません",
+        );
 
-const CMAKE_VERSION: &str = "4.2.3";
+    let version = webrtc_build
+        .get("version")
+        .and_then(|v| v.as_str())
+        .expect("webrtc-build.version が見つかりません")
+        .to_string();
+    let base_url = webrtc_build
+        .get("base-url")
+        .and_then(|v| v.as_str())
+        .expect("webrtc-build.base-url が見つかりません")
+        .to_string();
+
+    (version, base_url)
+}
 
 fn main() {
     // Cargo.toml か build.rs が更新されたら、依存ライブラリを再ビルドする
@@ -35,10 +52,6 @@ fn main() {
     println!(
         "cargo:rerun-if-changed={}",
         webrtc_dir.join("CMakeLists.txt").display()
-    );
-    println!(
-        "cargo:rerun-if-changed={}",
-        webrtc_dir.join("deps.json").display()
     );
 
     let target_platform = get_target_platform();
@@ -87,18 +100,28 @@ fn build_from_source(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -
 /// prebuilt バイナリをダウンロードして展開する
 fn download_prebuilt(target: &str, out_dir: &Path) -> Result<PrebuiltPaths, String> {
     let version = env::var("CARGO_PKG_VERSION").map_err(|e| e.to_string())?;
-    let url = format!(
-        "https://github.com/shiguredo/webrtc-rs/releases/download/{}/libwebrtc_c-{}.tar.gz",
-        version, target
+    let base_url = format!(
+        "https://github.com/shiguredo/webrtc-rs/releases/download/{}",
+        version
     );
+    let archive_name = format!("libwebrtc_c-{}.tar.gz", target);
+    let archive_url = format!("{}/{}", base_url, archive_name);
+    let sha256_url = format!("{}/{}.sha256", base_url, archive_name);
 
-    eprintln!("prebuilt ライブラリをダウンロード中: {}", url);
-
-    let archive_bytes = fetch_url(&url)?;
+    eprintln!("prebuilt ライブラリをダウンロード中: {}", archive_url);
 
     // OUT_DIR/prebuilt/ に展開
     let prebuilt_dir = out_dir.join("prebuilt");
-    extract_tar_gz_from_bytes(&archive_bytes, &prebuilt_dir)?;
+    let archive_path = out_dir.join("prebuilt.tar.gz");
+    let sha256_path = out_dir.join("prebuilt.sha256");
+    download(&archive_url, &archive_path)?;
+    download(&sha256_url, &sha256_path)?;
+    verify_sha256(&archive_path, &sha256_path)?;
+    fs::create_dir_all(&prebuilt_dir)
+        .map_err(|e| format!("展開先ディレクトリ作成に失敗: {}", e))?;
+    extract(&archive_path, &prebuilt_dir)?;
+    let _ = fs::remove_file(&archive_path);
+    let _ = fs::remove_file(&sha256_path);
 
     // libwebrtc_c.a を OUT_DIR/lib/ にコピー
     let lib_dir = out_dir.join("lib");
@@ -118,33 +141,94 @@ fn download_prebuilt(target: &str, out_dir: &Path) -> Result<PrebuiltPaths, Stri
     Ok(PrebuiltPaths { lib_path })
 }
 
-/// バイト列から tar.gz を展開する
-fn extract_tar_gz_from_bytes(data: &[u8], dest_dir: &Path) -> Result<(), String> {
-    fs::create_dir_all(dest_dir).map_err(|e| format!("展開先ディレクトリ作成に失敗: {}", e))?;
-    let decoder = flate2::read::GzDecoder::new(Cursor::new(data));
-    let mut archive = tar::Archive::new(decoder);
-    let entries = archive
-        .entries()
-        .map_err(|e| format!("tar エントリ取得に失敗: {}", e))?;
+/// curl を使ってファイルをダウンロードする
+fn download(url: &str, output: &Path) -> Result<(), String> {
+    let status = std::process::Command::new("curl")
+        .args(["-fSL", "--retry", "3", "-o"])
+        .arg(output)
+        .arg(url)
+        .status()
+        .map_err(|e| format!("curl の実行に失敗しました: {}", e))?;
+    if !status.success() {
+        return Err(format!("ダウンロードに失敗しました: {}", url));
+    }
+    Ok(())
+}
 
-    for entry in entries {
-        let mut entry = entry.map_err(|e| format!("tar エントリ読み込みに失敗: {}", e))?;
-        let path = entry
-            .path()
-            .map_err(|e| format!("tar パス取得に失敗: {}", e))?;
-        if !is_safe_path(&path) {
-            return Err(format!("不正なパスが含まれています: {}", path.display()));
-        }
-        let out_path = dest_dir.join(&*path);
-        if let Some(parent) = out_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("展開先ディレクトリ作成に失敗: {}", e))?;
-        }
-        entry
-            .unpack(&out_path)
-            .map_err(|e| format!("tar 展開に失敗: {}", e))?;
+/// SHA256 チェックサムを検証する
+fn verify_sha256(file_path: &Path, sha256_path: &Path) -> Result<(), String> {
+    let expected = fs::read_to_string(sha256_path)
+        .map_err(|e| format!("SHA256 チェックサムファイルの読み込みに失敗: {}", e))?
+        .split_whitespace()
+        .next()
+        .ok_or("SHA256 チェックサムファイルが空です")?
+        .to_lowercase();
+
+    let actual = compute_sha256(file_path)?;
+    if actual != expected {
+        return Err(format!(
+            "SHA256 チェックサムが一致しません:\n  expected: {}\n  actual:   {}",
+            expected, actual
+        ));
+    }
+    eprintln!("SHA256 チェックサム検証成功: {}", actual);
+    Ok(())
+}
+
+/// ファイルの SHA256 ハッシュを計算する
+fn compute_sha256(path: &Path) -> Result<String, String> {
+    let output = if cfg!(target_os = "macos") {
+        std::process::Command::new("shasum")
+            .args(["-a", "256"])
+            .arg(path)
+            .output()
+    } else if cfg!(target_os = "windows") {
+        std::process::Command::new("certutil")
+            .args(["-hashfile"])
+            .arg(path)
+            .arg("SHA256")
+            .output()
+    } else {
+        std::process::Command::new("sha256sum").arg(path).output()
+    }
+    .map_err(|e| format!("SHA256 計算コマンドの実行に失敗: {}", e))?;
+
+    if !output.status.success() {
+        return Err("SHA256 チェックサムの計算に失敗しました".to_string());
     }
 
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if cfg!(target_os = "windows") {
+        // certutil -hashfile の出力は3行:
+        //   SHA256 hash of <file>:
+        //   <hex hash>
+        //   CertUtil: -hashfile command completed successfully.
+        let lines: Vec<&str> = stdout.lines().collect();
+        if lines.len() < 2 {
+            return Err("certutil の出力のパースに失敗しました".to_string());
+        }
+        Ok(lines[1].trim().replace(' ', "").to_ascii_lowercase())
+    } else {
+        stdout
+            .split_whitespace()
+            .next()
+            .map(|s| s.to_lowercase())
+            .ok_or_else(|| "SHA256 出力のパースに失敗しました".to_string())
+    }
+}
+
+/// tar を使ってアーカイブを展開する
+fn extract(archive: &Path, dest: &Path) -> Result<(), String> {
+    let status = std::process::Command::new("tar")
+        .arg("xzf")
+        .arg(archive)
+        .arg("-C")
+        .arg(dest)
+        .status()
+        .map_err(|e| format!("tar の実行に失敗しました: {}", e))?;
+    if !status.success() {
+        return Err(format!("展開に失敗しました: {}", archive.display()));
+    }
     Ok(())
 }
 
@@ -189,20 +273,24 @@ fn detect_linux_distro() -> String {
     );
 }
 
-/// cmake crate を使って webrtc_c をビルドする
+/// shiguredo_cmake crate を使って webrtc_c をビルドする
 fn build_webrtc_c(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> PathBuf {
-    let mut config = cmake::Config::new(webrtc_dir);
+    let mut config = shiguredo_cmake::Config::new(webrtc_dir);
     let profile = "release";
-    let cmake_path = ensure_cmake(out_dir);
-    set_cmake_env(&cmake_path);
+    shiguredo_cmake::set_cmake_env();
 
     // 配布されている libwebrtc は Release 相当のため、ラッパー側も Release で揃える
     config.profile("Release");
     config.out_dir(out_dir.join("_build").join(target_platform).join(profile));
 
+    // Cargo.toml から WebRTC ビルド情報を取得して CMake に渡す
+    let (webrtc_build_version, webrtc_base_url) = get_webrtc_build_metadata();
+
     // ターゲットプラットフォームを設定（CMakeLists.txt 内で自動検出もされるが明示的に指定）
     config
         .define("WEBRTC_C_TARGET", target_platform)
+        .define("WEBRTC_BUILD_VERSION", &webrtc_build_version)
+        .define("WEBRTC_BASE_URL", &webrtc_base_url)
         .define("CMAKE_BUILD_TYPE", "Release")
         .define("CMAKE_EXPORT_COMPILE_COMMANDS", "ON");
 
@@ -281,421 +369,6 @@ fn remove_symlink(link_path: &Path) -> std::io::Result<()> {
     fs::remove_dir(link_path)
 }
 
-fn set_cmake_env(cmake_path: &Path) {
-    // build.rs は単一スレッドで実行される前提のため、安全に環境変数を設定する
-    unsafe {
-        env::set_var("CMAKE", cmake_path);
-    }
-}
-
-struct CmakeDownload {
-    archive_name: String,
-    platform: String,
-    /// アーカイブのルートディレクトリからの相対パス
-    executable_path: String,
-}
-
-fn ensure_cmake(out_dir: &Path) -> PathBuf {
-    let host = env::var("HOST").unwrap_or_default();
-    let download = cmake_download_info(&host);
-    let base_dir = out_dir.join("cmake").join(CMAKE_VERSION);
-    let cmake_root = base_dir.join(format!("cmake-{}-{}", CMAKE_VERSION, download.platform));
-    let cmake_bin = cmake_root.join(&download.executable_path);
-    if cmake_bin.exists() {
-        return cmake_bin;
-    }
-
-    fs::create_dir_all(&base_dir).expect("CMake の保存先ディレクトリ作成に失敗しました");
-    let archive_path = base_dir.join(&download.archive_name);
-    let url = format!(
-        "https://github.com/Kitware/CMake/releases/download/v{}/{}",
-        CMAKE_VERSION, download.archive_name
-    );
-
-    download_and_extract_cmake(&url, &archive_path, &base_dir, &download.archive_name)
-        .unwrap_or_else(|err| panic!("CMake のダウンロードまたは展開に失敗しました : {}", err));
-
-    if archive_path.exists() {
-        let _ = fs::remove_file(&archive_path);
-    }
-
-    if !cmake_bin.exists() {
-        panic!("CMake の展開に失敗しました: {}", cmake_bin.display());
-    }
-
-    cmake_bin
-}
-
-fn cmake_download_info(host: &str) -> CmakeDownload {
-    let is_windows = host.contains("windows");
-    let is_macos = host.contains("apple-darwin") || host.contains("darwin");
-    let is_linux = host.contains("linux");
-    let is_x86_64 = host.contains("x86_64") || host.contains("amd64");
-    let is_arm64 = host.contains("aarch64") || host.contains("arm64");
-
-    match (is_windows, is_macos, is_linux, is_x86_64, is_arm64) {
-        (true, _, _, true, _) => CmakeDownload {
-            archive_name: format!("cmake-{}-windows-x86_64.zip", CMAKE_VERSION),
-            platform: "windows-x86_64".to_string(),
-            executable_path: "bin/cmake.exe".to_string(),
-        },
-        (true, _, _, _, true) => CmakeDownload {
-            archive_name: format!("cmake-{}-windows-arm64.zip", CMAKE_VERSION),
-            platform: "windows-arm64".to_string(),
-            executable_path: "bin/cmake.exe".to_string(),
-        },
-        (false, true, _, _, _) => CmakeDownload {
-            archive_name: format!("cmake-{}-macos-universal.tar.gz", CMAKE_VERSION),
-            platform: "macos-universal".to_string(),
-            executable_path: "CMake.app/Contents/bin/cmake".to_string(),
-        },
-        (false, false, true, true, _) => CmakeDownload {
-            archive_name: format!("cmake-{}-linux-x86_64.tar.gz", CMAKE_VERSION),
-            platform: "linux-x86_64".to_string(),
-            executable_path: "bin/cmake".to_string(),
-        },
-        (false, false, true, _, true) => CmakeDownload {
-            archive_name: format!("cmake-{}-linux-aarch64.tar.gz", CMAKE_VERSION),
-            platform: "linux-aarch64".to_string(),
-            executable_path: "bin/cmake".to_string(),
-        },
-        _ => panic!("サポートされていない実行環境です: {}", host),
-    }
-}
-
-fn download_and_extract_cmake(
-    url: &str,
-    archive_path: &Path,
-    dest_dir: &Path,
-    archive_name: &str,
-) -> Result<(), String> {
-    fs::create_dir_all(dest_dir)
-        .map_err(|e| format!("CMake の保存先ディレクトリ作成に失敗しました : {}", e))?;
-
-    let archive_bytes = fetch_url(url)?;
-    let tmp_path = archive_path.with_file_name(format!(
-        "{}.part",
-        archive_path
-            .file_name()
-            .expect("アーカイブ名の取得に失敗しました")
-            .to_string_lossy()
-    ));
-    {
-        let mut file = fs::File::create(&tmp_path)
-            .map_err(|e| format!("CMake アーカイブの作成に失敗しました : {}", e))?;
-        file.write_all(&archive_bytes)
-            .map_err(|e| format!("CMake アーカイブの書き込みに失敗しました : {}", e))?;
-    }
-    fs::rename(&tmp_path, archive_path)
-        .map_err(|e| format!("CMake アーカイブの保存に失敗しました : {}", e))?;
-
-    verify_sha256(archive_path, archive_name)?;
-
-    if archive_name.ends_with(".zip") {
-        extract_zip(archive_path, dest_dir);
-    } else {
-        extract_tar_gz(archive_path, dest_dir);
-    }
-
-    Ok(())
-}
-
-fn verify_sha256(archive_path: &Path, archive_name: &str) -> Result<(), String> {
-    let sha_url = format!(
-        "https://github.com/Kitware/CMake/releases/download/v{}/cmake-{}-SHA-256.txt",
-        CMAKE_VERSION, CMAKE_VERSION
-    );
-    let sha_bytes = fetch_url(&sha_url)?;
-    let sha_text = String::from_utf8_lossy(&sha_bytes);
-    let expected = extract_expected_sha256(&sha_text, archive_name);
-    let actual = compute_sha256(archive_path);
-
-    if expected != actual {
-        return Err(format!(
-            "SHA256 が一致しません。期待値 : {}, 実際 : {}",
-            expected, actual
-        ));
-    }
-
-    Ok(())
-}
-
-fn extract_expected_sha256(text: &str, archive_name: &str) -> String {
-    for line in text.lines() {
-        let mut parts = line.split_whitespace();
-        let hash = parts.next();
-        let name = parts.next();
-        if let (Some(hash), Some(name)) = (hash, name)
-            && name == archive_name
-        {
-            return hash.to_ascii_lowercase();
-        }
-    }
-
-    panic!("SHA256 の取得に失敗しました : {}", archive_name);
-}
-
-fn compute_sha256(path: &Path) -> String {
-    let mut file = fs::File::open(path).expect("SHA256 計算用ファイルの取得に失敗しました");
-    let mut context = Context::new(&SHA256);
-    let mut buf = [0u8; 8192];
-    loop {
-        let n = file
-            .read(&mut buf)
-            .expect("SHA256 計算用ファイルの読み込みに失敗しました");
-        if n == 0 {
-            break;
-        }
-        context.update(&buf[..n]);
-    }
-    let digest = context.finish();
-    bytes_to_hex_lower(digest.as_ref())
-}
-
-fn bytes_to_hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        out.push(HEX[(byte >> 4) as usize] as char);
-        out.push(HEX[(byte & 0x0f) as usize] as char);
-    }
-    out
-}
-
-fn extract_tar_gz(archive_path: &Path, dest_dir: &Path) {
-    let file = fs::File::open(archive_path).expect("CMake アーカイブの読み込みに失敗しました");
-    let decoder = flate2::read::GzDecoder::new(file);
-    let mut archive = tar::Archive::new(decoder);
-    let entries = archive
-        .entries()
-        .expect("CMake アーカイブのエントリ取得に失敗しました");
-
-    for entry in entries {
-        let mut entry = entry.expect("CMake アーカイブのエントリ取得に失敗しました");
-        let path = entry
-            .path()
-            .expect("CMake アーカイブのパス取得に失敗しました");
-        if !is_safe_path(&path) {
-            panic!("不正なパスが含まれています : {}", path.display());
-        }
-        let out_path = dest_dir.join(&path);
-        if let Some(parent) = out_path.parent() {
-            fs::create_dir_all(parent).expect("展開先ディレクトリ作成に失敗しました");
-        }
-        entry
-            .unpack(&out_path)
-            .expect("CMake アーカイブの展開に失敗しました");
-    }
-}
-
-fn extract_zip(archive_path: &Path, dest_dir: &Path) {
-    let file = fs::File::open(archive_path).expect("CMake アーカイブの読み込みに失敗しました");
-    let mut archive = zip::ZipArchive::new(file).expect("CMake アーカイブの解析に失敗しました");
-
-    for i in 0..archive.len() {
-        let mut file = archive
-            .by_index(i)
-            .expect("CMake アーカイブのエントリ取得に失敗しました");
-        let Some(path) = file.enclosed_name() else {
-            panic!("不正なパスが含まれています");
-        };
-        let out_path = dest_dir.join(path);
-        if file.name().ends_with('/') {
-            fs::create_dir_all(&out_path).expect("展開先ディレクトリ作成に失敗しました");
-            continue;
-        }
-        if let Some(parent) = out_path.parent() {
-            fs::create_dir_all(parent).expect("展開先ディレクトリ作成に失敗しました");
-        }
-        let mut out = fs::File::create(&out_path).expect("展開先ファイルの作成に失敗しました");
-        std::io::copy(&mut file, &mut out).expect("CMake アーカイブの展開に失敗しました");
-    }
-}
-
-fn is_safe_path(path: &Path) -> bool {
-    for component in path.components() {
-        match component {
-            Component::Prefix(_) | Component::RootDir | Component::ParentDir => return false,
-            _ => {}
-        }
-    }
-    true
-}
-
-fn fetch_url(url: &str) -> Result<Vec<u8>, String> {
-    let mut current = url.to_string();
-    for _ in 0..5 {
-        let response = fetch_url_once(&current)?;
-        if response.is_redirect() {
-            let location = response
-                .get_header("Location")
-                .ok_or_else(|| "Location ヘッダーがありません".to_string())?;
-            current = resolve_redirect_url(&current, location)?;
-            continue;
-        }
-        if response.status_code != 200 {
-            return Err(format!(
-                "HTTP エラー : {} {} ({})",
-                response.status_code, response.reason_phrase, current
-            ));
-        }
-        return Ok(response.body);
-    }
-
-    Err(format!("リダイレクトが多すぎます : {}", url))
-}
-
-fn fetch_url_once(url: &str) -> Result<Response, String> {
-    let (scheme, host, port, path) = parse_url(url)?;
-    let request = Request::new("GET", &path)
-        .header("Host", &host)
-        .header("User-Agent", "shiguredo_webrtc-build")
-        .header("Accept", "*/*")
-        .header("Connection", "close");
-    let request_bytes = request.encode();
-    if scheme == "https" {
-        https_request(&host, port, &request_bytes)
-    } else {
-        http_request(&host, port, &request_bytes)
-    }
-}
-
-fn parse_url(url: &str) -> Result<(String, String, u16, String), String> {
-    let (scheme, rest) = if let Some(rest) = url.strip_prefix("https://") {
-        ("https".to_string(), rest)
-    } else if let Some(rest) = url.strip_prefix("http://") {
-        ("http".to_string(), rest)
-    } else {
-        return Err(format!("URL が不正です : {}", url));
-    };
-
-    let (host_port, path) = match rest.find('/') {
-        Some(index) => (&rest[..index], &rest[index..]),
-        None => (rest, "/"),
-    };
-
-    let (host, port) = match host_port.find(':') {
-        Some(index) => {
-            let port: u16 = host_port[index + 1..]
-                .parse()
-                .map_err(|e| format!("ポートの解析に失敗しました : {}", e))?;
-            (&host_port[..index], port)
-        }
-        None => {
-            let port = if scheme == "https" { 443 } else { 80 };
-            (host_port, port)
-        }
-    };
-
-    Ok((scheme, host.to_string(), port, path.to_string()))
-}
-
-fn resolve_redirect_url(current_url: &str, location: &str) -> Result<String, String> {
-    if location.starts_with("http://") || location.starts_with("https://") {
-        return Ok(location.to_string());
-    }
-
-    let (scheme, host, port, path) = parse_url(current_url)?;
-    let host_port = if (scheme == "https" && port == 443) || (scheme == "http" && port == 80) {
-        host
-    } else {
-        format!("{}:{}", host, port)
-    };
-
-    if location.starts_with('/') {
-        return Ok(format!("{}://{}{}", scheme, host_port, location));
-    }
-
-    let base = match path.rfind('/') {
-        Some(pos) => &path[..=pos],
-        None => "/",
-    };
-    Ok(format!("{}://{}{}{}", scheme, host_port, base, location))
-}
-
-fn http_request(host: &str, port: u16, request_bytes: &[u8]) -> Result<Response, String> {
-    let mut stream =
-        TcpStream::connect((host, port)).map_err(|e| format!("HTTP 接続に失敗しました : {}", e))?;
-    stream
-        .write_all(request_bytes)
-        .map_err(|e| format!("HTTP リクエスト送信に失敗しました : {}", e))?;
-
-    let mut decoder = ResponseDecoder::with_limits(DecoderLimits::unlimited());
-    let mut buf = [0u8; 8192];
-
-    loop {
-        let n = stream
-            .read(&mut buf)
-            .map_err(|e| format!("HTTP レスポンス受信に失敗しました : {}", e))?;
-        if n == 0 {
-            decoder.mark_eof();
-            if let Some(response) = decoder
-                .decode()
-                .map_err(|e| format!("HTTP レスポンス解析に失敗しました : {}", e))?
-            {
-                return Ok(response);
-            }
-            return Err("HTTP レスポンスの受信が完了しませんでした".to_string());
-        }
-        decoder
-            .feed(&buf[..n])
-            .map_err(|e| format!("HTTP レスポンス解析に失敗しました : {}", e))?;
-        if let Some(response) = decoder
-            .decode()
-            .map_err(|e| format!("HTTP レスポンス解析に失敗しました : {}", e))?
-        {
-            return Ok(response);
-        }
-    }
-}
-
-fn https_request(host: &str, port: u16, request_bytes: &[u8]) -> Result<Response, String> {
-    let config = ClientConfig::with_platform_verifier()
-        .map_err(|e| format!("TLS 設定の作成に失敗しました : {}", e))?;
-    let server_name = ServerName::try_from(host.to_string())
-        .map_err(|e| format!("サーバー名の解析に失敗しました : {}", e))?;
-    let conn = ClientConnection::new(Arc::new(config), server_name)
-        .map_err(|e| format!("TLS 接続に失敗しました : {}", e))?;
-    let sock = TcpStream::connect((host, port))
-        .map_err(|e| format!("HTTPS 接続に失敗しました : {}", e))?;
-    let mut tls = StreamOwned::new(conn, sock);
-
-    tls.write_all(request_bytes)
-        .map_err(|e| format!("HTTPS リクエスト送信に失敗しました : {}", e))?;
-
-    let mut decoder = ResponseDecoder::with_limits(DecoderLimits::unlimited());
-    let mut buf = [0u8; 8192];
-
-    loop {
-        let n = match tls.read(&mut buf) {
-            Ok(0) => {
-                decoder.mark_eof();
-                if let Some(response) = decoder
-                    .decode()
-                    .map_err(|e| format!("HTTPS レスポンス解析に失敗しました : {}", e))?
-                {
-                    return Ok(response);
-                }
-                return Err("HTTPS レスポンスの受信が完了しませんでした".to_string());
-            }
-            Ok(n) => n,
-            Err(err) => {
-                return Err(format!("HTTPS レスポンス受信に失敗しました : {}", err));
-            }
-        };
-
-        decoder
-            .feed(&buf[..n])
-            .map_err(|e| format!("HTTPS レスポンス解析に失敗しました : {}", e))?;
-        if let Some(response) = decoder
-            .decode()
-            .map_err(|e| format!("HTTPS レスポンス解析に失敗しました : {}", e))?
-        {
-            return Ok(response);
-        }
-    }
-}
-
 fn generate_bindings(header: &Path, include_dir: &Path) {
     println!("cargo:rerun-if-changed={}", header.display());
     println!("cargo:rerun-if-changed={}", include_dir.display());
@@ -721,7 +394,6 @@ fn emit_link_directives(lib_path: &Path) {
     let lib_dir = lib_path
         .parent()
         .expect("libwebrtc_c.a の親ディレクトリ取得に失敗しました");
-    println!("cargo:rerun-if-changed={}", lib_path.display());
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
     println!("cargo:rustc-link-lib=static=webrtc_c");
 

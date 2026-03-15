@@ -47,6 +47,19 @@ int libyuv_NV12ToI420(const uint8_t* src_y,
                       int width,
                       int height);
 
+int libyuv_I420ToNV12(const uint8_t* src_y,
+                      int src_stride_y,
+                      const uint8_t* src_u,
+                      int src_stride_u,
+                      const uint8_t* src_v,
+                      int src_stride_v,
+                      uint8_t* dst_y,
+                      int dst_stride_y,
+                      uint8_t* dst_uv,
+                      int dst_stride_uv,
+                      int width,
+                      int height);
+
 int libyuv_YUY2ToI420(const uint8_t* src_yuy2,
                       int src_stride_yuy2,
                       uint8_t* dst_y,

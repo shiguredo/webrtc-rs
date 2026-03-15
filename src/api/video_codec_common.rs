@@ -1,8 +1,139 @@
 use crate::ref_count::{EncodedImageBufferHandle, I420BufferHandle};
-use crate::{CxxStringRef, MapStringString, Result, ScopedRef, ffi};
+use crate::{CxxString, CxxStringRef, Error, MapStringString, Result, ScopedRef, ffi};
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::slice;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ScalabilityMode {
+    L1T1,
+    L1T2,
+    L1T3,
+    L2T1,
+    L2T1h,
+    L2T1Key,
+    L2T2,
+    L2T2h,
+    L2T2Key,
+    L2T2KeyShift,
+    L2T3,
+    L2T3h,
+    L2T3Key,
+    L3T1,
+    L3T1h,
+    L3T1Key,
+    L3T2,
+    L3T2h,
+    L3T2Key,
+    L3T3,
+    L3T3h,
+    L3T3Key,
+    S2T1,
+    S2T1h,
+    S2T2,
+    S2T2h,
+    S2T3,
+    S2T3h,
+    S3T1,
+    S3T1h,
+    S3T2,
+    S3T2h,
+    S3T3,
+    S3T3h,
+}
+
+impl ScalabilityMode {
+    pub fn as_str(self) -> Result<String> {
+        let raw = unsafe { ffi::webrtc_ScalabilityModeToString(self.to_raw()) };
+        let raw =
+            NonNull::new(raw).expect("BUG: webrtc_ScalabilityModeToString が null を返しました");
+        CxxString::from_unique(raw).to_string()
+    }
+
+    fn from_raw(value: i32) -> Option<Self> {
+        unsafe {
+            match value {
+                x if x == ffi::webrtc_ScalabilityMode_L1T1 => Some(Self::L1T1),
+                x if x == ffi::webrtc_ScalabilityMode_L1T2 => Some(Self::L1T2),
+                x if x == ffi::webrtc_ScalabilityMode_L1T3 => Some(Self::L1T3),
+                x if x == ffi::webrtc_ScalabilityMode_L2T1 => Some(Self::L2T1),
+                x if x == ffi::webrtc_ScalabilityMode_L2T1h => Some(Self::L2T1h),
+                x if x == ffi::webrtc_ScalabilityMode_L2T1_KEY => Some(Self::L2T1Key),
+                x if x == ffi::webrtc_ScalabilityMode_L2T2 => Some(Self::L2T2),
+                x if x == ffi::webrtc_ScalabilityMode_L2T2h => Some(Self::L2T2h),
+                x if x == ffi::webrtc_ScalabilityMode_L2T2_KEY => Some(Self::L2T2Key),
+                x if x == ffi::webrtc_ScalabilityMode_L2T2_KEY_SHIFT => Some(Self::L2T2KeyShift),
+                x if x == ffi::webrtc_ScalabilityMode_L2T3 => Some(Self::L2T3),
+                x if x == ffi::webrtc_ScalabilityMode_L2T3h => Some(Self::L2T3h),
+                x if x == ffi::webrtc_ScalabilityMode_L2T3_KEY => Some(Self::L2T3Key),
+                x if x == ffi::webrtc_ScalabilityMode_L3T1 => Some(Self::L3T1),
+                x if x == ffi::webrtc_ScalabilityMode_L3T1h => Some(Self::L3T1h),
+                x if x == ffi::webrtc_ScalabilityMode_L3T1_KEY => Some(Self::L3T1Key),
+                x if x == ffi::webrtc_ScalabilityMode_L3T2 => Some(Self::L3T2),
+                x if x == ffi::webrtc_ScalabilityMode_L3T2h => Some(Self::L3T2h),
+                x if x == ffi::webrtc_ScalabilityMode_L3T2_KEY => Some(Self::L3T2Key),
+                x if x == ffi::webrtc_ScalabilityMode_L3T3 => Some(Self::L3T3),
+                x if x == ffi::webrtc_ScalabilityMode_L3T3h => Some(Self::L3T3h),
+                x if x == ffi::webrtc_ScalabilityMode_L3T3_KEY => Some(Self::L3T3Key),
+                x if x == ffi::webrtc_ScalabilityMode_S2T1 => Some(Self::S2T1),
+                x if x == ffi::webrtc_ScalabilityMode_S2T1h => Some(Self::S2T1h),
+                x if x == ffi::webrtc_ScalabilityMode_S2T2 => Some(Self::S2T2),
+                x if x == ffi::webrtc_ScalabilityMode_S2T2h => Some(Self::S2T2h),
+                x if x == ffi::webrtc_ScalabilityMode_S2T3 => Some(Self::S2T3),
+                x if x == ffi::webrtc_ScalabilityMode_S2T3h => Some(Self::S2T3h),
+                x if x == ffi::webrtc_ScalabilityMode_S3T1 => Some(Self::S3T1),
+                x if x == ffi::webrtc_ScalabilityMode_S3T1h => Some(Self::S3T1h),
+                x if x == ffi::webrtc_ScalabilityMode_S3T2 => Some(Self::S3T2),
+                x if x == ffi::webrtc_ScalabilityMode_S3T2h => Some(Self::S3T2h),
+                x if x == ffi::webrtc_ScalabilityMode_S3T3 => Some(Self::S3T3),
+                x if x == ffi::webrtc_ScalabilityMode_S3T3h => Some(Self::S3T3h),
+                _ => None,
+            }
+        }
+    }
+
+    fn to_raw(self) -> i32 {
+        unsafe {
+            match self {
+                Self::L1T1 => ffi::webrtc_ScalabilityMode_L1T1,
+                Self::L1T2 => ffi::webrtc_ScalabilityMode_L1T2,
+                Self::L1T3 => ffi::webrtc_ScalabilityMode_L1T3,
+                Self::L2T1 => ffi::webrtc_ScalabilityMode_L2T1,
+                Self::L2T1h => ffi::webrtc_ScalabilityMode_L2T1h,
+                Self::L2T1Key => ffi::webrtc_ScalabilityMode_L2T1_KEY,
+                Self::L2T2 => ffi::webrtc_ScalabilityMode_L2T2,
+                Self::L2T2h => ffi::webrtc_ScalabilityMode_L2T2h,
+                Self::L2T2Key => ffi::webrtc_ScalabilityMode_L2T2_KEY,
+                Self::L2T2KeyShift => ffi::webrtc_ScalabilityMode_L2T2_KEY_SHIFT,
+                Self::L2T3 => ffi::webrtc_ScalabilityMode_L2T3,
+                Self::L2T3h => ffi::webrtc_ScalabilityMode_L2T3h,
+                Self::L2T3Key => ffi::webrtc_ScalabilityMode_L2T3_KEY,
+                Self::L3T1 => ffi::webrtc_ScalabilityMode_L3T1,
+                Self::L3T1h => ffi::webrtc_ScalabilityMode_L3T1h,
+                Self::L3T1Key => ffi::webrtc_ScalabilityMode_L3T1_KEY,
+                Self::L3T2 => ffi::webrtc_ScalabilityMode_L3T2,
+                Self::L3T2h => ffi::webrtc_ScalabilityMode_L3T2h,
+                Self::L3T2Key => ffi::webrtc_ScalabilityMode_L3T2_KEY,
+                Self::L3T3 => ffi::webrtc_ScalabilityMode_L3T3,
+                Self::L3T3h => ffi::webrtc_ScalabilityMode_L3T3h,
+                Self::L3T3Key => ffi::webrtc_ScalabilityMode_L3T3_KEY,
+                Self::S2T1 => ffi::webrtc_ScalabilityMode_S2T1,
+                Self::S2T1h => ffi::webrtc_ScalabilityMode_S2T1h,
+                Self::S2T2 => ffi::webrtc_ScalabilityMode_S2T2,
+                Self::S2T2h => ffi::webrtc_ScalabilityMode_S2T2h,
+                Self::S2T3 => ffi::webrtc_ScalabilityMode_S2T3,
+                Self::S2T3h => ffi::webrtc_ScalabilityMode_S2T3h,
+                Self::S3T1 => ffi::webrtc_ScalabilityMode_S3T1,
+                Self::S3T1h => ffi::webrtc_ScalabilityMode_S3T1h,
+                Self::S3T2 => ffi::webrtc_ScalabilityMode_S3T2,
+                Self::S3T2h => ffi::webrtc_ScalabilityMode_S3T2h,
+                Self::S3T3 => ffi::webrtc_ScalabilityMode_S3T3,
+                Self::S3T3h => ffi::webrtc_ScalabilityMode_S3T3h,
+            }
+        }
+    }
+}
 
 pub struct SdpVideoFormat {
     raw_unique: NonNull<ffi::webrtc_SdpVideoFormat_unique>,
@@ -10,17 +141,44 @@ pub struct SdpVideoFormat {
 
 impl SdpVideoFormat {
     pub fn new(name: &str) -> Self {
-        let raw = unsafe {
-            ffi::webrtc_SdpVideoFormat_new(
-                name.as_ptr() as *const _,
-                name.len(),
-                std::ptr::null_mut(),
-            )
-        };
+        let raw = unsafe { ffi::webrtc_SdpVideoFormat_new(name.as_ptr() as *const _, name.len()) };
         Self {
             raw_unique: NonNull::new(raw)
                 .expect("BUG: webrtc_SdpVideoFormat_new が null を返しました"),
         }
+    }
+
+    pub fn new_with_parameters(
+        name: &str,
+        parameters: &HashMap<String, String>,
+        scalability_modes: &[ScalabilityMode],
+    ) -> Self {
+        let raw_modes = scalability_modes
+            .iter()
+            .copied()
+            .map(ScalabilityMode::to_raw)
+            .collect::<Vec<_>>();
+        let raw = unsafe {
+            ffi::webrtc_SdpVideoFormat_new_with_parameters(
+                name.as_ptr() as *const _,
+                name.len(),
+                std::ptr::null_mut(),
+                if raw_modes.is_empty() {
+                    std::ptr::null()
+                } else {
+                    raw_modes.as_ptr()
+                },
+                raw_modes.len(),
+            )
+        };
+        let mut format = Self {
+            raw_unique: NonNull::new(raw)
+                .expect("BUG: webrtc_SdpVideoFormat_new_with_parameters が null を返しました"),
+        };
+        for (key, value) in parameters {
+            format.parameters_mut().set(key.as_str(), value.as_str());
+        }
+        format
     }
 
     pub fn name(&self) -> Result<String> {
@@ -31,8 +189,12 @@ impl SdpVideoFormat {
         self.as_ref().parameters_mut()
     }
 
-    pub fn is_equal(&self, other: &SdpVideoFormat) -> bool {
-        self.as_ref().is_equal(other.as_ref())
+    pub fn is_equal(&self, other: SdpVideoFormatRef<'_>) -> bool {
+        unsafe { ffi::webrtc_SdpVideoFormat_is_equal(self.raw().as_ptr(), other.raw.as_ptr()) != 0 }
+    }
+
+    pub fn scalability_modes(&self) -> Vec<ScalabilityMode> {
+        self.as_ref().scalability_modes()
     }
 
     pub fn as_ref(&self) -> SdpVideoFormatRef<'_> {
@@ -43,6 +205,16 @@ impl SdpVideoFormat {
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_SdpVideoFormat> {
         let raw = unsafe { ffi::webrtc_SdpVideoFormat_unique_get(self.raw_unique.as_ptr()) };
         NonNull::new(raw).expect("BUG: webrtc_SdpVideoFormat_unique_get が null を返しました")
+    }
+}
+
+impl Clone for SdpVideoFormat {
+    fn clone(&self) -> Self {
+        let raw = unsafe { ffi::webrtc_SdpVideoFormat_copy(self.raw().as_ptr()) };
+        Self {
+            raw_unique: NonNull::new(raw)
+                .expect("BUG: webrtc_SdpVideoFormat_copy が null を返しました"),
+        }
     }
 }
 
@@ -74,8 +246,37 @@ impl<'a> SdpVideoFormatRef<'a> {
         MapStringString::from_raw(NonNull::new(ptr).expect("BUG: ptr が null"))
     }
 
-    pub fn is_equal(&self, other: SdpVideoFormatRef<'_>) -> bool {
-        unsafe { ffi::webrtc_SdpVideoFormat_is_equal(self.raw.as_ptr(), other.raw.as_ptr()) != 0 }
+    pub fn scalability_modes(&self) -> Vec<ScalabilityMode> {
+        let len =
+            unsafe { ffi::webrtc_SdpVideoFormat_get_scalability_modes_size(self.raw.as_ptr()) };
+        if len == 0 {
+            return Vec::new();
+        }
+        let mut raw_modes = vec![unsafe { ffi::webrtc_ScalabilityMode_L1T1 }; len];
+        let copied = unsafe {
+            ffi::webrtc_SdpVideoFormat_copy_scalability_modes(
+                self.raw.as_ptr(),
+                raw_modes.as_mut_ptr(),
+                raw_modes.len(),
+            )
+        };
+        raw_modes
+            .into_iter()
+            .take(copied)
+            .filter_map(ScalabilityMode::from_raw)
+            .collect()
+    }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_SdpVideoFormat {
+        self.raw.as_ptr()
+    }
+
+    pub fn to_owned(&self) -> SdpVideoFormat {
+        let raw = unsafe { ffi::webrtc_SdpVideoFormat_copy(self.raw.as_ptr()) };
+        SdpVideoFormat {
+            raw_unique: NonNull::new(raw)
+                .expect("BUG: webrtc_SdpVideoFormat_copy が null を返しました"),
+        }
     }
 }
 
@@ -159,6 +360,15 @@ impl I420Buffer {
         unsafe { slice::from_raw_parts(ptr, len) }
     }
 
+    /// Y 平面を可変参照する。
+    pub fn y_data_mut(&mut self) -> &mut [u8] {
+        let raw = self.raw();
+        let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataY(raw.as_ptr()) };
+        let stride = unsafe { ffi::webrtc_I420Buffer_StrideY(raw.as_ptr()) } as usize;
+        let len = stride * self.height() as usize;
+        unsafe { slice::from_raw_parts_mut(ptr, len) }
+    }
+
     /// U 平面を参照する。
     pub fn u_data(&self) -> &[u8] {
         let raw = self.raw();
@@ -168,6 +378,15 @@ impl I420Buffer {
         unsafe { slice::from_raw_parts(ptr, stride * h) }
     }
 
+    /// U 平面を可変参照する。
+    pub fn u_data_mut(&mut self) -> &mut [u8] {
+        let raw = self.raw();
+        let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataU(raw.as_ptr()) };
+        let stride = unsafe { ffi::webrtc_I420Buffer_StrideU(raw.as_ptr()) } as usize;
+        let h = (self.height() as usize).div_ceil(2);
+        unsafe { slice::from_raw_parts_mut(ptr, stride * h) }
+    }
+
     /// V 平面を参照する。
     pub fn v_data(&self) -> &[u8] {
         let raw = self.raw();
@@ -175,6 +394,15 @@ impl I420Buffer {
         let stride = unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) } as usize;
         let h = (self.height() as usize).div_ceil(2);
         unsafe { slice::from_raw_parts(ptr, stride * h) }
+    }
+
+    /// V 平面を可変参照する。
+    pub fn v_data_mut(&mut self) -> &mut [u8] {
+        let raw = self.raw();
+        let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataV(raw.as_ptr()) };
+        let stride = unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) } as usize;
+        let h = (self.height() as usize).div_ceil(2);
+        unsafe { slice::from_raw_parts_mut(ptr, stride * h) }
     }
 
     pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_I420Buffer_refcounted {
@@ -192,12 +420,13 @@ pub struct VideoFrame {
 }
 
 impl VideoFrame {
-    pub fn from_i420(buffer: &I420Buffer, timestamp_us: i64) -> Self {
+    pub fn from_i420(buffer: &I420Buffer, timestamp_us: i64, timestamp_rtp: u32) -> Self {
         let raw = NonNull::new(unsafe {
             ffi::webrtc_VideoFrame_Create(
                 buffer.as_refcounted_ptr(),
                 ffi::webrtc_VideoRotation_0,
                 timestamp_us,
+                timestamp_rtp,
             )
         })
         .expect("BUG: webrtc_VideoFrame_Create が null を返しました");
@@ -214,6 +443,10 @@ impl VideoFrame {
 
     pub fn timestamp_us(&self) -> i64 {
         self.as_ref().timestamp_us()
+    }
+
+    pub fn rtp_timestamp(&self) -> u32 {
+        self.as_ref().rtp_timestamp()
     }
 
     /// I420Buffer を取得する。
@@ -268,12 +501,20 @@ impl<'a> VideoFrameRef<'a> {
         unsafe { ffi::webrtc_VideoFrame_timestamp_us(self.raw.as_ptr()) }
     }
 
+    pub fn rtp_timestamp(&self) -> u32 {
+        unsafe { ffi::webrtc_VideoFrame_timestamp_rtp(self.raw.as_ptr()) }
+    }
+
     pub fn buffer(&self) -> I420Buffer {
         let buf =
             NonNull::new(unsafe { ffi::webrtc_VideoFrame_video_frame_buffer(self.raw.as_ptr()) })
                 .expect("BUG: webrtc_VideoFrame_video_frame_buffer が null を返しました");
         let raw_ref = ScopedRef::<I420BufferHandle>::from_raw(buf);
         I420Buffer { raw_ref }
+    }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoFrame {
+        self.raw.as_ptr()
     }
 }
 
@@ -493,6 +734,18 @@ impl VideoCodecStatus {
 }
 
 impl VideoCodecType {
+    pub fn as_str(self) -> Option<&'static str> {
+        match self {
+            Self::Generic => Some("Generic"),
+            Self::Vp8 => Some("VP8"),
+            Self::Vp9 => Some("VP9"),
+            Self::Av1 => Some("AV1"),
+            Self::H264 => Some("H264"),
+            Self::H265 => Some("H265"),
+            Self::Unknown(_) => None,
+        }
+    }
+
     pub(crate) fn from_raw(value: i32) -> Self {
         if value == unsafe { ffi::webrtc_VideoCodecType_Generic } {
             Self::Generic
@@ -521,6 +774,30 @@ impl VideoCodecType {
             Self::H265 => unsafe { ffi::webrtc_VideoCodecType_H265 },
             Self::Unknown(v) => v,
         }
+    }
+}
+
+impl TryFrom<&str> for VideoCodecType {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        match value {
+            "Generic" => Ok(Self::Generic),
+            "VP8" => Ok(Self::Vp8),
+            "VP9" => Ok(Self::Vp9),
+            "AV1" => Ok(Self::Av1),
+            "H264" => Ok(Self::H264),
+            "H265" => Ok(Self::H265),
+            _ => Err(Error::InvalidVideoCodecType(value.to_string())),
+        }
+    }
+}
+
+impl std::str::FromStr for VideoCodecType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        Self::try_from(s)
     }
 }
 
@@ -561,6 +838,10 @@ impl<'a> VideoCodecRef<'a> {
 
     pub fn max_framerate(&self) -> u32 {
         unsafe { ffi::webrtc_VideoCodec_max_framerate(self.raw.as_ptr()) }
+    }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoCodec {
+        self.raw.as_ptr()
     }
 }
 

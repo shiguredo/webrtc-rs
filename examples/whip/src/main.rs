@@ -4,15 +4,18 @@ use rustls_platform_verifier::ConfigVerifierExt;
 use shiguredo_http11::{Request, Response, ResponseDecoder, uri::Uri};
 use shiguredo_webrtc::{
     AdaptFrameResult, AdaptedVideoTrackSource, AudioDecoderFactory, AudioDeviceModule,
-    AudioDeviceModuleAudioLayer, AudioEncoderFactory, AudioProcessingBuilder, CxxString,
-    Environment, IceServer, IceTransportsType, MediaType, PeerConnection,
+    AudioDeviceModuleAudioLayer, AudioEncoderFactory, AudioProcessingBuilder,
+    CreateSessionDescriptionObserver, CreateSessionDescriptionObserverHandler, CxxString,
+    Environment, I420Buffer, IceServer, IceTransportsType, MediaType, PeerConnection,
     PeerConnectionDependencies, PeerConnectionFactory, PeerConnectionFactoryDependencies,
-    PeerConnectionObserver, PeerConnectionObserverBuilder, PeerConnectionOfferAnswerOptions,
-    PeerConnectionRtcConfiguration, PeerConnectionState, RtcEventLogFactory, RtpCodec,
+    PeerConnectionObserver, PeerConnectionObserverHandler, PeerConnectionOfferAnswerOptions,
+    PeerConnectionRtcConfiguration, PeerConnectionState, RtcError, RtcEventLogFactory, RtpCodec,
     RtpCodecCapabilityVector, RtpEncodingParameters, RtpEncodingParametersVector,
     RtpTransceiverDirection, RtpTransceiverInit, SdpType, SessionDescription,
-    SetLocalDescriptionObserver, SetRemoteDescriptionObserver, Thread, VideoDecoderFactory,
-    VideoEncoderFactory, VideoTrackSource, log,
+    SetLocalDescriptionObserver, SetLocalDescriptionObserverHandler, SetRemoteDescriptionObserver,
+    SetRemoteDescriptionObserverHandler, Thread, TimestampAligner, VideoDecoderFactory,
+    VideoEncoderFactory, VideoFrame, VideoTrackSource, abgr_to_i420, log, random_string,
+    thread_sleep_ms, time_millis,
 };
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -104,7 +107,7 @@ impl Default for FakeVideoCapturerConfig {
 
 pub struct FakeVideoCapturer {
     source: AdaptedVideoTrackSource,
-    timestamp_aligner: Option<shiguredo_webrtc::TimestampAligner>,
+    timestamp_aligner: Option<TimestampAligner>,
     image: Vec<u32>,
     width: i32,
     height: i32,
@@ -126,14 +129,14 @@ impl FakeVideoCapturer {
         };
         let fps = if config.fps > 0 { config.fps } else { 30 };
         let source = AdaptedVideoTrackSource::new();
-        let timestamp_aligner = shiguredo_webrtc::TimestampAligner::new();
+        let timestamp_aligner = TimestampAligner::new();
         let video_source = source.cast_to_video_track_source();
         Some(Self {
             image: vec![0u32; (width * height) as usize],
             width,
             height,
             fps,
-            start_time_ms: shiguredo_webrtc::time_millis(),
+            start_time_ms: time_millis(),
             on_tick: config.on_tick,
             video_source,
             source,
@@ -179,7 +182,7 @@ impl FakeVideoCapturer {
                         on_tick.as_ref(),
                     );
                     let sleep_ms = (1000 / fps).saturating_sub(2).max(1);
-                    shiguredo_webrtc::thread_sleep_ms(sleep_ms);
+                    thread_sleep_ms(sleep_ms);
                 }
             });
         match handle {
@@ -209,7 +212,7 @@ impl Drop for FakeVideoCapturer {
 #[allow(clippy::too_many_arguments)]
 fn tick_once(
     source: &mut AdaptedVideoTrackSource,
-    timestamp_aligner: &mut shiguredo_webrtc::TimestampAligner,
+    timestamp_aligner: &mut TimestampAligner,
     image: &mut [u32],
     width: i32,
     height: i32,
@@ -217,7 +220,7 @@ fn tick_once(
     fps: i32,
     on_tick: Option<&Arc<dyn Fn() + Send + Sync>>,
 ) {
-    let elapsed_ms = shiguredo_webrtc::time_millis() - start_time_ms;
+    let elapsed_ms = time_millis() - start_time_ms;
     let radius = (width.min(height)) / 4;
     let center_x = width / 2;
     let center_y = height / 2;
@@ -250,26 +253,25 @@ fn tick_once(
         }
     }
 
-    if let Some(buffer) =
-        shiguredo_webrtc::abgr_to_i420(u32_slice_as_u8_slice(image), width, height)
-    {
+    if let Some(buffer) = abgr_to_i420(u32_slice_as_u8_slice(image), width, height) {
         let timestamp_us = elapsed_ms * 1000;
-        let frame = shiguredo_webrtc::VideoFrame::from_i420(&buffer, timestamp_us);
+        let frame = VideoFrame::from_i420(&buffer, timestamp_us, 0);
         let AdaptFrameResult { applied, size } = source.adapt_frame(width, height, timestamp_us);
         let frame = if applied
             && (size.adapted_width != frame.width() || size.adapted_height != frame.height())
         {
-            let mut scaled =
-                shiguredo_webrtc::I420Buffer::new(size.adapted_width, size.adapted_height);
+            let mut scaled = I420Buffer::new(size.adapted_width, size.adapted_height);
             scaled.scale_from(&buffer);
-            shiguredo_webrtc::VideoFrame::from_i420(
+            VideoFrame::from_i420(
                 &scaled,
-                timestamp_aligner.translate(timestamp_us, shiguredo_webrtc::time_millis() * 1000),
+                timestamp_aligner.translate(timestamp_us, time_millis() * 1000),
+                0,
             )
         } else {
-            shiguredo_webrtc::VideoFrame::from_i420(
+            VideoFrame::from_i420(
                 &buffer,
-                timestamp_aligner.translate(timestamp_us, shiguredo_webrtc::time_millis() * 1000),
+                timestamp_aligner.translate(timestamp_us, time_millis() * 1000),
+                0,
             )
         };
         source.on_frame(&frame);
@@ -304,6 +306,74 @@ enum WhipState {
     Connecting,
     Connected,
     Closed,
+}
+
+struct WhipPeerConnectionObserverHandler {
+    observer_state: Arc<(Mutex<WhipState>, Condvar)>,
+}
+
+impl PeerConnectionObserverHandler for WhipPeerConnectionObserverHandler {
+    fn on_connection_change(&mut self, state: PeerConnectionState) {
+        let (lock, cvar) = &*self.observer_state;
+        let mut guard = lock.lock().unwrap();
+        if matches!(state, PeerConnectionState::Connected) {
+            *guard = WhipState::Connected;
+        } else if matches!(
+            state,
+            PeerConnectionState::Failed | PeerConnectionState::Closed
+        ) {
+            *guard = WhipState::Closed;
+        }
+        cvar.notify_all();
+    }
+}
+
+struct CreateOfferObserverHandler {
+    tx: std::sync::mpsc::Sender<Result<String, String>>,
+}
+
+impl CreateSessionDescriptionObserverHandler for CreateOfferObserverHandler {
+    fn on_success(&mut self, desc: SessionDescription) {
+        let sdp = desc
+            .to_string()
+            .map_err(|e| format!("offer to_string failed: {e}"));
+        let _ = self.tx.send(sdp);
+    }
+
+    fn on_failure(&mut self, err: RtcError) {
+        let msg = err.message().unwrap_or_else(|_| "unknown".to_string());
+        let _ = self.tx.send(Err(msg));
+    }
+}
+
+struct SetLocalObserverHandler {
+    tx: std::sync::mpsc::Sender<Option<String>>,
+}
+
+impl SetLocalDescriptionObserverHandler for SetLocalObserverHandler {
+    fn on_set_local_description_complete(&mut self, err: RtcError) {
+        let msg = if err.ok() {
+            None
+        } else {
+            Some(err.message().unwrap_or_else(|_| "unknown".to_string()))
+        };
+        let _ = self.tx.send(msg);
+    }
+}
+
+struct SetRemoteObserverHandler {
+    tx: std::sync::mpsc::Sender<Option<String>>,
+}
+
+impl SetRemoteDescriptionObserverHandler for SetRemoteObserverHandler {
+    fn on_set_remote_description_complete(&mut self, err: RtcError) {
+        let msg = if err.ok() {
+            None
+        } else {
+            Some(err.message().unwrap_or_else(|_| "unknown".to_string()))
+        };
+        let _ = self.tx.send(msg);
+    }
 }
 
 /// シンプルな WHIP クライアント。
@@ -354,21 +424,10 @@ impl SignalingWhip {
         self.set_state(WhipState::Connecting);
         let pc_factory = self.config.pc_factory.factory();
         let observer_state = self.state.clone();
-        let observer = PeerConnectionObserverBuilder::new()
-            .on_connection_change(move |state| {
-                let (lock, cvar) = &*observer_state;
-                let mut guard = lock.lock().unwrap();
-                if matches!(state, PeerConnectionState::Connected) {
-                    *guard = WhipState::Connected;
-                } else if matches!(
-                    state,
-                    PeerConnectionState::Failed | PeerConnectionState::Closed
-                ) {
-                    *guard = WhipState::Closed;
-                }
-                cvar.notify_all();
-            })
-            .build();
+        let observer =
+            PeerConnectionObserver::new_with_handler(Box::new(WhipPeerConnectionObserverHandler {
+                observer_state,
+            }));
         // Keep observer alive for the lifetime of the PeerConnection.
         let mut deps = PeerConnectionDependencies::new(&observer);
         // Store observer so it lives as long as SignalingWhip.
@@ -405,7 +464,7 @@ impl SignalingWhip {
                     .name()
                     .map_err(|e| format!("codec 名の取得に失敗しました : {e}"))?;
                 if name.eq_ignore_ascii_case("opus") {
-                    codecs.push_ref(&cap);
+                    codecs.push(&cap);
                     break;
                 }
             }
@@ -424,13 +483,13 @@ impl SignalingWhip {
             init.set_send_encodings(encodings);
         }
         let mut stream_ids = init.stream_ids();
-        let stream_id = shiguredo_webrtc::random_string(16);
+        let stream_id = random_string(16);
         stream_ids.push(&CxxString::from_str(&stream_id));
         let source = match &self.config.video_source {
             Some(s) => s.clone(),
             None => return Ok(()),
         };
-        let track_id = shiguredo_webrtc::random_string(16);
+        let track_id = random_string(16);
         let track = self
             .config
             .pc_factory
@@ -454,7 +513,7 @@ impl SignalingWhip {
                     .map_err(|e| format!("codec 名の取得に失敗しました : {e}"))?
                     .to_ascii_lowercase();
                 if name == "rtx" {
-                    codecs.push_ref(&cap);
+                    codecs.push(&cap);
                     continue;
                 }
                 if let Some(encs) = &self.config.send_encodings {
@@ -475,7 +534,7 @@ impl SignalingWhip {
                         }
                     }
                     if matched {
-                        codecs.push_ref(&cap);
+                        codecs.push(&cap);
                     }
                 }
             }
@@ -493,19 +552,9 @@ impl SignalingWhip {
         opts.set_offer_to_receive_video(0);
 
         let (offer_tx, offer_rx) = std::sync::mpsc::channel::<Result<String, String>>();
-        let offer_tx_err = offer_tx.clone();
-        let mut offer_obs = shiguredo_webrtc::CreateSessionDescriptionObserver::new(
-            move |desc| {
-                let sdp = desc
-                    .to_string()
-                    .map_err(|e| format!("offer to_string failed: {e}"));
-                let _ = offer_tx.send(sdp);
-            },
-            move |err| {
-                let msg = err.message().unwrap_or_else(|_| "unknown".to_string());
-                let _ = offer_tx_err.send(Err(msg));
-            },
-        );
+        let mut offer_obs = CreateSessionDescriptionObserver::new_with_handler(Box::new(
+            CreateOfferObserverHandler { tx: offer_tx },
+        ));
         pc.create_offer(&mut offer_obs, &mut opts);
         let offer_sdp = offer_rx
             .recv_timeout(Duration::from_secs(5))
@@ -535,14 +584,10 @@ impl SignalingWhip {
         let offer_desc = SessionDescription::new(SdpType::Offer, &offer_sdp)
             .map_err(|e| format!("offer create failed: {e}"))?;
         let (loc_tx, loc_rx) = std::sync::mpsc::channel::<Option<String>>();
-        let loc_obs = SetLocalDescriptionObserver::new(move |err| {
-            let msg = if err.ok() {
-                None
-            } else {
-                Some(err.message().unwrap_or_else(|_| "unknown".to_string()))
-            };
-            let _ = loc_tx.send(msg);
-        });
+        let loc_obs =
+            SetLocalDescriptionObserver::new_with_handler(Box::new(SetLocalObserverHandler {
+                tx: loc_tx,
+            }));
         pc.set_local_description(offer_desc, &loc_obs);
         let loc_res = loc_rx
             .recv_timeout(Duration::from_secs(5))
@@ -554,14 +599,10 @@ impl SignalingWhip {
         let answer = SessionDescription::new(SdpType::Answer, &body.sdp)
             .map_err(|e| format!("answer create failed: {e}"))?;
         let (rem_tx, rem_rx) = std::sync::mpsc::channel::<Option<String>>();
-        let rem_obs = SetRemoteDescriptionObserver::new(move |err| {
-            let msg = if err.ok() {
-                None
-            } else {
-                Some(err.message().unwrap_or_else(|_| "unknown".to_string()))
-            };
-            let _ = rem_tx.send(msg);
-        });
+        let rem_obs =
+            SetRemoteDescriptionObserver::new_with_handler(Box::new(SetRemoteObserverHandler {
+                tx: rem_tx,
+            }));
         pc.set_remote_description(answer, &rem_obs);
         let rem_res = rem_rx
             .recv_timeout(Duration::from_secs(5))

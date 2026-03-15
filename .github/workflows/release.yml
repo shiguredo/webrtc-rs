@@ -82,10 +82,16 @@ jobs:
           cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
           cp "$OUT_DIR/bindings.rs" staging/
           tar czf "libwebrtc_c-${{ matrix.target }}.tar.gz" -C staging .
+      - name: Generate SHA256 checksum
+        run: shasum -a 256 "libwebrtc_c-${{ matrix.target }}.tar.gz" > "libwebrtc_c-${{ matrix.target }}.tar.gz.sha256"
       - name: Upload to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${GITHUB_REF_NAME}" "libwebrtc_c-${{ matrix.target }}.tar.gz" --clobber
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" \
+            "libwebrtc_c-${{ matrix.target }}.tar.gz" \
+            "libwebrtc_c-${{ matrix.target }}.tar.gz.sha256" \
+            --clobber
 
   # クロスコンパイル
   build-prebuilt-cross:
@@ -128,7 +134,7 @@ jobs:
       - name: Add cross-compile target and build sysroot with shiguredo-sysroot
         run: |
           rustup target add aarch64-unknown-linux-gnu
-          cargo install --git https://github.com/shiguredo/cargo-sysroot.git
+          cargo install shiguredo_sysroot
           cargo shiguredo-sysroot --config sysroot/${{ matrix.target }}.json
       - name: Build (cross)
         env:
@@ -147,14 +153,19 @@ jobs:
           cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
           cp "$OUT_DIR/bindings.rs" staging/
           tar czf "libwebrtc_c-${{ matrix.target }}.tar.gz" -C staging .
+      - name: Generate SHA256 checksum
+        run: shasum -a 256 "libwebrtc_c-${{ matrix.target }}.tar.gz" > "libwebrtc_c-${{ matrix.target }}.tar.gz.sha256"
       - name: Upload to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${GITHUB_REF_NAME}" "libwebrtc_c-${{ matrix.target }}.tar.gz" --clobber
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" \
+            "libwebrtc_c-${{ matrix.target }}.tar.gz" \
+            "libwebrtc_c-${{ matrix.target }}.tar.gz.sha256" \
+            --clobber
 
   publish:
     needs: [build-prebuilt, build-prebuilt-cross]
-    if: false
     runs-on: ubuntu-24.04
     environment: release
     permissions:

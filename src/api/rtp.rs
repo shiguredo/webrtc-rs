@@ -349,7 +349,7 @@ impl RtpCodecCapabilityVector {
         self.as_ref().get(index)
     }
 
-    pub fn push(&mut self, cap: &RtpCodecCapability) {
+    pub fn push(&mut self, cap: &RtpCodecCapabilityRef<'_>) {
         self.as_ref().push(cap);
     }
 
@@ -357,11 +357,7 @@ impl RtpCodecCapabilityVector {
         self.as_ref().resize(len);
     }
 
-    pub fn push_ref(&mut self, cap: &RtpCodecCapabilityRef<'_>) {
-        self.as_ref().push_ref(cap);
-    }
-
-    pub fn set(&mut self, index: usize, cap: &RtpCodecCapability) -> bool {
+    pub fn set(&mut self, index: usize, cap: &RtpCodecCapabilityRef<'_>) -> bool {
         self.as_ref().set(index, cap)
     }
 
@@ -414,13 +410,7 @@ impl<'a> RtpCodecCapabilityVectorRef<'a> {
         Some(RtpCodecCapabilityRef::from_raw(raw))
     }
 
-    pub fn push(&mut self, cap: &RtpCodecCapability) {
-        unsafe {
-            ffi::webrtc_RtpCodecCapability_vector_push_back(self.raw.as_ptr(), cap.as_ptr());
-        }
-    }
-
-    pub fn push_ref(&mut self, cap: &RtpCodecCapabilityRef<'_>) {
+    pub fn push(&mut self, cap: &RtpCodecCapabilityRef<'_>) {
         unsafe {
             ffi::webrtc_RtpCodecCapability_vector_push_back(self.raw.as_ptr(), cap.as_ptr());
         }
@@ -431,7 +421,7 @@ impl<'a> RtpCodecCapabilityVectorRef<'a> {
         unsafe { ffi::webrtc_RtpCodecCapability_vector_resize(self.raw.as_ptr(), len) };
     }
 
-    pub fn set(&mut self, index: usize, cap: &RtpCodecCapability) -> bool {
+    pub fn set(&mut self, index: usize, cap: &RtpCodecCapabilityRef<'_>) -> bool {
         if index >= self.len() {
             return false;
         }

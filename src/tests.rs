@@ -1,5 +1,9 @@
 use super::*;
 use std::ptr::NonNull;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use std::time::Duration;
 
 #[test]
@@ -122,29 +126,72 @@ fn session_description_to_string() {
 
 #[test]
 fn sdp_video_format_with_parameters() {
-    let mut fmt = SdpVideoFormat::new("VP8");
-    {
-        let mut params = fmt.parameters_mut();
-        params.set("profile-id", "0");
-        params.set("level", "3.1");
-        assert_eq!(params.len(), 2);
+    let mut fmt = SdpVideoFormat::new_with_parameters(
+        "VP8",
+        &std::collections::HashMap::from([
+            (String::from("profile-id"), String::from("0")),
+            (String::from("level"), String::from("3.1")),
+        ]),
+        &[ScalabilityMode::L1T1, ScalabilityMode::L1T2],
+    );
+    let params = fmt.parameters_mut();
+    assert_eq!(params.len(), 2);
 
-        let mut found = std::collections::HashMap::new();
-        for (k, v) in params.iter() {
-            found.insert(k, v);
+    let mut found = std::collections::HashMap::new();
+    for (k, v) in params.iter() {
+        found.insert(k, v);
+    }
+    assert_eq!(found.get("profile-id").map(String::as_str), Some("0"));
+    assert_eq!(found.get("level").map(String::as_str), Some("3.1"));
+    assert_eq!(
+        fmt.scalability_modes(),
+        vec![ScalabilityMode::L1T1, ScalabilityMode::L1T2]
+    );
+
+    let other = SdpVideoFormat::new_with_parameters(
+        "VP8",
+        &std::collections::HashMap::from([
+            (String::from("profile-id"), String::from("0")),
+            (String::from("level"), String::from("3.1")),
+        ]),
+        &[ScalabilityMode::L1T1, ScalabilityMode::L1T2],
+    );
+
+    assert!(fmt.is_equal(other.as_ref()));
+
+    let mut cloned = fmt.clone();
+    assert!(fmt.is_equal(cloned.as_ref()));
+    {
+        let mut params = cloned.parameters_mut();
+        params.set("packetization-mode", "1");
+    }
+    let mut has_packetization_mode = false;
+    for (k, _) in fmt.parameters_mut().iter() {
+        if k == "packetization-mode" {
+            has_packetization_mode = true;
+            break;
         }
-        assert_eq!(found.get("profile-id").map(String::as_str), Some("0"));
-        assert_eq!(found.get("level").map(String::as_str), Some("3.1"));
     }
+    assert!(
+        !has_packetization_mode,
+        "clone への変更が元の SdpVideoFormat に影響しています"
+    );
+}
 
-    let mut other = SdpVideoFormat::new("VP8");
-    {
-        let mut params = other.parameters_mut();
-        params.set("profile-id", "0");
-        params.set("level", "3.1");
-    }
+#[test]
+fn sdp_video_format_new_has_empty_scalability_modes() {
+    let fmt = SdpVideoFormat::new("VP8");
+    assert!(fmt.scalability_modes().is_empty());
+}
 
-    assert!(fmt.is_equal(&other));
+#[test]
+fn scalability_mode_round_trip() {
+    let mode = ScalabilityMode::L2T2;
+    assert_eq!(
+        mode.as_str()
+            .expect("ScalabilityMode の文字列化に失敗しました"),
+        "L2T2"
+    );
 }
 
 #[test]
@@ -153,13 +200,29 @@ fn i420_buffer_and_video_frame() {
     buf.fill_y(0x10);
     buf.fill_uv(0x80, 0x90);
 
-    let frame = VideoFrame::from_i420(&buf, 12345);
+    let frame = VideoFrame::from_i420(&buf, 12345, 0);
     assert_eq!(frame.width(), 4);
     assert_eq!(frame.height(), 4);
     assert_eq!(frame.timestamp_us(), 12345);
 
     let copied = frame.buffer();
     assert_eq!(copied.y_data()[0], 0x10);
+}
+
+#[test]
+fn i420_buffer_mutable_planes_and_video_frame_rtp_timestamp() {
+    let mut buf = I420Buffer::new(4, 4);
+    buf.y_data_mut().fill(0x11);
+    buf.u_data_mut().fill(0x22);
+    buf.v_data_mut().fill(0x33);
+    assert!(buf.y_data().iter().all(|&v| v == 0x11));
+    assert!(buf.u_data().iter().all(|&v| v == 0x22));
+    assert!(buf.v_data().iter().all(|&v| v == 0x33));
+
+    let frame = VideoFrame::from_i420(&buf, 12345, 67890);
+    assert_eq!(frame.timestamp_us(), 12345);
+    assert_eq!(frame.rtp_timestamp(), 67890);
+    assert_eq!(frame.as_ref().rtp_timestamp(), 67890);
 }
 
 #[test]
@@ -175,6 +238,43 @@ fn abgr_to_i420_conversion() {
     assert!(buf.y_data().iter().all(|&v| v == buf.y_data()[0]));
     assert!(buf.u_data().iter().all(|&v| v == buf.u_data()[0]));
     assert!(buf.v_data().iter().all(|&v| v == buf.v_data()[0]));
+}
+
+#[test]
+fn convert_from_i420_argb_conversion() {
+    let mut src = I420Buffer::new(2, 2);
+    src.fill_y(0x30);
+    src.fill_uv(0x80, 0x80);
+
+    let dst = convert_from_i420(&src, LibyuvFourcc::Argb)
+        .expect("convert_from_i420(Argb) の変換に失敗しました");
+    assert_eq!(dst.len(), 2 * 2 * 4);
+}
+
+#[test]
+fn i420_to_nv12_round_trip() {
+    let width = 4;
+    let height = 4;
+    let mut src = I420Buffer::new(width, height);
+    for (i, p) in src.y_data_mut().iter_mut().enumerate() {
+        *p = (i as u8).wrapping_mul(3);
+    }
+    for (i, p) in src.u_data_mut().iter_mut().enumerate() {
+        *p = 0x40u8.wrapping_add(i as u8);
+    }
+    for (i, p) in src.v_data_mut().iter_mut().enumerate() {
+        *p = 0x80u8.wrapping_add(i as u8);
+    }
+
+    let nv12 = i420_to_nv12(&src).expect("i420_to_nv12 の変換に失敗しました");
+    let y_size = (width * height) as usize;
+    let (y, uv) = nv12.split_at(y_size);
+    let restored = nv12_to_i420(y, width, uv, width, width, height)
+        .expect("nv12_to_i420 の逆変換に失敗しました");
+
+    assert_eq!(src.y_data(), restored.y_data());
+    assert_eq!(src.u_data(), restored.u_data());
+    assert_eq!(src.v_data(), restored.v_data());
 }
 
 #[test]
@@ -243,6 +343,29 @@ fn builtin_audio_factories_create() {
 
 #[test]
 fn audio_device_module_recording_device_name_roundtrip() {
+    struct TestAudioDeviceModuleHandler {
+        name: String,
+        guid: String,
+    }
+
+    impl AudioDeviceModuleHandler for TestAudioDeviceModuleHandler {
+        fn init(&self) -> i32 {
+            0
+        }
+
+        fn recording_devices(&self) -> i16 {
+            1
+        }
+
+        fn recording_device_name(&self, index: u16) -> Option<(String, String)> {
+            if index == 0 {
+                Some((self.name.clone(), self.guid.clone()))
+            } else {
+                None
+            }
+        }
+    }
+
     fn make_ascii_string(len: usize) -> String {
         (0..len).map(|i| (b'a' + (i % 26) as u8) as char).collect()
     }
@@ -251,19 +374,12 @@ fn audio_device_module_recording_device_name_roundtrip() {
     for &len in &lengths {
         let name = make_ascii_string(len);
         let guid = make_ascii_string(64usize.saturating_sub(len));
-        let name_value = name.clone();
-        let guid_value = guid.clone();
         let expected_name = name.clone();
         let expected_guid = guid.clone();
-        let callbacks = AudioDeviceModuleCallbacks {
-            init: Some(Box::new(|| 0)),
-            recording_devices: Some(Box::new(|| 1)),
-            recording_device_name: Some(Box::new(move |_| {
-                Some((name_value.clone(), guid_value.clone()))
-            })),
-            ..Default::default()
-        };
-        let mut adm = AudioDeviceModule::new_with_callbacks(callbacks);
+        let mut adm = AudioDeviceModule::new_with_handler(Box::new(TestAudioDeviceModuleHandler {
+            name,
+            guid,
+        }));
         adm.init().expect("AudioDeviceModule::init が失敗しました");
         assert_eq!(adm.recording_devices(), 1);
         let (got_name, got_guid) = adm
@@ -283,7 +399,7 @@ fn adapted_video_track_source() {
     assert!(adapted.size.adapted_height >= 0);
 
     let buf = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buf, 2_000_000);
+    let frame = VideoFrame::from_i420(&buf, 2_000_000, 0);
     src.on_frame(&frame);
 }
 
@@ -316,13 +432,18 @@ fn peer_connection_factory_and_capabilities() {
     deps.enable_media();
 
     // Factory を生成し、オプションと RTP 能力を取得する。
-    let mut factory = PeerConnectionFactory::create_modular(&mut deps)
-        .expect("PeerConnectionFactory の生成に失敗しました");
+    let (mut factory, context) = PeerConnectionFactory::create_modular_with_context(&mut deps)
+        .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
     let mut opts = PeerConnectionFactoryOptions::new();
     opts.set_disable_encryption(false);
     let dtls12 = unsafe { ffi::webrtc_SSL_PROTOCOL_DTLS_12 };
     opts.set_ssl_max_version(dtls12);
     factory.set_options(&opts);
+
+    let network_manager = context.default_network_manager();
+    let socket_factory = context.default_socket_factory();
+    assert!(!network_manager.as_ptr().is_null());
+    assert!(!socket_factory.as_ptr().is_null());
 
     let caps = factory.get_rtp_sender_capabilities(MediaType::Audio);
     assert!(caps.codec_len() >= 0);
@@ -334,6 +455,7 @@ fn peer_connection_factory_and_capabilities() {
     }
 
     drop(caps);
+    drop(context);
     drop(factory);
     drop(deps);
     network.stop();
@@ -348,6 +470,7 @@ fn rtc_configuration_and_ice_server() {
     let mut server = IceServer::new();
     server.set_username("user");
     server.set_password("pass");
+    server.set_tls_cert_policy(TlsCertPolicy::InsecureNoCheck);
     server.add_url("stun:192.0.2.1:3478");
 
     {
@@ -365,6 +488,63 @@ fn rtc_configuration_and_ice_server() {
 }
 
 #[test]
+fn tls_cert_policy_round_trip() {
+    assert_eq!(
+        TlsCertPolicy::from_int(TlsCertPolicy::Secure.to_int()),
+        TlsCertPolicy::Secure
+    );
+    assert_eq!(
+        TlsCertPolicy::from_int(TlsCertPolicy::InsecureNoCheck.to_int()),
+        TlsCertPolicy::InsecureNoCheck
+    );
+    assert_eq!(
+        TlsCertPolicy::from_int(123456),
+        TlsCertPolicy::Unknown(123456)
+    );
+}
+
+#[test]
+fn create_modular_with_context_returns_default_network_objects() {
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+
+    let mut deps = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps.set_network_thread(&network);
+    deps.set_worker_thread(&worker);
+    deps.set_signaling_thread(&signaling);
+    deps.set_audio_encoder_factory(&enc);
+    deps.set_audio_decoder_factory(&dec);
+    deps.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps.set_audio_device_module(&adm);
+    deps.enable_media();
+
+    let (factory, context) = PeerConnectionFactory::create_modular_with_context(&mut deps)
+        .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
+    let network_manager = context.default_network_manager();
+    let socket_factory = context.default_socket_factory();
+    assert!(!network_manager.as_ptr().is_null());
+    assert!(!socket_factory.as_ptr().is_null());
+    assert!(!factory.as_ptr().is_null());
+
+    drop(context);
+    drop(factory);
+    drop(deps);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
 fn rtp_codec_capability_vector() {
     let mut cap = RtpCodecCapability::new();
     cap.set_kind(MediaType::Audio);
@@ -378,14 +558,14 @@ fn rtp_codec_capability_vector() {
 
     let mut vec = RtpCodecCapabilityVector::new(0);
     let len_before = vec.len();
-    vec.push(&cap);
+    vec.push(&cap.as_ref());
     assert_eq!(vec.len(), len_before + 1);
     vec.resize(2);
     let mut cap2 = RtpCodecCapability::new();
     cap2.set_kind(MediaType::Audio);
     cap2.set_name("PCMU");
     cap2.set_clock_rate(Some(8_000));
-    assert!(vec.set(1, &cap2));
+    assert!(vec.set(1, &cap2.as_ref()));
     assert_eq!(vec.len(), 2);
     let first = vec.get(0).expect("先頭 codec の取得に失敗しました");
     let second = vec.get(1).expect("2 番目 codec の取得に失敗しました");
@@ -558,7 +738,7 @@ fn rtp_sender_get_set_parameters() {
         .expect("VideoTrack の生成に失敗しました");
 
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserverBuilder::new().build();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
     let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
         .expect("PeerConnection の生成に失敗しました");
@@ -620,7 +800,7 @@ fn peer_connection_create_and_transceiver() {
 
     // PC 用の構成と observer/dependencies を準備する。
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserverBuilder::new().build();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
 
     // PeerConnection を生成し、取得できることを確認する。
@@ -630,6 +810,63 @@ fn peer_connection_create_and_transceiver() {
 
     drop(pc);
     drop(pc_deps);
+    drop(factory);
+    drop(deps_factory);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
+fn peer_connection_create_with_proxy_allocator() {
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc);
+    deps_factory.set_audio_decoder_factory(&dec);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let (factory, context) = PeerConnectionFactory::create_modular_with_context(&mut deps_factory)
+        .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
+
+    let network_manager = context.default_network_manager();
+    let socket_factory = context.default_socket_factory();
+    assert!(!network_manager.as_ptr().is_null());
+    assert!(!socket_factory.as_ptr().is_null());
+
+    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let mut pc_deps = PeerConnectionDependencies::new(&observer);
+    pc_deps.set_proxy(
+        network_manager,
+        socket_factory,
+        "127.0.0.1",
+        8080,
+        "user",
+        "pass",
+        "shiguredo_webrtc test",
+    );
+    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+        .expect("Proxy 設定付き PeerConnection の生成に失敗しました");
+    assert!(!pc.as_ptr().is_null());
+
+    drop(pc);
+    drop(pc_deps);
+    drop(context);
     drop(factory);
     drop(deps_factory);
     network.stop();
@@ -676,12 +913,12 @@ fn video_track_and_transceiver_with_track() {
         .expect("VideoTrack の生成に失敗しました");
     // ついでにフレーム投入 API も呼んでおく。
     let buf = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buf, 1_000_000);
+    let frame = VideoFrame::from_i420(&buf, 1_000_000, 0);
     source.on_frame(&frame);
 
     // PeerConnection を作成し、トラック付きで transceiver を追加する。
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserverBuilder::new().build();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
     let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
         .expect("PeerConnection の生成に失敗しました");
@@ -708,84 +945,266 @@ fn video_track_and_transceiver_with_track() {
 
 #[test]
 fn peer_connection_observer_and_dependencies() {
-    let observer = PeerConnectionObserverBuilder::new().build();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
     let deps = PeerConnectionDependencies::new(&observer);
     assert!(!deps.as_ptr().is_null());
     drop(deps);
 }
 
 #[test]
+fn peer_connection_dependencies_set_tls_cert_verifier() {
+    struct TestVerifier {
+        dropped: Arc<AtomicBool>,
+    }
+
+    impl SSLCertificateVerifierHandler for TestVerifier {
+        fn verify_chain(&mut self, _chain: SSLCertChainRef<'_>) -> bool {
+            true
+        }
+    }
+
+    impl Drop for TestVerifier {
+        fn drop(&mut self) {
+            self.dropped.store(true, Ordering::SeqCst);
+        }
+    }
+
+    let dropped = Arc::new(AtomicBool::new(false));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let mut deps = PeerConnectionDependencies::new(&observer);
+    let verifier = SSLCertificateVerifier::new_with_handler(Box::new(TestVerifier {
+        dropped: dropped.clone(),
+    }));
+    deps.set_tls_cert_verifier(verifier);
+
+    drop(deps);
+    assert!(
+        dropped.load(Ordering::SeqCst),
+        "SSLCertificateVerifierHandler が解放されていません"
+    );
+}
+
+#[test]
 fn create_and_set_local_description_observers() {
-    let _create_obs = CreateSessionDescriptionObserver::new(|_| {}, |_| {});
-    let _set_local = SetLocalDescriptionObserver::new(|_| {});
-    let _set_remote = SetRemoteDescriptionObserver::new(|_| {});
+    let _create_obs = CreateSessionDescriptionObserver::new_with_handler(Box::new(()));
+    let _set_local = SetLocalDescriptionObserver::new_with_handler(Box::new(()));
+    let _set_remote = SetRemoteDescriptionObserver::new_with_handler(Box::new(()));
 }
 
 // VideoEncoderFactory でカスタムエンコーダーを登録して encode を呼び、
-// encode コールバックが呼ばれることを確認する。
+// encode callback が呼ばれることを確認する。
 #[test]
 fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
-    let mut created = false;
+    struct TestVideoEncoderHandler {
+        encode_count: i32,
+    }
+    impl VideoEncoderHandler for TestVideoEncoderHandler {
+        fn encode(
+            &mut self,
+            _frame: VideoFrameRef<'_>,
+            frame_types: Option<VideoFrameTypeVectorRef<'_>>,
+        ) -> VideoCodecStatus {
+            let frame_types = frame_types.expect("frame_types が None です");
+            assert_eq!(frame_types.len(), 2);
+            assert_eq!(frame_types.get(0), Some(VideoFrameType::Key));
+            assert_eq!(frame_types.get(1), Some(VideoFrameType::Delta));
+            self.encode_count += 1;
+            VideoCodecStatus::Unknown(self.encode_count)
+        }
+    }
 
-    let factory = VideoEncoderFactory::new_with_callbacks(VideoEncoderFactoryCallbacks {
-        create: {
-            Some(Box::new(move |env, format| {
-                assert!(!env.as_ptr().is_null());
-                assert_eq!(
-                    format
-                        .name()
-                        .expect("SdpVideoFormatRef::name に失敗しました"),
-                    "VP8"
-                );
-                if created {
-                    return None;
-                }
-                created = true;
-                let mut encode_count = 0;
-                Some(VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
-                    encode: Some(Box::new(move |_, frame_types| {
-                        let frame_types = frame_types.expect("frame_types が None です");
-                        assert_eq!(frame_types.len(), 2);
-                        assert_eq!(frame_types.get(0), Some(VideoFrameType::Key));
-                        assert_eq!(frame_types.get(1), Some(VideoFrameType::Delta));
-                        encode_count += 1;
-                        VideoCodecStatus::Unknown(encode_count)
-                    })),
-                    ..Default::default()
-                }))
-            }))
-        },
-        ..Default::default()
-    });
+    struct TestVideoEncoderFactoryHandler {
+        created: bool,
+    }
+    impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
+        fn create(
+            &mut self,
+            env: EnvironmentRef<'_>,
+            format: SdpVideoFormatRef<'_>,
+        ) -> Option<Box<dyn VideoEncoderHandler>> {
+            assert!(!env.as_ptr().is_null());
+            assert_eq!(
+                format
+                    .name()
+                    .expect("SdpVideoFormatRef::name に失敗しました"),
+                "VP8"
+            );
+            if self.created {
+                return None;
+            }
+            self.created = true;
+            Some(Box::new(TestVideoEncoderHandler { encode_count: 0 }))
+        }
+    }
 
+    let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler {
+        created: false,
+    }));
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
     let mut encoder = factory
-        .create(&env, &format)
+        .create(env.as_ref(), format.as_ref())
         .expect("custom encoder の作成に失敗しました");
 
     let buffer = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buffer, 123);
+    let frame = VideoFrame::from_i420(&buffer, 123, 0);
     let mut frame_types = VideoFrameTypeVector::new(0);
     frame_types.push(VideoFrameType::Key);
     frame_types.push(VideoFrameType::Delta);
 
     assert_eq!(
-        encoder.encode_with_frame_types(&frame, Some(frame_types.as_ref())),
+        encoder.encode(frame.as_ref(), Some(frame_types.as_ref())),
         VideoCodecStatus::NoOutput
     );
     assert_eq!(
-        encoder.encode_with_frame_types(&frame, Some(frame_types.as_ref())),
+        encoder.encode(frame.as_ref(), Some(frame_types.as_ref())),
         VideoCodecStatus::Unknown(2)
     );
     assert!(
-        factory.create(&env, &format).is_none(),
+        factory.create(env.as_ref(), format.as_ref()).is_none(),
         "2 回目の create は None を返す想定です"
     );
 }
 
-// VideoEncoderFactory でカスタムエンコーダーを登録して encode を呼び、
-// encoded_image と codec_specific_info がコールバックで受け取れることを確認する。
+#[test]
+fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
+    struct TestVideoEncoderFactoryHandler;
+    impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
+        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+            let mut h264 = SdpVideoFormat::new("H264");
+            h264.parameters_mut().set("profile-level-id", "42e01f");
+            let mut vp8 = SdpVideoFormat::new("VP8");
+            vp8.parameters_mut().set("x-google-start-bitrate", "300");
+            vec![h264, vp8]
+        }
+    }
+
+    let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler));
+    let mut formats = factory.get_supported_formats();
+    assert_eq!(formats.len(), 2);
+    assert_eq!(
+        formats[0].name().expect("name の取得に失敗しました"),
+        "H264"
+    );
+    assert_eq!(formats[1].name().expect("name の取得に失敗しました"), "VP8");
+
+    let params: std::collections::HashMap<String, String> = formats
+        .get_mut(0)
+        .expect("先頭フォーマットが存在しません")
+        .parameters_mut()
+        .iter()
+        .collect();
+    assert_eq!(
+        params.get("profile-level-id").map(String::as_str),
+        Some("42e01f")
+    );
+}
+
+#[test]
+fn video_decoder_factory_get_supported_formats_returns_owned_formats() {
+    struct TestVideoDecoderFactoryHandler;
+    impl VideoDecoderFactoryHandler for TestVideoDecoderFactoryHandler {
+        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+            let mut h264 = SdpVideoFormat::new("H264");
+            h264.parameters_mut().set("packetization-mode", "1");
+            vec![h264]
+        }
+    }
+
+    let factory = VideoDecoderFactory::new_with_handler(Box::new(TestVideoDecoderFactoryHandler));
+    let mut formats = factory.get_supported_formats();
+    assert_eq!(formats.len(), 1);
+    assert_eq!(
+        formats[0].name().expect("name の取得に失敗しました"),
+        "H264"
+    );
+    let params: std::collections::HashMap<String, String> = formats
+        .get_mut(0)
+        .expect("先頭フォーマットが存在しません")
+        .parameters_mut()
+        .iter()
+        .collect();
+    assert_eq!(
+        params.get("packetization-mode").map(String::as_str),
+        Some("1")
+    );
+}
+
+#[test]
+fn video_encoder_factory_create_calls_create_callback() {
+    struct TestVideoEncoderFactoryHandler {
+        called: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    }
+    impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
+        fn create(
+            &mut self,
+            env: EnvironmentRef<'_>,
+            format: SdpVideoFormatRef<'_>,
+        ) -> Option<Box<dyn VideoEncoderHandler>> {
+            self.called.store(true, std::sync::atomic::Ordering::SeqCst);
+            assert!(!env.as_ptr().is_null());
+            assert_eq!(
+                format
+                    .name()
+                    .expect("SdpVideoFormatRef::name に失敗しました"),
+                "H264"
+            );
+            Some(Box::new(()))
+        }
+    }
+
+    let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler {
+        called: called.clone(),
+    }));
+    let env = Environment::new();
+    let format = SdpVideoFormat::new("H264");
+    let encoder = factory.create(env.as_ref(), format.as_ref());
+    assert!(encoder.is_some(), "create が None を返しました");
+    assert!(
+        called.load(std::sync::atomic::Ordering::SeqCst),
+        "create callback が呼ばれていません"
+    );
+}
+
+#[test]
+fn video_decoder_factory_create_calls_create_callback() {
+    struct TestVideoDecoderFactoryHandler {
+        called: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    }
+    impl VideoDecoderFactoryHandler for TestVideoDecoderFactoryHandler {
+        fn create(
+            &mut self,
+            env: EnvironmentRef<'_>,
+            format: SdpVideoFormatRef<'_>,
+        ) -> Option<Box<dyn VideoDecoderHandler>> {
+            self.called.store(true, std::sync::atomic::Ordering::SeqCst);
+            assert!(!env.as_ptr().is_null());
+            assert_eq!(
+                format
+                    .name()
+                    .expect("SdpVideoFormatRef::name に失敗しました"),
+                "H264"
+            );
+            Some(Box::new(()))
+        }
+    }
+
+    let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let factory = VideoDecoderFactory::new_with_handler(Box::new(TestVideoDecoderFactoryHandler {
+        called: called.clone(),
+    }));
+    let env = Environment::new();
+    let format = SdpVideoFormat::new("H264");
+    let decoder = factory.create(env.as_ref(), format.as_ref());
+    assert!(decoder.is_some(), "create が None を返しました");
+    assert!(
+        called.load(std::sync::atomic::Ordering::SeqCst),
+        "create callback が呼ばれていません"
+    );
+}
+
+// VideoEncoder で encode を呼び、encoded_image と codec_specific_info を受け取れることを確認する。
 #[test]
 fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specific_info() {
     #[derive(Default)]
@@ -806,31 +1225,36 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
         }
     }
 
-    let mut state = Box::new(State::default());
-    let state_ptr = StatePtr((&mut *state) as *mut State);
-    let state_ptr_for_register = state_ptr;
-    let state_ptr_for_encode = state_ptr;
-    let state_ptr_for_callback = state_ptr;
-
-    let mut encoder = VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
-        register_encode_complete_callback: Some(Box::new(move |callback| {
+    struct TestVideoEncoderHandler {
+        state_ptr: StatePtr,
+    }
+    impl VideoEncoderHandler for TestVideoEncoderHandler {
+        fn register_encode_complete_callback(
+            &mut self,
+            callback: Option<VideoEncoderEncodedImageCallbackRef<'_>>,
+        ) -> VideoCodecStatus {
             let callback = callback.expect("register 側 callback が None です");
-            let state = unsafe { state_ptr_for_register.get_mut() };
+            let state = unsafe { self.state_ptr.get_mut() };
             state.register_called = true;
             state.order.push("register");
             state.callback_ptr =
                 Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_ref(callback) });
             VideoCodecStatus::Ok
-        })),
-        encode: Some(Box::new(move |_, _| {
+        }
+
+        fn encode(
+            &mut self,
+            _frame: VideoFrameRef<'_>,
+            _frame_types: Option<VideoFrameTypeVectorRef<'_>>,
+        ) -> VideoCodecStatus {
             {
-                let state = unsafe { state_ptr_for_encode.get_mut() };
+                let state = unsafe { self.state_ptr.get_mut() };
                 state.encode_called = true;
                 state.order.push("encode");
             }
 
             let callback_ptr = {
-                let state = unsafe { state_ptr_for_encode.get_mut() };
+                let state = unsafe { self.state_ptr.get_mut() };
                 state
                     .callback_ptr
                     .expect("encode 側 callback_ptr が未設定です")
@@ -863,44 +1287,56 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
             assert_eq!(result.frame_id(), 9999);
             assert!(!result.drop_next_frame());
             VideoCodecStatus::Unknown(88)
-        })),
-        ..Default::default()
-    });
+        }
+    }
 
-    let encoded_image_callback = VideoEncoderEncodedImageCallback::new_with_callbacks(
-        VideoEncoderEncodedImageCallbackCallbacks {
-            on_encoded_image: Some(Box::new(move |image, codec_specific_info| {
-                let state = unsafe { state_ptr_for_callback.get_mut() };
-                state.on_encoded_image_called = true;
-                state.order.push("on_encoded_image");
+    struct TestEncodedImageCallbackHandler {
+        state_ptr: StatePtr,
+    }
+    impl VideoEncoderEncodedImageCallbackHandler for TestEncodedImageCallbackHandler {
+        fn on_encoded_image(
+            &mut self,
+            image: EncodedImageRef<'_>,
+            codec_specific_info: Option<CodecSpecificInfoRef<'_>>,
+        ) -> VideoEncoderEncodedImageCallbackResult {
+            let state = unsafe { self.state_ptr.get_mut() };
+            state.on_encoded_image_called = true;
+            state.order.push("on_encoded_image");
 
-                let encoded_data = image.encoded_data().expect("encoded_data が None です");
-                assert_eq!(encoded_data.data(), [1, 2, 3, 4]);
-                assert_eq!(encoded_data.data().len(), 4);
-                assert_eq!(image.rtp_timestamp(), 12345);
-                assert_eq!(image.encoded_width(), 640);
-                assert_eq!(image.encoded_height(), 360);
-                assert_eq!(image.frame_type(), VideoFrameType::Key);
-                assert_eq!(image.qp(), 31);
+            let encoded_data = image.encoded_data().expect("encoded_data が None です");
+            assert_eq!(encoded_data.data(), [1, 2, 3, 4]);
+            assert_eq!(encoded_data.data().len(), 4);
+            assert_eq!(image.rtp_timestamp(), 12345);
+            assert_eq!(image.encoded_width(), 640);
+            assert_eq!(image.encoded_height(), 360);
+            assert_eq!(image.frame_type(), VideoFrameType::Key);
+            assert_eq!(image.qp(), 31);
 
-                let codec_specific_info =
-                    codec_specific_info.expect("codec_specific_info が None です");
-                assert_eq!(codec_specific_info.codec_type(), VideoCodecType::H264);
-                assert!(codec_specific_info.end_of_picture());
-                assert_eq!(
-                    codec_specific_info.h264_packetization_mode(),
-                    H264PacketizationMode::SingleNalUnit
-                );
-                assert_eq!(codec_specific_info.h264_temporal_idx(), 2);
-                assert!(codec_specific_info.h264_base_layer_sync());
-                assert!(codec_specific_info.h264_idr_frame());
-                VideoEncoderEncodedImageCallbackResult::new_with_frame_id(
-                    VideoEncoderEncodedImageCallbackResultError::Ok,
-                    9999,
-                )
-            })),
-        },
-    );
+            let codec_specific_info =
+                codec_specific_info.expect("codec_specific_info が None です");
+            assert_eq!(codec_specific_info.codec_type(), VideoCodecType::H264);
+            assert!(codec_specific_info.end_of_picture());
+            assert_eq!(
+                codec_specific_info.h264_packetization_mode(),
+                H264PacketizationMode::SingleNalUnit
+            );
+            assert_eq!(codec_specific_info.h264_temporal_idx(), 2);
+            assert!(codec_specific_info.h264_base_layer_sync());
+            assert!(codec_specific_info.h264_idr_frame());
+            VideoEncoderEncodedImageCallbackResult::new_with_frame_id(
+                VideoEncoderEncodedImageCallbackResultError::Ok,
+                9999,
+            )
+        }
+    }
+
+    let mut state = Box::new(State::default());
+    let state_ptr = StatePtr((&mut *state) as *mut State);
+    let mut encoder =
+        VideoEncoder::new_with_handler(Box::new(TestVideoEncoderHandler { state_ptr }));
+    let encoded_image_callback = VideoEncoderEncodedImageCallback::new_with_handler(Box::new(
+        TestEncodedImageCallbackHandler { state_ptr },
+    ));
 
     assert_eq!(
         encoder.register_encode_complete_callback(Some(encoded_image_callback.as_ref())),
@@ -908,8 +1344,11 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     );
 
     let buffer = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buffer, 123);
-    assert_eq!(encoder.encode(&frame), VideoCodecStatus::Unknown(88));
+    let frame = VideoFrame::from_i420(&buffer, 123, 0);
+    assert_eq!(
+        encoder.encode(frame.as_ref(), None),
+        VideoCodecStatus::Unknown(88)
+    );
 
     assert!(state.register_called, "register が呼ばれていません");
     assert!(state.encode_called, "encode が呼ばれていません");
@@ -924,105 +1363,126 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     );
 }
 
-// VideoDecoderFactory の create コールバックと、VideoDecoder の decode コールバックが呼ばれることを確認するテスト
+// VideoDecoderFactory の create callback と、VideoDecoder の decode callback が呼ばれることを確認する。
 #[test]
 fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
-    let mut created = false;
+    struct TestVideoDecoderHandler {
+        decode_count: i32,
+    }
+    impl VideoDecoderHandler for TestVideoDecoderHandler {
+        fn decode(
+            &mut self,
+            input_image: EncodedImageRef<'_>,
+            render_time_ms: i64,
+        ) -> VideoCodecStatus {
+            assert!(input_image.encoded_data().is_none());
+            assert_eq!(render_time_ms, 456);
+            self.decode_count += 1;
+            VideoCodecStatus::Unknown(self.decode_count)
+        }
+    }
 
-    let factory = VideoDecoderFactory::new_with_callbacks(VideoDecoderFactoryCallbacks {
-        create: {
-            Some(Box::new(move |env, _| {
-                assert!(!env.as_ptr().is_null());
-                if created {
-                    return None;
-                }
-                created = true;
-                let mut decode_count = 0;
-                Some(VideoDecoder::new_with_callbacks(VideoDecoderCallbacks {
-                    decode: Some(Box::new(move |input, render_time_ms| {
-                        assert!(input.encoded_data().is_none());
-                        assert_eq!(render_time_ms, 456);
-                        decode_count += 1;
-                        VideoCodecStatus::Unknown(decode_count)
-                    })),
-                    ..Default::default()
-                }))
-            }))
-        },
-        ..Default::default()
-    });
+    struct TestVideoDecoderFactoryHandler {
+        created: bool,
+    }
+    impl VideoDecoderFactoryHandler for TestVideoDecoderFactoryHandler {
+        fn create(
+            &mut self,
+            env: EnvironmentRef<'_>,
+            _format: SdpVideoFormatRef<'_>,
+        ) -> Option<Box<dyn VideoDecoderHandler>> {
+            assert!(!env.as_ptr().is_null());
+            if self.created {
+                return None;
+            }
+            self.created = true;
+            Some(Box::new(TestVideoDecoderHandler { decode_count: 0 }))
+        }
+    }
 
+    let factory = VideoDecoderFactory::new_with_handler(Box::new(TestVideoDecoderFactoryHandler {
+        created: false,
+    }));
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
     let mut decoder = factory
-        .create(&env, &format)
+        .create(env.as_ref(), format.as_ref())
         .expect("custom decoder の作成に失敗しました");
+    let image = EncodedImage::new();
 
-    assert_eq!(decoder.decode(None, 456), VideoCodecStatus::NoOutput);
-    assert_eq!(decoder.decode(None, 456), VideoCodecStatus::Unknown(2));
+    assert_eq!(
+        decoder.decode(image.as_ref(), 456),
+        VideoCodecStatus::NoOutput
+    );
+    assert_eq!(
+        decoder.decode(image.as_ref(), 456),
+        VideoCodecStatus::Unknown(2)
+    );
     assert!(
-        factory.create(&env, &format).is_none(),
+        factory.create(env.as_ref(), format.as_ref()).is_none(),
         "2 回目の create は None を返す想定です"
     );
 }
 
-// set_rates コールバックの呼び出しを確認するテスト
 #[test]
-fn custom_video_encoder_init_encode_and_set_rates_callbacks_getters() {
-    struct BoolPtr(*mut bool);
-    unsafe impl Send for BoolPtr {}
-    impl BoolPtr {
-        fn set_true(&self) {
-            unsafe {
-                *self.0 = true;
+fn video_decoder_handler_register_decode_complete_callback_accepts_none_and_some() {
+    struct TestVideoDecoderHandler {
+        called_with_none: bool,
+        called_with_some: bool,
+    }
+    impl VideoDecoderHandler for TestVideoDecoderHandler {
+        fn register_decode_complete_callback(
+            &mut self,
+            callback: Option<VideoDecoderDecodedImageCallbackPtr>,
+        ) -> VideoCodecStatus {
+            if callback.is_some() {
+                self.called_with_some = true;
+            } else {
+                self.called_with_none = true;
             }
+            VideoCodecStatus::Ok
         }
     }
 
-    let mut set_rates_called = false;
-    let set_rates_called_ptr = BoolPtr(&mut set_rates_called as *mut bool);
-    let mut encoder = VideoEncoder::new_with_callbacks(VideoEncoderCallbacks {
-        init_encode: Some(Box::new(move |codec, settings| {
-            assert_eq!(codec.codec_type(), VideoCodecType::Generic);
-            assert_eq!(codec.width(), 0);
-            assert_eq!(codec.height(), 0);
-            assert_eq!(settings.number_of_cores(), 1);
-            assert_eq!(settings.max_payload_size(), 1200);
-            assert!(!settings.loss_notification());
-            assert_eq!(settings.encoder_thread_limit(), None);
-            VideoCodecStatus::Unknown(123)
-        })),
-        set_rates: Some(Box::new(move |parameters| {
-            assert_eq!(parameters.framerate_fps(), 30.0);
-            assert_eq!(parameters.target_bitrate_sum_bps(), 300_000);
-            assert_eq!(parameters.bitrate_sum_bps(), 250_000);
-            assert_eq!(parameters.bandwidth_allocation_bps(), 350_000);
-            set_rates_called_ptr.set_true();
-        })),
-        ..Default::default()
-    });
-
-    assert_eq!(encoder.init_encode(), VideoCodecStatus::Unknown(123));
-    encoder.set_rates();
-    assert!(set_rates_called, "set_rates callback が呼ばれませんでした");
+    let mut handler = TestVideoDecoderHandler {
+        called_with_none: false,
+        called_with_some: false,
+    };
+    assert_eq!(
+        handler.register_decode_complete_callback(None),
+        VideoCodecStatus::Ok
+    );
+    let dummy_callback = unsafe {
+        // このテストでは callback を呼び出さず Option::Some 経路だけを確認する。
+        VideoDecoderDecodedImageCallbackPtr::from_raw(NonNull::dangling())
+    };
+    assert_eq!(
+        handler.register_decode_complete_callback(Some(dummy_callback)),
+        VideoCodecStatus::Ok
+    );
+    assert!(handler.called_with_none);
+    assert!(handler.called_with_some);
 }
 
 // implementation_name() が解放済みの値を返していることがあったので、その回帰テストを行う
 #[test]
 fn custom_video_decoder_get_decoder_info_name_experiment() {
+    struct TestVideoDecoderHandler {
+        expected: String,
+    }
+    impl VideoDecoderHandler for TestVideoDecoderHandler {
+        fn get_decoder_info(&mut self) -> VideoDecoderDecoderInfo {
+            let mut info = VideoDecoderDecoderInfo::new();
+            info.set_implementation_name(&self.expected);
+            info.set_is_hardware_accelerated(false);
+            info
+        }
+    }
+
     let expected = "decoder-info-name-".repeat(128);
-    let decoder = VideoDecoder::new_with_callbacks(VideoDecoderCallbacks {
-        get_decoder_info: Some(Box::new({
-            let expected = expected.clone();
-            move || {
-                let mut info = VideoDecoderDecoderInfo::new();
-                info.set_implementation_name(&expected);
-                info.set_is_hardware_accelerated(false);
-                info
-            }
-        })),
-        ..Default::default()
-    });
+    let decoder = VideoDecoder::new_with_handler(Box::new(TestVideoDecoderHandler {
+        expected: expected.clone(),
+    }));
 
     for _ in 0..100 {
         let info = decoder.get_decoder_info();

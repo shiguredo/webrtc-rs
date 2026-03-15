@@ -1,5 +1,6 @@
 use super::video_codec_common::{
     EncodedImageRef, SdpVideoFormat, SdpVideoFormatRef, VideoCodecStatus, VideoCodecType,
+    VideoFrameRef,
 };
 use crate::{CxxString, EnvironmentRef, Result, ffi};
 use std::marker::PhantomData;
@@ -112,6 +113,10 @@ impl<'a> VideoDecoderSettingsRef<'a> {
     pub fn max_render_resolution_height(&self) -> i32 {
         unsafe { ffi::webrtc_VideoDecoder_Settings_max_render_resolution_height(self.raw.as_ptr()) }
     }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoDecoder_Settings {
+        self.raw.as_ptr()
+    }
 }
 
 unsafe impl<'a> Send for VideoDecoderSettingsRef<'a> {}
@@ -136,85 +141,110 @@ impl<'a> VideoDecoderDecodedImageCallbackRef<'a> {
     pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoDecoder_DecodedImageCallback {
         self.raw.as_ptr()
     }
+
+    pub fn decoded(&self, decoded_image: VideoFrameRef<'_>) {
+        unsafe {
+            ffi::webrtc_VideoDecoder_DecodedImageCallback_Decoded(
+                self.raw.as_ptr(),
+                decoded_image.as_ptr(),
+            )
+        };
+    }
 }
 
 unsafe impl<'a> Send for VideoDecoderDecodedImageCallbackRef<'a> {}
 
-type VideoDecoderConfigureCallback =
-    Box<dyn for<'a> FnMut(VideoDecoderSettingsRef<'a>) -> bool + Send + 'static>;
-type VideoDecoderDecodeCallback =
-    Box<dyn for<'a> FnMut(EncodedImageRef<'a>, i64) -> VideoCodecStatus + Send + 'static>;
-type VideoDecoderRegisterDecodeCompleteCallback = Box<
-    dyn for<'a> FnMut(Option<VideoDecoderDecodedImageCallbackRef<'a>>) -> VideoCodecStatus
-        + Send
-        + 'static,
->;
-type VideoDecoderReleaseCallback = Box<dyn FnMut() -> VideoCodecStatus + Send + 'static>;
-type VideoDecoderGetDecoderInfoCallback =
-    Box<dyn FnMut() -> VideoDecoderDecoderInfo + Send + 'static>;
-
-#[derive(Default)]
-pub struct VideoDecoderCallbacks {
-    pub configure: Option<VideoDecoderConfigureCallback>,
-    pub decode: Option<VideoDecoderDecodeCallback>,
-    pub register_decode_complete_callback: Option<VideoDecoderRegisterDecodeCompleteCallback>,
-    pub release: Option<VideoDecoderReleaseCallback>,
-    pub get_decoder_info: Option<VideoDecoderGetDecoderInfoCallback>,
+#[derive(Clone, Copy)]
+pub struct VideoDecoderDecodedImageCallbackPtr {
+    raw: NonNull<ffi::webrtc_VideoDecoder_DecodedImageCallback>,
 }
 
-impl VideoDecoderCallbacks {
-    fn with_defaults(mut self) -> Self {
-        if self.configure.is_none() {
-            self.configure = Some(Box::new(|_| true));
-        }
-        if self.decode.is_none() {
-            self.decode = Some(Box::new(|_, _| VideoCodecStatus::Ok));
-        }
-        if self.register_decode_complete_callback.is_none() {
-            self.register_decode_complete_callback = Some(Box::new(|_| VideoCodecStatus::Ok));
-        }
-        if self.release.is_none() {
-            self.release = Some(Box::new(|| VideoCodecStatus::Ok));
-        }
-        if self.get_decoder_info.is_none() {
-            self.get_decoder_info = Some(Box::new(VideoDecoderDecoderInfo::new));
-        }
-        self
+impl VideoDecoderDecodedImageCallbackPtr {
+    /// # Safety
+    /// `callback` が指すオブジェクトは有効であり続ける必要があります。
+    pub unsafe fn from_ref(callback: VideoDecoderDecodedImageCallbackRef<'_>) -> Self {
+        Self { raw: callback.raw }
+    }
+
+    /// # Safety
+    /// `raw` は有効な `webrtc_VideoDecoder_DecodedImageCallback` を指し、
+    /// 呼び出し時点でも破棄されていない必要があります。
+    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoDecoder_DecodedImageCallback>) -> Self {
+        Self { raw }
+    }
+
+    /// # Safety
+    /// `self` が保持するポインタは有効である必要があります。
+    /// `register` の再呼び出しや `release` 後に使ってはいけません。
+    pub unsafe fn decoded(&self, decoded_image: VideoFrameRef<'_>) {
+        unsafe {
+            ffi::webrtc_VideoDecoder_DecodedImageCallback_Decoded(
+                self.raw.as_ptr(),
+                decoded_image.as_ptr(),
+            )
+        };
     }
 }
 
-type VideoDecoderFactoryGetSupportedFormatsCallback =
-    Box<dyn FnMut() -> Vec<SdpVideoFormat> + Send + 'static>;
-type VideoDecoderFactoryCreateCallback = Box<
-    dyn for<'a> FnMut(EnvironmentRef<'a>, SdpVideoFormatRef<'a>) -> Option<VideoDecoder>
-        + Send
-        + 'static,
->;
+unsafe impl Send for VideoDecoderDecodedImageCallbackPtr {}
 
-#[derive(Default)]
-pub struct VideoDecoderFactoryCallbacks {
-    pub get_supported_formats: Option<VideoDecoderFactoryGetSupportedFormatsCallback>,
-    pub create: Option<VideoDecoderFactoryCreateCallback>,
-}
+pub trait VideoDecoderHandler: Send {
+    #[expect(unused_variables)]
+    fn configure(&mut self, settings: VideoDecoderSettingsRef<'_>) -> bool {
+        true
+    }
 
-impl VideoDecoderFactoryCallbacks {
-    fn with_defaults(mut self) -> Self {
-        if self.get_supported_formats.is_none() {
-            self.get_supported_formats = Some(Box::new(Vec::new));
-        }
-        if self.create.is_none() {
-            self.create = Some(Box::new(|_, _| None));
-        }
-        self
+    #[expect(unused_variables)]
+    fn decode(
+        &mut self,
+        input_image: EncodedImageRef<'_>,
+        render_time_ms: i64,
+    ) -> VideoCodecStatus {
+        VideoCodecStatus::Ok
+    }
+
+    #[expect(unused_variables)]
+    fn register_decode_complete_callback(
+        &mut self,
+        callback: Option<VideoDecoderDecodedImageCallbackPtr>,
+    ) -> VideoCodecStatus {
+        VideoCodecStatus::Ok
+    }
+
+    fn release(&mut self) -> VideoCodecStatus {
+        VideoCodecStatus::Ok
+    }
+
+    fn get_decoder_info(&mut self) -> VideoDecoderDecoderInfo {
+        VideoDecoderDecoderInfo::new()
     }
 }
 
-struct VideoDecoderCallbackState {
-    callbacks: VideoDecoderCallbacks,
+impl VideoDecoderHandler for () {}
+
+pub trait VideoDecoderFactoryHandler: Send {
+    fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+        Vec::new()
+    }
+
+    #[expect(unused_variables)]
+    fn create(
+        &mut self,
+        env: EnvironmentRef<'_>,
+        format: SdpVideoFormatRef<'_>,
+    ) -> Option<Box<dyn VideoDecoderHandler>> {
+        None
+    }
 }
 
-struct VideoDecoderFactoryCallbackState {
-    callbacks: VideoDecoderFactoryCallbacks,
+impl VideoDecoderFactoryHandler for () {}
+
+struct VideoDecoderHandlerState {
+    handler: Box<dyn VideoDecoderHandler>,
+}
+
+struct VideoDecoderFactoryHandlerState {
+    handler: Box<dyn VideoDecoderFactoryHandler>,
 }
 
 unsafe extern "C" fn video_decoder_on_destroy(user_data: *mut c_void) {
@@ -222,7 +252,7 @@ unsafe extern "C" fn video_decoder_on_destroy(user_data: *mut c_void) {
         !user_data.is_null(),
         "video_decoder_on_destroy: user_data is null"
     );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoDecoderCallbackState) };
+    let _ = unsafe { Box::from_raw(user_data as *mut VideoDecoderHandlerState) };
 }
 
 unsafe extern "C" fn video_decoder_configure(
@@ -233,15 +263,14 @@ unsafe extern "C" fn video_decoder_configure(
         !user_data.is_null(),
         "video_decoder_configure: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoDecoderCallbackState) };
-    let cb = state
-        .callbacks
-        .configure
-        .as_mut()
-        .expect("video_decoder_configure: callback is None");
+    let state = unsafe { &mut *(user_data as *mut VideoDecoderHandlerState) };
     let settings = NonNull::new(settings).expect("video_decoder_configure: settings is null");
     let settings = unsafe { VideoDecoderSettingsRef::from_raw(settings) };
-    if cb(settings) { 1 } else { 0 }
+    if state.handler.configure(settings) {
+        1
+    } else {
+        0
+    }
 }
 
 unsafe extern "C" fn video_decoder_decode(
@@ -253,15 +282,10 @@ unsafe extern "C" fn video_decoder_decode(
         !user_data.is_null(),
         "video_decoder_decode: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoDecoderCallbackState) };
-    let cb = state
-        .callbacks
-        .decode
-        .as_mut()
-        .expect("video_decoder_decode: callback is None");
+    let state = unsafe { &mut *(user_data as *mut VideoDecoderHandlerState) };
     let input_image = NonNull::new(input_image).expect("video_decoder_decode: input_image is null");
     let input_image = unsafe { EncodedImageRef::from_raw(input_image) };
-    cb(input_image, render_time_ms).to_raw()
+    state.handler.decode(input_image, render_time_ms).to_raw()
 }
 
 unsafe extern "C" fn video_decoder_register_decode_complete_callback(
@@ -272,15 +296,13 @@ unsafe extern "C" fn video_decoder_register_decode_complete_callback(
         !user_data.is_null(),
         "video_decoder_register_decode_complete_callback: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoDecoderCallbackState) };
-    let cb = state
-        .callbacks
-        .register_decode_complete_callback
-        .as_mut()
-        .expect("video_decoder_register_decode_complete_callback: callback is None");
+    let state = unsafe { &mut *(user_data as *mut VideoDecoderHandlerState) };
     let callback = NonNull::new(callback)
-        .map(|callback| unsafe { VideoDecoderDecodedImageCallbackRef::from_raw(callback) });
-    cb(callback).to_raw()
+        .map(|callback| unsafe { VideoDecoderDecodedImageCallbackPtr::from_raw(callback) });
+    state
+        .handler
+        .register_decode_complete_callback(callback)
+        .to_raw()
 }
 
 unsafe extern "C" fn video_decoder_release(user_data: *mut c_void) -> i32 {
@@ -288,13 +310,8 @@ unsafe extern "C" fn video_decoder_release(user_data: *mut c_void) -> i32 {
         !user_data.is_null(),
         "video_decoder_release: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoDecoderCallbackState) };
-    let cb = state
-        .callbacks
-        .release
-        .as_mut()
-        .expect("video_decoder_release: callback is None");
-    cb().to_raw()
+    let state = unsafe { &mut *(user_data as *mut VideoDecoderHandlerState) };
+    state.handler.release().to_raw()
 }
 
 unsafe extern "C" fn video_decoder_get_decoder_info(
@@ -304,13 +321,8 @@ unsafe extern "C" fn video_decoder_get_decoder_info(
         !user_data.is_null(),
         "video_decoder_get_decoder_info: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoDecoderCallbackState) };
-    let cb = state
-        .callbacks
-        .get_decoder_info
-        .as_mut()
-        .expect("video_decoder_get_decoder_info: callback is None");
-    cb().into_raw()
+    let state = unsafe { &mut *(user_data as *mut VideoDecoderHandlerState) };
+    state.handler.get_decoder_info().into_raw()
 }
 
 unsafe extern "C" fn video_decoder_factory_on_destroy(user_data: *mut c_void) {
@@ -318,7 +330,7 @@ unsafe extern "C" fn video_decoder_factory_on_destroy(user_data: *mut c_void) {
         !user_data.is_null(),
         "video_decoder_factory_on_destroy: user_data is null"
     );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoDecoderFactoryCallbackState) };
+    let _ = unsafe { Box::from_raw(user_data as *mut VideoDecoderFactoryHandlerState) };
 }
 
 unsafe extern "C" fn video_decoder_factory_get_supported_formats(
@@ -329,13 +341,8 @@ unsafe extern "C" fn video_decoder_factory_get_supported_formats(
         !user_data.is_null(),
         "video_decoder_factory_get_supported_formats: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoDecoderFactoryCallbackState) };
-    let cb = state
-        .callbacks
-        .get_supported_formats
-        .as_mut()
-        .expect("video_decoder_factory_get_supported_formats: callback is None");
-    let formats = cb();
+    let state = unsafe { &mut *(user_data as *mut VideoDecoderFactoryHandlerState) };
+    let formats = state.handler.get_supported_formats();
     let vec = empty();
     if vec.is_null() {
         return std::ptr::null_mut();
@@ -355,18 +362,13 @@ unsafe extern "C" fn video_decoder_factory_create(
         !user_data.is_null(),
         "video_decoder_factory_create: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoDecoderFactoryCallbackState) };
-    let cb = state
-        .callbacks
-        .create
-        .as_mut()
-        .expect("video_decoder_factory_create: callback is None");
+    let state = unsafe { &mut *(user_data as *mut VideoDecoderFactoryHandlerState) };
     let env = NonNull::new(env).expect("video_decoder_factory_create: env is null");
     let format = NonNull::new(format).expect("video_decoder_factory_create: format is null");
     let env = unsafe { EnvironmentRef::from_raw(env) };
     let format = unsafe { SdpVideoFormatRef::from_raw(format) };
-    match cb(env, format) {
-        Some(decoder) => decoder.into_raw(),
+    match state.handler.create(env, format) {
+        Some(handler) => VideoDecoder::new_with_handler(handler).into_raw(),
         None => std::ptr::null_mut(),
     }
 }
@@ -377,10 +379,8 @@ pub struct VideoDecoder {
 }
 
 impl VideoDecoder {
-    pub fn new_with_callbacks(callbacks: VideoDecoderCallbacks) -> Self {
-        let state = Box::new(VideoDecoderCallbackState {
-            callbacks: callbacks.with_defaults(),
-        });
+    pub fn new_with_handler(handler: Box<dyn VideoDecoderHandler>) -> Self {
+        let state = Box::new(VideoDecoderHandlerState { handler });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_VideoDecoder_cbs {
             Configure: Some(video_decoder_configure),
@@ -394,7 +394,7 @@ impl VideoDecoder {
         let raw_unique = match NonNull::new(raw) {
             Some(raw_unique) => raw_unique,
             None => {
-                let _ = unsafe { Box::from_raw(user_data as *mut VideoDecoderCallbackState) };
+                let _ = unsafe { Box::from_raw(user_data as *mut VideoDecoderHandlerState) };
                 panic!("BUG: webrtc_VideoDecoder_new が null を返しました");
             }
         };
@@ -409,19 +409,34 @@ impl VideoDecoder {
         std::mem::ManuallyDrop::new(self).raw_unique.as_ptr()
     }
 
-    pub fn configure(&mut self) -> bool {
-        unsafe { ffi::webrtc_VideoDecoder_Configure(self.as_ptr(), std::ptr::null_mut()) != 0 }
+    pub fn configure(&mut self, settings: VideoDecoderSettingsRef<'_>) -> bool {
+        unsafe { ffi::webrtc_VideoDecoder_Configure(self.as_ptr(), settings.as_ptr()) != 0 }
     }
 
     pub fn decode(
         &mut self,
-        input_image: Option<EncodedImageRef<'_>>,
+        input_image: EncodedImageRef<'_>,
         render_time_ms: i64,
     ) -> VideoCodecStatus {
-        let input_image =
-            input_image.map_or(std::ptr::null_mut(), |input_image| input_image.as_ptr());
-        let value =
-            unsafe { ffi::webrtc_VideoDecoder_Decode(self.as_ptr(), input_image, render_time_ms) };
+        let value = unsafe {
+            ffi::webrtc_VideoDecoder_Decode(self.as_ptr(), input_image.as_ptr(), render_time_ms)
+        };
+        VideoCodecStatus::from_raw(value)
+    }
+
+    pub fn register_decode_complete_callback(
+        &mut self,
+        callback: Option<VideoDecoderDecodedImageCallbackPtr>,
+    ) -> VideoCodecStatus {
+        let callback = callback.map_or(std::ptr::null_mut(), |callback| callback.raw.as_ptr());
+        let value = unsafe {
+            ffi::webrtc_VideoDecoder_RegisterDecodeCompleteCallback(self.as_ptr(), callback)
+        };
+        VideoCodecStatus::from_raw(value)
+    }
+
+    pub fn release(&mut self) -> VideoCodecStatus {
+        let value = unsafe { ffi::webrtc_VideoDecoder_Release(self.as_ptr()) };
         VideoCodecStatus::from_raw(value)
     }
 
@@ -433,11 +448,42 @@ impl VideoDecoder {
     }
 }
 
+impl VideoDecoderHandler for VideoDecoder {
+    fn configure(&mut self, settings: VideoDecoderSettingsRef<'_>) -> bool {
+        VideoDecoder::configure(self, settings)
+    }
+
+    fn decode(
+        &mut self,
+        input_image: EncodedImageRef<'_>,
+        render_time_ms: i64,
+    ) -> VideoCodecStatus {
+        VideoDecoder::decode(self, input_image, render_time_ms)
+    }
+
+    fn register_decode_complete_callback(
+        &mut self,
+        callback: Option<VideoDecoderDecodedImageCallbackPtr>,
+    ) -> VideoCodecStatus {
+        VideoDecoder::register_decode_complete_callback(self, callback)
+    }
+
+    fn release(&mut self) -> VideoCodecStatus {
+        VideoDecoder::release(self)
+    }
+
+    fn get_decoder_info(&mut self) -> VideoDecoderDecoderInfo {
+        VideoDecoder::get_decoder_info(self)
+    }
+}
+
 impl Drop for VideoDecoder {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoDecoder_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
+
+unsafe impl Send for VideoDecoder {}
 
 /// webrtc::VideoDecoderFactory のラッパー。
 pub struct VideoDecoderFactory {
@@ -451,10 +497,8 @@ impl VideoDecoderFactory {
         Self { raw_unique: raw }
     }
 
-    pub fn new_with_callbacks(callbacks: VideoDecoderFactoryCallbacks) -> Self {
-        let state = Box::new(VideoDecoderFactoryCallbackState {
-            callbacks: callbacks.with_defaults(),
-        });
+    pub fn new_with_handler(handler: Box<dyn VideoDecoderFactoryHandler>) -> Self {
+        let state = Box::new(VideoDecoderFactoryHandlerState { handler });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_VideoDecoderFactory_cbs {
             GetSupportedFormats: Some(video_decoder_factory_get_supported_formats),
@@ -465,8 +509,7 @@ impl VideoDecoderFactory {
         let raw_unique = match NonNull::new(raw) {
             Some(raw_unique) => raw_unique,
             None => {
-                let _ =
-                    unsafe { Box::from_raw(user_data as *mut VideoDecoderFactoryCallbackState) };
+                let _ = unsafe { Box::from_raw(user_data as *mut VideoDecoderFactoryHandlerState) };
                 panic!("BUG: webrtc_VideoDecoderFactory_new が null を返しました");
             }
         };
@@ -483,19 +526,32 @@ impl VideoDecoderFactory {
 
     pub fn create(
         &self,
-        env: &crate::Environment,
-        format: &SdpVideoFormat,
+        env: EnvironmentRef<'_>,
+        format: SdpVideoFormatRef<'_>,
     ) -> Option<VideoDecoder> {
         let raw = unsafe {
-            ffi::webrtc_VideoDecoderFactory_Create(
-                self.as_ptr(),
-                env.as_ptr(),
-                format.raw().as_ptr(),
-            )
+            ffi::webrtc_VideoDecoderFactory_Create(self.as_ptr(), env.as_ptr(), format.as_ptr())
         };
         Some(VideoDecoder {
             raw_unique: NonNull::new(raw)?,
         })
+    }
+
+    pub fn get_supported_formats(&self) -> Vec<SdpVideoFormat> {
+        let raw_vec = unsafe { ffi::webrtc_VideoDecoderFactory_GetSupportedFormats(self.as_ptr()) };
+        let raw_vec = NonNull::new(raw_vec)
+            .expect("BUG: webrtc_VideoDecoderFactory_GetSupportedFormats が null を返しました");
+        let size = unsafe { ffi::webrtc_SdpVideoFormat_vector_size(raw_vec.as_ptr()) };
+        let mut formats = Vec::with_capacity(size.max(0) as usize);
+        for i in 0..size {
+            let raw_format = unsafe { ffi::webrtc_SdpVideoFormat_vector_get(raw_vec.as_ptr(), i) };
+            let raw_format = NonNull::new(raw_format)
+                .expect("BUG: webrtc_SdpVideoFormat_vector_get が null を返しました");
+            let format_ref = unsafe { SdpVideoFormatRef::from_raw(raw_format) };
+            formats.push(format_ref.to_owned());
+        }
+        unsafe { ffi::webrtc_SdpVideoFormat_vector_delete(raw_vec.as_ptr()) };
+        formats
     }
 }
 
@@ -504,3 +560,5 @@ impl Drop for VideoDecoderFactory {
         unsafe { ffi::webrtc_VideoDecoderFactory_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
+
+unsafe impl Send for VideoDecoderFactory {}

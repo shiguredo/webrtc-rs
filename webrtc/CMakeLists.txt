@@ -5,10 +5,13 @@ cmake_policy(SET CMP0054 NEW)
 # MSVC runtime library flags are selected by an abstraction.
 cmake_policy(SET CMP0091 NEW)
 
-# deps.json を読み込む（project() の前）
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/deps.json" DEPS_JSON)
-string(JSON WEBRTC_BUILD_VERSION GET ${DEPS_JSON} "webrtc_build_version")
-string(JSON WEBRTC_BASE_URL GET ${DEPS_JSON} "webrtc_base_url")
+# WEBRTC_BUILD_VERSION と WEBRTC_BASE_URL は -D オプションで渡される
+if(NOT DEFINED WEBRTC_BUILD_VERSION)
+  message(FATAL_ERROR "WEBRTC_BUILD_VERSION is required. Set -DWEBRTC_BUILD_VERSION=...")
+endif()
+if(NOT DEFINED WEBRTC_BASE_URL)
+  message(FATAL_ERROR "WEBRTC_BASE_URL is required. Set -DWEBRTC_BASE_URL=...")
+endif()
 
 # execute_process の実行結果を共通で検査する
 function(execute_process_checked)
@@ -355,9 +358,11 @@ add_library(webrtc_c
     src/webrtc_c/modules/video_coding/include/video_codec_interface.cc
     src/webrtc_c/libyuv.cc
     src/webrtc_c/media/base/adapted_video_track_source.cc
+    src/webrtc_c/pc/connection_context.cc
     src/webrtc_c/rtc_base/crypto_random.cc
     src/webrtc_c/rtc_base/logging.cc
     src/webrtc_c/rtc_base/ssl_adapter.cc
+    src/webrtc_c/rtc_base/ssl_certificate.cc
     src/webrtc_c/rtc_base/thread.cc
     src/webrtc_c/rtc_base/time_utils.cc
     src/webrtc_c/rtc_base/timestamp_aligner.cc

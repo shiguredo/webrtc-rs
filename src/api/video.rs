@@ -6,19 +6,28 @@ use crate::{MediaStreamTrack, ScopedRef, ffi};
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 
-struct VideoSinkCallbacks {
-    on_frame: Box<dyn FnMut(VideoFrameRef) + Send + 'static>,
-    on_discarded_frame: Option<Box<dyn FnMut() + Send + 'static>>,
+pub trait VideoSinkHandler: Send {
+    fn on_frame(&mut self, frame: VideoFrameRef<'_>);
+    fn on_discarded_frame(&mut self) {}
+}
+
+impl VideoSinkHandler for () {
+    #[expect(unused_variables)]
+    fn on_frame(&mut self, frame: VideoFrameRef<'_>) {}
+}
+
+struct VideoSinkHandlerState {
+    handler: Box<dyn VideoSinkHandler>,
 }
 
 unsafe extern "C" fn video_sink_on_frame(
     frame: *const ffi::webrtc_VideoFrame,
     user_data: *mut c_void,
 ) {
-    let callbacks = unsafe { &mut *(user_data as *mut VideoSinkCallbacks) };
+    let state = unsafe { &mut *(user_data as *mut VideoSinkHandlerState) };
     let frame = NonNull::new(frame as *mut ffi::webrtc_VideoFrame).expect("BUG: frame が null");
     let frame = unsafe { VideoFrameRef::from_raw(frame) };
-    (callbacks.on_frame)(frame);
+    state.handler.on_frame(frame);
 }
 
 unsafe extern "C" fn video_sink_on_discarded_frame(user_data: *mut c_void) {
@@ -26,10 +35,8 @@ unsafe extern "C" fn video_sink_on_discarded_frame(user_data: *mut c_void) {
         !user_data.is_null(),
         "video_sink_on_discarded_frame: user_data is null"
     );
-    let callbacks = unsafe { &mut *(user_data as *mut VideoSinkCallbacks) };
-    if let Some(cb) = callbacks.on_discarded_frame.as_mut() {
-        cb();
-    }
+    let state = unsafe { &mut *(user_data as *mut VideoSinkHandlerState) };
+    state.handler.on_discarded_frame();
 }
 
 unsafe extern "C" fn video_sink_on_destroy(user_data: *mut c_void) {
@@ -37,7 +44,7 @@ unsafe extern "C" fn video_sink_on_destroy(user_data: *mut c_void) {
         !user_data.is_null(),
         "video_sink_on_destroy: user_data is null"
     );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoSinkCallbacks) };
+    let _ = unsafe { Box::from_raw(user_data as *mut VideoSinkHandlerState) };
 }
 
 /// webrtc::VideoSinkWants のラッパー。
@@ -69,67 +76,25 @@ impl Drop for VideoSinkWants {
     }
 }
 
-pub struct VideoSinkBuilder {
-    on_frame: Box<dyn FnMut(VideoFrameRef) + Send + 'static>,
-    on_discarded_frame: Option<Box<dyn FnMut() + Send + 'static>>,
-}
-
-impl VideoSinkBuilder {
-    pub fn new<F>(on_frame: F) -> Self
-    where
-        F: FnMut(VideoFrameRef) + Send + 'static,
-    {
-        Self {
-            on_frame: Box::new(on_frame),
-            on_discarded_frame: None,
-        }
-    }
-
-    pub fn on_discarded_frame<F>(self, on_discarded_frame: F) -> Self
-    where
-        F: FnMut() + Send + 'static,
-    {
-        Self {
-            on_discarded_frame: Some(Box::new(on_discarded_frame)),
-            ..self
-        }
-    }
-
-    pub fn build(self) -> VideoSink {
-        VideoSink::new(self.on_frame, self.on_discarded_frame)
-    }
-}
-
 /// webrtc::VideoSinkInterface のラッパー。
 pub struct VideoSink {
     raw: NonNull<ffi::webrtc_VideoSinkInterface>,
 }
 
 impl VideoSink {
-    fn new(
-        on_frame: Box<dyn FnMut(VideoFrameRef) + Send + 'static>,
-        on_discarded_frame: Option<Box<dyn FnMut() + Send + 'static>>,
-    ) -> Self {
-        let has_on_discarded = on_discarded_frame.is_some();
-        let callbacks = Box::new(VideoSinkCallbacks {
-            on_frame: Box::new(on_frame),
-            on_discarded_frame,
-        });
-        let user_data = Box::into_raw(callbacks) as *mut c_void;
+    pub fn new_with_handler(handler: Box<dyn VideoSinkHandler>) -> Self {
+        let state = Box::new(VideoSinkHandlerState { handler });
+        let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_VideoSinkInterface_cbs {
             OnFrame: Some(video_sink_on_frame),
-            OnDiscardedFrame: if has_on_discarded {
-                Some(video_sink_on_discarded_frame)
-            } else {
-                None
-            },
+            OnDiscardedFrame: Some(video_sink_on_discarded_frame),
             OnDestroy: Some(video_sink_on_destroy),
         };
         let raw = match NonNull::new(unsafe { ffi::webrtc_VideoSinkInterface_new(&cbs, user_data) })
         {
             Some(raw) => raw,
             None => {
-                let _ = unsafe { Box::from_raw(user_data as *mut VideoSinkCallbacks) };
+                let _ = unsafe { Box::from_raw(user_data as *mut VideoSinkHandlerState) };
                 panic!("BUG: webrtc_VideoSinkInterface_new が null を返しました");
             }
         };
