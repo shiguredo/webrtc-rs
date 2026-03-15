@@ -11,6 +11,10 @@
 
 ## develop
 
+## 0.146.0
+
+**リリース日**: 2026-03-15
+
 - [CHANGE] VideoEncoder / VideoDecoder の API を handler と 1 対 1 に統一する
   - `VideoEncoder::init_encode` / `encode` / `set_rates` を handler と同じ引数に統一する
   - `VideoDecoder::configure` / `decode` を handler と同じ引数に統一する
