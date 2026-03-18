@@ -543,6 +543,11 @@ impl IceServer {
         self.as_ref().set_tls_cert_policy(tls_cert_policy);
     }
 
+    /// TURN-TLS 接続でクライアント認証 (mTLS) に使用する SSLIdentity を設定する。
+    pub fn set_tls_client_identity(&mut self, identity: crate::SSLIdentity) {
+        self.as_ref().set_tls_client_identity(identity);
+    }
+
     pub fn as_ref(&self) -> IceServerRef<'_> {
         IceServerRef::from_raw(self.raw)
     }
@@ -608,6 +613,16 @@ impl<'a> IceServerRef<'a> {
             ffi::webrtc_PeerConnectionInterface_IceServer_set_tls_cert_policy(
                 self.raw.as_ptr(),
                 tls_cert_policy.to_int(),
+            );
+        }
+    }
+
+    /// TURN-TLS 接続でクライアント認証 (mTLS) に使用する SSLIdentity を設定する。
+    pub fn set_tls_client_identity(&mut self, identity: crate::SSLIdentity) {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_IceServer_set_tls_client_identity(
+                self.raw.as_ptr(),
+                identity.into_raw(),
             );
         }
     }
