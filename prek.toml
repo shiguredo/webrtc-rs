@@ -1,0 +1,35 @@
+# Configuration file for `prek`, a git hook framework written in Rust.
+# See https://prek.j178.dev for more information.
+#:schema https://www.schemastore.org/prek.json
+
+[[repos]]
+repo = "local"
+hooks = [
+  {
+    id = "cargo-fmt",
+    name = "cargo fmt",
+    entry = "cargo fmt --all -- --check",
+    language = "system",
+    types = ["rust"],
+    pass_filenames = false
+  },
+  {
+    id = "cargo-check",
+    name = "cargo check",
+    entry = "cargo check --workspace --features source-build",
+    language = "system",
+    types = ["rust"],
+    pass_filenames = false
+  },
+  {
+    id = "clang-format",
+    name = "clang-format",
+    entry = "clang-format --dry-run --Werror",
+    language = "system",
+    types_or = [
+      "c",
+      "c++"
+    ],
+    files = "^webrtc/src/"
+  }
+]
