@@ -468,10 +468,14 @@ fn rtc_configuration_and_ice_server() {
     let mut config = PeerConnectionRtcConfiguration::new();
     config.set_type(IceTransportsType::Relay);
     let mut server = IceServer::new();
+    assert_eq!(server.urls_len(), 0);
     server.set_username("user");
     server.set_password("pass");
     server.set_tls_cert_policy(TlsCertPolicy::InsecureNoCheck);
     server.add_url("stun:192.0.2.1:3478");
+    assert_eq!(server.urls_len(), 1);
+    server.add_url("turn:192.0.2.2:3478?transport=udp");
+    assert_eq!(server.urls_len(), 2);
 
     {
         let mut servers = config.servers();

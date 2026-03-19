@@ -13,6 +13,8 @@
 
 - [UPDATE] libwebrtc m146 (m146.7680.3.1) に上げる
   - @voluntas
+- [ADD] `IceServer::urls_len` を追加する
+  - @melpon
 
 
 ## 0.146.0

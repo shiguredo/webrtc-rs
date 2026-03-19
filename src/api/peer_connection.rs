@@ -531,6 +531,10 @@ impl IceServer {
         self.as_ref().add_url(url);
     }
 
+    pub fn urls_len(&self) -> usize {
+        self.as_ref().urls_len()
+    }
+
     pub fn set_username(&mut self, username: &str) {
         self.as_ref().set_username(username);
     }
@@ -581,6 +585,13 @@ impl<'a> IceServerRef<'a> {
             unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_get_urls(self.raw.as_ptr()) };
         let cxx = CxxString::from_str(url);
         unsafe { ffi::std_string_vector_push_back(urls, cxx.as_ptr()) };
+    }
+
+    pub fn urls_len(&self) -> usize {
+        let urls =
+            unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_get_urls(self.raw.as_ptr()) };
+        let len = unsafe { ffi::std_string_vector_size(urls) };
+        len.max(0) as usize
     }
 
     pub fn set_username(&mut self, username: &str) {
