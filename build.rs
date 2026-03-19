@@ -38,6 +38,7 @@ fn main() {
     println!("cargo::rerun-if-env-changed=CARGO_FEATURE_SOURCE_BUILD");
     println!("cargo::rerun-if-env-changed=WEBRTC_C_TARGET");
     println!("cargo::rerun-if-env-changed=WEBRTC_C_SYSROOT");
+    println!("cargo::rerun-if-env-changed=LIBCLANG_PATH");
 
     let manifest_dir = PathBuf::from(
         env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR の取得に失敗しました"),
@@ -93,6 +94,9 @@ fn build_from_source(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -
     let include_dir = webrtc_dir.join("src");
     let lib_path = build_webrtc_c(webrtc_dir, target_platform, out_dir);
     maybe_export_local_build_dir(webrtc_dir, out_dir);
+    if is_windows_target(target_platform) {
+        ensure_windows_libclang(out_dir);
+    }
     generate_bindings(&header, &include_dir);
     lib_path
 }
@@ -123,12 +127,13 @@ fn download_prebuilt(target: &str, out_dir: &Path) -> Result<PrebuiltPaths, Stri
     let _ = fs::remove_file(&archive_path);
     let _ = fs::remove_file(&sha256_path);
 
-    // libwebrtc_c.a を OUT_DIR/lib/ にコピー
+    // 静的ライブラリを OUT_DIR/lib/ にコピー
+    let static_lib_name = static_library_filename_for_target(target);
     let lib_dir = out_dir.join("lib");
     fs::create_dir_all(&lib_dir).map_err(|e| format!("lib ディレクトリ作成に失敗: {}", e))?;
-    let lib_path = lib_dir.join("libwebrtc_c.a");
-    fs::copy(prebuilt_dir.join("lib").join("libwebrtc_c.a"), &lib_path)
-        .map_err(|e| format!("libwebrtc_c.a のコピーに失敗: {}", e))?;
+    let lib_path = lib_dir.join(static_lib_name);
+    fs::copy(prebuilt_dir.join("lib").join(static_lib_name), &lib_path)
+        .map_err(|e| format!("{static_lib_name} のコピーに失敗: {}", e))?;
 
     // bindgen 生成済みの bindings.rs を OUT_DIR/ にコピー
     // （利用者が libclang-dev をインストールしなくて済むようにするため）
@@ -302,15 +307,111 @@ fn build_webrtc_c(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> P
     // bundled_webrtc_c_bundling ターゲットのみをビルド（all ターゲットを避ける）
     let dst = config.build_target("bundled_webrtc_c_bundling").build();
 
-    // ビルド結果から libwebrtc_c.a を OUT_DIR にコピー
+    // ビルド結果から静的ライブラリを OUT_DIR にコピー
+    let static_lib_name = static_library_filename_for_target(target_platform);
     let build_dir = dst.join("build");
-    let bundled_lib = build_dir.join("bundled").join("libwebrtc_c.a");
+    let bundled_lib = build_dir.join("bundled").join(static_lib_name);
     let lib_dir = out_dir.join("lib");
     fs::create_dir_all(&lib_dir).expect("lib ディレクトリの作成に失敗しました");
-    let dest_lib = lib_dir.join("libwebrtc_c.a");
-    fs::copy(&bundled_lib, &dest_lib).expect("libwebrtc_c.a のコピーに失敗しました");
+    let dest_lib = lib_dir.join(static_lib_name);
+    fs::copy(&bundled_lib, &dest_lib).unwrap_or_else(|e| {
+        panic!(
+            "{} のコピーに失敗しました: src={}, dst={}, error={}",
+            static_lib_name,
+            bundled_lib.display(),
+            dest_lib.display(),
+            e
+        )
+    });
 
     dest_lib
+}
+
+fn is_windows_target(target_platform: &str) -> bool {
+    target_platform.starts_with("windows_")
+}
+
+fn static_library_filename_for_target(target_platform: &str) -> &'static str {
+    if is_windows_target(target_platform) {
+        "webrtc_c.lib"
+    } else {
+        "libwebrtc_c.a"
+    }
+}
+
+fn ensure_windows_libclang(out_dir: &Path) {
+    if env::var_os("LIBCLANG_PATH").is_some() {
+        return;
+    }
+
+    let tools_dir = out_dir.join("tools");
+    fs::create_dir_all(&tools_dir).expect("tools ディレクトリの作成に失敗しました");
+    let vswhere_path = tools_dir.join("vswhere.exe");
+    if !vswhere_path.exists() {
+        download(
+            "https://github.com/microsoft/vswhere/releases/latest/download/vswhere.exe",
+            &vswhere_path,
+        )
+        .expect("vswhere.exe のダウンロードに失敗しました");
+    }
+
+    let installation_path = find_visual_studio_installation(&vswhere_path).unwrap_or_else(|e| {
+        panic!(
+            "Visual Studio 2022 の検出に失敗しました: {}\n\
+             Visual Studio 2022 に `Desktop development with C++` と \
+             `C++ Clang tools for Windows (Microsoft.VisualStudio.Component.VC.Llvm.Clang)` \
+             をインストールしてください。",
+            e
+        )
+    });
+    let libclang_dir = PathBuf::from(installation_path)
+        .join("VC")
+        .join("Tools")
+        .join("Llvm")
+        .join("x64")
+        .join("bin");
+    let libclang_dll = libclang_dir.join("libclang.dll");
+    if !libclang_dll.exists() {
+        panic!(
+            "Visual Studio の LLVM コンポーネントが見つかりません: {}\n\
+             Visual Studio 2022 に `C++ Clang tools for Windows \
+             (Microsoft.VisualStudio.Component.VC.Llvm.Clang)` をインストールしてください。",
+            libclang_dll.display()
+        );
+    }
+
+    // bindgen が libclang.dll を見つけられるように環境変数を設定する。
+    unsafe { env::set_var("LIBCLANG_PATH", &libclang_dir) };
+}
+
+fn find_visual_studio_installation(vswhere_path: &Path) -> Result<String, String> {
+    let output = std::process::Command::new(vswhere_path)
+        .args([
+            "-latest",
+            "-products",
+            "*",
+            "-version",
+            "[17.0,18.0)",
+            "-requires",
+            "Microsoft.VisualStudio.Component.VC.Llvm.Clang",
+            "-property",
+            "installationPath",
+        ])
+        .output()
+        .map_err(|e| format!("vswhere.exe の実行に失敗しました: {}", e))?;
+    if !output.status.success() {
+        return Err(format!(
+            "vswhere.exe が失敗しました: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    stdout
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| "Visual Studio 2022 のインストールが見つかりません".to_string())
 }
 
 fn maybe_export_local_build_dir(webrtc_dir: &Path, out_dir: &Path) {
@@ -323,14 +424,12 @@ fn maybe_export_local_build_dir(webrtc_dir: &Path, out_dir: &Path) {
     fs::create_dir_all(&build_dir).expect("_build ディレクトリの作成に失敗しました");
 
     if let Ok(metadata) = fs::symlink_metadata(&link_path) {
-        if metadata.file_type().is_symlink() {
-            let current = fs::read_link(&link_path)
-                .expect("既存 webrtc/_build シンボリックリンク先の取得に失敗しました");
-            if current == build_dir {
+        if is_directory_link(&metadata) {
+            if paths_point_to_same_location(&link_path, &build_dir) {
                 return;
             }
-            remove_symlink(&link_path)
-                .expect("既存 webrtc/_build シンボリックリンクの削除に失敗しました");
+            remove_directory_link(&link_path)
+                .expect("既存 webrtc/_build リンクの削除に失敗しました");
         } else if metadata.is_dir() {
             fs::remove_dir_all(&link_path)
                 .expect("既存 webrtc/_build ディレクトリの削除に失敗しました");
@@ -339,34 +438,89 @@ fn maybe_export_local_build_dir(webrtc_dir: &Path, out_dir: &Path) {
         }
     }
 
-    create_dir_symlink(&build_dir, &link_path).unwrap_or_else(|err| {
+    if let Err(err) = create_directory_link(&build_dir, &link_path) {
+        if should_skip_local_export_symlink_error(&err) {
+            eprintln!(
+                "warning: webrtc/_build リンクを作成できないため local-export をスキップします: {}",
+                err
+            );
+            return;
+        }
         panic!(
-            "webrtc/_build シンボリックリンクの作成に失敗しました: {} -> {} ({})",
+            "webrtc/_build リンクの作成に失敗しました: {} -> {} ({})",
             link_path.display(),
             build_dir.display(),
             err
-        )
-    });
+        );
+    }
 }
 
 #[cfg(unix)]
-fn create_dir_symlink(target: &Path, link_path: &Path) -> std::io::Result<()> {
+fn create_directory_link(target: &Path, link_path: &Path) -> std::io::Result<()> {
     std::os::unix::fs::symlink(target, link_path)
 }
 
 #[cfg(windows)]
-fn create_dir_symlink(target: &Path, link_path: &Path) -> std::io::Result<()> {
-    std::os::windows::fs::symlink_dir(target, link_path)
+fn create_directory_link(target: &Path, link_path: &Path) -> std::io::Result<()> {
+    // Windows では権限要求の少ないジャンクションを使う。
+    let status = std::process::Command::new("cmd")
+        .arg("/C")
+        .arg("mklink")
+        .arg("/J")
+        .arg(link_path)
+        .arg(target)
+        .status()?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(std::io::Error::other(format!(
+            "mklink /J の実行に失敗しました: {}",
+            status
+        )))
+    }
 }
 
 #[cfg(unix)]
-fn remove_symlink(link_path: &Path) -> std::io::Result<()> {
+fn remove_directory_link(link_path: &Path) -> std::io::Result<()> {
     fs::remove_file(link_path)
 }
 
 #[cfg(windows)]
-fn remove_symlink(link_path: &Path) -> std::io::Result<()> {
+fn remove_directory_link(link_path: &Path) -> std::io::Result<()> {
     fs::remove_dir(link_path)
+}
+
+fn paths_point_to_same_location(a: &Path, b: &Path) -> bool {
+    match (fs::canonicalize(a), fs::canonicalize(b)) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
+}
+
+#[cfg(unix)]
+fn is_directory_link(metadata: &std::fs::Metadata) -> bool {
+    metadata.file_type().is_symlink()
+}
+
+#[cfg(windows)]
+fn is_directory_link(metadata: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+    (metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT) != 0
+}
+
+#[cfg(windows)]
+fn should_skip_local_export_symlink_error(err: &std::io::Error) -> bool {
+    matches!(
+        err.raw_os_error(),
+        // ERROR_PRIVILEGE_NOT_HELD
+        Some(1314)
+    ) || err.kind() == std::io::ErrorKind::PermissionDenied
+}
+
+#[cfg(not(windows))]
+fn should_skip_local_export_symlink_error(_err: &std::io::Error) -> bool {
+    false
 }
 
 fn generate_bindings(header: &Path, include_dir: &Path) {
@@ -393,7 +547,7 @@ fn generate_bindings(header: &Path, include_dir: &Path) {
 fn emit_link_directives(lib_path: &Path) {
     let lib_dir = lib_path
         .parent()
-        .expect("libwebrtc_c.a の親ディレクトリ取得に失敗しました");
+        .expect("静的ライブラリの親ディレクトリ取得に失敗しました");
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
     println!("cargo:rustc-link-lib=static=webrtc_c");
 

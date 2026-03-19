@@ -55,6 +55,9 @@ jobs:
           - target: macos_arm64
             os: macos-26
             rust_target: aarch64-apple-darwin
+          - target: windows_x86_64
+            os: windows-2022
+            rust_target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -70,7 +73,8 @@ jobs:
       - run: rustup update stable
       - name: Build (native)
         run: cargo build --release --features source-build --target ${{ matrix.rust_target }}
-      - name: Package prebuilt artifacts
+      - name: Package prebuilt artifacts (non-Windows)
+        if: runner.os != 'Windows'
         run: |
           OUT_DIR=$(find target/${{ matrix.rust_target }}/release/build/shiguredo_webrtc-*/out -maxdepth 0 -type d | head -1)
           if [ -z "$OUT_DIR" ]; then
@@ -82,8 +86,33 @@ jobs:
           cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
           cp "$OUT_DIR/bindings.rs" staging/
           tar czf "libwebrtc_c-${{ matrix.target }}.tar.gz" -C staging .
-      - name: Generate SHA256 checksum
+      - name: Package prebuilt artifacts (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $pattern = "target/${{ matrix.rust_target }}/release/build/shiguredo_webrtc-*/out"
+          $outDir = Get-ChildItem -Path $pattern -Directory -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if ($null -eq $outDir) {
+            Write-Error "ERROR: OUT_DIR が見つかりません"
+            exit 1
+          }
+          Write-Host "OUT_DIR: $($outDir.FullName)"
+          New-Item -ItemType Directory -Force -Path "staging/lib" | Out-Null
+          Copy-Item "$($outDir.FullName)/lib/webrtc_c.lib" "staging/lib/"
+          Copy-Item "$($outDir.FullName)/bindings.rs" "staging/"
+          tar -czf "libwebrtc_c-${{ matrix.target }}.tar.gz" -C staging .
+      - name: Generate SHA256 checksum (non-Windows)
+        if: runner.os != 'Windows'
         run: shasum -a 256 "libwebrtc_c-${{ matrix.target }}.tar.gz" > "libwebrtc_c-${{ matrix.target }}.tar.gz.sha256"
+      - name: Generate SHA256 checksum (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $archive = "libwebrtc_c-${{ matrix.target }}.tar.gz"
+          $hash = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLower()
+          "$hash  $archive" | Out-File -FilePath "$archive.sha256" -Encoding ascii
       - name: Upload to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
