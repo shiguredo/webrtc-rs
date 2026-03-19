@@ -9,8 +9,9 @@ use crate::{
     AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit, Error, IceCandidate,
     IceCandidateRef, MediaStreamTrack, MediaType, RTCStatsReport, Result, RtcError,
     RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender, RtpTransceiver,
-    RtpTransceiverInit, SSLCertificateVerifier, ScopedRef, SessionDescription, StringVector,
-    Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack, VideoTrackSource, ffi,
+    RtpTransceiverInit, SSLCertificateVerifier, SSLIdentity, ScopedRef, SessionDescription,
+    StringVector, Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack, VideoTrackSource,
+    ffi,
 };
 use std::marker::PhantomData;
 use std::os::raw::{c_char, c_void};
@@ -544,7 +545,7 @@ impl IceServer {
     }
 
     /// TURN-TLS 接続でクライアント認証 (mTLS) に使用する SSLIdentity を設定する。
-    pub fn set_tls_client_identity(&mut self, identity: crate::SSLIdentity) {
+    pub fn set_tls_client_identity(&mut self, identity: SSLIdentity) {
         self.as_ref().set_tls_client_identity(identity);
     }
 
@@ -618,7 +619,7 @@ impl<'a> IceServerRef<'a> {
     }
 
     /// TURN-TLS 接続でクライアント認証 (mTLS) に使用する SSLIdentity を設定する。
-    pub fn set_tls_client_identity(&mut self, identity: crate::SSLIdentity) {
+    pub fn set_tls_client_identity(&mut self, identity: SSLIdentity) {
         unsafe {
             ffi::webrtc_PeerConnectionInterface_IceServer_set_tls_client_identity(
                 self.raw.as_ptr(),
