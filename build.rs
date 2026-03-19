@@ -439,13 +439,6 @@ fn maybe_export_local_build_dir(webrtc_dir: &Path, out_dir: &Path) {
     }
 
     if let Err(err) = create_directory_link(&build_dir, &link_path) {
-        if should_skip_local_export_symlink_error(&err) {
-            eprintln!(
-                "warning: webrtc/_build リンクを作成できないため local-export をスキップします: {}",
-                err
-            );
-            return;
-        }
         panic!(
             "webrtc/_build リンクの作成に失敗しました: {} -> {} ({})",
             link_path.display(),
@@ -507,20 +500,6 @@ fn is_directory_link(metadata: &std::fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
     const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
     (metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT) != 0
-}
-
-#[cfg(windows)]
-fn should_skip_local_export_symlink_error(err: &std::io::Error) -> bool {
-    matches!(
-        err.raw_os_error(),
-        // ERROR_PRIVILEGE_NOT_HELD
-        Some(1314)
-    ) || err.kind() == std::io::ErrorKind::PermissionDenied
-}
-
-#[cfg(not(windows))]
-fn should_skip_local_export_symlink_error(_err: &std::io::Error) -> bool {
-    false
 }
 
 fn generate_bindings(header: &Path, include_dir: &Path) {
