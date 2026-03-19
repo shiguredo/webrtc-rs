@@ -88,7 +88,6 @@ jobs:
           tar czf "libwebrtc_c-${{ matrix.target }}.tar.gz" -C staging .
       - name: Package prebuilt artifacts (Windows)
         if: runner.os == 'Windows'
-        shell: powershell
         run: |
           $pattern = "target/${{ matrix.rust_target }}/release/build/shiguredo_webrtc-*/out"
           $outDir = Get-ChildItem -Path $pattern -Directory -ErrorAction SilentlyContinue |
@@ -108,7 +107,6 @@ jobs:
         run: shasum -a 256 "libwebrtc_c-${{ matrix.target }}.tar.gz" > "libwebrtc_c-${{ matrix.target }}.tar.gz.sha256"
       - name: Generate SHA256 checksum (Windows)
         if: runner.os == 'Windows'
-        shell: powershell
         run: |
           $archive = "libwebrtc_c-${{ matrix.target }}.tar.gz"
           $hash = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLower()
@@ -116,6 +114,7 @@ jobs:
       - name: Upload to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
           gh release upload "${GITHUB_REF_NAME}" \
             "libwebrtc_c-${{ matrix.target }}.tar.gz" \
