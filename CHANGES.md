@@ -17,6 +17,9 @@
 
 ## 0.146.0
 
+- [ADD] Windows に対応する
+  - @melpon
+
 **リリース日**: 2026-03-15
 
 - [CHANGE] VideoEncoder / VideoDecoder の API を handler と 1 対 1 に統一する
