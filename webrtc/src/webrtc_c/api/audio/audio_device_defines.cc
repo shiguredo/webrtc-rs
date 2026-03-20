@@ -106,20 +106,20 @@ class AudioTransportImpl : public webrtc::AudioTransport {
 
 extern "C" {
 
-struct webrtc_AudioTransport* WEBRTC_EXPORT
-webrtc_AudioTransport_new(const struct webrtc_AudioTransport_cbs* cbs,
-                          void* user_data) {
+WEBRTC_EXPORT struct webrtc_AudioTransport* webrtc_AudioTransport_new(
+    const struct webrtc_AudioTransport_cbs* cbs,
+    void* user_data) {
   auto transport = new AudioTransportImpl(cbs, user_data);
   return reinterpret_cast<struct webrtc_AudioTransport*>(transport);
 }
 
-void WEBRTC_EXPORT
-webrtc_AudioTransport_delete(struct webrtc_AudioTransport* self) {
+WEBRTC_EXPORT void webrtc_AudioTransport_delete(
+    struct webrtc_AudioTransport* self) {
   auto transport = reinterpret_cast<AudioTransportImpl*>(self);
   delete transport;
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioTransport_RecordedDataIsAvailable(
+WEBRTC_EXPORT int32_t webrtc_AudioTransport_RecordedDataIsAvailable(
     struct webrtc_AudioTransport* self,
     const void* audio_samples,
     size_t n_samples,
@@ -148,7 +148,7 @@ int32_t WEBRTC_EXPORT webrtc_AudioTransport_RecordedDataIsAvailable(
   return ret;
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioTransport_NeedMorePlayData(struct webrtc_AudioTransport* self,
                                        size_t n_samples,
                                        size_t n_bytes_per_sample,
@@ -169,15 +169,15 @@ webrtc_AudioTransport_NeedMorePlayData(struct webrtc_AudioTransport* self,
   return ret;
 }
 
-void WEBRTC_EXPORT
-webrtc_AudioTransport_PullRenderData(struct webrtc_AudioTransport* self,
-                                     int bits_per_sample,
-                                     int sample_rate,
-                                     size_t number_of_channels,
-                                     size_t number_of_frames,
-                                     void* audio_data,
-                                     int64_t* elapsed_time_ms,
-                                     int64_t* ntp_time_ms) {
+WEBRTC_EXPORT void webrtc_AudioTransport_PullRenderData(
+    struct webrtc_AudioTransport* self,
+    int bits_per_sample,
+    int sample_rate,
+    size_t number_of_channels,
+    size_t number_of_frames,
+    void* audio_data,
+    int64_t* elapsed_time_ms,
+    int64_t* ntp_time_ms) {
   auto transport = reinterpret_cast<webrtc::AudioTransport*>(self);
   transport->PullRenderData(bits_per_sample, sample_rate, number_of_channels,
                             number_of_frames, audio_data, elapsed_time_ms,

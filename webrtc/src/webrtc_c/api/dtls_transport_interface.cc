@@ -21,7 +21,7 @@ WEBRTC_EXPORT extern const int webrtc_DtlsTransportState_kClosed =
 WEBRTC_EXPORT extern const int webrtc_DtlsTransportState_kFailed =
     static_cast<int>(webrtc::DtlsTransportState::kFailed);
 
-webrtc_DtlsTransportState WEBRTC_EXPORT webrtc_DtlsTransportInterface_state(
+WEBRTC_EXPORT webrtc_DtlsTransportState webrtc_DtlsTransportInterface_state(
     struct webrtc_DtlsTransportInterface* self) {
   if (self == nullptr) {
     return webrtc_DtlsTransportState_kClosed;

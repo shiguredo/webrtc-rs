@@ -15,7 +15,7 @@
 // -------------------------
 
 extern "C" {
-int WEBRTC_EXPORT libyuv_ABGRToI420(const uint8_t* src_abgr,
+WEBRTC_EXPORT int libyuv_ABGRToI420(const uint8_t* src_abgr,
                                     int src_stride_abgr,
                                     uint8_t* dst_y,
                                     int dst_stride_y,
@@ -34,7 +34,7 @@ WEBRTC_EXPORT const uint32_t libyuv_FOURCC_ARGB =
 WEBRTC_EXPORT const uint32_t libyuv_FOURCC_BGRA =
     static_cast<uint32_t>(libyuv::FOURCC_BGRA);
 
-int WEBRTC_EXPORT libyuv_ConvertFromI420(const uint8_t* src_y,
+WEBRTC_EXPORT int libyuv_ConvertFromI420(const uint8_t* src_y,
                                          int src_stride_y,
                                          const uint8_t* src_u,
                                          int src_stride_u,
@@ -50,7 +50,7 @@ int WEBRTC_EXPORT libyuv_ConvertFromI420(const uint8_t* src_y,
                                  width, height, fourcc);
 }
 
-int WEBRTC_EXPORT libyuv_NV12ToI420(const uint8_t* src_y,
+WEBRTC_EXPORT int libyuv_NV12ToI420(const uint8_t* src_y,
                                     int src_stride_y,
                                     const uint8_t* src_uv,
                                     int src_stride_uv,
@@ -67,7 +67,7 @@ int WEBRTC_EXPORT libyuv_NV12ToI420(const uint8_t* src_y,
                             dst_stride_v, width, height);
 }
 
-int WEBRTC_EXPORT libyuv_I420ToNV12(const uint8_t* src_y,
+WEBRTC_EXPORT int libyuv_I420ToNV12(const uint8_t* src_y,
                                     int src_stride_y,
                                     const uint8_t* src_u,
                                     int src_stride_u,
@@ -84,7 +84,7 @@ int WEBRTC_EXPORT libyuv_I420ToNV12(const uint8_t* src_y,
                             dst_stride_uv, width, height);
 }
 
-int WEBRTC_EXPORT libyuv_YUY2ToI420(const uint8_t* src_yuy2,
+WEBRTC_EXPORT int libyuv_YUY2ToI420(const uint8_t* src_yuy2,
                                     int src_stride_yuy2,
                                     uint8_t* dst_y,
                                     int dst_stride_y,

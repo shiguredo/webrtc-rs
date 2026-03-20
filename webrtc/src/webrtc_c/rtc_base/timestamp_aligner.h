@@ -13,9 +13,9 @@ extern "C" {
 // -------------------------
 
 WEBRTC_DECLARE_UNIQUE(webrtc_TimestampAligner);
-struct webrtc_TimestampAligner_unique* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_TimestampAligner_unique*
 webrtc_TimestampAligner_new();
-int64_t WEBRTC_EXPORT
+WEBRTC_EXPORT int64_t
 webrtc_TimestampAligner_TranslateTimestamp(struct webrtc_TimestampAligner* self,
                                            int64_t timestamp_us,
                                            int64_t now_us);

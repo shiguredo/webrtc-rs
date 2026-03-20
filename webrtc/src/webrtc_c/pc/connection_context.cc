@@ -9,7 +9,7 @@
 extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_ConnectionContext, webrtc::ConnectionContext);
 
-struct webrtc_NetworkManager* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_NetworkManager*
 webrtc_ConnectionContext_default_network_manager(
     struct webrtc_ConnectionContext* self) {
   auto* context = reinterpret_cast<webrtc::ConnectionContext*>(self);
@@ -18,7 +18,7 @@ webrtc_ConnectionContext_default_network_manager(
   return reinterpret_cast<struct webrtc_NetworkManager*>(network_manager);
 }
 
-struct webrtc_PacketSocketFactory* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_PacketSocketFactory*
 webrtc_ConnectionContext_default_socket_factory(
     struct webrtc_ConnectionContext* self) {
   auto* context = reinterpret_cast<webrtc::ConnectionContext*>(self);

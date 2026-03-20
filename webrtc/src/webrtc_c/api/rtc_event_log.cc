@@ -16,7 +16,7 @@
 
 extern "C" {
 WEBRTC_DEFINE_UNIQUE(webrtc_RtcEventLogFactory, webrtc::RtcEventLogFactory);
-webrtc_RtcEventLogFactory_unique* WEBRTC_EXPORT
+WEBRTC_EXPORT webrtc_RtcEventLogFactory_unique*
 webrtc_RtcEventLogFactory_Create() {
   auto factory = std::make_unique<webrtc::RtcEventLogFactory>();
   return reinterpret_cast<struct webrtc_RtcEventLogFactory_unique*>(

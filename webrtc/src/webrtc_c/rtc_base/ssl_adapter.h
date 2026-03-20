@@ -10,7 +10,7 @@ extern "C" {
 // webrtc::InitializeSSL()
 // -------------------------
 
-void WEBRTC_EXPORT webrtc_InitializeSSL();
+WEBRTC_EXPORT void webrtc_InitializeSSL();
 
 #if defined(__cplusplus)
 }

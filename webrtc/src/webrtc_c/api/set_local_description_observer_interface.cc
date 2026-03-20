@@ -57,7 +57,7 @@ extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_SetLocalDescriptionObserverInterface,
                          webrtc::SetLocalDescriptionObserverInterface);
 
-struct webrtc_SetLocalDescriptionObserverInterface_refcounted* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_SetLocalDescriptionObserverInterface_refcounted*
 webrtc_SetLocalDescriptionObserverInterface_make_ref_counted(
     const struct webrtc_SetLocalDescriptionObserverInterface_cbs* cbs,
     void* user_data) {

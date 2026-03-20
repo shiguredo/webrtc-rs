@@ -52,15 +52,15 @@ class DataChannelObserverImpl : public webrtc::DataChannelObserver {
   void* user_data_;
 };
 
-struct webrtc_DataChannelObserver* WEBRTC_EXPORT
-webrtc_DataChannelObserver_new(const struct webrtc_DataChannelObserver_cbs* cbs,
-                               void* user_data) {
+WEBRTC_EXPORT struct webrtc_DataChannelObserver* webrtc_DataChannelObserver_new(
+    const struct webrtc_DataChannelObserver_cbs* cbs,
+    void* user_data) {
   auto impl = new DataChannelObserverImpl(cbs, user_data);
   return reinterpret_cast<struct webrtc_DataChannelObserver*>(impl);
 }
 
-void WEBRTC_EXPORT
-webrtc_DataChannelObserver_delete(struct webrtc_DataChannelObserver* self) {
+WEBRTC_EXPORT void webrtc_DataChannelObserver_delete(
+    struct webrtc_DataChannelObserver* self) {
   auto impl = reinterpret_cast<DataChannelObserverImpl*>(self);
   delete impl;
 }
@@ -83,37 +83,37 @@ WEBRTC_EXPORT extern const int webrtc_DataChannelInterface_DataState_kClosing =
 WEBRTC_EXPORT extern const int webrtc_DataChannelInterface_DataState_kClosed =
     static_cast<int>(webrtc::DataChannelInterface::DataState::kClosed);
 
-struct std_string_unique* WEBRTC_EXPORT
-webrtc_DataChannelInterface_label(struct webrtc_DataChannelInterface* self) {
+WEBRTC_EXPORT struct std_string_unique* webrtc_DataChannelInterface_label(
+    struct webrtc_DataChannelInterface* self) {
   auto dc = reinterpret_cast<webrtc::DataChannelInterface*>(self);
   auto label = std::make_unique<std::string>(dc->label());
   return reinterpret_cast<struct std_string_unique*>(label.release());
 }
 
-webrtc_DataChannelInterface_DataState WEBRTC_EXPORT
+WEBRTC_EXPORT webrtc_DataChannelInterface_DataState
 webrtc_DataChannelInterface_state(struct webrtc_DataChannelInterface* self) {
   auto dc = reinterpret_cast<webrtc::DataChannelInterface*>(self);
   return static_cast<webrtc_DataChannelInterface_DataState>(dc->state());
 }
 
-int WEBRTC_EXPORT
-webrtc_DataChannelInterface_Send(struct webrtc_DataChannelInterface* self,
-                                 const uint8_t* data,
-                                 size_t len,
-                                 int is_binary) {
+WEBRTC_EXPORT int webrtc_DataChannelInterface_Send(
+    struct webrtc_DataChannelInterface* self,
+    const uint8_t* data,
+    size_t len,
+    int is_binary) {
   auto dc = reinterpret_cast<webrtc::DataChannelInterface*>(self);
   webrtc::CopyOnWriteBuffer buffer(data, len);
   webrtc::DataBuffer data_buffer(buffer, is_binary != 0);
   return dc->Send(data_buffer) ? 1 : 0;
 }
 
-void WEBRTC_EXPORT
-webrtc_DataChannelInterface_Close(struct webrtc_DataChannelInterface* self) {
+WEBRTC_EXPORT void webrtc_DataChannelInterface_Close(
+    struct webrtc_DataChannelInterface* self) {
   auto dc = reinterpret_cast<webrtc::DataChannelInterface*>(self);
   dc->Close();
 }
 
-void WEBRTC_EXPORT webrtc_DataChannelInterface_RegisterObserver(
+WEBRTC_EXPORT void webrtc_DataChannelInterface_RegisterObserver(
     struct webrtc_DataChannelInterface* self,
     struct webrtc_DataChannelObserver* observer) {
   auto dc = reinterpret_cast<webrtc::DataChannelInterface*>(self);
@@ -121,7 +121,7 @@ void WEBRTC_EXPORT webrtc_DataChannelInterface_RegisterObserver(
   dc->RegisterObserver(obs);
 }
 
-void WEBRTC_EXPORT webrtc_DataChannelInterface_UnregisterObserver(
+WEBRTC_EXPORT void webrtc_DataChannelInterface_UnregisterObserver(
     struct webrtc_DataChannelInterface* self) {
   auto dc = reinterpret_cast<webrtc::DataChannelInterface*>(self);
   dc->UnregisterObserver();
@@ -131,28 +131,28 @@ void WEBRTC_EXPORT webrtc_DataChannelInterface_UnregisterObserver(
 // webrtc::DataChannelInit
 // -------------------------
 
-struct webrtc_DataChannelInit* WEBRTC_EXPORT webrtc_DataChannelInit_new() {
+WEBRTC_EXPORT struct webrtc_DataChannelInit* webrtc_DataChannelInit_new() {
   auto init = new webrtc::DataChannelInit();
   return reinterpret_cast<struct webrtc_DataChannelInit*>(init);
 }
 
-void WEBRTC_EXPORT
-webrtc_DataChannelInit_delete(struct webrtc_DataChannelInit* self) {
+WEBRTC_EXPORT void webrtc_DataChannelInit_delete(
+    struct webrtc_DataChannelInit* self) {
   auto init = reinterpret_cast<webrtc::DataChannelInit*>(self);
   delete init;
 }
 
-void WEBRTC_EXPORT
-webrtc_DataChannelInit_set_ordered(struct webrtc_DataChannelInit* self,
-                                   int ordered) {
+WEBRTC_EXPORT void webrtc_DataChannelInit_set_ordered(
+    struct webrtc_DataChannelInit* self,
+    int ordered) {
   auto init = reinterpret_cast<webrtc::DataChannelInit*>(self);
   init->ordered = ordered != 0;
 }
 
-void WEBRTC_EXPORT
-webrtc_DataChannelInit_set_protocol(struct webrtc_DataChannelInit* self,
-                                    const char* protocol,
-                                    size_t protocol_len) {
+WEBRTC_EXPORT void webrtc_DataChannelInit_set_protocol(
+    struct webrtc_DataChannelInit* self,
+    const char* protocol,
+    size_t protocol_len) {
   auto init = reinterpret_cast<webrtc::DataChannelInit*>(self);
   init->protocol = std::string(protocol, protocol_len);
 }

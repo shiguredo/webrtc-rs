@@ -19,8 +19,8 @@
 extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_RTCStatsReport, webrtc::RTCStatsReport);
 
-struct std_string_unique* WEBRTC_EXPORT
-webrtc_RTCStatsReport_ToJson(struct webrtc_RTCStatsReport* report) {
+WEBRTC_EXPORT struct std_string_unique* webrtc_RTCStatsReport_ToJson(
+    struct webrtc_RTCStatsReport* report) {
   if (report == nullptr) {
     return nullptr;
   }

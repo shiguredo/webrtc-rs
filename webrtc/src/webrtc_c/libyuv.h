@@ -12,7 +12,7 @@ extern "C" {
 // libyuv
 // -------------------------
 
-int WEBRTC_EXPORT libyuv_ABGRToI420(const uint8_t* src_abgr,
+WEBRTC_EXPORT int libyuv_ABGRToI420(const uint8_t* src_abgr,
                                     int src_stride_abgr,
                                     uint8_t* dst_y,
                                     int dst_stride_y,
@@ -24,7 +24,7 @@ int WEBRTC_EXPORT libyuv_ABGRToI420(const uint8_t* src_abgr,
                                     int height);
 WEBRTC_EXPORT extern const uint32_t libyuv_FOURCC_ARGB;
 WEBRTC_EXPORT extern const uint32_t libyuv_FOURCC_BGRA;
-int WEBRTC_EXPORT libyuv_ConvertFromI420(const uint8_t* src_y,
+WEBRTC_EXPORT int libyuv_ConvertFromI420(const uint8_t* src_y,
                                          int src_stride_y,
                                          const uint8_t* src_u,
                                          int src_stride_u,
@@ -36,7 +36,7 @@ int WEBRTC_EXPORT libyuv_ConvertFromI420(const uint8_t* src_y,
                                          int height,
                                          uint32_t fourcc);
 
-int WEBRTC_EXPORT libyuv_NV12ToI420(const uint8_t* src_y,
+WEBRTC_EXPORT int libyuv_NV12ToI420(const uint8_t* src_y,
                                     int src_stride_y,
                                     const uint8_t* src_uv,
                                     int src_stride_uv,
@@ -49,7 +49,7 @@ int WEBRTC_EXPORT libyuv_NV12ToI420(const uint8_t* src_y,
                                     int width,
                                     int height);
 
-int WEBRTC_EXPORT libyuv_I420ToNV12(const uint8_t* src_y,
+WEBRTC_EXPORT int libyuv_I420ToNV12(const uint8_t* src_y,
                                     int src_stride_y,
                                     const uint8_t* src_u,
                                     int src_stride_u,
@@ -62,7 +62,7 @@ int WEBRTC_EXPORT libyuv_I420ToNV12(const uint8_t* src_y,
                                     int width,
                                     int height);
 
-int WEBRTC_EXPORT libyuv_YUY2ToI420(const uint8_t* src_yuy2,
+WEBRTC_EXPORT int libyuv_YUY2ToI420(const uint8_t* src_yuy2,
                                     int src_stride_yuy2,
                                     uint8_t* dst_y,
                                     int dst_stride_y,

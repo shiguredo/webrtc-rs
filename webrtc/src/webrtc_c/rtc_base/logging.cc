@@ -27,18 +27,18 @@ WEBRTC_EXPORT const int webrtc_LogSeverity_LS_ERROR =
 WEBRTC_EXPORT const int webrtc_LogSeverity_LS_NONE =
     static_cast<int>(webrtc::LoggingSeverity::LS_NONE);
 
-void WEBRTC_EXPORT webrtc_LogMessage_LogToDebug(int severity) {
+WEBRTC_EXPORT void webrtc_LogMessage_LogToDebug(int severity) {
   webrtc::LogMessage::LogToDebug(
       static_cast<webrtc::LoggingSeverity>(severity));
 }
-void WEBRTC_EXPORT webrtc_LogMessage_LogTimestamps() {
+WEBRTC_EXPORT void webrtc_LogMessage_LogTimestamps() {
   webrtc::LogMessage::LogTimestamps();
 }
-void WEBRTC_EXPORT webrtc_LogMessage_LogThreads() {
+WEBRTC_EXPORT void webrtc_LogMessage_LogThreads() {
   webrtc::LogMessage::LogThreads();
 }
 
-void WEBRTC_EXPORT webrtc_LogMessage_Print(int severity,
+WEBRTC_EXPORT void webrtc_LogMessage_Print(int severity,
                                            const char* file,
                                            int line,
                                            const char* fmt,

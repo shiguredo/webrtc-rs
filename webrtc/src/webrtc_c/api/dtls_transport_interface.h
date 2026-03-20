@@ -19,7 +19,7 @@ WEBRTC_EXPORT extern const int webrtc_DtlsTransportState_kConnected;
 WEBRTC_EXPORT extern const int webrtc_DtlsTransportState_kClosed;
 WEBRTC_EXPORT extern const int webrtc_DtlsTransportState_kFailed;
 
-webrtc_DtlsTransportState WEBRTC_EXPORT
+WEBRTC_EXPORT webrtc_DtlsTransportState
 webrtc_DtlsTransportInterface_state(struct webrtc_DtlsTransportInterface* self);
 
 #if defined(__cplusplus)

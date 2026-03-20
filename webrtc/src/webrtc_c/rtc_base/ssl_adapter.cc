@@ -13,7 +13,7 @@
 // -------------------------
 
 extern "C" {
-void WEBRTC_EXPORT webrtc_InitializeSSL() {
+WEBRTC_EXPORT void webrtc_InitializeSSL() {
   webrtc::InitializeSSL();
 }
 }

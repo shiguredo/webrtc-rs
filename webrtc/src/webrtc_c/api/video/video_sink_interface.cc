@@ -43,15 +43,15 @@ class VideoSinkInterfaceImpl
 };
 
 extern "C" {
-struct webrtc_VideoSinkInterface* WEBRTC_EXPORT
-webrtc_VideoSinkInterface_new(const struct webrtc_VideoSinkInterface_cbs* cbs,
-                              void* user_data) {
+WEBRTC_EXPORT struct webrtc_VideoSinkInterface* webrtc_VideoSinkInterface_new(
+    const struct webrtc_VideoSinkInterface_cbs* cbs,
+    void* user_data) {
   auto sink = new VideoSinkInterfaceImpl(cbs, user_data);
   return reinterpret_cast<struct webrtc_VideoSinkInterface*>(sink);
 }
 
-void WEBRTC_EXPORT
-webrtc_VideoSinkInterface_delete(struct webrtc_VideoSinkInterface* self) {
+WEBRTC_EXPORT void webrtc_VideoSinkInterface_delete(
+    struct webrtc_VideoSinkInterface* self) {
   auto sink = reinterpret_cast<VideoSinkInterfaceImpl*>(self);
   delete sink;
 }

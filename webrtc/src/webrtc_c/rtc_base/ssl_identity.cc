@@ -13,7 +13,7 @@
 extern "C" {
 WEBRTC_DEFINE_UNIQUE(webrtc_SSLIdentity, webrtc::SSLIdentity);
 
-struct webrtc_SSLIdentity_unique* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_SSLIdentity_unique*
 webrtc_SSLIdentity_CreateFromPEMStrings(const char* private_key,
                                         size_t private_key_len,
                                         const char* certificate,
@@ -28,7 +28,7 @@ webrtc_SSLIdentity_CreateFromPEMStrings(const char* private_key,
       identity.release());
 }
 
-struct webrtc_SSLIdentity_unique* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_SSLIdentity_unique*
 webrtc_SSLIdentity_CreateFromPEMChainStrings(const char* private_key,
                                              size_t private_key_len,
                                              const char* certificate_chain,

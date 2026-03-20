@@ -14,7 +14,7 @@
 extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_RtpSenderInterface, webrtc::RtpSenderInterface);
 
-struct webrtc_RtpParameters* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_RtpParameters*
 webrtc_RtpSenderInterface_GetParameters(
     struct webrtc_RtpSenderInterface* self) {
   auto sender = reinterpret_cast<webrtc::RtpSenderInterface*>(self);
@@ -22,7 +22,7 @@ webrtc_RtpSenderInterface_GetParameters(
   return reinterpret_cast<struct webrtc_RtpParameters*>(parameters);
 }
 
-struct webrtc_RTCError_unique* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_RTCError_unique*
 webrtc_RtpSenderInterface_SetParameters(
     struct webrtc_RtpSenderInterface* self,
     const struct webrtc_RtpParameters* parameters) {

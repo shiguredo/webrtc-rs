@@ -19,7 +19,7 @@ struct webrtc_SetRemoteDescriptionObserverInterface_cbs {
   void (*OnDestroy)(void* user_data);
 };
 
-struct webrtc_SetRemoteDescriptionObserverInterface_refcounted* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_SetRemoteDescriptionObserverInterface_refcounted*
 webrtc_SetRemoteDescriptionObserverInterface_make_ref_counted(
     const struct webrtc_SetRemoteDescriptionObserverInterface_cbs* cbs,
     void* user_data);

@@ -15,10 +15,10 @@ WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_INFO;
 WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_WARNING;
 WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_ERROR;
 WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_NONE;
-void WEBRTC_EXPORT webrtc_LogMessage_LogToDebug(int severity);
-void WEBRTC_EXPORT webrtc_LogMessage_LogTimestamps();
-void WEBRTC_EXPORT webrtc_LogMessage_LogThreads();
-void WEBRTC_EXPORT webrtc_LogMessage_Print(int severity,
+WEBRTC_EXPORT void webrtc_LogMessage_LogToDebug(int severity);
+WEBRTC_EXPORT void webrtc_LogMessage_LogTimestamps();
+WEBRTC_EXPORT void webrtc_LogMessage_LogThreads();
+WEBRTC_EXPORT void webrtc_LogMessage_Print(int severity,
                                            const char* file,
                                            int line,
                                            const char* fmt,

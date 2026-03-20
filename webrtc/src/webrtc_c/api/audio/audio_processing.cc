@@ -18,7 +18,7 @@
 extern "C" {
 WEBRTC_DEFINE_UNIQUE(webrtc_AudioProcessingBuilderInterface,
                      webrtc::AudioProcessingBuilderInterface);
-struct webrtc_AudioProcessingBuilderInterface_unique* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_AudioProcessingBuilderInterface_unique*
 webrtc_BuiltinAudioProcessingBuilder_Create() {
   auto builder = std::make_unique<webrtc::BuiltinAudioProcessingBuilder>();
   return reinterpret_cast<

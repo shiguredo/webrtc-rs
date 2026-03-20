@@ -181,14 +181,14 @@ WEBRTC_DEFINE_UNIQUE(webrtc_VideoEncoder_EncoderInfo,
 WEBRTC_DEFINE_UNIQUE(webrtc_VideoEncoder_EncodedImageCallback_Result,
                      webrtc::EncodedImageCallback::Result);
 
-struct webrtc_VideoEncoder_EncoderInfo_unique* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_VideoEncoder_EncoderInfo_unique*
 webrtc_VideoEncoder_EncoderInfo_new() {
   auto info = std::make_unique<webrtc::VideoEncoder::EncoderInfo>();
   return reinterpret_cast<struct webrtc_VideoEncoder_EncoderInfo_unique*>(
       info.release());
 }
 
-struct std_string_unique* WEBRTC_EXPORT
+WEBRTC_EXPORT struct std_string_unique*
 webrtc_VideoEncoder_EncoderInfo_get_implementation_name(
     struct webrtc_VideoEncoder_EncoderInfo* self) {
   auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
@@ -196,7 +196,7 @@ webrtc_VideoEncoder_EncoderInfo_get_implementation_name(
   return reinterpret_cast<struct std_string_unique*>(out.release());
 }
 
-void WEBRTC_EXPORT webrtc_VideoEncoder_EncoderInfo_set_implementation_name(
+WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_set_implementation_name(
     struct webrtc_VideoEncoder_EncoderInfo* self,
     struct std_string_unique* name) {
   auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
@@ -213,20 +213,20 @@ void WEBRTC_EXPORT webrtc_VideoEncoder_EncoderInfo_set_implementation_name(
   std_string_unique_delete(name);
 }
 
-int WEBRTC_EXPORT webrtc_VideoEncoder_EncoderInfo_get_is_hardware_accelerated(
+WEBRTC_EXPORT int webrtc_VideoEncoder_EncoderInfo_get_is_hardware_accelerated(
     struct webrtc_VideoEncoder_EncoderInfo* self) {
   auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
   return info->is_hardware_accelerated ? 1 : 0;
 }
 
-void WEBRTC_EXPORT webrtc_VideoEncoder_EncoderInfo_set_is_hardware_accelerated(
+WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_set_is_hardware_accelerated(
     struct webrtc_VideoEncoder_EncoderInfo* self,
     int value) {
   auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
   info->is_hardware_accelerated = value != 0;
 }
 
-struct webrtc_VideoEncoder_EncodedImageCallback_Result_unique* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_VideoEncoder_EncodedImageCallback_Result_unique*
 webrtc_VideoEncoder_EncodedImageCallback_Result_new(int error) {
   auto result = std::make_unique<webrtc::EncodedImageCallback::Result>(
       static_cast<webrtc::EncodedImageCallback::Result::Error>(error));
@@ -235,7 +235,7 @@ webrtc_VideoEncoder_EncodedImageCallback_Result_new(int error) {
       result.release());
 }
 
-struct webrtc_VideoEncoder_EncodedImageCallback_Result_unique* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_VideoEncoder_EncodedImageCallback_Result_unique*
 webrtc_VideoEncoder_EncodedImageCallback_Result_new_with_frame_id(
     int error,
     uint32_t frame_id) {
@@ -247,13 +247,13 @@ webrtc_VideoEncoder_EncodedImageCallback_Result_new_with_frame_id(
       result.release());
 }
 
-int WEBRTC_EXPORT webrtc_VideoEncoder_EncodedImageCallback_Result_error(
+WEBRTC_EXPORT int webrtc_VideoEncoder_EncodedImageCallback_Result_error(
     struct webrtc_VideoEncoder_EncodedImageCallback_Result* self) {
   auto result = reinterpret_cast<webrtc::EncodedImageCallback::Result*>(self);
   return static_cast<int>(result->error);
 }
 
-void WEBRTC_EXPORT webrtc_VideoEncoder_EncodedImageCallback_Result_set_error(
+WEBRTC_EXPORT void webrtc_VideoEncoder_EncodedImageCallback_Result_set_error(
     struct webrtc_VideoEncoder_EncodedImageCallback_Result* self,
     int error) {
   auto result = reinterpret_cast<webrtc::EncodedImageCallback::Result*>(self);
@@ -261,27 +261,27 @@ void WEBRTC_EXPORT webrtc_VideoEncoder_EncodedImageCallback_Result_set_error(
       static_cast<webrtc::EncodedImageCallback::Result::Error>(error);
 }
 
-uint32_t WEBRTC_EXPORT webrtc_VideoEncoder_EncodedImageCallback_Result_frame_id(
+WEBRTC_EXPORT uint32_t webrtc_VideoEncoder_EncodedImageCallback_Result_frame_id(
     struct webrtc_VideoEncoder_EncodedImageCallback_Result* self) {
   auto result = reinterpret_cast<webrtc::EncodedImageCallback::Result*>(self);
   return result->frame_id;
 }
 
-void WEBRTC_EXPORT webrtc_VideoEncoder_EncodedImageCallback_Result_set_frame_id(
+WEBRTC_EXPORT void webrtc_VideoEncoder_EncodedImageCallback_Result_set_frame_id(
     struct webrtc_VideoEncoder_EncodedImageCallback_Result* self,
     uint32_t frame_id) {
   auto result = reinterpret_cast<webrtc::EncodedImageCallback::Result*>(self);
   result->frame_id = frame_id;
 }
 
-int WEBRTC_EXPORT
+WEBRTC_EXPORT int
 webrtc_VideoEncoder_EncodedImageCallback_Result_drop_next_frame(
     struct webrtc_VideoEncoder_EncodedImageCallback_Result* self) {
   auto result = reinterpret_cast<webrtc::EncodedImageCallback::Result*>(self);
   return result->drop_next_frame ? 1 : 0;
 }
 
-void WEBRTC_EXPORT
+WEBRTC_EXPORT void
 webrtc_VideoEncoder_EncodedImageCallback_Result_set_drop_next_frame(
     struct webrtc_VideoEncoder_EncodedImageCallback_Result* self,
     int drop_next_frame) {
@@ -289,7 +289,7 @@ webrtc_VideoEncoder_EncodedImageCallback_Result_set_drop_next_frame(
   result->drop_next_frame = drop_next_frame != 0;
 }
 
-struct webrtc_VideoEncoder_EncodedImageCallback* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_VideoEncoder_EncodedImageCallback*
 webrtc_VideoEncoder_EncodedImageCallback_new(
     const struct webrtc_VideoEncoder_EncodedImageCallback_cbs* cbs,
     void* user_data) {
@@ -298,13 +298,13 @@ webrtc_VideoEncoder_EncodedImageCallback_new(
       callback);
 }
 
-void WEBRTC_EXPORT webrtc_VideoEncoder_EncodedImageCallback_delete(
+WEBRTC_EXPORT void webrtc_VideoEncoder_EncodedImageCallback_delete(
     struct webrtc_VideoEncoder_EncodedImageCallback* self) {
   auto callback = reinterpret_cast<EncodedImageCallbackImpl*>(self);
   delete callback;
 }
 
-struct webrtc_VideoEncoder_EncodedImageCallback_Result_unique* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_VideoEncoder_EncodedImageCallback_Result_unique*
 webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage(
     struct webrtc_VideoEncoder_EncodedImageCallback* self,
     struct webrtc_EncodedImage* encoded_image,
@@ -324,14 +324,14 @@ webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage(
       out.release());
 }
 
-struct webrtc_VideoEncoder_unique* WEBRTC_EXPORT
-webrtc_VideoEncoder_new(const struct webrtc_VideoEncoder_cbs* cbs,
-                        void* user_data) {
+WEBRTC_EXPORT struct webrtc_VideoEncoder_unique* webrtc_VideoEncoder_new(
+    const struct webrtc_VideoEncoder_cbs* cbs,
+    void* user_data) {
   auto encoder = new VideoEncoderImpl(cbs, user_data);
   return reinterpret_cast<struct webrtc_VideoEncoder_unique*>(encoder);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_VideoEncoder_InitEncode(struct webrtc_VideoEncoder* self,
                                struct webrtc_VideoCodec* codec_settings,
                                struct webrtc_VideoEncoder_Settings* settings) {
@@ -356,7 +356,7 @@ webrtc_VideoEncoder_InitEncode(struct webrtc_VideoEncoder* self,
   return encoder->InitEncode(codec, *encoder_settings);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_VideoEncoder_Encode(struct webrtc_VideoEncoder* self,
                            struct webrtc_VideoFrame* frame,
                            struct webrtc_VideoFrameType_vector* frame_types) {
@@ -370,7 +370,7 @@ webrtc_VideoEncoder_Encode(struct webrtc_VideoEncoder* self,
   return encoder->Encode(*input_frame, types);
 }
 
-int32_t WEBRTC_EXPORT webrtc_VideoEncoder_RegisterEncodeCompleteCallback(
+WEBRTC_EXPORT int32_t webrtc_VideoEncoder_RegisterEncodeCompleteCallback(
     struct webrtc_VideoEncoder* self,
     struct webrtc_VideoEncoder_EncodedImageCallback* callback) {
   if (self == nullptr) {
@@ -382,7 +382,7 @@ int32_t WEBRTC_EXPORT webrtc_VideoEncoder_RegisterEncodeCompleteCallback(
   return encoder->RegisterEncodeCompleteCallback(encoded_image_callback);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_VideoEncoder_Release(struct webrtc_VideoEncoder* self) {
   if (self == nullptr) {
     return -1;
@@ -391,7 +391,7 @@ webrtc_VideoEncoder_Release(struct webrtc_VideoEncoder* self) {
   return encoder->Release();
 }
 
-void WEBRTC_EXPORT webrtc_VideoEncoder_SetRates(
+WEBRTC_EXPORT void webrtc_VideoEncoder_SetRates(
     struct webrtc_VideoEncoder* self,
     struct webrtc_VideoEncoder_RateControlParameters* parameters) {
   if (self == nullptr) {
@@ -415,7 +415,7 @@ void WEBRTC_EXPORT webrtc_VideoEncoder_SetRates(
   encoder->SetRates(*rates);
 }
 
-struct webrtc_VideoEncoder_EncoderInfo_unique* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_VideoEncoder_EncoderInfo_unique*
 webrtc_VideoEncoder_GetEncoderInfo(struct webrtc_VideoEncoder* self) {
   if (self == nullptr) {
     return nullptr;

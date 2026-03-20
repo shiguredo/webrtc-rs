@@ -761,7 +761,7 @@ WEBRTC_EXPORT extern const int webrtc_AudioDeviceModule_kDefaultDevice =
     webrtc::AudioDeviceModule::kDefaultDevice;
 
 WEBRTC_DEFINE_REFCOUNTED(webrtc_AudioDeviceModule, webrtc::AudioDeviceModule);
-struct webrtc_AudioDeviceModule_refcounted* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_AudioDeviceModule_refcounted*
 webrtc_CreateAudioDeviceModule(struct webrtc_Environment* env, int audio_type) {
   auto environment = reinterpret_cast<webrtc::Environment*>(env);
   auto adm = webrtc::CreateAudioDeviceModule(
@@ -771,7 +771,7 @@ webrtc_CreateAudioDeviceModule(struct webrtc_Environment* env, int audio_type) {
       adm.release());
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_ActiveAudioLayer(struct webrtc_AudioDeviceModule* self,
                                           int* audio_layer) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -784,7 +784,7 @@ webrtc_AudioDeviceModule_ActiveAudioLayer(struct webrtc_AudioDeviceModule* self,
   return ret;
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_RegisterAudioCallback(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_RegisterAudioCallback(
     struct webrtc_AudioDeviceModule* self,
     struct webrtc_AudioTransport* audio_transport) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -792,37 +792,37 @@ int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_RegisterAudioCallback(
   return adm->RegisterAudioCallback(transport);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_Init(struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->Init();
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_Terminate(struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->Terminate();
 }
 
-int WEBRTC_EXPORT
-webrtc_AudioDeviceModule_Initialized(struct webrtc_AudioDeviceModule* self) {
+WEBRTC_EXPORT int webrtc_AudioDeviceModule_Initialized(
+    struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->Initialized() ? 1 : 0;
 }
 
-int16_t WEBRTC_EXPORT
+WEBRTC_EXPORT int16_t
 webrtc_AudioDeviceModule_PlayoutDevices(struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->PlayoutDevices();
 }
 
-int16_t WEBRTC_EXPORT webrtc_AudioDeviceModule_RecordingDevices(
+WEBRTC_EXPORT int16_t webrtc_AudioDeviceModule_RecordingDevices(
     struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->RecordingDevices();
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_PlayoutDeviceName(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_PlayoutDeviceName(
     struct webrtc_AudioDeviceModule* self,
     uint16_t index,
     char name[128],
@@ -831,7 +831,7 @@ int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_PlayoutDeviceName(
   return adm->PlayoutDeviceName(index, name, guid);
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_RecordingDeviceName(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_RecordingDeviceName(
     struct webrtc_AudioDeviceModule* self,
     uint16_t index,
     char name[128],
@@ -840,14 +840,14 @@ int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_RecordingDeviceName(
   return adm->RecordingDeviceName(index, name, guid);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_SetPlayoutDevice(struct webrtc_AudioDeviceModule* self,
                                           uint16_t index) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->SetPlayoutDevice(index);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_SetPlayoutDeviceWithWindowsDeviceType(
     struct webrtc_AudioDeviceModule* self,
     int device) {
@@ -856,14 +856,14 @@ webrtc_AudioDeviceModule_SetPlayoutDeviceWithWindowsDeviceType(
       static_cast<webrtc::AudioDeviceModule::WindowsDeviceType>(device));
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_SetRecordingDevice(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_SetRecordingDevice(
     struct webrtc_AudioDeviceModule* self,
     uint16_t index) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->SetRecordingDevice(index);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_SetRecordingDeviceWithWindowsDeviceType(
     struct webrtc_AudioDeviceModule* self,
     int device) {
@@ -872,7 +872,7 @@ webrtc_AudioDeviceModule_SetRecordingDeviceWithWindowsDeviceType(
       static_cast<webrtc::AudioDeviceModule::WindowsDeviceType>(device));
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_PlayoutIsAvailable(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_PlayoutIsAvailable(
     struct webrtc_AudioDeviceModule* self,
     int* available) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -884,19 +884,19 @@ int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_PlayoutIsAvailable(
   return ret;
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_InitPlayout(struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->InitPlayout();
 }
 
-int WEBRTC_EXPORT webrtc_AudioDeviceModule_PlayoutIsInitialized(
+WEBRTC_EXPORT int webrtc_AudioDeviceModule_PlayoutIsInitialized(
     struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->PlayoutIsInitialized() ? 1 : 0;
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_RecordingIsAvailable(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_RecordingIsAvailable(
     struct webrtc_AudioDeviceModule* self,
     int* available) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -908,79 +908,79 @@ int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_RecordingIsAvailable(
   return ret;
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_InitRecording(struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->InitRecording();
 }
 
-int WEBRTC_EXPORT webrtc_AudioDeviceModule_RecordingIsInitialized(
+WEBRTC_EXPORT int webrtc_AudioDeviceModule_RecordingIsInitialized(
     struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->RecordingIsInitialized() ? 1 : 0;
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_StartPlayout(struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->StartPlayout();
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_StopPlayout(struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->StopPlayout();
 }
 
-int WEBRTC_EXPORT
-webrtc_AudioDeviceModule_Playing(struct webrtc_AudioDeviceModule* self) {
+WEBRTC_EXPORT int webrtc_AudioDeviceModule_Playing(
+    struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->Playing() ? 1 : 0;
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_StartRecording(struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->StartRecording();
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_StopRecording(struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->StopRecording();
 }
 
-int WEBRTC_EXPORT
-webrtc_AudioDeviceModule_Recording(struct webrtc_AudioDeviceModule* self) {
+WEBRTC_EXPORT int webrtc_AudioDeviceModule_Recording(
+    struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->Recording() ? 1 : 0;
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_InitSpeaker(struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->InitSpeaker();
 }
 
-int WEBRTC_EXPORT webrtc_AudioDeviceModule_SpeakerIsInitialized(
+WEBRTC_EXPORT int webrtc_AudioDeviceModule_SpeakerIsInitialized(
     struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->SpeakerIsInitialized() ? 1 : 0;
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_InitMicrophone(struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->InitMicrophone();
 }
 
-int WEBRTC_EXPORT webrtc_AudioDeviceModule_MicrophoneIsInitialized(
+WEBRTC_EXPORT int webrtc_AudioDeviceModule_MicrophoneIsInitialized(
     struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->MicrophoneIsInitialized() ? 1 : 0;
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_SpeakerVolumeIsAvailable(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_SpeakerVolumeIsAvailable(
     struct webrtc_AudioDeviceModule* self,
     int* available) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -992,35 +992,35 @@ int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_SpeakerVolumeIsAvailable(
   return ret;
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_SetSpeakerVolume(struct webrtc_AudioDeviceModule* self,
                                           uint32_t volume) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->SetSpeakerVolume(volume);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_SpeakerVolume(struct webrtc_AudioDeviceModule* self,
                                        uint32_t* volume) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->SpeakerVolume(volume);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_MaxSpeakerVolume(struct webrtc_AudioDeviceModule* self,
                                           uint32_t* max_volume) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->MaxSpeakerVolume(max_volume);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_MinSpeakerVolume(struct webrtc_AudioDeviceModule* self,
                                           uint32_t* min_volume) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->MinSpeakerVolume(min_volume);
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_MicrophoneVolumeIsAvailable(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_MicrophoneVolumeIsAvailable(
     struct webrtc_AudioDeviceModule* self,
     int* available) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -1032,35 +1032,35 @@ int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_MicrophoneVolumeIsAvailable(
   return ret;
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_SetMicrophoneVolume(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_SetMicrophoneVolume(
     struct webrtc_AudioDeviceModule* self,
     uint32_t volume) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->SetMicrophoneVolume(volume);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_MicrophoneVolume(struct webrtc_AudioDeviceModule* self,
                                           uint32_t* volume) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->MicrophoneVolume(volume);
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_MaxMicrophoneVolume(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_MaxMicrophoneVolume(
     struct webrtc_AudioDeviceModule* self,
     uint32_t* max_volume) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->MaxMicrophoneVolume(max_volume);
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_MinMicrophoneVolume(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_MinMicrophoneVolume(
     struct webrtc_AudioDeviceModule* self,
     uint32_t* min_volume) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->MinMicrophoneVolume(min_volume);
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_SpeakerMuteIsAvailable(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_SpeakerMuteIsAvailable(
     struct webrtc_AudioDeviceModule* self,
     int* available) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -1072,14 +1072,14 @@ int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_SpeakerMuteIsAvailable(
   return ret;
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_SetSpeakerMute(struct webrtc_AudioDeviceModule* self,
                                         int enable) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->SetSpeakerMute(enable != 0);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_SpeakerMute(struct webrtc_AudioDeviceModule* self,
                                      int* enabled) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -1091,7 +1091,7 @@ webrtc_AudioDeviceModule_SpeakerMute(struct webrtc_AudioDeviceModule* self,
   return ret;
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_MicrophoneMuteIsAvailable(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_MicrophoneMuteIsAvailable(
     struct webrtc_AudioDeviceModule* self,
     int* available) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -1103,14 +1103,14 @@ int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_MicrophoneMuteIsAvailable(
   return ret;
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_SetMicrophoneMute(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_SetMicrophoneMute(
     struct webrtc_AudioDeviceModule* self,
     int enable) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->SetMicrophoneMute(enable != 0);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_MicrophoneMute(struct webrtc_AudioDeviceModule* self,
                                         int* enabled) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -1122,7 +1122,7 @@ webrtc_AudioDeviceModule_MicrophoneMute(struct webrtc_AudioDeviceModule* self,
   return ret;
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_StereoPlayoutIsAvailable(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_StereoPlayoutIsAvailable(
     struct webrtc_AudioDeviceModule* self,
     int* available) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -1134,14 +1134,14 @@ int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_StereoPlayoutIsAvailable(
   return ret;
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_SetStereoPlayout(struct webrtc_AudioDeviceModule* self,
                                           int enable) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->SetStereoPlayout(enable != 0);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_StereoPlayout(struct webrtc_AudioDeviceModule* self,
                                        int* enabled) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -1153,7 +1153,7 @@ webrtc_AudioDeviceModule_StereoPlayout(struct webrtc_AudioDeviceModule* self,
   return ret;
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_StereoRecordingIsAvailable(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_StereoRecordingIsAvailable(
     struct webrtc_AudioDeviceModule* self,
     int* available) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -1165,14 +1165,14 @@ int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_StereoRecordingIsAvailable(
   return ret;
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_SetStereoRecording(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_SetStereoRecording(
     struct webrtc_AudioDeviceModule* self,
     int enable) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->SetStereoRecording(enable != 0);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_StereoRecording(struct webrtc_AudioDeviceModule* self,
                                          int* enabled) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -1184,59 +1184,59 @@ webrtc_AudioDeviceModule_StereoRecording(struct webrtc_AudioDeviceModule* self,
   return ret;
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_PlayoutDelay(struct webrtc_AudioDeviceModule* self,
                                       uint16_t* delay_ms) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->PlayoutDelay(delay_ms);
 }
 
-int WEBRTC_EXPORT webrtc_AudioDeviceModule_BuiltInAECIsAvailable(
+WEBRTC_EXPORT int webrtc_AudioDeviceModule_BuiltInAECIsAvailable(
     struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->BuiltInAECIsAvailable() ? 1 : 0;
 }
 
-int WEBRTC_EXPORT webrtc_AudioDeviceModule_BuiltInAGCIsAvailable(
+WEBRTC_EXPORT int webrtc_AudioDeviceModule_BuiltInAGCIsAvailable(
     struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->BuiltInAGCIsAvailable() ? 1 : 0;
 }
 
-int WEBRTC_EXPORT webrtc_AudioDeviceModule_BuiltInNSIsAvailable(
+WEBRTC_EXPORT int webrtc_AudioDeviceModule_BuiltInNSIsAvailable(
     struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->BuiltInNSIsAvailable() ? 1 : 0;
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_EnableBuiltInAEC(struct webrtc_AudioDeviceModule* self,
                                           int enable) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->EnableBuiltInAEC(enable != 0);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_EnableBuiltInAGC(struct webrtc_AudioDeviceModule* self,
                                           int enable) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->EnableBuiltInAGC(enable != 0);
 }
 
-int32_t WEBRTC_EXPORT
+WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_EnableBuiltInNS(struct webrtc_AudioDeviceModule* self,
                                          int enable) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->EnableBuiltInNS(enable != 0);
 }
 
-int32_t WEBRTC_EXPORT webrtc_AudioDeviceModule_GetPlayoutUnderrunCount(
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_GetPlayoutUnderrunCount(
     struct webrtc_AudioDeviceModule* self) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
   return adm->GetPlayoutUnderrunCount();
 }
 
-int WEBRTC_EXPORT webrtc_AudioDeviceModule_GetStats(
+WEBRTC_EXPORT int webrtc_AudioDeviceModule_GetStats(
     struct webrtc_AudioDeviceModule* self,
     struct webrtc_AudioDeviceModule_Stats* out_stats) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
@@ -1256,7 +1256,7 @@ int WEBRTC_EXPORT webrtc_AudioDeviceModule_GetStats(
   return 1;
 }
 
-struct webrtc_AudioDeviceModule_refcounted* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_AudioDeviceModule_refcounted*
 webrtc_CreateAudioDeviceModuleWithCallback(
     struct webrtc_AudioDeviceModule_cbs* cbs,
     void* user_data) {

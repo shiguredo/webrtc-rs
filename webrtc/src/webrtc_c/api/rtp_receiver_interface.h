@@ -13,7 +13,7 @@ extern "C" {
 
 WEBRTC_DECLARE_REFCOUNTED(webrtc_RtpReceiverInterface);
 
-struct webrtc_MediaStreamTrackInterface_refcounted* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_MediaStreamTrackInterface_refcounted*
 webrtc_RtpReceiverInterface_track(struct webrtc_RtpReceiverInterface* self);
 
 #if defined(__cplusplus)

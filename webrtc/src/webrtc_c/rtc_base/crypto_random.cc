@@ -14,7 +14,7 @@
 // -------------------------
 
 extern "C" {
-struct std_string_unique* WEBRTC_EXPORT webrtc_CreateRandomString(int length) {
+WEBRTC_EXPORT struct std_string_unique* webrtc_CreateRandomString(int length) {
   auto str = std::make_unique<std::string>(webrtc::CreateRandomString(length));
   return reinterpret_cast<struct std_string_unique*>(str.release());
 }

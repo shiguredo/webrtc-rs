@@ -24,11 +24,11 @@ WEBRTC_EXPORT const int webrtc_VideoRotation_0 =
     static_cast<int>(webrtc::kVideoRotation_0);
 
 WEBRTC_DEFINE_UNIQUE(webrtc_VideoFrame, webrtc::VideoFrame);
-struct webrtc_VideoFrame_unique* WEBRTC_EXPORT
-webrtc_VideoFrame_Create(struct webrtc_I420Buffer_refcounted* buffer,
-                         int rotation,
-                         int64_t timestamp_us,
-                         uint32_t timestamp_rtp) {
+WEBRTC_EXPORT struct webrtc_VideoFrame_unique* webrtc_VideoFrame_Create(
+    struct webrtc_I420Buffer_refcounted* buffer,
+    int rotation,
+    int64_t timestamp_us,
+    uint32_t timestamp_rtp) {
   webrtc::scoped_refptr<webrtc::I420Buffer> buf(
       reinterpret_cast<webrtc::I420Buffer*>(buffer));
   auto frame = std::make_unique<webrtc::VideoFrame>(
@@ -40,27 +40,27 @@ webrtc_VideoFrame_Create(struct webrtc_I420Buffer_refcounted* buffer,
           .build());
   return reinterpret_cast<struct webrtc_VideoFrame_unique*>(frame.release());
 }
-int WEBRTC_EXPORT
-webrtc_VideoFrame_width(const struct webrtc_VideoFrame* self) {
+WEBRTC_EXPORT int webrtc_VideoFrame_width(
+    const struct webrtc_VideoFrame* self) {
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
   return frame->width();
 }
-int WEBRTC_EXPORT
-webrtc_VideoFrame_height(const struct webrtc_VideoFrame* self) {
+WEBRTC_EXPORT int webrtc_VideoFrame_height(
+    const struct webrtc_VideoFrame* self) {
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
   return frame->height();
 }
-int64_t WEBRTC_EXPORT
+WEBRTC_EXPORT int64_t
 webrtc_VideoFrame_timestamp_us(const struct webrtc_VideoFrame* self) {
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
   return frame->timestamp_us();
 }
-uint32_t WEBRTC_EXPORT
+WEBRTC_EXPORT uint32_t
 webrtc_VideoFrame_timestamp_rtp(const struct webrtc_VideoFrame* self) {
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
   return frame->rtp_timestamp();
 }
-struct webrtc_I420Buffer_refcounted* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted*
 webrtc_VideoFrame_video_frame_buffer(const struct webrtc_VideoFrame* self) {
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
   auto buf = frame->video_frame_buffer()->ToI420();

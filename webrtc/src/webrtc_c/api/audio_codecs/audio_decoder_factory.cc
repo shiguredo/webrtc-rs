@@ -18,7 +18,7 @@
 extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_AudioDecoderFactory,
                          webrtc::AudioDecoderFactory);
-struct webrtc_AudioDecoderFactory_refcounted* WEBRTC_EXPORT
+WEBRTC_EXPORT struct webrtc_AudioDecoderFactory_refcounted*
 webrtc_CreateBuiltinAudioDecoderFactory() {
   auto factory = webrtc::CreateBuiltinAudioDecoderFactory();
   return reinterpret_cast<struct webrtc_AudioDecoderFactory_refcounted*>(

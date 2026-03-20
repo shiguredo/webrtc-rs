@@ -60,83 +60,83 @@ WEBRTC_EXPORT const int webrtc_VideoFrameType_Key =
 WEBRTC_EXPORT const int webrtc_VideoFrameType_Delta =
     static_cast<int>(webrtc::VideoFrameType::kVideoFrameDelta);
 
-int WEBRTC_EXPORT webrtc_VideoCodec_codec_type(struct webrtc_VideoCodec* self) {
+WEBRTC_EXPORT int webrtc_VideoCodec_codec_type(struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
   return static_cast<int>(codec->codecType);
 }
 
-int WEBRTC_EXPORT webrtc_VideoCodec_width(struct webrtc_VideoCodec* self) {
+WEBRTC_EXPORT int webrtc_VideoCodec_width(struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
   return static_cast<int>(codec->width);
 }
 
-int WEBRTC_EXPORT webrtc_VideoCodec_height(struct webrtc_VideoCodec* self) {
+WEBRTC_EXPORT int webrtc_VideoCodec_height(struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
   return static_cast<int>(codec->height);
 }
 
-unsigned int WEBRTC_EXPORT
-webrtc_VideoCodec_start_bitrate_kbps(struct webrtc_VideoCodec* self) {
+WEBRTC_EXPORT unsigned int webrtc_VideoCodec_start_bitrate_kbps(
+    struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
   return codec->startBitrate;
 }
 
-unsigned int WEBRTC_EXPORT
-webrtc_VideoCodec_max_bitrate_kbps(struct webrtc_VideoCodec* self) {
+WEBRTC_EXPORT unsigned int webrtc_VideoCodec_max_bitrate_kbps(
+    struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
   return codec->maxBitrate;
 }
 
-unsigned int WEBRTC_EXPORT
-webrtc_VideoCodec_min_bitrate_kbps(struct webrtc_VideoCodec* self) {
+WEBRTC_EXPORT unsigned int webrtc_VideoCodec_min_bitrate_kbps(
+    struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
   return codec->minBitrate;
 }
 
-uint32_t WEBRTC_EXPORT
+WEBRTC_EXPORT uint32_t
 webrtc_VideoCodec_max_framerate(struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
   return codec->maxFramerate;
 }
 
-int WEBRTC_EXPORT webrtc_VideoEncoder_Settings_number_of_cores(
+WEBRTC_EXPORT int webrtc_VideoEncoder_Settings_number_of_cores(
     struct webrtc_VideoEncoder_Settings* self) {
   auto settings = reinterpret_cast<webrtc::VideoEncoder::Settings*>(self);
   return settings->number_of_cores;
 }
 
-size_t WEBRTC_EXPORT webrtc_VideoEncoder_Settings_max_payload_size(
+WEBRTC_EXPORT size_t webrtc_VideoEncoder_Settings_max_payload_size(
     struct webrtc_VideoEncoder_Settings* self) {
   auto settings = reinterpret_cast<webrtc::VideoEncoder::Settings*>(self);
   return settings->max_payload_size;
 }
 
-int WEBRTC_EXPORT webrtc_VideoEncoder_Settings_loss_notification(
+WEBRTC_EXPORT int webrtc_VideoEncoder_Settings_loss_notification(
     struct webrtc_VideoEncoder_Settings* self) {
   auto settings = reinterpret_cast<webrtc::VideoEncoder::Settings*>(self);
   return settings->capabilities.loss_notification ? 1 : 0;
 }
 
-int WEBRTC_EXPORT webrtc_VideoEncoder_Settings_has_encoder_thread_limit(
+WEBRTC_EXPORT int webrtc_VideoEncoder_Settings_has_encoder_thread_limit(
     struct webrtc_VideoEncoder_Settings* self) {
   auto settings = reinterpret_cast<webrtc::VideoEncoder::Settings*>(self);
   return settings->encoder_thread_limit.has_value() ? 1 : 0;
 }
 
-int WEBRTC_EXPORT webrtc_VideoEncoder_Settings_encoder_thread_limit(
+WEBRTC_EXPORT int webrtc_VideoEncoder_Settings_encoder_thread_limit(
     struct webrtc_VideoEncoder_Settings* self) {
   auto settings = reinterpret_cast<webrtc::VideoEncoder::Settings*>(self);
   return settings->encoder_thread_limit.value_or(0);
 }
 
-double WEBRTC_EXPORT webrtc_VideoEncoder_RateControlParameters_framerate_fps(
+WEBRTC_EXPORT double webrtc_VideoEncoder_RateControlParameters_framerate_fps(
     struct webrtc_VideoEncoder_RateControlParameters* self) {
   auto parameters =
       reinterpret_cast<webrtc::VideoEncoder::RateControlParameters*>(self);
   return parameters->framerate_fps;
 }
 
-uint32_t WEBRTC_EXPORT
+WEBRTC_EXPORT uint32_t
 webrtc_VideoEncoder_RateControlParameters_target_bitrate_sum_bps(
     struct webrtc_VideoEncoder_RateControlParameters* self) {
   auto parameters =
@@ -144,7 +144,7 @@ webrtc_VideoEncoder_RateControlParameters_target_bitrate_sum_bps(
   return parameters->target_bitrate.get_sum_bps();
 }
 
-uint32_t WEBRTC_EXPORT
+WEBRTC_EXPORT uint32_t
 webrtc_VideoEncoder_RateControlParameters_bitrate_sum_bps(
     struct webrtc_VideoEncoder_RateControlParameters* self) {
   auto parameters =
@@ -152,7 +152,7 @@ webrtc_VideoEncoder_RateControlParameters_bitrate_sum_bps(
   return parameters->bitrate.get_sum_bps();
 }
 
-int64_t WEBRTC_EXPORT
+WEBRTC_EXPORT int64_t
 webrtc_VideoEncoder_RateControlParameters_bandwidth_allocation_bps(
     struct webrtc_VideoEncoder_RateControlParameters* self) {
   auto parameters =
@@ -162,13 +162,13 @@ webrtc_VideoEncoder_RateControlParameters_bandwidth_allocation_bps(
 
 WEBRTC_DEFINE_VECTOR(webrtc_VideoFrameType, webrtc::VideoFrameType);
 
-int WEBRTC_EXPORT
-webrtc_VideoFrameType_value(struct webrtc_VideoFrameType* self) {
+WEBRTC_EXPORT int webrtc_VideoFrameType_value(
+    struct webrtc_VideoFrameType* self) {
   auto value = reinterpret_cast<webrtc::VideoFrameType*>(self);
   return static_cast<int>(*value);
 }
 
-void WEBRTC_EXPORT webrtc_VideoFrameType_vector_push_back_value(
+WEBRTC_EXPORT void webrtc_VideoFrameType_vector_push_back_value(
     struct webrtc_VideoFrameType_vector* self,
     int value) {
   auto vec = reinterpret_cast<std::vector<webrtc::VideoFrameType>*>(self);

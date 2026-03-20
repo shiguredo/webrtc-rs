@@ -16,11 +16,11 @@
 
 extern "C" {
 WEBRTC_DEFINE_UNIQUE(webrtc_RTCError, webrtc::RTCError);
-int WEBRTC_EXPORT webrtc_RTCError_ok(struct webrtc_RTCError* self) {
+WEBRTC_EXPORT int webrtc_RTCError_ok(struct webrtc_RTCError* self) {
   auto err = reinterpret_cast<webrtc::RTCError*>(self);
   return err->ok() ? 1 : 0;
 }
-void WEBRTC_EXPORT webrtc_RTCError_message(struct webrtc_RTCError* self,
+WEBRTC_EXPORT void webrtc_RTCError_message(struct webrtc_RTCError* self,
                                            const char** out_message,
                                            size_t* out_len) {
   auto err = reinterpret_cast<webrtc::RTCError*>(self);
