@@ -1,15 +1,17 @@
 #include "ssl_certificate.h"
 
 #include <stddef.h>
+#include <cstdint>
 #include <memory>
 #include <string>
-#include <utility>
-#include <vector>
 
 // WebRTC
 #include <rtc_base/ssl_certificate.h>
 
+#include "../common.h"
 #include "../common.impl.h"
+#include "../std.h"
+#include "rtc_base/buffer.h"
 
 namespace {
 
@@ -49,14 +51,14 @@ extern "C" {
 WEBRTC_DEFINE_UNIQUE(webrtc_SSLCertificateVerifier,
                      webrtc::SSLCertificateVerifier);
 
-struct std_string_unique* webrtc_SSLCertificate_ToPEMString(
+WEBRTC_EXPORT struct std_string_unique* webrtc_SSLCertificate_ToPEMString(
     const struct webrtc_SSLCertificate* self) {
   auto cert = reinterpret_cast<const webrtc::SSLCertificate*>(self);
   auto pem = std::make_unique<std::string>(cert->ToPEMString());
   return reinterpret_cast<struct std_string_unique*>(pem.release());
 }
 
-struct std_string_unique* webrtc_SSLCertificate_ToDER(
+WEBRTC_EXPORT struct std_string_unique* webrtc_SSLCertificate_ToDER(
     const struct webrtc_SSLCertificate* self) {
   auto cert = reinterpret_cast<const webrtc::SSLCertificate*>(self);
   webrtc::Buffer der_buffer;
@@ -66,18 +68,19 @@ struct std_string_unique* webrtc_SSLCertificate_ToDER(
   return reinterpret_cast<struct std_string_unique*>(der.release());
 }
 
-int64_t webrtc_SSLCertificate_CertificateExpirationTime(
+WEBRTC_EXPORT int64_t webrtc_SSLCertificate_CertificateExpirationTime(
     const struct webrtc_SSLCertificate* self) {
   auto cert = reinterpret_cast<const webrtc::SSLCertificate*>(self);
   return cert->CertificateExpirationTime();
 }
 
-int webrtc_SSLCertChain_GetSize(const struct webrtc_SSLCertChain* self) {
+WEBRTC_EXPORT int webrtc_SSLCertChain_GetSize(
+    const struct webrtc_SSLCertChain* self) {
   auto chain = reinterpret_cast<const webrtc::SSLCertChain*>(self);
   return static_cast<int>(chain->GetSize());
 }
 
-const struct webrtc_SSLCertificate* webrtc_SSLCertChain_Get(
+WEBRTC_EXPORT const struct webrtc_SSLCertificate* webrtc_SSLCertChain_Get(
     const struct webrtc_SSLCertChain* self,
     int index) {
   auto chain = reinterpret_cast<const webrtc::SSLCertChain*>(self);
@@ -88,7 +91,8 @@ const struct webrtc_SSLCertificate* webrtc_SSLCertChain_Get(
   return reinterpret_cast<const struct webrtc_SSLCertificate*>(&cert);
 }
 
-struct webrtc_SSLCertificateVerifier_unique* webrtc_SSLCertificateVerifier_new(
+WEBRTC_EXPORT struct webrtc_SSLCertificateVerifier_unique*
+webrtc_SSLCertificateVerifier_new(
     const struct webrtc_SSLCertificateVerifier_cbs* cbs,
     void* user_data) {
   auto verifier = std::make_unique<SSLCertificateVerifierImpl>(cbs, user_data);

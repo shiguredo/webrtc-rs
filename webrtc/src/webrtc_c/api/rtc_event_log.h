@@ -11,7 +11,8 @@ extern "C" {
 // -------------------------
 
 WEBRTC_DECLARE_UNIQUE(webrtc_RtcEventLogFactory);
-struct webrtc_RtcEventLogFactory_unique* webrtc_RtcEventLogFactory_Create();
+WEBRTC_EXPORT struct webrtc_RtcEventLogFactory_unique*
+webrtc_RtcEventLogFactory_Create();
 
 #if defined(__cplusplus)
 }

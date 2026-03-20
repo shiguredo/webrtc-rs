@@ -8,6 +8,7 @@
 #include <api/audio_codecs/builtin_audio_decoder_factory.h>
 #include <api/scoped_refptr.h>
 
+#include "../../common.h"
 #include "../../common.impl.h"
 
 // -------------------------
@@ -17,7 +18,7 @@
 extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_AudioDecoderFactory,
                          webrtc::AudioDecoderFactory);
-struct webrtc_AudioDecoderFactory_refcounted*
+WEBRTC_EXPORT struct webrtc_AudioDecoderFactory_refcounted*
 webrtc_CreateBuiltinAudioDecoderFactory() {
   auto factory = webrtc::CreateBuiltinAudioDecoderFactory();
   return reinterpret_cast<struct webrtc_AudioDecoderFactory_refcounted*>(

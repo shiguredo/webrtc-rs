@@ -12,6 +12,7 @@
 #include <api/scoped_refptr.h>
 #include <api/set_local_description_observer_interface.h>
 
+#include "../common.h"
 #include "../common.impl.h"
 #include "rtc_error.h"
 
@@ -56,7 +57,7 @@ extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_SetLocalDescriptionObserverInterface,
                          webrtc::SetLocalDescriptionObserverInterface);
 
-struct webrtc_SetLocalDescriptionObserverInterface_refcounted*
+WEBRTC_EXPORT struct webrtc_SetLocalDescriptionObserverInterface_refcounted*
 webrtc_SetLocalDescriptionObserverInterface_make_ref_counted(
     const struct webrtc_SetLocalDescriptionObserverInterface_cbs* cbs,
     void* user_data) {

@@ -13,6 +13,7 @@
 #include <media/base/adapted_video_track_source.h>
 
 #include "../../api/video/video_frame.h"
+#include "../../common.h"
 #include "../../common.impl.h"
 
 // -------------------------
@@ -53,14 +54,14 @@ extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_AdaptedVideoTrackSource,
                          AdaptedVideoTrackSourceWrapper);
 
-struct webrtc_AdaptedVideoTrackSource_refcounted*
+WEBRTC_EXPORT struct webrtc_AdaptedVideoTrackSource_refcounted*
 webrtc_AdaptedVideoTrackSource_Create() {
   auto src = webrtc::make_ref_counted<AdaptedVideoTrackSourceWrapper>();
   return reinterpret_cast<struct webrtc_AdaptedVideoTrackSource_refcounted*>(
       src.release());
 }
 
-int webrtc_AdaptedVideoTrackSource_AdaptFrame(
+WEBRTC_EXPORT int webrtc_AdaptedVideoTrackSource_AdaptFrame(
     struct webrtc_AdaptedVideoTrackSource* self,
     int width,
     int height,
@@ -79,7 +80,7 @@ int webrtc_AdaptedVideoTrackSource_AdaptFrame(
              : 0;
 }
 
-void webrtc_AdaptedVideoTrackSource_OnFrame(
+WEBRTC_EXPORT void webrtc_AdaptedVideoTrackSource_OnFrame(
     struct webrtc_AdaptedVideoTrackSource* self,
     struct webrtc_VideoFrame* frame) {
   auto src = reinterpret_cast<AdaptedVideoTrackSourceWrapper*>(self);

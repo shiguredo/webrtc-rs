@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../common.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -8,19 +10,19 @@ extern "C" {
 // rtc_base/logging
 // -------------------------
 
-extern const int webrtc_LogSeverity_LS_VERBOSE;
-extern const int webrtc_LogSeverity_LS_INFO;
-extern const int webrtc_LogSeverity_LS_WARNING;
-extern const int webrtc_LogSeverity_LS_ERROR;
-extern const int webrtc_LogSeverity_LS_NONE;
-void webrtc_LogMessage_LogToDebug(int severity);
-void webrtc_LogMessage_LogTimestamps();
-void webrtc_LogMessage_LogThreads();
-void webrtc_LogMessage_Print(int severity,
-                             const char* file,
-                             int line,
-                             const char* fmt,
-                             ...);
+WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_VERBOSE;
+WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_INFO;
+WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_WARNING;
+WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_ERROR;
+WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_NONE;
+WEBRTC_EXPORT void webrtc_LogMessage_LogToDebug(int severity);
+WEBRTC_EXPORT void webrtc_LogMessage_LogTimestamps();
+WEBRTC_EXPORT void webrtc_LogMessage_LogThreads();
+WEBRTC_EXPORT void webrtc_LogMessage_Print(int severity,
+                                           const char* file,
+                                           int line,
+                                           const char* fmt,
+                                           ...);
 
 #define RTC_LOG_VERBOSE(fmt, ...)                                            \
   webrtc_LogMessage_Print(webrtc_LogSeverity_LS_VERBOSE, __FILE__, __LINE__, \
