@@ -5,6 +5,7 @@
 #include "../common.h"
 #include "../pc/connection_context.h"
 #include "../rtc_base/ssl_certificate.h"
+#include "../rtc_base/ssl_identity.h"
 #include "../rtc_base/thread.h"
 #include "../std.h"
 #include "data_channel_interface.h"
@@ -67,6 +68,9 @@ extern const int
 void webrtc_PeerConnectionInterface_IceServer_set_tls_cert_policy(
     struct webrtc_PeerConnectionInterface_IceServer* self,
     webrtc_PeerConnectionInterface_TlsCertPolicy tls_cert_policy);
+void webrtc_PeerConnectionInterface_IceServer_set_tls_client_identity(
+    struct webrtc_PeerConnectionInterface_IceServer* self,
+    struct webrtc_SSLIdentity_unique* identity);
 struct webrtc_PeerConnectionInterface_IceServer_vector*
 webrtc_PeerConnectionInterface_RTCConfiguration_get_servers(
     struct webrtc_PeerConnectionInterface_RTCConfiguration* self);

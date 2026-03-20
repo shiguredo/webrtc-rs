@@ -46,6 +46,7 @@
 #include <rtc_base/network.h>
 #include <rtc_base/proxy_info_revive.h>
 #include <rtc_base/socket_address.h>
+#include <rtc_base/ssl_identity.h>
 #include <rtc_base/ssl_stream_adapter.h>
 #include <rtc_base/thread.h>
 
@@ -320,6 +321,20 @@ void webrtc_PeerConnectionInterface_IceServer_set_tls_cert_policy(
   server->tls_cert_policy =
       static_cast<webrtc::PeerConnectionInterface::TlsCertPolicy>(
           tls_cert_policy);
+}
+void webrtc_PeerConnectionInterface_IceServer_set_tls_client_identity(
+    struct webrtc_PeerConnectionInterface_IceServer* self,
+    struct webrtc_SSLIdentity_unique* identity) {
+  auto server =
+      reinterpret_cast<webrtc::PeerConnectionInterface::IceServer*>(self);
+  if (identity != nullptr) {
+    auto ssl_identity =
+        std::unique_ptr<webrtc::SSLIdentity>(
+            reinterpret_cast<webrtc::SSLIdentity*>(identity));
+    server->tls_client_identity = std::move(ssl_identity);
+  } else {
+    server->tls_client_identity.reset();
+  }
 }
 struct webrtc_PeerConnectionInterface_IceServer_vector*
 webrtc_PeerConnectionInterface_RTCConfiguration_get_servers(

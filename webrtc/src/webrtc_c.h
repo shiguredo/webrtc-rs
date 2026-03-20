@@ -42,6 +42,7 @@
 #include "webrtc_c/rtc_base/logging.h"
 #include "webrtc_c/rtc_base/ssl_adapter.h"
 #include "webrtc_c/rtc_base/ssl_certificate.h"
+#include "webrtc_c/rtc_base/ssl_identity.h"
 #include "webrtc_c/rtc_base/thread.h"
 #include "webrtc_c/rtc_base/time_utils.h"
 #include "webrtc_c/rtc_base/timestamp_aligner.h"

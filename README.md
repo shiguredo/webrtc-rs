@@ -313,6 +313,8 @@ impl FactoryHolder {
   - SSL 証明書の参照
 - `SSLCertChainRef`
   - SSL 証明書チェーンの参照
+- `SSLIdentity`
+  - TURN-TLS 接続でのクライアント認証 (mTLS) 用の SSL アイデンティティ
 
 ### エラー
 
