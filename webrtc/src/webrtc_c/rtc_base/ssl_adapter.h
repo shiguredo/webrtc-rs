@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../common.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -8,7 +10,7 @@ extern "C" {
 // webrtc::InitializeSSL()
 // -------------------------
 
-void webrtc_InitializeSSL();
+void WEBRTC_EXPORT webrtc_InitializeSSL();
 
 #if defined(__cplusplus)
 }

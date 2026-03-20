@@ -8,6 +8,8 @@
 #include <api/ref_count.h>
 #include <api/scoped_refptr.h>
 
+#include "../common.h"
+
 // -------------------------
 // webrtc::RefCountInterface
 // -------------------------
@@ -24,16 +26,16 @@ struct webrtc_RefCountInterface_ref : webrtc::RefCountInterface {
 
 extern "C" {
 
-void webrtc_RefCountInterface_AddRef(struct webrtc_RefCountInterface_ref* ref) {
+void WEBRTC_EXPORT
+webrtc_RefCountInterface_AddRef(struct webrtc_RefCountInterface_ref* ref) {
   ref->AddRef();
 }
-void webrtc_RefCountInterface_Release(
-    struct webrtc_RefCountInterface_ref* ref) {
+void WEBRTC_EXPORT
+webrtc_RefCountInterface_Release(struct webrtc_RefCountInterface_ref* ref) {
   ref->Release();
 }
-struct webrtc_RefCountInterface_ref* webrtc_RefCountInterface_Create(
-    void (*dtor)(void*),
-    void* user_data) {
+struct webrtc_RefCountInterface_ref* WEBRTC_EXPORT
+webrtc_RefCountInterface_Create(void (*dtor)(void*), void* user_data) {
   return webrtc::make_ref_counted<webrtc_RefCountInterface_ref>(dtor, user_data)
       .release();
 }

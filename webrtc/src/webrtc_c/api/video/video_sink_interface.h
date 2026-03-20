@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../common.h"
 #include "video_frame.h"
 
 #if defined(__cplusplus)
@@ -14,10 +15,11 @@ struct webrtc_VideoSinkInterface_cbs {
   void (*OnDestroy)(void* user_data);
 };
 
-struct webrtc_VideoSinkInterface* webrtc_VideoSinkInterface_new(
-    const struct webrtc_VideoSinkInterface_cbs* cbs,
-    void* user_data);
-void webrtc_VideoSinkInterface_delete(struct webrtc_VideoSinkInterface* self);
+struct webrtc_VideoSinkInterface* WEBRTC_EXPORT
+webrtc_VideoSinkInterface_new(const struct webrtc_VideoSinkInterface_cbs* cbs,
+                              void* user_data);
+void WEBRTC_EXPORT
+webrtc_VideoSinkInterface_delete(struct webrtc_VideoSinkInterface* self);
 
 #if defined(__cplusplus)
 }

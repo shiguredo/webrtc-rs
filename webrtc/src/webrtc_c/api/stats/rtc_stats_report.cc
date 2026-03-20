@@ -8,6 +8,7 @@
 // WebRTC
 #include <api/stats/rtc_stats_report.h>
 
+#include "../../common.h"
 #include "../../common.impl.h"
 #include "../../std.h"
 
@@ -18,8 +19,8 @@
 extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_RTCStatsReport, webrtc::RTCStatsReport);
 
-struct std_string_unique* webrtc_RTCStatsReport_ToJson(
-    struct webrtc_RTCStatsReport* report) {
+struct std_string_unique* WEBRTC_EXPORT
+webrtc_RTCStatsReport_ToJson(struct webrtc_RTCStatsReport* report) {
   if (report == nullptr) {
     return nullptr;
   }

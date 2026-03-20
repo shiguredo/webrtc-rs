@@ -7,6 +7,7 @@
 // WebRTC
 #include <api/rtc_error.h>
 
+#include "../common.h"
 #include "../common.impl.h"
 
 // -------------------------
@@ -15,13 +16,13 @@
 
 extern "C" {
 WEBRTC_DEFINE_UNIQUE(webrtc_RTCError, webrtc::RTCError);
-int webrtc_RTCError_ok(struct webrtc_RTCError* self) {
+int WEBRTC_EXPORT webrtc_RTCError_ok(struct webrtc_RTCError* self) {
   auto err = reinterpret_cast<webrtc::RTCError*>(self);
   return err->ok() ? 1 : 0;
 }
-void webrtc_RTCError_message(struct webrtc_RTCError* self,
-                             const char** out_message,
-                             size_t* out_len) {
+void WEBRTC_EXPORT webrtc_RTCError_message(struct webrtc_RTCError* self,
+                                           const char** out_message,
+                                           size_t* out_len) {
   auto err = reinterpret_cast<webrtc::RTCError*>(self);
   if (out_message != nullptr) {
     *out_message = err->message();

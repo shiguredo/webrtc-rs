@@ -6,12 +6,14 @@
 // WebRTC
 #include <rtc_base/ssl_adapter.h>
 
+#include "../common.h"
+
 // -------------------------
 // webrtc::InitializeSSL()
 // -------------------------
 
 extern "C" {
-void webrtc_InitializeSSL() {
+void WEBRTC_EXPORT webrtc_InitializeSSL() {
   webrtc::InitializeSSL();
 }
 }

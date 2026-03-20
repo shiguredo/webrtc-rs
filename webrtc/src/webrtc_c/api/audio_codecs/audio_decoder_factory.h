@@ -11,7 +11,7 @@ extern "C" {
 // -------------------------
 
 WEBRTC_DECLARE_REFCOUNTED(webrtc_AudioDecoderFactory);
-struct webrtc_AudioDecoderFactory_refcounted*
+struct webrtc_AudioDecoderFactory_refcounted* WEBRTC_EXPORT
 webrtc_CreateBuiltinAudioDecoderFactory();
 
 #if defined(__cplusplus)

@@ -8,6 +8,7 @@
 #include <api/audio/audio_processing.h>
 #include <api/audio/builtin_audio_processing_builder.h>
 
+#include "../../common.h"
 #include "../../common.impl.h"
 
 // -------------------------
@@ -17,7 +18,7 @@
 extern "C" {
 WEBRTC_DEFINE_UNIQUE(webrtc_AudioProcessingBuilderInterface,
                      webrtc::AudioProcessingBuilderInterface);
-struct webrtc_AudioProcessingBuilderInterface_unique*
+struct webrtc_AudioProcessingBuilderInterface_unique* WEBRTC_EXPORT
 webrtc_BuiltinAudioProcessingBuilder_Create() {
   auto builder = std::make_unique<webrtc::BuiltinAudioProcessingBuilder>();
   return reinterpret_cast<

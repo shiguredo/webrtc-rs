@@ -23,32 +23,32 @@ struct webrtc_EncodedImage;
 struct webrtc_VideoDecoder_Settings;
 struct webrtc_VideoDecoder_DecodedImageCallback;
 
-struct webrtc_VideoDecoder_DecoderInfo_unique*
+struct webrtc_VideoDecoder_DecoderInfo_unique* WEBRTC_EXPORT
 webrtc_VideoDecoder_DecoderInfo_new();
-struct std_string_unique*
+struct std_string_unique* WEBRTC_EXPORT
 webrtc_VideoDecoder_DecoderInfo_get_implementation_name(
     struct webrtc_VideoDecoder_DecoderInfo* self);
-void webrtc_VideoDecoder_DecoderInfo_set_implementation_name(
+void WEBRTC_EXPORT webrtc_VideoDecoder_DecoderInfo_set_implementation_name(
     struct webrtc_VideoDecoder_DecoderInfo* self,
     struct std_string_unique* name);
-int webrtc_VideoDecoder_DecoderInfo_get_is_hardware_accelerated(
+int WEBRTC_EXPORT webrtc_VideoDecoder_DecoderInfo_get_is_hardware_accelerated(
     struct webrtc_VideoDecoder_DecoderInfo* self);
-void webrtc_VideoDecoder_DecoderInfo_set_is_hardware_accelerated(
+void WEBRTC_EXPORT webrtc_VideoDecoder_DecoderInfo_set_is_hardware_accelerated(
     struct webrtc_VideoDecoder_DecoderInfo* self,
     int value);
-int webrtc_VideoDecoder_Settings_number_of_cores(
+int WEBRTC_EXPORT webrtc_VideoDecoder_Settings_number_of_cores(
     struct webrtc_VideoDecoder_Settings* self);
-int webrtc_VideoDecoder_Settings_codec_type(
+int WEBRTC_EXPORT webrtc_VideoDecoder_Settings_codec_type(
     struct webrtc_VideoDecoder_Settings* self);
-int webrtc_VideoDecoder_Settings_has_buffer_pool_size(
+int WEBRTC_EXPORT webrtc_VideoDecoder_Settings_has_buffer_pool_size(
     struct webrtc_VideoDecoder_Settings* self);
-int webrtc_VideoDecoder_Settings_buffer_pool_size(
+int WEBRTC_EXPORT webrtc_VideoDecoder_Settings_buffer_pool_size(
     struct webrtc_VideoDecoder_Settings* self);
-int webrtc_VideoDecoder_Settings_max_render_resolution_width(
+int WEBRTC_EXPORT webrtc_VideoDecoder_Settings_max_render_resolution_width(
     struct webrtc_VideoDecoder_Settings* self);
-int webrtc_VideoDecoder_Settings_max_render_resolution_height(
+int WEBRTC_EXPORT webrtc_VideoDecoder_Settings_max_render_resolution_height(
     struct webrtc_VideoDecoder_Settings* self);
-void webrtc_VideoDecoder_DecodedImageCallback_Decoded(
+void WEBRTC_EXPORT webrtc_VideoDecoder_DecodedImageCallback_Decoded(
     struct webrtc_VideoDecoder_DecodedImageCallback* self,
     struct webrtc_VideoFrame* decoded_image);
 
@@ -67,20 +67,22 @@ struct webrtc_VideoDecoder_cbs {
   void (*OnDestroy)(void* user_data);
 };
 
-struct webrtc_VideoDecoder_unique* webrtc_VideoDecoder_new(
-    const struct webrtc_VideoDecoder_cbs* cbs,
-    void* user_data);
-int webrtc_VideoDecoder_Configure(
-    struct webrtc_VideoDecoder* self,
-    struct webrtc_VideoDecoder_Settings* settings);
-int32_t webrtc_VideoDecoder_Decode(struct webrtc_VideoDecoder* self,
-                                   struct webrtc_EncodedImage* input_image,
-                                   int64_t render_time_ms);
-int32_t webrtc_VideoDecoder_RegisterDecodeCompleteCallback(
+struct webrtc_VideoDecoder_unique* WEBRTC_EXPORT
+webrtc_VideoDecoder_new(const struct webrtc_VideoDecoder_cbs* cbs,
+                        void* user_data);
+int WEBRTC_EXPORT
+webrtc_VideoDecoder_Configure(struct webrtc_VideoDecoder* self,
+                              struct webrtc_VideoDecoder_Settings* settings);
+int32_t WEBRTC_EXPORT
+webrtc_VideoDecoder_Decode(struct webrtc_VideoDecoder* self,
+                           struct webrtc_EncodedImage* input_image,
+                           int64_t render_time_ms);
+int32_t WEBRTC_EXPORT webrtc_VideoDecoder_RegisterDecodeCompleteCallback(
     struct webrtc_VideoDecoder* self,
     struct webrtc_VideoDecoder_DecodedImageCallback* callback);
-int32_t webrtc_VideoDecoder_Release(struct webrtc_VideoDecoder* self);
-struct webrtc_VideoDecoder_DecoderInfo_unique*
+int32_t WEBRTC_EXPORT
+webrtc_VideoDecoder_Release(struct webrtc_VideoDecoder* self);
+struct webrtc_VideoDecoder_DecoderInfo_unique* WEBRTC_EXPORT
 webrtc_VideoDecoder_GetDecoderInfo(struct webrtc_VideoDecoder* self);
 
 #if defined(__cplusplus)

@@ -12,6 +12,7 @@
 #include <api/video_codecs/video_decoder.h>
 #include <api/video_codecs/video_decoder_factory.h>
 
+#include "../../common.h"
 #include "../../common.impl.h"
 #include "../environment.h"
 #include "sdp_video_format.h"
@@ -84,17 +85,17 @@ class VideoDecoderFactoryImpl : public webrtc::VideoDecoderFactory {
 
 extern "C" {
 WEBRTC_DEFINE_UNIQUE(webrtc_VideoDecoderFactory, webrtc::VideoDecoderFactory);
-struct webrtc_VideoDecoderFactory_unique* webrtc_VideoDecoderFactory_new(
-    const struct webrtc_VideoDecoderFactory_cbs* cbs,
-    void* user_data) {
+struct webrtc_VideoDecoderFactory_unique* WEBRTC_EXPORT
+webrtc_VideoDecoderFactory_new(const struct webrtc_VideoDecoderFactory_cbs* cbs,
+                               void* user_data) {
   auto factory = new VideoDecoderFactoryImpl(cbs, user_data);
   return reinterpret_cast<struct webrtc_VideoDecoderFactory_unique*>(factory);
 }
 
-struct webrtc_VideoDecoder_unique* webrtc_VideoDecoderFactory_Create(
-    struct webrtc_VideoDecoderFactory* self,
-    struct webrtc_Environment* env,
-    struct webrtc_SdpVideoFormat* format) {
+struct webrtc_VideoDecoder_unique* WEBRTC_EXPORT
+webrtc_VideoDecoderFactory_Create(struct webrtc_VideoDecoderFactory* self,
+                                  struct webrtc_Environment* env,
+                                  struct webrtc_SdpVideoFormat* format) {
   if (self == nullptr || env == nullptr || format == nullptr) {
     return nullptr;
   }
@@ -106,7 +107,7 @@ struct webrtc_VideoDecoder_unique* webrtc_VideoDecoderFactory_Create(
       decoder.release());
 }
 
-struct webrtc_SdpVideoFormat_vector*
+struct webrtc_SdpVideoFormat_vector* WEBRTC_EXPORT
 webrtc_VideoDecoderFactory_GetSupportedFormats(
     struct webrtc_VideoDecoderFactory* self) {
   if (self == nullptr) {
@@ -118,7 +119,7 @@ webrtc_VideoDecoderFactory_GetSupportedFormats(
   return reinterpret_cast<struct webrtc_SdpVideoFormat_vector*>(vec);
 }
 
-struct webrtc_VideoDecoderFactory_unique*
+struct webrtc_VideoDecoderFactory_unique* WEBRTC_EXPORT
 webrtc_CreateBuiltinVideoDecoderFactory() {
   auto factory = webrtc::CreateBuiltinVideoDecoderFactory();
   return reinterpret_cast<struct webrtc_VideoDecoderFactory_unique*>(

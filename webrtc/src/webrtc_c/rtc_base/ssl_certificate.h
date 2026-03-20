@@ -14,11 +14,11 @@ extern "C" {
 // -------------------------
 
 struct webrtc_SSLCertificate;
-struct std_string_unique* webrtc_SSLCertificate_ToPEMString(
-    const struct webrtc_SSLCertificate* self);
-struct std_string_unique* webrtc_SSLCertificate_ToDER(
-    const struct webrtc_SSLCertificate* self);
-int64_t webrtc_SSLCertificate_CertificateExpirationTime(
+struct std_string_unique* WEBRTC_EXPORT
+webrtc_SSLCertificate_ToPEMString(const struct webrtc_SSLCertificate* self);
+struct std_string_unique* WEBRTC_EXPORT
+webrtc_SSLCertificate_ToDER(const struct webrtc_SSLCertificate* self);
+int64_t WEBRTC_EXPORT webrtc_SSLCertificate_CertificateExpirationTime(
     const struct webrtc_SSLCertificate* self);
 
 // -------------------------
@@ -26,10 +26,10 @@ int64_t webrtc_SSLCertificate_CertificateExpirationTime(
 // -------------------------
 
 struct webrtc_SSLCertChain;
-int webrtc_SSLCertChain_GetSize(const struct webrtc_SSLCertChain* self);
-const struct webrtc_SSLCertificate* webrtc_SSLCertChain_Get(
-    const struct webrtc_SSLCertChain* self,
-    int index);
+int WEBRTC_EXPORT
+webrtc_SSLCertChain_GetSize(const struct webrtc_SSLCertChain* self);
+const struct webrtc_SSLCertificate* WEBRTC_EXPORT
+webrtc_SSLCertChain_Get(const struct webrtc_SSLCertChain* self, int index);
 
 // -------------------------
 // webrtc::SSLCertificateVerifier
@@ -40,7 +40,8 @@ struct webrtc_SSLCertificateVerifier_cbs {
   int (*VerifyChain)(const struct webrtc_SSLCertChain* chain, void* user_data);
   void (*OnDestroy)(void* user_data);
 };
-struct webrtc_SSLCertificateVerifier_unique* webrtc_SSLCertificateVerifier_new(
+struct webrtc_SSLCertificateVerifier_unique* WEBRTC_EXPORT
+webrtc_SSLCertificateVerifier_new(
     const struct webrtc_SSLCertificateVerifier_cbs* cbs,
     void* user_data);
 
