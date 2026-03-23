@@ -192,7 +192,7 @@ jobs:
             "libwebrtc_c-${{ matrix.target }}.tar.gz.sha256" \
             --clobber
 
-  # Android クロスコンパイル
+  # Android クロスコンパイル（CMake 直接ビルド、bindgen なし）
   build-prebuilt-android:
     name: "Build prebuilt (android_arm64)"
     needs: create-release
@@ -206,28 +206,35 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libclang-dev python3
+          sudo apt-get install -y build-essential ninja-build
       - name: Install Android NDK r29
         run: |
-          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;29.0.13113456"
-          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/29.0.13113456" >> $GITHUB_ENV
-      - run: rustup update stable
-      - run: rustup target add aarch64-linux-android
-      - name: Build for Android arm64
-        env:
-          WEBRTC_C_TARGET: android_arm64
-        run: cargo build --release --features source-build --target aarch64-linux-android
+          yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;29.0.14206865"
+          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/29.0.14206865" >> $GITHUB_ENV
+      - name: Build libwebrtc_c for Android arm64
+        run: |
+          WEBRTC_BUILD_VERSION=$(grep 'webrtc-build' Cargo.toml | grep -oP 'version = "\K[^"]+')
+          WEBRTC_BASE_URL=$(grep 'webrtc-build' Cargo.toml | grep -oP 'base-url = "\K[^"]+')
+          cmake -B build/android -G Ninja \
+            -DWEBRTC_C_TARGET=android_arm64 \
+            -DWEBRTC_BUILD_VERSION="$WEBRTC_BUILD_VERSION" \
+            -DWEBRTC_BASE_URL="$WEBRTC_BASE_URL" \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DCMAKE_BUILD_TYPE=Release \
+            webrtc/
+          cmake --build build/android --target bundled_webrtc_c_bundling
       - name: Package prebuilt artifacts
         run: |
-          OUT_DIR=$(find target/aarch64-linux-android/release/build/shiguredo_webrtc-*/out -maxdepth 0 -type d | head -1)
-          if [ -z "$OUT_DIR" ]; then
-            echo "ERROR: OUT_DIR が見つかりません"
-            exit 1
-          fi
-          echo "OUT_DIR: $OUT_DIR"
           mkdir -p staging/lib
-          cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
-          cp "$OUT_DIR/bindings.rs" staging/
+          cp build/android/bundled/libwebrtc_c.a staging/lib/
+          mkdir -p staging/include
+          find webrtc/src -name '*.h' | while read f; do
+            dest="staging/include/${f#webrtc/src/}"
+            mkdir -p "$(dirname "$dest")"
+            cp "$f" "$dest"
+          done
           tar czf "libwebrtc_c-android_arm64.tar.gz" -C staging .
       - name: Generate SHA256 checksum
         run: shasum -a 256 "libwebrtc_c-android_arm64.tar.gz" > "libwebrtc_c-android_arm64.tar.gz.sha256"
