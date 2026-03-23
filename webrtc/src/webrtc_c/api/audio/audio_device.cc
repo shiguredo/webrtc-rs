@@ -714,6 +714,7 @@ class AudioDeviceModuleImpl : public webrtc::AudioDeviceModule {
     return cbs_->GetPlayoutUnderrunCount(user_data_);
   }
 
+#if defined(WEBRTC_IOS)
   int GetPlayoutAudioParameters(
       webrtc::AudioParameters* params) const override {
     webrtc_AudioParameters c_params{};
@@ -745,6 +746,7 @@ class AudioDeviceModuleImpl : public webrtc::AudioDeviceModule {
                                        c_params.frames_per_buffer);
     return 0;
   }
+#endif
 
   std::optional<Stats> GetStats() const override {
     webrtc_AudioDeviceModule_Stats stats;
