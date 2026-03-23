@@ -1,5 +1,6 @@
 #include "media_stream_interface.h"
 
+#include <stdint.h>
 #include <memory>
 #include <string>
 

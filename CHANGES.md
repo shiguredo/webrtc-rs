@@ -17,6 +17,11 @@
   - @voluntas
 - [ADD] `IceServer::urls_len` を追加する
   - @melpon
+- [ADD] `VideoEncoder::EncoderInfo` の全フィールドと関連型 API を追加する
+  - `QpThresholds` / `ScalingSettings` / `ResolutionBitrateLimits` / `Resolution` を追加する
+  - `ToString` / `GetEncoderBitrateLimitsForResolution` を追加する
+  - `fps_allocation` / `preferred_pixel_formats` / optional フィールド操作を追加する
+  - @melpon
 
 
 ## 0.146.0

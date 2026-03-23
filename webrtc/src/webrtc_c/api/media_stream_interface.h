@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 #include "../common.h"
 #include "../std.h"
 #include "video/video_sink_interface.h"
