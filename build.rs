@@ -68,6 +68,12 @@ fn main() {
                 e
             )
         });
+        // Android の prebuilt には bindings.rs が含まれないため、ローカルで生成する
+        if is_android_target(&target_platform) {
+            let header = webrtc_dir.join("src").join("webrtc_c.h");
+            let include_dir = webrtc_dir.join("src");
+            generate_bindings(&header, &include_dir);
+        }
         paths.lib_path
     } else {
         build_from_source(&webrtc_dir, &target_platform, &out_dir)
@@ -139,11 +145,14 @@ fn download_prebuilt(target: &str, out_dir: &Path) -> Result<PrebuiltPaths, Stri
 
     // bindgen 生成済みの bindings.rs を OUT_DIR/ にコピー
     // （利用者が libclang-dev をインストールしなくて済むようにするため）
-    fs::copy(
-        prebuilt_dir.join("bindings.rs"),
-        out_dir.join("bindings.rs"),
-    )
-    .map_err(|e| format!("bindings.rs のコピーに失敗: {}", e))?;
+    // Android の prebuilt には bindings.rs が含まれない（ローカルで生成する）
+    if !is_android_target(target) {
+        fs::copy(
+            prebuilt_dir.join("bindings.rs"),
+            out_dir.join("bindings.rs"),
+        )
+        .map_err(|e| format!("bindings.rs のコピーに失敗: {}", e))?;
+    }
 
     Ok(PrebuiltPaths { lib_path })
 }
@@ -355,6 +364,10 @@ fn build_webrtc_c(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> P
 
 fn is_windows_target(target_platform: &str) -> bool {
     target_platform.starts_with("windows_")
+}
+
+fn is_android_target(target_platform: &str) -> bool {
+    target_platform.starts_with("android_")
 }
 
 fn static_library_filename_for_target(target_platform: &str) -> &'static str {

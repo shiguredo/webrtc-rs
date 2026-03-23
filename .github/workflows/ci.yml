@@ -134,22 +134,29 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libclang-dev python3
+          sudo apt-get install -y build-essential ninja-build
       - name: Install Android NDK r29
         run: |
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;29.0.14206865"
-          NDK=${ANDROID_HOME}/ndk/29.0.14206865
-          TOOLCHAIN=${NDK}/toolchains/llvm/prebuilt/linux-x86_64
-          echo "ANDROID_NDK_HOME=${NDK}" >> $GITHUB_ENV
-          echo "CC_aarch64_linux_android=${TOOLCHAIN}/bin/aarch64-linux-android24-clang" >> $GITHUB_ENV
-          echo "CXX_aarch64_linux_android=${TOOLCHAIN}/bin/aarch64-linux-android24-clang++" >> $GITHUB_ENV
-          echo "AR_aarch64_linux_android=${TOOLCHAIN}/bin/llvm-ar" >> $GITHUB_ENV
-      - run: rustup update stable
-      - run: rustup target add aarch64-linux-android
-      - name: Build for Android arm64
-        env:
-          WEBRTC_C_TARGET: android_arm64
-        run: cargo build --features source-build --workspace --target aarch64-linux-android
+          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/29.0.14206865" >> $GITHUB_ENV
+      - name: Build libwebrtc_c for Android arm64
+        run: |
+          WEBRTC_BUILD_VERSION=$(grep 'webrtc-build' Cargo.toml | grep -oP 'version = "\K[^"]+')
+          WEBRTC_BASE_URL=$(grep 'webrtc-build' Cargo.toml | grep -oP 'base-url = "\K[^"]+')
+          cmake -B build/android -G Ninja \
+            -DWEBRTC_C_TARGET=android_arm64 \
+            -DWEBRTC_BUILD_VERSION="$WEBRTC_BUILD_VERSION" \
+            -DWEBRTC_BASE_URL="$WEBRTC_BASE_URL" \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DCMAKE_BUILD_TYPE=Release \
+            webrtc/
+          cmake --build build/android --target bundled_webrtc_c_bundling
+      - name: Verify build output
+        run: |
+          file build/android/bundled/libwebrtc_c.a
+          ls -lh build/android/bundled/libwebrtc_c.a
 
   slack_notify:
     needs: [ci, cross-compile, verify-linux-arm64, cross-compile-android]
