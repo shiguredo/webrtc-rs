@@ -125,12 +125,19 @@ jobs:
   #         ./whip --help
   #         ./whep --help
 
-  cross-compile-ios:
+  build-ios:
     runs-on: macos-26
     timeout-minutes: 30
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
+      - name: Install CMake 4.3.0
+        run: |
+          curl -fsSL https://github.com/Kitware/CMake/releases/download/v4.3.0/cmake-4.3.0-macos-universal.tar.gz -o cmake.tar.gz
+          tar xzf cmake.tar.gz
+          sudo cp -R cmake-4.3.0-macos-universal/CMake.app/Contents/bin/* /usr/local/bin/
+          sudo cp -R cmake-4.3.0-macos-universal/CMake.app/Contents/share/* /usr/local/share/
+          cmake --version
       - name: Install build dependencies
         run: brew install ninja
       - name: Build libwebrtc_c for iOS arm64
@@ -152,12 +159,17 @@ jobs:
           file build/ios/bundled/libwebrtc_c.a
           ls -lh build/ios/bundled/libwebrtc_c.a
 
-  cross-compile-android:
+  build-android:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
+      - name: Install CMake 4.3.0
+        run: |
+          curl -fsSL https://github.com/Kitware/CMake/releases/download/v4.3.0/cmake-4.3.0-linux-x86_64.sh -o cmake-install.sh
+          sudo sh cmake-install.sh --skip-license --prefix=/usr/local
+          cmake --version
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -187,7 +199,7 @@ jobs:
 
   slack_notify:
     # needs: [ci, cross-compile, verify-linux-arm64, cross-compile-ios, cross-compile-android]
-    needs: [cross-compile-ios, cross-compile-android]
+    needs: [build-ios, build-android]
     runs-on: ubuntu-slim
     if: ${{ !cancelled() }}
     steps:
