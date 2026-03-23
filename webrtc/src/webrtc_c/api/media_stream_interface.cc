@@ -53,6 +53,19 @@ WEBRTC_EXPORT struct std_string_unique* webrtc_MediaStreamTrackInterface_id(
   auto id = std::make_unique<std::string>(track->id());
   return reinterpret_cast<struct std_string_unique*>(id.release());
 }
+
+WEBRTC_EXPORT int8_t webrtc_MediaStreamTrackInterface_enabled(
+    struct webrtc_MediaStreamTrackInterface* self) {
+  auto track = reinterpret_cast<webrtc::MediaStreamTrackInterface*>(self);
+  return track->enabled() ? 1 : 0;
+}
+
+WEBRTC_EXPORT int8_t webrtc_MediaStreamTrackInterface_set_enabled(
+    struct webrtc_MediaStreamTrackInterface* self,
+    int8_t enable) {
+  auto track = reinterpret_cast<webrtc::MediaStreamTrackInterface*>(self);
+  return track->set_enabled(enable != 0) ? 1 : 0;
+}
 }
 
 // -------------------------

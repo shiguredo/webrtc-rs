@@ -24,6 +24,11 @@ WEBRTC_EXPORT struct std_string_unique* webrtc_MediaStreamTrackInterface_kind(
     struct webrtc_MediaStreamTrackInterface* self);
 WEBRTC_EXPORT struct std_string_unique* webrtc_MediaStreamTrackInterface_id(
     struct webrtc_MediaStreamTrackInterface* self);
+WEBRTC_EXPORT int8_t webrtc_MediaStreamTrackInterface_enabled(
+    struct webrtc_MediaStreamTrackInterface* self);
+WEBRTC_EXPORT int8_t webrtc_MediaStreamTrackInterface_set_enabled(
+    struct webrtc_MediaStreamTrackInterface* self,
+    int8_t enable);
 WEBRTC_DECLARE_CAST_REFCOUNTED(webrtc_MediaStreamTrackInterface,
                                webrtc_VideoTrackInterface);
 WEBRTC_DECLARE_CAST_REFCOUNTED(webrtc_VideoTrackInterface,

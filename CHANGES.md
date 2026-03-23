@@ -13,6 +13,8 @@
 
 - [UPDATE] libwebrtc m146 (m146.7680.3.1) に上げる
   - @voluntas
+- [ADD] トラックの有効/無効を制御する `MediaStreamTrack::enabled` / `MediaStreamTrack::set_enabled` を追加する
+  - @voluntas
 - [ADD] `IceServer::urls_len` を追加する
   - @melpon
 
