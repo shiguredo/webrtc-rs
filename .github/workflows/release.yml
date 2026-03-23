@@ -266,6 +266,12 @@ jobs:
           mkdir -p staging/lib
           cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
           cp "$OUT_DIR/bindings.rs" staging/
+          mkdir -p staging/include
+          find webrtc/src -name '*.h' | while read f; do
+            dest="staging/include/${f#webrtc/src/}"
+            mkdir -p "$(dirname "$dest")"
+            cp "$f" "$dest"
+          done
           tar czf "libwebrtc_c-ios_arm64.tar.gz" -C staging .
       - name: Generate SHA256 checksum
         run: shasum -a 256 "libwebrtc_c-ios_arm64.tar.gz" > "libwebrtc_c-ios_arm64.tar.gz.sha256"
