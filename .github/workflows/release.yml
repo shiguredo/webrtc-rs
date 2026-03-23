@@ -229,6 +229,12 @@ jobs:
         run: |
           mkdir -p staging/lib
           cp build/android/bundled/libwebrtc_c.a staging/lib/
+          mkdir -p staging/include
+          find webrtc/src -name '*.h' | while read f; do
+            dest="staging/include/${f#webrtc/src/}"
+            mkdir -p "$(dirname "$dest")"
+            cp "$f" "$dest"
+          done
           tar czf "libwebrtc_c-android_arm64.tar.gz" -C staging .
       - name: Generate SHA256 checksum
         run: shasum -a 256 "libwebrtc_c-android_arm64.tar.gz" > "libwebrtc_c-android_arm64.tar.gz.sha256"
