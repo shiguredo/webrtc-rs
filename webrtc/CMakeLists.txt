@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.2)
+cmake_minimum_required(VERSION 3.20)
 
 # Only interpret if() arguments as variables or keywords when unquoted.
 cmake_policy(SET CMP0054 NEW)
@@ -397,6 +397,9 @@ add_library(webrtc_c
     src/webrtc_c/rtc_base/timestamp_aligner.cc
     src/webrtc_c/std.cc
 )
+# CMake 4.x で C++20 モジュールスキャンが自動有効になるが、
+# WebRTC の clang に clang-scan-deps が含まれないため無効化する
+set_target_properties(webrtc_c PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 add_executable(whip_cpp src/whip.cpp)
 add_executable(whep_cpp src/whep.cpp)
 set(WEBRTC_CPP_TARGETS webrtc_c whip_cpp whep_cpp)
