@@ -130,6 +130,8 @@ elseif(WEBRTC_C_TARGET STREQUAL "ubuntu-22.04_armv8")
   set(WEBRTC_ARCHIVE_NAME "webrtc.ubuntu-22.04_armv8.tar.gz")
 elseif(WEBRTC_C_TARGET STREQUAL "raspberry-pi-os_armv8")
   set(WEBRTC_ARCHIVE_NAME "webrtc.raspberry-pi-os_armv8.tar.gz")
+elseif(WEBRTC_C_TARGET STREQUAL "ios_arm64")
+  set(WEBRTC_ARCHIVE_NAME "webrtc.ios.tar.gz")
 elseif(WEBRTC_C_TARGET STREQUAL "android_arm64")
   set(WEBRTC_ARCHIVE_NAME "webrtc.android.tar.gz")
 elseif(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
@@ -324,6 +326,13 @@ if(WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_ARMV8)
   # クロスコンパイル時はシステムの ld ではなく LLD を使用する
   set(CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld" CACHE STRING "" FORCE)
   set(CMAKE_SHARED_LINKER_FLAGS "-fuse-ld=lld" CACHE STRING "" FORCE)
+endif()
+
+# iOS クロスコンパイル設定（project() の前に配置が必要）
+if(WEBRTC_C_TARGET STREQUAL "ios_arm64")
+  set(CMAKE_SYSTEM_NAME iOS)
+  set(CMAKE_OSX_ARCHITECTURES arm64)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 16.0)
 endif()
 
 # ここで project() を呼び出す
@@ -575,6 +584,44 @@ elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
     )
   endforeach()
 
+elseif (WEBRTC_C_TARGET STREQUAL "ios_arm64")
+  enable_language(OBJCXX)
+
+  foreach(target IN LISTS WEBRTC_CPP_TARGETS)
+    target_compile_options(${target} PRIVATE -fconstant-string-class=NSConstantString)
+    target_compile_definitions(${target}
+      PRIVATE
+        WEBRTC_POSIX
+        WEBRTC_MAC
+        WEBRTC_IOS
+        _LIBCPP_ABI_NAMESPACE=Cr
+        _LIBCPP_ABI_VERSION=2
+        _LIBCPP_DISABLE_AVAILABILITY
+        _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS
+        _LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS
+        _LIBCPP_ENABLE_NODISCARD
+        _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
+    )
+    set_target_properties(${target} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+  endforeach()
+
+  foreach(target IN LISTS WEBRTC_CPP_TARGETS)
+    target_link_libraries(${target}
+      PRIVATE
+        "-framework CoreFoundation"
+        "-framework AVFoundation"
+        "-framework AudioToolbox"
+        "-framework CoreAudio"
+        "-framework CoreMedia"
+        "-framework CoreVideo"
+        "-framework VideoToolbox"
+        "-framework Metal"
+        "-framework IOSurface"
+        "-framework QuartzCore"
+        "-framework UIKit"
+    )
+  endforeach()
+
 elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_UBUNTU)
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
     target_compile_definitions(${target}
@@ -732,6 +779,23 @@ elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
         "-framework OpenGL"
         "-framework IOSurface"
         "-framework ScreenCaptureKit"
+    )
+  endforeach()
+elseif (WEBRTC_C_TARGET STREQUAL "ios_arm64")
+  foreach(target IN LISTS WEBRTC_C_TARGETS)
+    target_link_libraries(${target}
+      PRIVATE
+        "-framework CoreFoundation"
+        "-framework AVFoundation"
+        "-framework AudioToolbox"
+        "-framework CoreAudio"
+        "-framework CoreMedia"
+        "-framework CoreVideo"
+        "-framework VideoToolbox"
+        "-framework Metal"
+        "-framework IOSurface"
+        "-framework QuartzCore"
+        "-framework UIKit"
     )
   endforeach()
 elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_UBUNTU)

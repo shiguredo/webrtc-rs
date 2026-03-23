@@ -254,6 +254,7 @@ fn get_target_platform() -> String {
         ("linux", "aarch64") => format!("{}_armv8", detect_linux_distro()),
         ("macos", "aarch64") => "macos_arm64".to_string(),
         ("windows", "x86_64") => "windows_x86_64".to_string(),
+        ("ios", "aarch64") => "ios_arm64".to_string(),
         ("android", "aarch64") => "android_arm64".to_string(),
         _ => panic!(
             "サポートされていないターゲットです: os={}, arch={}",
@@ -305,6 +306,13 @@ fn build_webrtc_c(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> P
     // WEBRTC_C_SYSROOT が設定されていれば CMake に渡す
     if let Ok(sysroot) = env::var("WEBRTC_C_SYSROOT") {
         config.define("WEBRTC_C_SYSROOT", &sysroot);
+    }
+
+    // iOS クロスコンパイル設定
+    if target_platform == "ios_arm64" {
+        config.define("CMAKE_SYSTEM_NAME", "iOS");
+        config.define("CMAKE_OSX_ARCHITECTURES", "arm64");
+        config.define("CMAKE_OSX_DEPLOYMENT_TARGET", "16.0");
     }
 
     // Android NDK ツールチェーンの設定
@@ -597,6 +605,27 @@ fn emit_link_directives(lib_path: &Path) {
                 "wmcodecdspuuid",
             ] {
                 println!("cargo:rustc-link-lib={lib}");
+            }
+        }
+        "ios" => {
+            println!("cargo:rustc-link-lib=c++");
+            for framework in [
+                "Foundation",
+                "AVFoundation",
+                "CoreAudio",
+                "AudioToolbox",
+                "CoreMedia",
+                "CoreVideo",
+                "CoreGraphics",
+                "CoreFoundation",
+                "VideoToolbox",
+                "Security",
+                "Metal",
+                "IOSurface",
+                "QuartzCore",
+                "UIKit",
+            ] {
+                println!("cargo:rustc-link-lib=framework={framework}");
             }
         }
         "android" => {

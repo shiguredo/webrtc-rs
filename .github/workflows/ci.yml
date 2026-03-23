@@ -125,6 +125,17 @@ jobs:
           ./whip --help
           ./whep --help
 
+  cross-compile-ios:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+      - run: rustup update stable
+      - run: rustup target add aarch64-apple-ios
+      - name: Build for iOS arm64
+        run: cargo build --features source-build --workspace --target aarch64-apple-ios
+
   cross-compile-android:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -147,7 +158,7 @@ jobs:
         run: cargo build --features source-build --workspace --target aarch64-linux-android
 
   slack_notify:
-    needs: [ci, cross-compile, verify-linux-arm64, cross-compile-android]
+    needs: [ci, cross-compile, verify-linux-arm64, cross-compile-ios, cross-compile-android]
     runs-on: ubuntu-slim
     if: ${{ !cancelled() }}
     steps:
