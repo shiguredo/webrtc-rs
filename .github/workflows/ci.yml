@@ -125,8 +125,29 @@ jobs:
           ./whip --help
           ./whep --help
 
+  cross-compile-android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libclang-dev python3
+      - name: Install Android NDK r29
+        run: |
+          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;29.0.13113456"
+          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/29.0.13113456" >> $GITHUB_ENV
+      - run: rustup update stable
+      - run: rustup target add aarch64-linux-android
+      - name: Build for Android arm64
+        env:
+          WEBRTC_C_TARGET: android_arm64
+        run: cargo build --features source-build --workspace --target aarch64-linux-android
+
   slack_notify:
-    needs: [ci, cross-compile, verify-linux-arm64]
+    needs: [ci, cross-compile, verify-linux-arm64, cross-compile-android]
     runs-on: ubuntu-slim
     if: ${{ !cancelled() }}
     steps:

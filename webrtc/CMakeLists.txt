@@ -130,6 +130,8 @@ elseif(WEBRTC_C_TARGET STREQUAL "ubuntu-22.04_armv8")
   set(WEBRTC_ARCHIVE_NAME "webrtc.ubuntu-22.04_armv8.tar.gz")
 elseif(WEBRTC_C_TARGET STREQUAL "raspberry-pi-os_armv8")
   set(WEBRTC_ARCHIVE_NAME "webrtc.raspberry-pi-os_armv8.tar.gz")
+elseif(WEBRTC_C_TARGET STREQUAL "android_arm64")
+  set(WEBRTC_ARCHIVE_NAME "webrtc.android.tar.gz")
 elseif(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
   set(WEBRTC_ARCHIVE_NAME "webrtc.windows_x86_64.zip")
 else()
@@ -153,9 +155,15 @@ set(WEBRTC_VERSION_FILE "${DEPS_DIR}/webrtc.version")
 set(LLVM_VERSION_FILE "${DEPS_DIR}/llvm.version")
 # WebRTC 向けの libc++ ヘッダーのダウンロードと使用（WebRTC との ABI 互換性のため）
 set(WEBRTC_USE_WEBRTC_LIBCXX TRUE)
+# Chromium の Clang をコンパイラとして使用するかどうか
+# Android は NDK の Clang を使い、libc++ ヘッダーのみ Chromium のものを使う
+set(WEBRTC_USE_CHROMIUM_CLANG TRUE)
 
 if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
   set(WEBRTC_USE_WEBRTC_LIBCXX FALSE)
+  set(WEBRTC_USE_CHROMIUM_CLANG FALSE)
+elseif(WEBRTC_C_TARGET STREQUAL "android_arm64")
+  set(WEBRTC_USE_CHROMIUM_CLANG FALSE)
 endif()
 
 # WebRTC のダウンロード（project() の前に実行）
@@ -194,7 +202,11 @@ endif()
 
 # WebRTC のパスを設定
 set(WEBRTC_INCLUDE_DIR "${WEBRTC_DIR}/include")
-set(WEBRTC_LIBRARY_DIR "${WEBRTC_DIR}/lib")
+if(WEBRTC_C_TARGET STREQUAL "android_arm64")
+  set(WEBRTC_LIBRARY_DIR "${WEBRTC_DIR}/lib/arm64-v8a")
+else()
+  set(WEBRTC_LIBRARY_DIR "${WEBRTC_DIR}/lib")
+endif()
 
 # WebRTC パッケージの VERSIONS ファイルから LLVM 関連の情報を読み込む
 file(STRINGS "${WEBRTC_DIR}/VERSIONS" VERSIONS_LINES)
@@ -227,21 +239,24 @@ if(WEBRTC_USE_WEBRTC_LIBCXX AND LLVM_NEEDS_INSTALL)
   file(REMOVE_RECURSE "${LLVM_DIR}")
   file(MAKE_DIRECTORY "${LLVM_DIR}")
 
-  # tools を shallow clone
-  message(STATUS "Cloning tools...")
-  git_shallow_clone(
-    NAME "tools"
-    WORKING_DIRECTORY "${LLVM_TOOLS_DIR}"
-    REPOSITORY "${WEBRTC_WEBRTC_SRC_TOOLS_URL}"
-    COMMIT "${WEBRTC_WEBRTC_SRC_TOOLS_COMMIT}"
-  )
+  # Chromium の Clang をダウンロード（Android 以外）
+  if(WEBRTC_USE_CHROMIUM_CLANG)
+    # tools を shallow clone
+    message(STATUS "Cloning tools...")
+    git_shallow_clone(
+      NAME "tools"
+      WORKING_DIRECTORY "${LLVM_TOOLS_DIR}"
+      REPOSITORY "${WEBRTC_WEBRTC_SRC_TOOLS_URL}"
+      COMMIT "${WEBRTC_WEBRTC_SRC_TOOLS_COMMIT}"
+    )
 
-  # update.py を実行して Clang をダウンロード
-  message(STATUS "Downloading Clang via update.py...")
-  execute_process_checked(
-    COMMAND python3 "${LLVM_TOOLS_DIR}/clang/scripts/update.py" --output-dir "${LLVM_CLANG_DIR}"
-    ERROR_MESSAGE "Failed to download Clang"
-  )
+    # update.py を実行して Clang をダウンロード
+    message(STATUS "Downloading Clang via update.py...")
+    execute_process_checked(
+      COMMAND python3 "${LLVM_TOOLS_DIR}/clang/scripts/update.py" --output-dir "${LLVM_CLANG_DIR}"
+      ERROR_MESSAGE "Failed to download Clang"
+    )
+  endif()
 
   if(WEBRTC_USE_WEBRTC_LIBCXX)
     # libcxx を shallow clone
@@ -278,17 +293,19 @@ if(WEBRTC_USE_WEBRTC_LIBCXX AND LLVM_NEEDS_INSTALL)
   message(STATUS "LLVM installation complete")
 endif()
 
-if(WEBRTC_USE_WEBRTC_LIBCXX)
+if(WEBRTC_USE_CHROMIUM_CLANG)
   # Prebuilt Clang コンパイラのパスを設定（project() の前）
   set(CMAKE_C_COMPILER "${LLVM_CLANG_DIR}/bin/clang" CACHE FILEPATH "" FORCE)
   set(CMAKE_CXX_COMPILER "${LLVM_CLANG_DIR}/bin/clang++" CACHE FILEPATH "" FORCE)
   message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
   message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
-
-  set(LIBCXX_INCLUDE_DIR "${LLVM_LIBCXX_DIR}/include")
-  message(STATUS "LIBCXX_INCLUDE_DIR: ${LIBCXX_INCLUDE_DIR}")
 else()
   message(STATUS "Using default C/C++ compiler from CMake generator")
+endif()
+
+if(WEBRTC_USE_WEBRTC_LIBCXX)
+  set(LIBCXX_INCLUDE_DIR "${LLVM_LIBCXX_DIR}/include")
+  message(STATUS "LIBCXX_INCLUDE_DIR: ${LIBCXX_INCLUDE_DIR}")
 endif()
 
 # ARM64 クロスコンパイル設定（project() の前に配置が必要）
@@ -618,6 +635,32 @@ elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_RASPBERRY_PI)
     )
   endforeach()
 
+elseif (WEBRTC_C_TARGET STREQUAL "android_arm64")
+  foreach(target IN LISTS WEBRTC_CPP_TARGETS)
+    target_compile_definitions(${target}
+      PRIVATE
+        WEBRTC_POSIX
+        WEBRTC_LINUX
+        WEBRTC_ANDROID
+        _LIBCPP_ABI_NAMESPACE=Cr
+        _LIBCPP_ABI_VERSION=2
+        _LIBCPP_DISABLE_AVAILABILITY
+        _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
+        RTC_ENABLE_H265
+    )
+    # libwebrtc.a は Relative VTable ABI でビルドされているため、
+    # webrtc_c 側も同じフラグでコンパイルする必要がある
+    target_compile_options(${target} PRIVATE
+      "$<$<COMPILE_LANGUAGE:CXX>:-fexperimental-relative-c++-abi-vtables>"
+    )
+    set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_link_libraries(${target}
+      PRIVATE
+        log
+        OpenSLES
+    )
+  endforeach()
+
 endif()
 
 # 静的ライブラリを webrtc_c.lib に含める
@@ -698,5 +741,9 @@ elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_UBUNTU)
 elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_RASPBERRY_PI)
   foreach(target IN LISTS WEBRTC_C_TARGETS)
     target_link_libraries(${target} PRIVATE X11 dl rt Threads::Threads)
+  endforeach()
+elseif (WEBRTC_C_TARGET STREQUAL "android_arm64")
+  foreach(target IN LISTS WEBRTC_C_TARGETS)
+    target_link_libraries(${target} PRIVATE log OpenSLES)
   endforeach()
 endif()

@@ -39,6 +39,8 @@ fn main() {
     println!("cargo::rerun-if-env-changed=WEBRTC_C_TARGET");
     println!("cargo::rerun-if-env-changed=WEBRTC_C_SYSROOT");
     println!("cargo::rerun-if-env-changed=LIBCLANG_PATH");
+    println!("cargo::rerun-if-env-changed=ANDROID_NDK_HOME");
+    println!("cargo::rerun-if-env-changed=ANDROID_NDK");
 
     let manifest_dir = PathBuf::from(
         env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR の取得に失敗しました"),
@@ -252,6 +254,7 @@ fn get_target_platform() -> String {
         ("linux", "aarch64") => format!("{}_armv8", detect_linux_distro()),
         ("macos", "aarch64") => "macos_arm64".to_string(),
         ("windows", "x86_64") => "windows_x86_64".to_string(),
+        ("android", "aarch64") => "android_arm64".to_string(),
         _ => panic!(
             "サポートされていないターゲットです: os={}, arch={}",
             target_os, target_arch
@@ -302,6 +305,29 @@ fn build_webrtc_c(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> P
     // WEBRTC_C_SYSROOT が設定されていれば CMake に渡す
     if let Ok(sysroot) = env::var("WEBRTC_C_SYSROOT") {
         config.define("WEBRTC_C_SYSROOT", &sysroot);
+    }
+
+    // Android NDK ツールチェーンの設定
+    if target_platform == "android_arm64" {
+        let ndk = env::var("ANDROID_NDK_HOME")
+            .or_else(|_| env::var("ANDROID_NDK"))
+            .expect(
+                "ANDROID_NDK_HOME または ANDROID_NDK 環境変数が必要です。\
+                 Android NDK r29+ のパスを設定してください",
+            );
+        let toolchain_file = PathBuf::from(&ndk)
+            .join("build")
+            .join("cmake")
+            .join("android.toolchain.cmake");
+        if !toolchain_file.exists() {
+            panic!(
+                "Android NDK toolchain file が見つかりません: {}",
+                toolchain_file.display()
+            );
+        }
+        config.define("CMAKE_TOOLCHAIN_FILE", toolchain_file.to_str().unwrap());
+        config.define("ANDROID_ABI", "arm64-v8a");
+        config.define("ANDROID_PLATFORM", "android-24");
     }
 
     // bundled_webrtc_c_bundling ターゲットのみをビルド（all ターゲットを避ける）
@@ -570,6 +596,11 @@ fn emit_link_directives(lib_path: &Path) {
                 "secur32",
                 "wmcodecdspuuid",
             ] {
+                println!("cargo:rustc-link-lib={lib}");
+            }
+        }
+        "android" => {
+            for lib in ["log", "OpenSLES", "m", "dl"] {
                 println!("cargo:rustc-link-lib={lib}");
             }
         }
