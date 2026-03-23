@@ -210,7 +210,12 @@ jobs:
       - name: Install Android NDK r29
         run: |
           ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;29.0.13113456"
-          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/29.0.13113456" >> $GITHUB_ENV
+          NDK=${ANDROID_HOME}/ndk/29.0.13113456
+          TOOLCHAIN=${NDK}/toolchains/llvm/prebuilt/linux-x86_64
+          echo "ANDROID_NDK_HOME=${NDK}" >> $GITHUB_ENV
+          echo "CC_aarch64_linux_android=${TOOLCHAIN}/bin/aarch64-linux-android24-clang" >> $GITHUB_ENV
+          echo "CXX_aarch64_linux_android=${TOOLCHAIN}/bin/aarch64-linux-android24-clang++" >> $GITHUB_ENV
+          echo "AR_aarch64_linux_android=${TOOLCHAIN}/bin/llvm-ar" >> $GITHUB_ENV
       - run: rustup update stable
       - run: rustup target add aarch64-linux-android
       - name: Build for Android arm64
