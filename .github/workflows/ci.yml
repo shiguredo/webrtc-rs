@@ -131,10 +131,26 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
-      - run: rustup update stable
-      - run: rustup target add aarch64-apple-ios
-      - name: Build for iOS arm64
-        run: cargo build --features source-build --workspace --target aarch64-apple-ios
+      - name: Install build dependencies
+        run: brew install ninja
+      - name: Build libwebrtc_c for iOS arm64
+        run: |
+          WEBRTC_BUILD_VERSION=$(grep 'webrtc-build' Cargo.toml | grep -oE 'version = "[^"]+"' | sed 's/version = "//;s/"//')
+          WEBRTC_BASE_URL=$(grep 'webrtc-build' Cargo.toml | grep -oE 'base-url = "[^"]+"' | sed 's/base-url = "//;s/"//')
+          cmake -B build/ios -G Ninja \
+            -DWEBRTC_C_TARGET=ios_arm64 \
+            -DWEBRTC_BUILD_VERSION="$WEBRTC_BUILD_VERSION" \
+            -DWEBRTC_BASE_URL="$WEBRTC_BASE_URL" \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
+            -DCMAKE_BUILD_TYPE=Release \
+            webrtc/
+          cmake --build build/ios --target bundled_webrtc_c_bundling
+      - name: Verify build output
+        run: |
+          file build/ios/bundled/libwebrtc_c.a
+          ls -lh build/ios/bundled/libwebrtc_c.a
 
   cross-compile-android:
     runs-on: ubuntu-24.04
