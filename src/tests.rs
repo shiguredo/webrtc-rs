@@ -1219,7 +1219,7 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
     );
 
     let limits = info
-        .encoder_bitrate_limits_for_resolution(640 * 360)
+        .get_encoder_bitrate_limits_for_resolution(640 * 360)
         .expect("GetEncoderBitrateLimitsForResolution(640x360) が None です");
     assert_eq!(limits.frame_size_pixels(), 640 * 360);
     assert_eq!(limits.min_start_bitrate_bps(), 100000);
