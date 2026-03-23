@@ -131,12 +131,11 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
-      - name: Install CMake 4.3.0
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+      - name: Install CMake
         run: |
-          curl -fsSL https://github.com/Kitware/CMake/releases/download/v4.3.0/cmake-4.3.0-macos-universal.tar.gz -o cmake.tar.gz
-          tar xzf cmake.tar.gz
-          sudo cp -R cmake-4.3.0-macos-universal/CMake.app/Contents/bin/* /usr/local/bin/
-          sudo cp -R cmake-4.3.0-macos-universal/CMake.app/Contents/share/* /usr/local/share/
+          uv tool install cmake
           cmake --version
       - name: Install build dependencies
         run: brew install ninja
@@ -165,10 +164,11 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
-      - name: Install CMake 4.3.0
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+      - name: Install CMake
         run: |
-          curl -fsSL https://github.com/Kitware/CMake/releases/download/v4.3.0/cmake-4.3.0-linux-x86_64.sh -o cmake-install.sh
-          sudo sh cmake-install.sh --skip-license --prefix=/usr/local
+          uv tool install cmake
           cmake --version
       - name: Install build dependencies
         run: |
