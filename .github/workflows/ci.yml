@@ -137,8 +137,8 @@ jobs:
           sudo apt-get install -y build-essential libclang-dev python3
       - name: Install Android NDK r29
         run: |
-          yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;29.0.13113456"
-          NDK=${ANDROID_HOME}/ndk/29.0.13113456
+          yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;29.0.14206865"
+          NDK=${ANDROID_HOME}/ndk/29.0.14206865
           TOOLCHAIN=${NDK}/toolchains/llvm/prebuilt/linux-x86_64
           echo "ANDROID_NDK_HOME=${NDK}" >> $GITHUB_ENV
           echo "CC_aarch64_linux_android=${TOOLCHAIN}/bin/aarch64-linux-android24-clang" >> $GITHUB_ENV
