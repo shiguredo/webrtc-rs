@@ -1365,6 +1365,22 @@ impl MediaStreamTrack {
         id.to_string()
     }
 
+    /// トラックが有効かどうかを返す。
+    /// 無効なトラックは音声なら無音、映像なら黒フレームを生成する。
+    pub fn enabled(&self) -> bool {
+        let raw = self.raw_ref.as_ptr();
+        unsafe { ffi::webrtc_MediaStreamTrackInterface_enabled(raw) != 0 }
+    }
+
+    /// トラックの有効/無効を設定する。
+    /// 設定が成功した場合は true を返す。
+    pub fn set_enabled(&self, enable: bool) -> bool {
+        let raw = self.raw_ref.as_ptr();
+        unsafe {
+            ffi::webrtc_MediaStreamTrackInterface_set_enabled(raw, if enable { 1 } else { 0 }) != 0
+        }
+    }
+
     pub fn cast_to_video_track(&self) -> VideoTrack {
         let raw_ref = unsafe {
             ffi::webrtc_MediaStreamTrackInterface_refcounted_cast_to_webrtc_VideoTrackInterface(
