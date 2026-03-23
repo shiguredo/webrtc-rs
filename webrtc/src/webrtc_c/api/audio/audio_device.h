@@ -265,6 +265,12 @@ WEBRTC_EXPORT int webrtc_AudioDeviceModule_GetStats(
 // AudioDeviceModule (Callbacks)
 // -------------------------
 
+struct webrtc_AudioParameters {
+  int sample_rate;
+  size_t channels;
+  size_t frames_per_buffer;
+};
+
 struct webrtc_AudioDeviceModule_Stats {
   double synthesized_samples_duration_s;
   uint64_t synthesized_samples_events;
@@ -357,6 +363,12 @@ struct webrtc_AudioDeviceModule_cbs {
   int32_t (*EnableBuiltInNS)(int enable, void* user_data);
 
   int32_t (*GetPlayoutUnderrunCount)(void* user_data);
+
+  int (*GetPlayoutAudioParameters)(struct webrtc_AudioParameters* params,
+                  void* user_data);
+  int (*GetRecordAudioParameters)(struct webrtc_AudioParameters* params,
+                  void* user_data);
+
   int (*GetStats)(struct webrtc_AudioDeviceModule_Stats* out_stats,
                   void* user_data);
 

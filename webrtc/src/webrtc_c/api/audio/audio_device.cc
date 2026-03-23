@@ -106,6 +106,11 @@ int32_t DefaultReturnMinusOneI32(void* user_data) {
   return -1;
 }
 
+int DefaultGetAudioParameters(struct webrtc_AudioParameters* params,
+                              void* user_data) {
+  return -1;
+}
+
 int DefaultGetStats(struct webrtc_AudioDeviceModule_Stats* out_stats,
                     void* user_data) {
   return 0;
@@ -178,6 +183,8 @@ webrtc_AudioDeviceModule_cbs MakeDefaultAudioDeviceModuleCbs() {
   cbs.EnableBuiltInAGC = DefaultReturnMinusOneI32WithIntArg;
   cbs.EnableBuiltInNS = DefaultReturnMinusOneI32WithIntArg;
   cbs.GetPlayoutUnderrunCount = DefaultReturnMinusOneI32;
+  cbs.GetPlayoutAudioParameters = DefaultGetAudioParameters;
+  cbs.GetRecordAudioParameters = DefaultGetAudioParameters;
   cbs.GetStats = DefaultGetStats;
   cbs.OnDestroy = DefaultOnDestroy;
   return cbs;
@@ -366,6 +373,12 @@ void MergeAudioDeviceModuleCbs(webrtc_AudioDeviceModule_cbs* dst,
   }
   if (src->GetPlayoutUnderrunCount != nullptr) {
     dst->GetPlayoutUnderrunCount = src->GetPlayoutUnderrunCount;
+  }
+  if (src->GetPlayoutAudioParameters != nullptr) {
+    dst->GetPlayoutAudioParameters = src->GetPlayoutAudioParameters;
+  }
+  if (src->GetRecordAudioParameters != nullptr) {
+    dst->GetRecordAudioParameters = src->GetRecordAudioParameters;
   }
   if (src->GetStats != nullptr) {
     dst->GetStats = src->GetStats;
@@ -699,6 +712,38 @@ class AudioDeviceModuleImpl : public webrtc::AudioDeviceModule {
 
   int32_t GetPlayoutUnderrunCount() const override {
     return cbs_->GetPlayoutUnderrunCount(user_data_);
+  }
+
+  int GetPlayoutAudioParameters(
+      webrtc::AudioParameters* params) const override {
+    webrtc_AudioParameters c_params{};
+    int ret = cbs_->GetPlayoutAudioParameters(&c_params, user_data_);
+    if (ret != 0) {
+      return ret;
+    }
+    if (params == nullptr) {
+      return -1;
+    }
+    *params = webrtc::AudioParameters(c_params.sample_rate,
+                                       c_params.channels,
+                                       c_params.frames_per_buffer);
+    return 0;
+  }
+
+  int GetRecordAudioParameters(
+      webrtc::AudioParameters* params) const override {
+    webrtc_AudioParameters c_params{};
+    int ret = cbs_->GetRecordAudioParameters(&c_params, user_data_);
+    if (ret != 0) {
+      return ret;
+    }
+    if (params == nullptr) {
+      return -1;
+    }
+    *params = webrtc::AudioParameters(c_params.sample_rate,
+                                       c_params.channels,
+                                       c_params.frames_per_buffer);
+    return 0;
   }
 
   std::optional<Stats> GetStats() const override {
