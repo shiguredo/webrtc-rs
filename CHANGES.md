@@ -11,6 +11,11 @@
 
 ## develop
 
+
+## 0.146.1
+
+**リリース日**: 2026-03-24
+
 - [ADD] `PeerConnection::close` を追加する
   - @voluntas
 - [ADD] `DtlsTransport` / `DtlsTransportObserver` / `DtlsTransportState` を追加する
@@ -24,12 +29,11 @@
   - @voluntas
 - [ADD] `IceServer::urls_len` を追加する
   - @melpon
+- [ADD] Windows に対応する
+  - @melpon
 
 
 ## 0.146.0
-
-- [ADD] Windows に対応する
-  - @melpon
 
 **リリース日**: 2026-03-15
 
