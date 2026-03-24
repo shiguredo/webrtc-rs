@@ -13,6 +13,12 @@
 
 - [UPDATE] libwebrtc m146 (m146.7680.3.1) に上げる
   - @voluntas
+- [ADD] `AudioSinkHandler` / `AudioSink` を追加する
+  - @voluntas
+- [ADD] `AudioTrack` に `add_sink()` / `remove_sink()` を追加する
+  - @voluntas
+- [ADD] `MediaStreamTrack` に `cast_to_audio_track()` を追加する
+  - @voluntas
 - [ADD] トラックの有効/無効を制御する `MediaStreamTrack::enabled` / `MediaStreamTrack::set_enabled` を追加する
   - @voluntas
 - [ADD] `IceServer::urls_len` を追加する
