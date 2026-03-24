@@ -684,6 +684,12 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_GetStats(
   pc->GetStats(callback.get());
 }
 
+WEBRTC_EXPORT void webrtc_PeerConnectionInterface_Close(
+    struct webrtc_PeerConnectionInterface* self) {
+  auto pc = reinterpret_cast<webrtc::PeerConnectionInterface*>(self);
+  pc->Close();
+}
+
 WEBRTC_EXPORT struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions*
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_new() {
   auto opts = new webrtc::PeerConnectionInterface::RTCOfferAnswerOptions();

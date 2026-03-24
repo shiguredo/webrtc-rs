@@ -11,6 +11,8 @@
 
 ## develop
 
+- [ADD] `PeerConnection::close` を追加する
+  - @voluntas
 - [ADD] `DtlsTransport` / `DtlsTransportObserver` / `DtlsTransportState` を追加する
   - @voluntas
 - [ADD] `PeerConnection::lookup_dtls_transport_by_mid` を追加する
