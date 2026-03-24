@@ -1834,6 +1834,14 @@ impl PeerConnection {
         };
     }
 
+    /// PeerConnection を閉じる。
+    ///
+    /// 全メディアの終了、トランスポートの切断、リソースの解放を行う不可逆な操作。
+    /// この呼び出し後、PeerConnectionObserver のコールバックは呼ばれなくなる。
+    pub fn close(&self) {
+        unsafe { ffi::webrtc_PeerConnectionInterface_Close(self.raw_ref.as_ptr()) };
+    }
+
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface {
         self.raw_ref.as_ptr()
     }
