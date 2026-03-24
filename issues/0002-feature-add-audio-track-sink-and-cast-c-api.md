@@ -1,28 +1,34 @@
-# libwebrtc-c に AudioTrackInterface の Sink 操作とキャスト API を追加する
+# Rust 層に AudioSink / AudioTrack sink 操作 / cast_to_audio_track() を追加する
 
 Created: 2026-03-24
 Model: Opus 4.6
 
 ## 背景
 
-Video 側には `webrtc_VideoTrackInterface_AddOrUpdateSink()` / `webrtc_VideoTrackInterface_RemoveSink()` が `media_stream_interface.h` に定義されている。また `MediaStreamTrackInterface` から `VideoTrackInterface` へのキャスト (`WEBRTC_DECLARE_CAST_REFCOUNTED`) も公開されている。
+Video 側には以下の Rust API が実装されている:
 
-Audio 側には `AudioTrackInterface` から `MediaStreamTrackInterface` へのキャストは存在するが、以下が欠落している:
+- `VideoSinkHandler` trait（`on_frame()` / `on_discarded_frame()`）
+- `VideoSink` struct（`new_with_handler()`）
+- `VideoTrack::add_or_update_sink()` / `VideoTrack::remove_sink()`
+- `MediaStreamTrack::cast_to_video_track()`
 
-- `AudioTrackInterface` への `AddSink()` / `RemoveSink()`
-- `MediaStreamTrackInterface` から `AudioTrackInterface` へのキャスト
+Audio 側にはこれらに相当する API が一切存在しない。
 
 ## 根拠
 
-AudioSinkInterface (#0001) を作成しても、AudioTrack に登録する手段がなければ音声データを受信できない。また `MediaStreamTrack` から `AudioTrack` を取り出すキャストがないと、RTP レシーバーから取得したトラックを AudioTrack として扱えない。
+音声データをアプリケーション側で受信・処理するには、Video と同等の Sink パターンが Audio にも必要である。現状では `MediaStreamTrack` を取得しても Audio トラックとして利用する手段がない。
+
+C 層には `MediaStreamTrackInterface ↔ AudioTrackInterface` のキャストが既に実装済みであり、#0001 で AudioTrackSinkInterface の C API が追加されれば、Rust 側のラッパーを実装できる。
 
 ## 対応内容
 
-- `media_stream_interface.h` に `webrtc_AudioTrackInterface_AddSink()` を追加する
-- `media_stream_interface.h` に `webrtc_AudioTrackInterface_RemoveSink()` を追加する
-- `media_stream_interface.h` に `WEBRTC_DECLARE_CAST_REFCOUNTED(webrtc_MediaStreamTrackInterface, webrtc_AudioTrackInterface)` を追加する
-- 対応する `.cc` 実装を追加する
+- `src/api/audio.rs` に以下を追加する
+  - `AudioSinkHandler` trait（`on_data()` コールバック）
+  - `AudioSink` struct（`new_with_handler()` ファクトリ）
+  - `AudioTrack::add_sink()` / `AudioTrack::remove_sink()` メソッド
+- `src/api/rtp.rs` の `MediaStreamTrack` に `cast_to_audio_track()` を追加する
+- `CHANGES.md` を更新する
 
 ## 依存
 
-- #0001 (AudioSinkInterface の C API)
+- #0001 (C 層に AudioTrackSinkInterface と AudioTrack の Sink 操作 API を追加する)
