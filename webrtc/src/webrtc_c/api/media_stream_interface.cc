@@ -1,5 +1,6 @@
 #include "media_stream_interface.h"
 
+#include <stdint.h>
 #include <memory>
 #include <string>
 
@@ -12,6 +13,7 @@
 #include "../common.h"
 #include "../common.impl.h"
 #include "../std.h"
+#include "audio/audio_track_sink_interface.h"
 #include "video/video_sink_interface.h"
 #include "video/video_source_interface.h"
 

@@ -1,5 +1,7 @@
 #include "audio_track_sink_interface.h"
 
+#include <stddef.h>
+
 #include <api/media_stream_interface.h>
 
 #include "../../common.h"

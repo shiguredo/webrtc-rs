@@ -5,6 +5,7 @@
 
 #include "../common.h"
 #include "../common.impl.h"
+#include "api/rtc_error.h"
 
 extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_DtlsTransportInterface,
