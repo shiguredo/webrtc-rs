@@ -174,6 +174,9 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_GetStats(
     struct webrtc_RTCStatsCollectorCallback_cbs* cbs,
     void* user_data);
 
+WEBRTC_EXPORT void webrtc_PeerConnectionInterface_Close(
+    struct webrtc_PeerConnectionInterface* self);
+
 typedef int webrtc_PeerConnectionInterface_PeerConnectionState;
 WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_PeerConnectionState_kNew;
