@@ -57,7 +57,7 @@ WEBRTC_EXPORT void webrtc_VideoTrackInterface_RemoveSink(
 WEBRTC_DECLARE_REFCOUNTED(webrtc_AudioSourceInterface);
 
 // -------------------------
-// webrtc::AudioTrackInterface
+// webrtc::AudioTrackSinkInterface
 // -------------------------
 
 struct webrtc_AudioTrackSinkInterface;
@@ -78,6 +78,10 @@ webrtc_AudioTrackSinkInterface_new(
     void* user_data);
 WEBRTC_EXPORT void webrtc_AudioTrackSinkInterface_delete(
     struct webrtc_AudioTrackSinkInterface* self);
+
+// -------------------------
+// webrtc::AudioTrackInterface
+// -------------------------
 
 WEBRTC_DECLARE_REFCOUNTED(webrtc_AudioTrackInterface);
 WEBRTC_EXPORT void webrtc_AudioTrackInterface_AddSink(
