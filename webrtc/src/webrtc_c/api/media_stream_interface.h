@@ -1,10 +1,10 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "../common.h"
 #include "../std.h"
-#include "audio/audio_track_sink_interface.h"
 #include "video/video_sink_interface.h"
 #include "video/video_source_interface.h"
 
@@ -59,6 +59,25 @@ WEBRTC_DECLARE_REFCOUNTED(webrtc_AudioSourceInterface);
 // -------------------------
 // webrtc::AudioTrackInterface
 // -------------------------
+
+struct webrtc_AudioTrackSinkInterface;
+
+struct webrtc_AudioTrackSinkInterface_cbs {
+  void (*OnData)(const void* audio_data,
+                 int bits_per_sample,
+                 int sample_rate,
+                 size_t number_of_channels,
+                 size_t number_of_frames,
+                 void* user_data);
+  void (*OnDestroy)(void* user_data);
+};
+
+WEBRTC_EXPORT struct webrtc_AudioTrackSinkInterface*
+webrtc_AudioTrackSinkInterface_new(
+    const struct webrtc_AudioTrackSinkInterface_cbs* cbs,
+    void* user_data);
+WEBRTC_EXPORT void webrtc_AudioTrackSinkInterface_delete(
+    struct webrtc_AudioTrackSinkInterface* self);
 
 WEBRTC_DECLARE_REFCOUNTED(webrtc_AudioTrackInterface);
 WEBRTC_EXPORT void webrtc_AudioTrackInterface_AddSink(

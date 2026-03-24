@@ -3,7 +3,6 @@
 // IWYU pragma: begin_exports
 #include "webrtc_c/api/audio/audio_device.h"
 #include "webrtc_c/api/audio/audio_processing.h"
-#include "webrtc_c/api/audio/audio_track_sink_interface.h"
 #include "webrtc_c/api/audio_codecs/audio_decoder_factory.h"
 #include "webrtc_c/api/audio_codecs/audio_encoder_factory.h"
 #include "webrtc_c/api/environment.h"
