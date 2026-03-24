@@ -37,10 +37,10 @@ def update_version(file_path: str, dry_run: bool) -> Optional[str]:
             count=1,  # 最初の1つだけを更新
         )
     else:
-        # -canary.X がない場合、次のマイナーバージョンにして -canary.0 を追加
+        # -canary.X がない場合、次のパッチバージョンにして -canary.0 を追加
         updated_package, count = re.subn(
             r'(version\s*=\s*")(\d+)\.(\d+)\.(\d+)',
-            lambda m: f"{m.group(1)}{m.group(2)}.{int(m.group(3)) + 1}.0-canary.0",
+            lambda m: f"{m.group(1)}{m.group(2)}.{m.group(3)}.{int(m.group(4)) + 1}-canary.0",
             package_content,
             count=1,  # 最初の1つだけを更新
         )
