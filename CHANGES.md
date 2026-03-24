@@ -11,6 +11,28 @@
 
 ## develop
 
+
+## 0.146.1
+
+**リリース日**: 2026-03-24
+
+- [ADD] `PeerConnection::close` を追加する
+  - @voluntas
+- [ADD] `DtlsTransport` / `DtlsTransportObserver` / `DtlsTransportState` を追加する
+  - @voluntas
+- [ADD] `PeerConnection::lookup_dtls_transport_by_mid` を追加する
+  - `DtlsTransport` のインスタンスを取得するために必要
+  - @voluntas
+- [UPDATE] libwebrtc m146 (m146.7680.3.1) に上げる
+  - @voluntas
+- [ADD] トラックの有効/無効を制御する `MediaStreamTrack::enabled` / `MediaStreamTrack::set_enabled` を追加する
+  - @voluntas
+- [ADD] `IceServer::urls_len` を追加する
+  - @melpon
+- [ADD] Windows に対応する
+  - @melpon
+
+
 ## 0.146.0
 
 **リリース日**: 2026-03-15

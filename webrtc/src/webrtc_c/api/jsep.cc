@@ -11,6 +11,7 @@
 #include <api/rtc_error.h>
 #include <api/scoped_refptr.h>
 
+#include "../common.h"
 #include "../common.impl.h"
 #include "../std.h"
 #include "rtc_error.h"
@@ -20,20 +21,22 @@
 // -------------------------
 
 extern "C" {
-const int webrtc_SdpType_kOffer = static_cast<int>(webrtc::SdpType::kOffer);
-const int webrtc_SdpType_kPrAnswer =
+WEBRTC_EXPORT const int webrtc_SdpType_kOffer =
+    static_cast<int>(webrtc::SdpType::kOffer);
+WEBRTC_EXPORT const int webrtc_SdpType_kPrAnswer =
     static_cast<int>(webrtc::SdpType::kPrAnswer);
-const int webrtc_SdpType_kAnswer = static_cast<int>(webrtc::SdpType::kAnswer);
-const int webrtc_SdpType_kRollback =
+WEBRTC_EXPORT const int webrtc_SdpType_kAnswer =
+    static_cast<int>(webrtc::SdpType::kAnswer);
+WEBRTC_EXPORT const int webrtc_SdpType_kRollback =
     static_cast<int>(webrtc::SdpType::kRollback);
 
-int webrtc_SdpTypeFromString(const char* type, size_t type_len) {
+WEBRTC_EXPORT int webrtc_SdpTypeFromString(const char* type, size_t type_len) {
   std::string type_str =
       type != nullptr ? std::string(type, type_len) : std::string();
   auto sdp_type = webrtc::SdpTypeFromString(type_str);
   return static_cast<int>(sdp_type.value_or(webrtc::SdpType::kOffer));
 }
-const char* webrtc_SdpTypeToString(int type) {
+WEBRTC_EXPORT const char* webrtc_SdpTypeToString(int type) {
   return webrtc::SdpTypeToString(static_cast<webrtc::SdpType>(type));
 }
 }
@@ -46,7 +49,7 @@ extern "C" {
 WEBRTC_DEFINE_UNIQUE(webrtc_SessionDescriptionInterface,
                      webrtc::SessionDescriptionInterface);
 
-struct webrtc_SessionDescriptionInterface_unique*
+WEBRTC_EXPORT struct webrtc_SessionDescriptionInterface_unique*
 webrtc_CreateSessionDescription(int sdp_type, const char* sdp, size_t sdp_len) {
   auto type = static_cast<webrtc::SdpType>(sdp_type);
   auto desc = webrtc::CreateSessionDescription(type, std::string(sdp, sdp_len));
@@ -56,12 +59,12 @@ webrtc_CreateSessionDescription(int sdp_type, const char* sdp, size_t sdp_len) {
   return reinterpret_cast<struct webrtc_SessionDescriptionInterface_unique*>(
       desc.release());
 }
-int webrtc_SessionDescriptionInterface_GetType(
+WEBRTC_EXPORT int webrtc_SessionDescriptionInterface_GetType(
     struct webrtc_SessionDescriptionInterface* self) {
   auto desc = reinterpret_cast<webrtc::SessionDescriptionInterface*>(self);
   return static_cast<int>(desc->GetType());
 }
-int webrtc_SessionDescriptionInterface_ToString(
+WEBRTC_EXPORT int webrtc_SessionDescriptionInterface_ToString(
     struct webrtc_SessionDescriptionInterface* self,
     struct std_string_unique** out_sdp) {
   auto desc = reinterpret_cast<webrtc::SessionDescriptionInterface*>(self);
@@ -78,9 +81,9 @@ int webrtc_SessionDescriptionInterface_ToString(
 
 extern "C" {
 WEBRTC_DEFINE_UNIQUE(webrtc_SdpParseError, webrtc::SdpParseError);
-void webrtc_SdpParseError_line(struct webrtc_SdpParseError* self,
-                               const char** out_line,
-                               size_t* out_len) {
+WEBRTC_EXPORT void webrtc_SdpParseError_line(struct webrtc_SdpParseError* self,
+                                             const char** out_line,
+                                             size_t* out_len) {
   auto error = reinterpret_cast<webrtc::SdpParseError*>(self);
   if (out_line != nullptr) {
     *out_line = error->line.c_str();
@@ -89,9 +92,10 @@ void webrtc_SdpParseError_line(struct webrtc_SdpParseError* self,
     *out_len = error->line.size();
   }
 }
-void webrtc_SdpParseError_description(struct webrtc_SdpParseError* self,
-                                      const char** out_description,
-                                      size_t* out_len) {
+WEBRTC_EXPORT void webrtc_SdpParseError_description(
+    struct webrtc_SdpParseError* self,
+    const char** out_description,
+    size_t* out_len) {
   auto error = reinterpret_cast<webrtc::SdpParseError*>(self);
   if (out_description != nullptr) {
     *out_description = error->description.c_str();
@@ -100,7 +104,7 @@ void webrtc_SdpParseError_description(struct webrtc_SdpParseError* self,
     *out_len = error->description.size();
   }
 }
-struct webrtc_IceCandidate* webrtc_CreateIceCandidate(
+WEBRTC_EXPORT struct webrtc_IceCandidate* webrtc_CreateIceCandidate(
     const char* sdp_mid,
     size_t sdp_mid_len,
     int sdp_mline_index,
@@ -124,23 +128,26 @@ struct webrtc_IceCandidate* webrtc_CreateIceCandidate(
   }
   return reinterpret_cast<struct webrtc_IceCandidate*>(ice_candidate);
 }
-void webrtc_IceCandidate_delete(struct webrtc_IceCandidate* self) {
+WEBRTC_EXPORT void webrtc_IceCandidate_delete(
+    struct webrtc_IceCandidate* self) {
   auto candidate = reinterpret_cast<webrtc::IceCandidate*>(self);
   delete candidate;
 }
-void webrtc_IceCandidate_sdp_mid(const struct webrtc_IceCandidate* self,
-                                 struct std_string_unique** out) {
+WEBRTC_EXPORT void webrtc_IceCandidate_sdp_mid(
+    const struct webrtc_IceCandidate* self,
+    struct std_string_unique** out) {
   auto candidate = reinterpret_cast<const webrtc::IceCandidate*>(self);
   auto mid = std::make_unique<std::string>(candidate->sdp_mid());
   *out = reinterpret_cast<struct std_string_unique*>(mid.release());
 }
-int webrtc_IceCandidate_sdp_mline_index(
+WEBRTC_EXPORT int webrtc_IceCandidate_sdp_mline_index(
     const struct webrtc_IceCandidate* self) {
   auto candidate = reinterpret_cast<const webrtc::IceCandidate*>(self);
   return candidate->sdp_mline_index();
 }
-int webrtc_IceCandidate_ToString(const struct webrtc_IceCandidate* self,
-                                 struct std_string_unique** out_sdp) {
+WEBRTC_EXPORT int webrtc_IceCandidate_ToString(
+    const struct webrtc_IceCandidate* self,
+    struct std_string_unique** out_sdp) {
   auto candidate = reinterpret_cast<const webrtc::IceCandidate*>(self);
   std::string sdp;
   if (!candidate->ToString(&sdp)) {
@@ -198,7 +205,7 @@ extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_CreateSessionDescriptionObserver,
                          webrtc::CreateSessionDescriptionObserver);
 
-struct webrtc_CreateSessionDescriptionObserver*
+WEBRTC_EXPORT struct webrtc_CreateSessionDescriptionObserver*
 webrtc_CreateSessionDescriptionObserver_make_ref_counted(
     const struct webrtc_CreateSessionDescriptionObserver_cbs* cbs,
     void* user_data) {

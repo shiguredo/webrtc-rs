@@ -6,13 +6,15 @@
 // WebRTC
 #include <api/media_types.h>
 
+#include "../common.h"
+
 // -------------------------
 // webrtc::MediaType
 // -------------------------
 
 extern "C" {
-extern const int webrtc_MediaType_AUDIO =
+WEBRTC_EXPORT extern const int webrtc_MediaType_AUDIO =
     static_cast<int>(webrtc::MediaType::AUDIO);
-extern const int webrtc_MediaType_VIDEO =
+WEBRTC_EXPORT extern const int webrtc_MediaType_VIDEO =
     static_cast<int>(webrtc::MediaType::VIDEO);
 }

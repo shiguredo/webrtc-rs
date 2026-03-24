@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../common.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -8,8 +10,8 @@ extern "C" {
 // webrtc::MediaType
 // -------------------------
 
-extern const int webrtc_MediaType_AUDIO;
-extern const int webrtc_MediaType_VIDEO;
+WEBRTC_EXPORT extern const int webrtc_MediaType_AUDIO;
+WEBRTC_EXPORT extern const int webrtc_MediaType_VIDEO;
 
 #if defined(__cplusplus)
 }

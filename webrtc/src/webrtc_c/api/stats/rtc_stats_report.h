@@ -13,7 +13,7 @@ extern "C" {
 
 WEBRTC_DECLARE_REFCOUNTED(webrtc_RTCStatsReport);
 
-struct std_string_unique* webrtc_RTCStatsReport_ToJson(
+WEBRTC_EXPORT struct std_string_unique* webrtc_RTCStatsReport_ToJson(
     struct webrtc_RTCStatsReport* report);
 
 #if defined(__cplusplus)

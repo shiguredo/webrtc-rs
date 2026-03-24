@@ -10,6 +10,7 @@
 #include <api/rtp_transceiver_direction.h>
 #include <api/rtp_transceiver_interface.h>
 
+#include "../common.h"
 #include "../common.impl.h"
 #include "../std.h"
 #include "rtp_parameters.h"
@@ -20,26 +21,29 @@
 // -------------------------
 
 extern "C" {
-struct webrtc_RtpTransceiverInit* webrtc_RtpTransceiverInit_new() {
+WEBRTC_EXPORT struct webrtc_RtpTransceiverInit*
+webrtc_RtpTransceiverInit_new() {
   auto init = new webrtc::RtpTransceiverInit();
   return reinterpret_cast<struct webrtc_RtpTransceiverInit*>(init);
 }
-void webrtc_RtpTransceiverInit_delete(struct webrtc_RtpTransceiverInit* self) {
+WEBRTC_EXPORT void webrtc_RtpTransceiverInit_delete(
+    struct webrtc_RtpTransceiverInit* self) {
   auto init = reinterpret_cast<webrtc::RtpTransceiverInit*>(self);
   delete init;
 }
-void webrtc_RtpTransceiverInit_set_direction(
+WEBRTC_EXPORT void webrtc_RtpTransceiverInit_set_direction(
     struct webrtc_RtpTransceiverInit* self,
     int direction) {
   auto init = reinterpret_cast<webrtc::RtpTransceiverInit*>(self);
   init->direction = static_cast<webrtc::RtpTransceiverDirection>(direction);
 }
-struct std_string_vector* webrtc_RtpTransceiverInit_get_stream_ids(
+WEBRTC_EXPORT struct std_string_vector*
+webrtc_RtpTransceiverInit_get_stream_ids(
     struct webrtc_RtpTransceiverInit* self) {
   auto init = reinterpret_cast<webrtc::RtpTransceiverInit*>(self);
   return reinterpret_cast<struct std_string_vector*>(&init->stream_ids);
 }
-void webrtc_RtpTransceiverInit_set_send_encodings(
+WEBRTC_EXPORT void webrtc_RtpTransceiverInit_set_send_encodings(
     struct webrtc_RtpTransceiverInit* self,
     struct webrtc_RtpEncodingParameters_vector* encodings) {
   auto init = reinterpret_cast<webrtc::RtpTransceiverInit*>(self);
@@ -56,7 +60,8 @@ void webrtc_RtpTransceiverInit_set_send_encodings(
 WEBRTC_DEFINE_REFCOUNTED(webrtc_RtpTransceiverInterface,
                          webrtc::RtpTransceiverInterface);
 
-webrtc_RTCError_unique* webrtc_RtpTransceiverInterface_SetCodecPreferences(
+WEBRTC_EXPORT webrtc_RTCError_unique*
+webrtc_RtpTransceiverInterface_SetCodecPreferences(
     struct webrtc_RtpTransceiverInterface* self,
     struct webrtc_RtpCodecCapability_vector* codecs) {
   auto transceiver = reinterpret_cast<webrtc::RtpTransceiverInterface*>(self);
@@ -70,7 +75,7 @@ webrtc_RTCError_unique* webrtc_RtpTransceiverInterface_SetCodecPreferences(
   }
 }
 
-struct webrtc_RtpReceiverInterface_refcounted*
+WEBRTC_EXPORT struct webrtc_RtpReceiverInterface_refcounted*
 webrtc_RtpTransceiverInterface_receiver(
     struct webrtc_RtpTransceiverInterface* self) {
   auto transceiver = reinterpret_cast<webrtc::RtpTransceiverInterface*>(self);

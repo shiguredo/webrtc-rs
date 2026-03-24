@@ -15,9 +15,10 @@ struct webrtc_PacketSocketFactory;
 
 WEBRTC_DECLARE_REFCOUNTED(webrtc_ConnectionContext);
 
-struct webrtc_NetworkManager* webrtc_ConnectionContext_default_network_manager(
+WEBRTC_EXPORT struct webrtc_NetworkManager*
+webrtc_ConnectionContext_default_network_manager(
     struct webrtc_ConnectionContext* self);
-struct webrtc_PacketSocketFactory*
+WEBRTC_EXPORT struct webrtc_PacketSocketFactory*
 webrtc_ConnectionContext_default_socket_factory(
     struct webrtc_ConnectionContext* self);
 

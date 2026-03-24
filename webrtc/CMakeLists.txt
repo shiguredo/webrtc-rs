@@ -278,15 +278,17 @@ if(WEBRTC_USE_WEBRTC_LIBCXX AND LLVM_NEEDS_INSTALL)
   message(STATUS "LLVM installation complete")
 endif()
 
-# Prebuilt Clang コンパイラのパスを設定（project() の前）
-set(CMAKE_C_COMPILER "${LLVM_CLANG_DIR}/bin/clang" CACHE FILEPATH "" FORCE)
-set(CMAKE_CXX_COMPILER "${LLVM_CLANG_DIR}/bin/clang++" CACHE FILEPATH "" FORCE)
-message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
-message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
-
 if(WEBRTC_USE_WEBRTC_LIBCXX)
+  # Prebuilt Clang コンパイラのパスを設定（project() の前）
+  set(CMAKE_C_COMPILER "${LLVM_CLANG_DIR}/bin/clang" CACHE FILEPATH "" FORCE)
+  set(CMAKE_CXX_COMPILER "${LLVM_CLANG_DIR}/bin/clang++" CACHE FILEPATH "" FORCE)
+  message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
+  message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
+
   set(LIBCXX_INCLUDE_DIR "${LLVM_LIBCXX_DIR}/include")
   message(STATUS "LIBCXX_INCLUDE_DIR: ${LIBCXX_INCLUDE_DIR}")
+else()
+  message(STATUS "Using default C/C++ compiler from CMake generator")
 endif()
 
 # ARM64 クロスコンパイル設定（project() の前に配置が必要）
@@ -363,6 +365,7 @@ add_library(webrtc_c
     src/webrtc_c/rtc_base/logging.cc
     src/webrtc_c/rtc_base/ssl_adapter.cc
     src/webrtc_c/rtc_base/ssl_certificate.cc
+    src/webrtc_c/rtc_base/ssl_identity.cc
     src/webrtc_c/rtc_base/thread.cc
     src/webrtc_c/rtc_base/time_utils.cc
     src/webrtc_c/rtc_base/timestamp_aligner.cc
@@ -505,6 +508,7 @@ if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
         UNICODE
         _UNICODE
         _USE_MATH_DEFINES
+        NDEBUG
         RTC_ENABLE_H265
         _ITERATOR_DEBUG_LEVEL=0
     )
@@ -664,6 +668,7 @@ if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
         UNICODE
         _UNICODE
         _USE_MATH_DEFINES
+        NDEBUG
         RTC_ENABLE_H265
     )
   endforeach()

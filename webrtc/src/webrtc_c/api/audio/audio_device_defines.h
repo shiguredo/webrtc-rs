@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "../../common.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -42,12 +44,13 @@ struct webrtc_AudioTransport_cbs {
   void (*OnDestroy)(void* user_data);
 };
 
-struct webrtc_AudioTransport* webrtc_AudioTransport_new(
+WEBRTC_EXPORT struct webrtc_AudioTransport* webrtc_AudioTransport_new(
     const struct webrtc_AudioTransport_cbs* cbs,
     void* user_data);
-void webrtc_AudioTransport_delete(struct webrtc_AudioTransport* self);
+WEBRTC_EXPORT void webrtc_AudioTransport_delete(
+    struct webrtc_AudioTransport* self);
 
-int32_t webrtc_AudioTransport_RecordedDataIsAvailable(
+WEBRTC_EXPORT int32_t webrtc_AudioTransport_RecordedDataIsAvailable(
     struct webrtc_AudioTransport* self,
     const void* audio_samples,
     size_t n_samples,
@@ -61,25 +64,26 @@ int32_t webrtc_AudioTransport_RecordedDataIsAvailable(
     uint32_t* new_mic_level,
     const int64_t* estimated_capture_time_ns);
 
-int32_t webrtc_AudioTransport_NeedMorePlayData(
+WEBRTC_EXPORT int32_t
+webrtc_AudioTransport_NeedMorePlayData(struct webrtc_AudioTransport* self,
+                                       size_t n_samples,
+                                       size_t n_bytes_per_sample,
+                                       size_t n_channels,
+                                       uint32_t samples_per_sec,
+                                       void* audio_samples,
+                                       size_t* n_samples_out,
+                                       int64_t* elapsed_time_ms,
+                                       int64_t* ntp_time_ms);
+
+WEBRTC_EXPORT void webrtc_AudioTransport_PullRenderData(
     struct webrtc_AudioTransport* self,
-    size_t n_samples,
-    size_t n_bytes_per_sample,
-    size_t n_channels,
-    uint32_t samples_per_sec,
-    void* audio_samples,
-    size_t* n_samples_out,
+    int bits_per_sample,
+    int sample_rate,
+    size_t number_of_channels,
+    size_t number_of_frames,
+    void* audio_data,
     int64_t* elapsed_time_ms,
     int64_t* ntp_time_ms);
-
-void webrtc_AudioTransport_PullRenderData(struct webrtc_AudioTransport* self,
-                                          int bits_per_sample,
-                                          int sample_rate,
-                                          size_t number_of_channels,
-                                          size_t number_of_frames,
-                                          void* audio_data,
-                                          int64_t* elapsed_time_ms,
-                                          int64_t* ntp_time_ms);
 
 #if defined(__cplusplus)
 }

@@ -9,6 +9,7 @@
 #include <api/video/video_sink_interface.h>
 #include <api/video/video_source_interface.h>
 
+#include "../common.h"
 #include "../common.impl.h"
 #include "../std.h"
 #include "video/video_sink_interface.h"
@@ -39,18 +40,31 @@ WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_VideoTrackInterface,
                               webrtc::VideoTrackInterface,
                               webrtc::MediaStreamTrackInterface);
 
-struct std_string_unique* webrtc_MediaStreamTrackInterface_kind(
+WEBRTC_EXPORT struct std_string_unique* webrtc_MediaStreamTrackInterface_kind(
     struct webrtc_MediaStreamTrackInterface* self) {
   auto track = reinterpret_cast<webrtc::MediaStreamTrackInterface*>(self);
   auto kind = std::make_unique<std::string>(track->kind());
   return reinterpret_cast<struct std_string_unique*>(kind.release());
 }
 
-struct std_string_unique* webrtc_MediaStreamTrackInterface_id(
+WEBRTC_EXPORT struct std_string_unique* webrtc_MediaStreamTrackInterface_id(
     struct webrtc_MediaStreamTrackInterface* self) {
   auto track = reinterpret_cast<webrtc::MediaStreamTrackInterface*>(self);
   auto id = std::make_unique<std::string>(track->id());
   return reinterpret_cast<struct std_string_unique*>(id.release());
+}
+
+WEBRTC_EXPORT int8_t webrtc_MediaStreamTrackInterface_enabled(
+    struct webrtc_MediaStreamTrackInterface* self) {
+  auto track = reinterpret_cast<webrtc::MediaStreamTrackInterface*>(self);
+  return track->enabled() ? 1 : 0;
+}
+
+WEBRTC_EXPORT int8_t webrtc_MediaStreamTrackInterface_set_enabled(
+    struct webrtc_MediaStreamTrackInterface* self,
+    int8_t enable) {
+  auto track = reinterpret_cast<webrtc::MediaStreamTrackInterface*>(self);
+  return track->set_enabled(enable != 0) ? 1 : 0;
 }
 }
 
@@ -62,7 +76,7 @@ extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_VideoTrackInterface,
                          webrtc::VideoTrackInterface);
 
-void webrtc_VideoTrackInterface_AddOrUpdateSink(
+WEBRTC_EXPORT void webrtc_VideoTrackInterface_AddOrUpdateSink(
     struct webrtc_VideoTrackInterface* self,
     struct webrtc_VideoSinkInterface* sink,
     struct webrtc_VideoSinkWants* wants) {
@@ -73,7 +87,7 @@ void webrtc_VideoTrackInterface_AddOrUpdateSink(
   track->AddOrUpdateSink(sink_impl, *wants_impl);
 }
 
-void webrtc_VideoTrackInterface_RemoveSink(
+WEBRTC_EXPORT void webrtc_VideoTrackInterface_RemoveSink(
     struct webrtc_VideoTrackInterface* self,
     struct webrtc_VideoSinkInterface* sink) {
   auto track = reinterpret_cast<webrtc::VideoTrackInterface*>(self);
