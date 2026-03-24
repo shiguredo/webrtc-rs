@@ -1,6 +1,6 @@
 [package]
 name = "shiguredo_webrtc"
-version = "0.146.1-canary.2"
+version = "0.147.0"
 edition = "2024"
 rust-version = "1.88"
 authors = ["Shiguredo Inc."]
@@ -28,7 +28,7 @@ source-build = []
 [dependencies]
 
 [package.metadata.external-dependencies]
-webrtc-build = { version = "m146.7680.3.1", base-url = "https://github.com/shiguredo-webrtc-build/webrtc-build/releases/download" }
+webrtc-build = { version = "m147.7727.6.0", base-url = "https://github.com/shiguredo-webrtc-build/webrtc-build/releases/download" }
 
 [build-dependencies]
 bindgen = "0.72"
