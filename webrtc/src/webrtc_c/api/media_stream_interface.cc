@@ -113,6 +113,22 @@ WEBRTC_DEFINE_REFCOUNTED(webrtc_AudioSourceInterface,
 extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_AudioTrackInterface,
                          webrtc::AudioTrackInterface);
+
+WEBRTC_EXPORT void webrtc_AudioTrackInterface_AddSink(
+    struct webrtc_AudioTrackInterface* self,
+    struct webrtc_AudioTrackSinkInterface* sink) {
+  auto track = reinterpret_cast<webrtc::AudioTrackInterface*>(self);
+  auto sink_impl = reinterpret_cast<webrtc::AudioTrackSinkInterface*>(sink);
+  track->AddSink(sink_impl);
+}
+
+WEBRTC_EXPORT void webrtc_AudioTrackInterface_RemoveSink(
+    struct webrtc_AudioTrackInterface* self,
+    struct webrtc_AudioTrackSinkInterface* sink) {
+  auto track = reinterpret_cast<webrtc::AudioTrackInterface*>(self);
+  auto sink_impl = reinterpret_cast<webrtc::AudioTrackSinkInterface*>(sink);
+  track->RemoveSink(sink_impl);
+}
 WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_AudioTrackInterface,
                               webrtc_MediaStreamTrackInterface,
                               webrtc::AudioTrackInterface,

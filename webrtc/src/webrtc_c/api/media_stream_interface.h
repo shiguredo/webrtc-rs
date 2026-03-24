@@ -2,6 +2,7 @@
 
 #include "../common.h"
 #include "../std.h"
+#include "audio/audio_track_sink_interface.h"
 #include "video/video_sink_interface.h"
 #include "video/video_source_interface.h"
 
@@ -58,6 +59,12 @@ WEBRTC_DECLARE_REFCOUNTED(webrtc_AudioSourceInterface);
 // -------------------------
 
 WEBRTC_DECLARE_REFCOUNTED(webrtc_AudioTrackInterface);
+WEBRTC_EXPORT void webrtc_AudioTrackInterface_AddSink(
+    struct webrtc_AudioTrackInterface* self,
+    struct webrtc_AudioTrackSinkInterface* sink);
+WEBRTC_EXPORT void webrtc_AudioTrackInterface_RemoveSink(
+    struct webrtc_AudioTrackInterface* self,
+    struct webrtc_AudioTrackSinkInterface* sink);
 WEBRTC_DECLARE_CAST_REFCOUNTED(webrtc_AudioTrackInterface,
                                webrtc_MediaStreamTrackInterface);
 WEBRTC_DECLARE_CAST_REFCOUNTED(webrtc_MediaStreamTrackInterface,
