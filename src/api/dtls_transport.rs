@@ -67,7 +67,6 @@ impl DtlsTransport {
 }
 
 unsafe impl Send for DtlsTransport {}
-unsafe impl Sync for DtlsTransport {}
 
 // -------------------------
 // DtlsTransportObserver
@@ -152,4 +151,3 @@ impl Drop for DtlsTransportObserver {
 }
 
 unsafe impl Send for DtlsTransportObserver {}
-unsafe impl Sync for DtlsTransportObserver {}
