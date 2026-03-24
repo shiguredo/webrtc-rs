@@ -11,6 +11,11 @@
 
 ## develop
 
+- [ADD] `DtlsTransport` / `DtlsTransportObserver` / `DtlsTransportState` を追加する
+  - @voluntas
+- [ADD] `PeerConnection::lookup_dtls_transport_by_mid` を追加する
+  - `DtlsTransport` のインスタンスを取得するために必要
+  - @voluntas
 - [UPDATE] libwebrtc m146 (m146.7680.3.1) に上げる
   - @voluntas
 - [ADD] `AudioSinkHandler` / `AudioSink` を追加する
