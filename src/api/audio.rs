@@ -93,15 +93,15 @@ impl AudioTrack {
         MediaStreamTrack::from_scoped_ref(ScopedRef::<MediaStreamTrackHandle>::from_raw(raw))
     }
 
-    /// AudioTrack に AudioSink を登録する。
-    pub fn add_sink(&mut self, sink: &AudioSink) {
+    /// AudioTrack に AudioTrackSink を登録する。
+    pub fn add_sink(&mut self, sink: &AudioTrackSink) {
         unsafe {
             ffi::webrtc_AudioTrackInterface_AddSink(self.raw_ref.as_ptr(), sink.as_ptr());
         }
     }
 
-    /// AudioTrack から AudioSink を解除する。
-    pub fn remove_sink(&mut self, sink: &AudioSink) {
+    /// AudioTrack から AudioTrackSink を解除する。
+    pub fn remove_sink(&mut self, sink: &AudioTrackSink) {
         unsafe {
             ffi::webrtc_AudioTrackInterface_RemoveSink(self.raw_ref.as_ptr(), sink.as_ptr());
         }
@@ -115,7 +115,7 @@ unsafe impl Send for AudioTrack {}
 unsafe impl Sync for AudioTrack {}
 
 /// 音声データを受信するためのコールバックハンドラ。
-pub trait AudioSinkHandler: Send {
+pub trait AudioTrackSinkHandler: Send {
     /// 音声データを受信した際に呼ばれる。
     fn on_data(
         &mut self,
@@ -127,11 +127,11 @@ pub trait AudioSinkHandler: Send {
     );
 }
 
-struct AudioSinkHandlerState {
-    handler: Box<dyn AudioSinkHandler>,
+struct AudioTrackSinkHandlerState {
+    handler: Box<dyn AudioTrackSinkHandler>,
 }
 
-unsafe extern "C" fn audio_sink_on_data(
+unsafe extern "C" fn audio_track_sink_on_data(
     audio_data: *const c_void,
     bits_per_sample: i32,
     sample_rate: i32,
@@ -139,7 +139,7 @@ unsafe extern "C" fn audio_sink_on_data(
     number_of_frames: usize,
     user_data: *mut c_void,
 ) {
-    let state = unsafe { &mut *(user_data as *mut AudioSinkHandlerState) };
+    let state = unsafe { &mut *(user_data as *mut AudioTrackSinkHandlerState) };
     let byte_len = number_of_frames * number_of_channels * (bits_per_sample as usize) / 8;
     let data = if audio_data.is_null() || byte_len == 0 {
         &[]
@@ -155,33 +155,33 @@ unsafe extern "C" fn audio_sink_on_data(
     );
 }
 
-unsafe extern "C" fn audio_sink_on_destroy(user_data: *mut c_void) {
+unsafe extern "C" fn audio_track_sink_on_destroy(user_data: *mut c_void) {
     assert!(
         !user_data.is_null(),
-        "audio_sink_on_destroy: user_data is null"
+        "audio_track_sink_on_destroy: user_data is null"
     );
-    let _ = unsafe { Box::from_raw(user_data as *mut AudioSinkHandlerState) };
+    let _ = unsafe { Box::from_raw(user_data as *mut AudioTrackSinkHandlerState) };
 }
 
 /// webrtc::AudioTrackSinkInterface のラッパー。
-pub struct AudioSink {
+pub struct AudioTrackSink {
     raw: NonNull<ffi::webrtc_AudioTrackSinkInterface>,
 }
 
-impl AudioSink {
-    pub fn new_with_handler(handler: Box<dyn AudioSinkHandler>) -> Self {
-        let state = Box::new(AudioSinkHandlerState { handler });
+impl AudioTrackSink {
+    pub fn new_with_handler(handler: Box<dyn AudioTrackSinkHandler>) -> Self {
+        let state = Box::new(AudioTrackSinkHandlerState { handler });
         let user_data = Box::into_raw(state) as *mut c_void;
         let cbs = ffi::webrtc_AudioTrackSinkInterface_cbs {
-            OnData: Some(audio_sink_on_data),
-            OnDestroy: Some(audio_sink_on_destroy),
+            OnData: Some(audio_track_sink_on_data),
+            OnDestroy: Some(audio_track_sink_on_destroy),
         };
         let raw =
             match NonNull::new(unsafe { ffi::webrtc_AudioTrackSinkInterface_new(&cbs, user_data) })
             {
                 Some(raw) => raw,
                 None => {
-                    let _ = unsafe { Box::from_raw(user_data as *mut AudioSinkHandlerState) };
+                    let _ = unsafe { Box::from_raw(user_data as *mut AudioTrackSinkHandlerState) };
                     panic!("BUG: webrtc_AudioTrackSinkInterface_new が null を返しました");
                 }
             };
@@ -193,13 +193,13 @@ impl AudioSink {
     }
 }
 
-impl Drop for AudioSink {
+impl Drop for AudioTrackSink {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_AudioTrackSinkInterface_delete(self.raw.as_ptr()) };
     }
 }
 
-unsafe impl Send for AudioSink {}
+unsafe impl Send for AudioTrackSink {}
 
 /// webrtc::AudioProcessingBuilderInterface のラッパー。
 pub struct AudioProcessingBuilder {
