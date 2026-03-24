@@ -1,13 +1,13 @@
 use crate::ref_count::{
     AudioTrackHandle, AudioTrackSourceHandle, ConnectionContextHandle, DataChannelHandle,
-    PeerConnectionFactoryHandle, PeerConnectionHandle, RtpReceiverHandle, RtpSenderHandle,
-    RtpTransceiverHandle, SetLocalDescriptionObserverHandle, SetRemoteDescriptionObserverHandle,
-    VideoTrackHandle,
+    DtlsTransportHandle, PeerConnectionFactoryHandle, PeerConnectionHandle, RtpReceiverHandle,
+    RtpSenderHandle, RtpTransceiverHandle, SetLocalDescriptionObserverHandle,
+    SetRemoteDescriptionObserverHandle, VideoTrackHandle,
 };
 use crate::{
     AudioDecoderFactory, AudioDeviceModule, AudioEncoderFactory, AudioProcessingBuilder,
-    AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit, Error, IceCandidate,
-    IceCandidateRef, MediaStreamTrack, MediaType, RTCStatsReport, Result, RtcError,
+    AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit, DtlsTransport, Error,
+    IceCandidate, IceCandidateRef, MediaStreamTrack, MediaType, RTCStatsReport, Result, RtcError,
     RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender, RtpTransceiver,
     RtpTransceiverInit, SSLCertificateVerifier, SSLIdentity, ScopedRef, SessionDescription,
     StringVector, Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack, VideoTrackSource,
@@ -1840,6 +1840,21 @@ impl PeerConnection {
     /// この呼び出し後、PeerConnectionObserver のコールバックは呼ばれなくなる。
     pub fn close(&self) {
         unsafe { ffi::webrtc_PeerConnectionInterface_Close(self.raw_ref.as_ptr()) };
+    }
+
+    /// mid に対応する DtlsTransport を取得する。
+    pub fn lookup_dtls_transport_by_mid(&self, mid: &str) -> Option<DtlsTransport> {
+        let ptr = unsafe {
+            ffi::webrtc_PeerConnectionInterface_LookupDtlsTransportByMid(
+                self.raw_ref.as_ptr(),
+                mid.as_ptr() as *const _,
+                mid.len(),
+            )
+        };
+        NonNull::new(ptr).map(|p| {
+            let raw_ref = ScopedRef::<DtlsTransportHandle>::from_raw(p);
+            DtlsTransport::from_scoped_ref(raw_ref)
+        })
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface {

@@ -297,6 +297,22 @@ impl RefCountedHandle for PeerConnectionHandle {
     }
 }
 
+pub(crate) struct DtlsTransportHandle;
+impl RefCountedHandle for DtlsTransportHandle {
+    type Refcounted = ffi::webrtc_DtlsTransportInterface_refcounted;
+    type Raw = ffi::webrtc_DtlsTransportInterface;
+
+    unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
+        unsafe { ffi::webrtc_DtlsTransportInterface_refcounted_get(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *mut Self::Raw) {
+        unsafe { ffi::webrtc_DtlsTransportInterface_AddRef(raw) };
+    }
+    unsafe fn release(raw: *mut Self::Raw) {
+        unsafe { ffi::webrtc_DtlsTransportInterface_Release(raw) };
+    }
+}
+
 pub(crate) struct RTCStatsReportHandle;
 impl RefCountedHandle for RTCStatsReportHandle {
     type Refcounted = ffi::webrtc_RTCStatsReport_refcounted;
