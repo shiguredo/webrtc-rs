@@ -822,6 +822,60 @@ fn peer_connection_create_and_transceiver() {
 }
 
 #[test]
+fn peer_connection_lookup_dtls_transport() {
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc);
+    deps_factory.set_audio_decoder_factory(&dec);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let mut pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+        .expect("PeerConnection の生成に失敗しました");
+
+    let mut transceiver_init = RtpTransceiverInit::new();
+    transceiver_init.set_direction(RtpTransceiverDirection::SendRecv);
+    let _ = pc
+        .add_transceiver(MediaType::Audio, &mut transceiver_init)
+        .expect("transceiver の追加に失敗しました");
+
+    if let Some(dtls_transport) = pc.lookup_dtls_transport_by_mid("0") {
+        let observer = DtlsTransportObserver::new_with_handler(Box::new(()));
+        let _ = dtls_transport.state();
+        dtls_transport.register_observer(&observer);
+        dtls_transport.unregister_observer();
+    }
+
+    drop(pc);
+    drop(pc_deps);
+    drop(factory);
+    drop(deps_factory);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
 fn peer_connection_create_with_proxy_allocator() {
     let dec = AudioDecoderFactory::builtin();
     let enc = AudioEncoderFactory::builtin();
