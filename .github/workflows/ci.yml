@@ -131,32 +131,20 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-      - name: Install CMake and Ninja
-        run: |
-          uv tool install cmake
-          uv tool install ninja
-          cmake --version
-          ninja --version
-      - name: Build libwebrtc_c for iOS arm64
-        run: |
-          WEBRTC_BUILD_VERSION=$(grep 'webrtc-build' Cargo.toml | grep -oE 'version = "[^"]+"' | sed 's/version = "//;s/"//')
-          WEBRTC_BASE_URL=$(grep 'webrtc-build' Cargo.toml | grep -oE 'base-url = "[^"]+"' | sed 's/base-url = "//;s/"//')
-          cmake -B build/ios -G Ninja \
-            -DWEBRTC_C_TARGET=ios_arm64 \
-            -DWEBRTC_BUILD_VERSION="$WEBRTC_BUILD_VERSION" \
-            -DWEBRTC_BASE_URL="$WEBRTC_BASE_URL" \
-            -DCMAKE_SYSTEM_NAME=iOS \
-            -DCMAKE_OSX_ARCHITECTURES=arm64 \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
-            -DCMAKE_BUILD_TYPE=Release \
-            webrtc/
-          cmake --build build/ios --target bundled_webrtc_c_bundling
+      - run: rustup update stable
+      - run: rustup target add aarch64-apple-ios
+      - name: Build shiguredo_webrtc for iOS arm64
+        run: cargo build --features source-build --target aarch64-apple-ios
       - name: Verify build output
         run: |
-          file build/ios/bundled/libwebrtc_c.a
-          ls -lh build/ios/bundled/libwebrtc_c.a
+          OUT_DIR=$(find target/aarch64-apple-ios/debug/build/shiguredo_webrtc-*/out -maxdepth 0 -type d | head -1)
+          if [ -z "$OUT_DIR" ]; then
+            echo "ERROR: OUT_DIR が見つかりません"
+            exit 1
+          fi
+          file "$OUT_DIR/lib/libwebrtc_c.a"
+          ls -lh "$OUT_DIR/lib/libwebrtc_c.a"
+          ls -lh "$OUT_DIR/bindings.rs"
 
   build-android:
     runs-on: ubuntu-24.04
@@ -164,40 +152,30 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-      - name: Install CMake and Ninja
-        run: |
-          uv tool install cmake
-          uv tool install ninja
-          cmake --version
-          ninja --version
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential
+          sudo apt-get install -y build-essential libclang-dev clang
+      - run: rustup update stable
+      - run: rustup target add aarch64-linux-android
       - name: Install Android NDK r29
         run: |
+          echo "ANDROID_NDK=$ANDROID_NDK"
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;29.0.14206865"
           echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/29.0.14206865" >> $GITHUB_ENV
-      - name: Build libwebrtc_c for Android arm64
-        run: |
-          WEBRTC_BUILD_VERSION=$(grep 'webrtc-build' Cargo.toml | grep -oP 'version = "\K[^"]+')
-          WEBRTC_BASE_URL=$(grep 'webrtc-build' Cargo.toml | grep -oP 'base-url = "\K[^"]+')
-          cmake -B build/android -G Ninja \
-            -DWEBRTC_C_TARGET=android_arm64 \
-            -DWEBRTC_BUILD_VERSION="$WEBRTC_BUILD_VERSION" \
-            -DWEBRTC_BASE_URL="$WEBRTC_BASE_URL" \
-            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-24 \
-            -DCMAKE_BUILD_TYPE=Release \
-            webrtc/
-          cmake --build build/android --target bundled_webrtc_c_bundling
+      - name: Build shiguredo_webrtc for Android arm64
+        run: cargo build --features source-build --target aarch64-linux-android
       - name: Verify build output
         run: |
-          file build/android/bundled/libwebrtc_c.a
-          ls -lh build/android/bundled/libwebrtc_c.a
+          OUT_DIR=$(find target/aarch64-linux-android/debug/build/shiguredo_webrtc-*/out -maxdepth 0 -type d | head -1)
+          if [ -z "$OUT_DIR" ]; then
+            echo "ERROR: OUT_DIR が見つかりません"
+            exit 1
+          fi
+          file "$OUT_DIR/lib/libwebrtc_c.a"
+          ls -lh "$OUT_DIR/lib/libwebrtc_c.a"
+          ls -lh "$OUT_DIR/bindings.rs"
 
   slack_notify:
     # needs: [ci, cross-compile, verify-linux-arm64, cross-compile-ios, cross-compile-android]
