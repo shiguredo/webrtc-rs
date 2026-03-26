@@ -158,13 +158,11 @@ set(LLVM_VERSION_FILE "${DEPS_DIR}/llvm.version")
 # WebRTC 向けの libc++ ヘッダーのダウンロードと使用（WebRTC との ABI 互換性のため）
 set(WEBRTC_USE_WEBRTC_LIBCXX TRUE)
 # WebRTC の Clang をコンパイラとして使用するかどうか
-# Android は NDK の Clang を使い、libc++ ヘッダーのみ WebRTC のものを使う
+# Windows 以外は WebRTC の Clang を使う
 set(WEBRTC_USE_WEBRTC_CLANG TRUE)
 
 if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
   set(WEBRTC_USE_WEBRTC_LIBCXX FALSE)
-  set(WEBRTC_USE_WEBRTC_CLANG FALSE)
-elseif(WEBRTC_C_TARGET STREQUAL "android_arm64")
   set(WEBRTC_USE_WEBRTC_CLANG FALSE)
 endif()
 
