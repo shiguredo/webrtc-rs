@@ -41,4 +41,13 @@ webrtc_RtpSenderInterface_SetParameters(
   return reinterpret_cast<struct webrtc_RTCError_unique*>(
       new webrtc::RTCError(result));
 }
+
+WEBRTC_EXPORT int webrtc_RtpSenderInterface_SetTrack(
+    struct webrtc_RtpSenderInterface* self,
+    struct webrtc_MediaStreamTrackInterface* track) {
+  auto sender = reinterpret_cast<webrtc::RtpSenderInterface*>(self);
+  auto media_track =
+      reinterpret_cast<webrtc::MediaStreamTrackInterface*>(track);
+  return sender->SetTrack(media_track) ? 1 : 0;
+}
 }

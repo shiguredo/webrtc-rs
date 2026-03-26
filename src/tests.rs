@@ -822,6 +822,60 @@ fn peer_connection_create_and_transceiver() {
 }
 
 #[test]
+fn peer_connection_lookup_dtls_transport() {
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc);
+    deps_factory.set_audio_decoder_factory(&dec);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let mut pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+        .expect("PeerConnection の生成に失敗しました");
+
+    let mut transceiver_init = RtpTransceiverInit::new();
+    transceiver_init.set_direction(RtpTransceiverDirection::SendRecv);
+    let _ = pc
+        .add_transceiver(MediaType::Audio, &mut transceiver_init)
+        .expect("transceiver の追加に失敗しました");
+
+    if let Some(dtls_transport) = pc.lookup_dtls_transport_by_mid("0") {
+        let observer = DtlsTransportObserver::new_with_handler(Box::new(()));
+        let _ = dtls_transport.state();
+        dtls_transport.register_observer(&observer);
+        dtls_transport.unregister_observer();
+    }
+
+    drop(pc);
+    drop(pc_deps);
+    drop(factory);
+    drop(deps_factory);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
 fn peer_connection_create_with_proxy_allocator() {
     let dec = AudioDecoderFactory::builtin();
     let enc = AudioEncoderFactory::builtin();
@@ -1068,6 +1122,175 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
         factory.create(env.as_ref(), format.as_ref()).is_none(),
         "2 回目の create は None を返す想定です"
     );
+}
+
+#[test]
+fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
+    struct TestVideoEncoderHandler;
+    impl VideoEncoderHandler for TestVideoEncoderHandler {
+        fn get_encoder_info(&mut self) -> VideoEncoderEncoderInfo {
+            let mut info = VideoEncoderEncoderInfo::new();
+            info.set_implementation_name("encoder-info-full");
+
+            let mut scaling = VideoEncoderScalingSettings::new();
+            let mut thresholds = VideoEncoderQpThresholds::new();
+            thresholds.set_low(11);
+            thresholds.set_high(33);
+            scaling.set_thresholds(Some(&thresholds));
+            scaling.set_min_pixels_per_frame(12345);
+            info.set_scaling_settings(&scaling);
+
+            info.set_requested_resolution_alignment(4);
+            info.set_apply_alignment_to_all_simulcast_layers(true);
+            info.set_supports_native_handle(true);
+            info.set_has_trusted_rate_controller(true);
+            info.set_is_hardware_accelerated(true);
+
+            if let Some(mut fps0) = info.fps_allocation(0) {
+                fps0.clear();
+                fps0.push(128);
+                fps0.push(255);
+            } else {
+                panic!("fps_allocation(0) が取得できません");
+            }
+            if let Some(mut fps1) = info.fps_allocation(1) {
+                fps1.clear();
+                fps1.push(64);
+            } else {
+                panic!("fps_allocation(1) が取得できません");
+            }
+
+            let limits0 =
+                VideoEncoderResolutionBitrateLimits::new(640 * 360, 100000, 80000, 500000);
+            let limits1 =
+                VideoEncoderResolutionBitrateLimits::new(1280 * 720, 300000, 200000, 1500000);
+            {
+                let mut limits = info.resolution_bitrate_limits();
+                limits.clear();
+                limits.push(&limits0);
+                limits.push(&limits1);
+            }
+
+            info.set_supports_simulcast(true);
+            {
+                let mut preferred = info.preferred_pixel_formats();
+                preferred.clear();
+                preferred.push(VideoFrameBufferType::I420);
+                preferred.push(VideoFrameBufferType::Nv12);
+            }
+
+            info.set_is_qp_trusted(Some(true));
+            info.set_min_qp(Some(9));
+            let mapped = VideoEncoderResolution::new(1280, 720);
+            info.set_mapped_resolution(Some(&mapped));
+            info
+        }
+    }
+
+    let encoder = VideoEncoder::new_with_handler(Box::new(TestVideoEncoderHandler));
+    let mut info = encoder.get_encoder_info();
+
+    assert_eq!(
+        info.implementation_name()
+            .expect("implementation_name の取得に失敗しました"),
+        "encoder-info-full"
+    );
+    assert_eq!(info.requested_resolution_alignment(), 4);
+    assert!(info.apply_alignment_to_all_simulcast_layers());
+    assert!(info.supports_native_handle());
+    assert!(info.has_trusted_rate_controller());
+    assert!(info.is_hardware_accelerated());
+    assert!(info.supports_simulcast());
+
+    let scaling = info.scaling_settings();
+    let thresholds = scaling.thresholds().expect("thresholds が None です");
+    assert_eq!(thresholds.low(), 11);
+    assert_eq!(thresholds.high(), 33);
+    assert_eq!(scaling.min_pixels_per_frame(), 12345);
+
+    let mut fps0 = info
+        .fps_allocation(0)
+        .expect("fps_allocation(0) が None です");
+    assert_eq!(fps0.len(), 2);
+    assert_eq!(fps0.get(0), Some(128));
+    assert_eq!(fps0.get(1), Some(255));
+    assert!(fps0.set(1, 200));
+    assert_eq!(fps0.get(1), Some(200));
+
+    let fps1 = info
+        .fps_allocation(1)
+        .expect("fps_allocation(1) が None です");
+    assert_eq!(fps1.len(), 1);
+    assert_eq!(fps1.get(0), Some(64));
+
+    {
+        let mut limits = info.resolution_bitrate_limits();
+        assert_eq!(limits.len(), 2);
+        let limits0 = limits
+            .get(0)
+            .expect("resolution_bitrate_limits[0] が None です");
+        assert_eq!(limits0.frame_size_pixels(), 640 * 360);
+        assert_eq!(limits0.min_start_bitrate_bps(), 100000);
+        assert_eq!(limits0.min_bitrate_bps(), 80000);
+        assert_eq!(limits0.max_bitrate_bps(), 500000);
+
+        let replacement =
+            VideoEncoderResolutionBitrateLimits::new(1920 * 1080, 500000, 400000, 2500000);
+        assert!(
+            limits.set(1, &replacement),
+            "resolution_bitrate_limits.set(1) が失敗しました"
+        );
+        let limits1 = limits
+            .get(1)
+            .expect("resolution_bitrate_limits[1] が None です");
+        assert_eq!(limits1.frame_size_pixels(), 1920 * 1080);
+        assert_eq!(limits1.min_start_bitrate_bps(), 500000);
+        assert_eq!(limits1.min_bitrate_bps(), 400000);
+        assert_eq!(limits1.max_bitrate_bps(), 2500000);
+    }
+
+    let mut preferred = info.preferred_pixel_formats();
+    assert_eq!(preferred.len(), 2);
+    assert_eq!(preferred.get(0), Some(VideoFrameBufferType::I420));
+    assert_eq!(preferred.get(1), Some(VideoFrameBufferType::Nv12));
+    assert!(preferred.set(1, VideoFrameBufferType::I420A));
+    assert_eq!(preferred.get(1), Some(VideoFrameBufferType::I420A));
+
+    assert_eq!(info.is_qp_trusted(), Some(true));
+    assert_eq!(info.min_qp(), Some(9));
+    let mapped = info
+        .mapped_resolution()
+        .expect("mapped_resolution が None です");
+    assert_eq!(mapped.width(), 1280);
+    assert_eq!(mapped.height(), 720);
+
+    let info_text = info.to_string().expect("ToString に失敗しました");
+    assert!(!info_text.is_empty(), "ToString の結果が空です");
+    assert!(
+        info_text.contains("encoder-info-full"),
+        "ToString に implementation_name が含まれていません: {}",
+        info_text
+    );
+
+    let limits = info
+        .get_encoder_bitrate_limits_for_resolution(640 * 360)
+        .expect("GetEncoderBitrateLimitsForResolution(640x360) が None です");
+    assert_eq!(limits.frame_size_pixels(), 640 * 360);
+    assert_eq!(limits.min_start_bitrate_bps(), 100000);
+    assert_eq!(limits.min_bitrate_bps(), 80000);
+    assert_eq!(limits.max_bitrate_bps(), 500000);
+
+    info.set_is_qp_trusted(None);
+    assert_eq!(info.is_qp_trusted(), None);
+    info.set_min_qp(None);
+    assert_eq!(info.min_qp(), None);
+    info.set_mapped_resolution(None);
+    assert!(info.mapped_resolution().is_none());
+
+    let mut scaling_none = VideoEncoderScalingSettings::new();
+    scaling_none.set_thresholds(None);
+    info.set_scaling_settings(&scaling_none);
+    assert!(info.scaling_settings().thresholds().is_none());
 }
 
 #[test]

@@ -140,6 +140,10 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTrack(
     struct std_string_vector* stream_ids,
     struct webrtc_RtpSenderInterface_refcounted** out_sender,
     struct webrtc_RTCError_unique** out_rtc_error);
+WEBRTC_EXPORT void webrtc_PeerConnectionInterface_RemoveTrackOrError(
+    struct webrtc_PeerConnectionInterface* self,
+    struct webrtc_RtpSenderInterface_refcounted* sender,
+    struct webrtc_RTCError_unique** out_rtc_error);
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_CreateOffer(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_CreateSessionDescriptionObserver* observer,
@@ -173,6 +177,9 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_GetStats(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_RTCStatsCollectorCallback_cbs* cbs,
     void* user_data);
+
+WEBRTC_EXPORT void webrtc_PeerConnectionInterface_Close(
+    struct webrtc_PeerConnectionInterface* self);
 
 typedef int webrtc_PeerConnectionInterface_PeerConnectionState;
 WEBRTC_EXPORT extern const int

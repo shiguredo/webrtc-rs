@@ -1,6 +1,7 @@
 mod audio;
 mod audio_device_module;
 mod data_channel;
+mod dtls_transport;
 mod environment;
 mod jsep;
 mod media_types;
@@ -17,6 +18,7 @@ mod video_encoder;
 pub use audio::*;
 pub use audio_device_module::*;
 pub use data_channel::*;
+pub use dtls_transport::*;
 pub use environment::*;
 pub use jsep::*;
 pub use media_types::*;

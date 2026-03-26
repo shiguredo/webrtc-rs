@@ -11,18 +11,45 @@
 
 ## develop
 
+- [ADD] `PeerConnection::remove_track` を追加する
+  - `PeerConnectionInterface::RemoveTrackOrError` の C API / Rust バインディングを追加する
+  - @voluntas
+- [ADD] `RtpSender::set_track` を追加する
+  - `RtpSenderInterface::SetTrack` の C API / Rust バインディングを追加する
+  - @voluntas
+- [ADD] `VideoEncoder::EncoderInfo` の全フィールドと関連型 API を追加する
+  - `QpThresholds` / `ScalingSettings` / `ResolutionBitrateLimits` / `Resolution` を追加する
+  - `ToString` / `GetEncoderBitrateLimitsForResolution` を追加する
+  - `fps_allocation` / `preferred_pixel_formats` / optional フィールド操作を追加する
+  - @melpon
+
+## 0.146.1
+
+**リリース日**: 2026-03-24
+
+- [ADD] `PeerConnection::close` を追加する
+  - @voluntas
+- [ADD] `DtlsTransport` / `DtlsTransportObserver` / `DtlsTransportState` を追加する
+  - @voluntas
+- [ADD] `PeerConnection::lookup_dtls_transport_by_mid` を追加する
+  - `DtlsTransport` のインスタンスを取得するために必要
+  - @voluntas
 - [UPDATE] libwebrtc m146 (m146.7680.3.1) に上げる
+  - @voluntas
+- [ADD] `AudioSinkHandler` / `AudioSink` を追加する
+  - @voluntas
+- [ADD] `AudioTrack` に `add_sink()` / `remove_sink()` を追加する
+  - @voluntas
+- [ADD] `MediaStreamTrack` に `cast_to_audio_track()` を追加する
   - @voluntas
 - [ADD] トラックの有効/無効を制御する `MediaStreamTrack::enabled` / `MediaStreamTrack::set_enabled` を追加する
   - @voluntas
 - [ADD] `IceServer::urls_len` を追加する
   - @melpon
-
-
-## 0.146.0
-
 - [ADD] Windows に対応する
   - @melpon
+
+## 0.146.0
 
 **リリース日**: 2026-03-15
 

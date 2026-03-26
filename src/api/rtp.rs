@@ -1,10 +1,10 @@
 use crate::ref_count::{
-    MediaStreamTrackHandle, RtpReceiverHandle, RtpSenderHandle, RtpTransceiverHandle,
-    VideoTrackHandle,
+    AudioTrackHandle, MediaStreamTrackHandle, RtpReceiverHandle, RtpSenderHandle,
+    RtpTransceiverHandle, VideoTrackHandle,
 };
 use crate::{
-    CxxString, CxxStringRef, Error, MapStringString, MediaType, Result, RtcError, ScopedRef,
-    StringVectorRef, VideoTrack, ffi,
+    AudioTrack, CxxString, CxxStringRef, Error, MapStringString, MediaType, Result, RtcError,
+    ScopedRef, StringVectorRef, VideoTrack, ffi,
 };
 use std::marker::PhantomData;
 use std::ptr::NonNull;
@@ -1322,6 +1322,14 @@ impl RtpSender {
         RtpParameters::from_raw(raw)
     }
 
+    pub fn set_track(&mut self, track: Option<&MediaStreamTrack>) -> bool {
+        let track_ptr = match track {
+            Some(t) => t.raw_ref.as_ptr(),
+            None => std::ptr::null_mut(),
+        };
+        unsafe { ffi::webrtc_RtpSenderInterface_SetTrack(self.as_ptr(), track_ptr) != 0 }
+    }
+
     pub fn set_parameters(&mut self, parameters: &RtpParameters) -> Result<()> {
         let err = unsafe {
             ffi::webrtc_RtpSenderInterface_SetParameters(self.as_ptr(), parameters.as_ptr())
@@ -1390,5 +1398,17 @@ impl MediaStreamTrack {
         assert!(!raw_ref.is_null());
         let raw_ref = ScopedRef::<VideoTrackHandle>::from_raw(NonNull::new(raw_ref).unwrap());
         VideoTrack::from_scoped_ref(raw_ref)
+    }
+
+    pub fn cast_to_audio_track(&self) -> AudioTrack {
+        let raw_ref = unsafe {
+            ffi::webrtc_MediaStreamTrackInterface_refcounted_cast_to_webrtc_AudioTrackInterface(
+                self.raw_ref.as_refcounted_ptr(),
+            )
+        };
+        let raw_ref = NonNull::new(raw_ref)
+            .expect("BUG: MediaStreamTrackInterface から AudioTrackInterface へのキャストが null を返しました");
+        let raw_ref = ScopedRef::<AudioTrackHandle>::from_raw(raw_ref);
+        AudioTrack::from_scoped_ref(raw_ref)
     }
 }
