@@ -901,9 +901,17 @@ fn build_webrtc_c(
         } else {
             ""
         };
-        let llvm_clang_dir = "${CMAKE_BINARY_DIR}/_deps/llvm/clang/bin";
-        let override_c_compiler = format!("{llvm_clang_dir}/clang{postfix}");
-        let override_cxx_compiler = format!("{llvm_clang_dir}/clang++{postfix}");
+        let llvm_clang_dir = out_dir
+            .join("_build")
+            .join(target_platform)
+            .join(profile)
+            .join("build")
+            .join("_deps")
+            .join("llvm")
+            .join("clang")
+            .join("bin");
+        let override_c_compiler = llvm_clang_dir.join(format!("clang{postfix}"));
+        let override_cxx_compiler = llvm_clang_dir.join(format!("clang++{postfix}"));
 
         config.define(
             "CMAKE_TOOLCHAIN_FILE",
@@ -913,8 +921,14 @@ fn build_webrtc_c(
             "ANDROID_OVERRIDE_TOOLCHAIN_FILE",
             ndk_toolchain_file.to_str().unwrap(),
         );
-        config.define("ANDROID_OVERRIDE_C_COMPILER", &override_c_compiler);
-        config.define("ANDROID_OVERRIDE_CXX_COMPILER", &override_cxx_compiler);
+        config.define(
+            "ANDROID_OVERRIDE_C_COMPILER",
+            override_c_compiler.to_str().unwrap(),
+        );
+        config.define(
+            "ANDROID_OVERRIDE_CXX_COMPILER",
+            override_cxx_compiler.to_str().unwrap(),
+        );
         config.define("CMAKE_TRY_COMPILE_TARGET_TYPE", "STATIC_LIBRARY");
         config.define("ANDROID_ABI", "arm64-v8a");
         config.define("ANDROID_PLATFORM", &build_metadata.android_platform);
