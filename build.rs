@@ -295,7 +295,7 @@ fn build_webrtc_c(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> P
     // Cargo.toml から WebRTC ビルド情報を取得して CMake に渡す
     let (webrtc_build_version, webrtc_base_url) = get_webrtc_build_metadata();
 
-    // ターゲットプラットフォームを設定（CMakeLists.txt 内で自動検出もされるが明示的に指定）
+    // ターゲットプラットフォームを設定
     config
         .define("WEBRTC_C_TARGET", target_platform)
         .define("WEBRTC_BUILD_VERSION", &webrtc_build_version)
@@ -599,13 +599,6 @@ fn resolve_android_ndk_sysroot(ndk: &Path) -> PathBuf {
     .iter()
     .map(|name| prebuilt.join(name))
     .find(|path| path.exists())
-    .or_else(|| {
-        fs::read_dir(&prebuilt)
-            .ok()?
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
-            .find(|path| path.is_dir())
-    })
     .unwrap_or_else(|| panic!("android ndk prebuilt dir not found: {}", prebuilt.display()));
     let sysroot = selected.join("sysroot");
     if !sysroot.exists() {

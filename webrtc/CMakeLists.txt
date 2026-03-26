@@ -157,15 +157,15 @@ set(WEBRTC_VERSION_FILE "${DEPS_DIR}/webrtc.version")
 set(LLVM_VERSION_FILE "${DEPS_DIR}/llvm.version")
 # WebRTC 向けの libc++ ヘッダーのダウンロードと使用（WebRTC との ABI 互換性のため）
 set(WEBRTC_USE_WEBRTC_LIBCXX TRUE)
-# Chromium の Clang をコンパイラとして使用するかどうか
-# Android は NDK の Clang を使い、libc++ ヘッダーのみ Chromium のものを使う
-set(WEBRTC_USE_CHROMIUM_CLANG TRUE)
+# WebRTC の Clang をコンパイラとして使用するかどうか
+# Android は NDK の Clang を使い、libc++ ヘッダーのみ WebRTC のものを使う
+set(WEBRTC_USE_WEBRTC_CLANG TRUE)
 
 if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
   set(WEBRTC_USE_WEBRTC_LIBCXX FALSE)
-  set(WEBRTC_USE_CHROMIUM_CLANG FALSE)
+  set(WEBRTC_USE_WEBRTC_CLANG FALSE)
 elseif(WEBRTC_C_TARGET STREQUAL "android_arm64")
-  set(WEBRTC_USE_CHROMIUM_CLANG FALSE)
+  set(WEBRTC_USE_WEBRTC_CLANG FALSE)
 endif()
 
 # WebRTC のダウンロード（project() の前に実行）
@@ -236,13 +236,13 @@ if(WEBRTC_USE_WEBRTC_LIBCXX AND EXISTS "${LLVM_VERSION_FILE}")
   endif()
 endif()
 
-if(WEBRTC_USE_WEBRTC_LIBCXX AND LLVM_NEEDS_INSTALL)
+if(LLVM_NEEDS_INSTALL AND (WEBRTC_USE_WEBRTC_CLANG OR WEBRTC_USE_WEBRTC_LIBCXX))
   message(STATUS "Installing LLVM...")
   file(REMOVE_RECURSE "${LLVM_DIR}")
   file(MAKE_DIRECTORY "${LLVM_DIR}")
 
-  # Chromium の Clang をダウンロード（Android 以外）
-  if(WEBRTC_USE_CHROMIUM_CLANG)
+  # WebRTC の Clang をダウンロード
+  if(WEBRTC_USE_WEBRTC_CLANG)
     # tools を shallow clone
     message(STATUS "Cloning tools...")
     git_shallow_clone(
@@ -295,7 +295,7 @@ if(WEBRTC_USE_WEBRTC_LIBCXX AND LLVM_NEEDS_INSTALL)
   message(STATUS "LLVM installation complete")
 endif()
 
-if(WEBRTC_USE_CHROMIUM_CLANG)
+if(WEBRTC_USE_WEBRTC_CLANG)
   # Prebuilt Clang コンパイラのパスを設定（project() の前）
   set(CMAKE_C_COMPILER "${LLVM_CLANG_DIR}/bin/clang" CACHE FILEPATH "" FORCE)
   set(CMAKE_CXX_COMPILER "${LLVM_CLANG_DIR}/bin/clang++" CACHE FILEPATH "" FORCE)
@@ -326,13 +326,6 @@ if(WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_ARMV8)
   # クロスコンパイル時はシステムの ld ではなく LLD を使用する
   set(CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld" CACHE STRING "" FORCE)
   set(CMAKE_SHARED_LINKER_FLAGS "-fuse-ld=lld" CACHE STRING "" FORCE)
-endif()
-
-# iOS クロスコンパイル設定（project() の前に配置が必要）
-if(WEBRTC_C_TARGET STREQUAL "ios_arm64")
-  set(CMAKE_SYSTEM_NAME iOS)
-  set(CMAKE_OSX_ARCHITECTURES arm64)
-  set(CMAKE_OSX_DEPLOYMENT_TARGET 16.0)
 endif()
 
 # ここで project() を呼び出す
