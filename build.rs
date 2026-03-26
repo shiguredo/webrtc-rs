@@ -16,9 +16,12 @@ struct BuildMetadata {
 }
 
 /// Cargo.toml からビルド設定を取得する。
+///
 /// 引数:
 /// - `manifest_dir`: この crate の `Cargo.toml` があるディレクトリ。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `BuildMetadata`: ビルドに必要な固定設定値。
 fn get_build_metadata(manifest_dir: &Path) -> BuildMetadata {
@@ -144,12 +147,16 @@ struct PrebuiltPaths {
 }
 
 /// prebuilt バイナリを使用するかどうかを判定する。
+///
 /// 引数: なし。
+///
 /// 環境変数依存:
 /// - `CARGO_FEATURE_SOURCE_BUILD`
+///
 /// 戻り値:
 /// - `true`: prebuilt を利用する。
 /// - `false`: ソースビルドする。
+///
 /// 副作用: なし。
 fn should_use_prebuilt() -> bool {
     // source-build feature が有効 → ソースビルド
@@ -161,17 +168,21 @@ fn should_use_prebuilt() -> bool {
 }
 
 /// ソースからビルドする（CMake + bindgen）。
+///
 /// 引数:
 /// - `manifest_dir`: crate ルートディレクトリ。
 /// - `webrtc_dir`: C/C++ 側ソースディレクトリ。
 /// - `target_platform`: `android_arm64` などの内部ターゲット名。
 /// - `out_dir`: Cargo が割り当てた出力先。
 /// - `build_metadata`: `Cargo.toml` 由来のビルド設定。
+///
 /// 環境変数依存:
 /// - `ANDROID_NDK_HOME`, `ANDROID_NDK`（Android 時）
 /// - `LIBCLANG_PATH`（Windows 時）
+///
 /// 戻り値:
 /// - 生成した静的ライブラリのパス。
+///
 /// 副作用:
 /// - Android 時に NDK 自動セットアップを実行する。
 /// - CMake ビルド結果を `out_dir` 配下へ出力する。
@@ -199,12 +210,16 @@ fn build_from_source(
 }
 
 /// Android NDK の存在を保証する。
+///
 /// 引数:
 /// - `manifest_dir`: crate ルートディレクトリ。
 /// - `build_metadata`: Android NDK / command-line tools のバージョン情報を含む設定。
+///
 /// 環境変数依存:
 /// - `ANDROID_NDK_HOME`, `ANDROID_NDK`
+///
 /// 戻り値: なし。
+///
 /// 副作用:
 /// - 必要時に `target/android-sdk` へ command-line tools / NDK をインストールする。
 /// - 環境変数 `ANDROID_NDK_HOME` と `ANDROID_NDK` を設定する。
@@ -233,12 +248,16 @@ fn ensure_android_ndk(manifest_dir: &Path, build_metadata: &BuildMetadata) {
 }
 
 /// 環境変数から既存の Android NDK パスを解決する。
+///
 /// 引数: なし。
+///
 /// 環境変数依存:
 /// - `ANDROID_NDK_HOME`, `ANDROID_NDK`
+///
 /// 戻り値:
 /// - `Some(path)`: 有効な NDK が見つかった。
 /// - `None`: 見つからなかった。
+///
 /// 副作用:
 /// - 無効な値を検出した場合は標準エラーへ警告を出力する。
 fn resolve_android_ndk_from_env() -> Option<PathBuf> {
@@ -259,10 +278,14 @@ fn resolve_android_ndk_from_env() -> Option<PathBuf> {
 }
 
 /// Android NDK 関連の環境変数を現在プロセスに設定する。
+///
 /// 引数:
 /// - `ndk`: 設定する NDK ルートパス。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値: なし。
+///
 /// 副作用:
 /// - `ANDROID_NDK_HOME`, `ANDROID_NDK` を設定する。
 fn export_android_ndk_env(ndk: &Path) {
@@ -273,11 +296,15 @@ fn export_android_ndk_env(ndk: &Path) {
 }
 
 /// `cargo metadata` から `target_directory` を取得する。
+///
 /// 引数:
 /// - `manifest_dir`: 対象 `Cargo.toml` の親ディレクトリ。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `cargo metadata` が返した `target_directory` 文字列。
+///
 /// 副作用:
 /// - 外部コマンド `cargo metadata` を実行する。
 fn load_target_directory_from_metadata(manifest_dir: &Path) -> String {
@@ -309,12 +336,16 @@ fn load_target_directory_from_metadata(manifest_dir: &Path) -> String {
 }
 
 /// Android command-line tools を必要に応じて配置する。
+///
 /// 引数:
 /// - `sdk_root`: Android SDK ルート (`target/android-sdk`)。
 /// - `version`: command-line tools のバージョン番号。
+///
 /// 環境変数依存:
 /// - ホスト OS 判定に `env::consts::OS` を利用。
+///
 /// 戻り値: なし。
+///
 /// 副作用:
 /// - `curl` でダウンロードし、`tar` / `unzip` で展開する。
 /// - `sdk_root` 配下へディレクトリ作成、移動、削除を行う。
@@ -367,12 +398,16 @@ fn install_android_commandline_tools(sdk_root: &Path, version: &str) {
 }
 
 /// `sdkmanager` を `yes` パイプ付きで実行する。
+///
 /// 引数:
 /// - `sdkmanager`: 実行する `sdkmanager` のパス。
 /// - `sdk_root`: `--sdk_root` に渡す Android SDK ルート。
 /// - `args`: `sdkmanager` に追加で渡す引数列。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値: なし。
+///
 /// 副作用:
 /// - 外部プロセスを起動する。
 /// - `ANDROID_SDK_ROOT`, `ANDROID_HOME` を子プロセス環境へ設定する。
@@ -411,23 +446,31 @@ fn run_sdkmanager_with_auto_yes(sdkmanager: &Path, sdk_root: &Path, args: &[&str
 }
 
 /// Android NDK のバージョン付きディレクトリを組み立てる。
+///
 /// 引数:
 /// - `sdk_root`: Android SDK ルート。
 /// - `version`: NDK バージョン文字列。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `sdk_root/ndk/<version>`。
+///
 /// 副作用: なし。
 fn android_ndk_dir(sdk_root: &Path, version: &str) -> PathBuf {
     sdk_root.join("ndk").join(version)
 }
 
 /// Android NDK の標準 toolchain ファイルパスを組み立てる。
+///
 /// 引数:
 /// - `ndk`: Android NDK ルート。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `<ndk>/build/cmake/android.toolchain.cmake`。
+///
 /// 副作用: なし。
 fn android_ndk_toolchain_file(ndk: &Path) -> PathBuf {
     ndk.join("build")
@@ -436,10 +479,14 @@ fn android_ndk_toolchain_file(ndk: &Path) -> PathBuf {
 }
 
 /// command-line tools ダウンロード URL 用の OS セグメントを返す。
+///
 /// 引数: なし。
+///
 /// 環境変数依存: なし（`env::consts::OS` のみ参照）。
+///
 /// 戻り値:
 /// - `linux` / `mac` / `win`。
+///
 /// 副作用:
 /// - 未対応 OS の場合に panic する。
 fn commandline_tools_os_segment() -> &'static str {
@@ -452,11 +499,15 @@ fn commandline_tools_os_segment() -> &'static str {
 }
 
 /// `sdk_root` から `sdkmanager` 実行ファイルのフルパスを組み立てる。
+///
 /// 引数:
 /// - `sdk_root`: Android SDK ルート。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `<sdk_root>/cmdline-tools/bin/<sdkmanager(.bat)>`。
+///
 /// 副作用: なし。
 fn android_sdkmanager_path(sdk_root: &Path) -> PathBuf {
     let executable_name = if cfg!(target_os = "windows") {
@@ -471,14 +522,18 @@ fn android_sdkmanager_path(sdk_root: &Path) -> PathBuf {
 }
 
 /// prebuilt バイナリをダウンロードして展開し、リンク用成果物を配置する。
+///
 /// 引数:
 /// - `target`: ダウンロード対象のターゲット名（`android_arm64` など）。
 /// - `out_dir`: Cargo の出力先ディレクトリ。
+///
 /// 環境変数依存:
 /// - `CARGO_PKG_VERSION`（GitHub Releases のタグ決定に使用）。
+///
 /// 戻り値:
 /// - `Ok(PrebuiltPaths)`: 配置済み静的ライブラリのパス情報。
 /// - `Err(String)`: ダウンロード、検証、展開、コピーいずれかに失敗。
+///
 /// 副作用:
 /// - 外部ネットワークからファイルをダウンロードする。
 /// - `out_dir` 配下へファイル作成、展開、コピー、削除を行う。
@@ -527,13 +582,17 @@ fn download_prebuilt(target: &str, out_dir: &Path) -> Result<PrebuiltPaths, Stri
 }
 
 /// `curl` を使って単一ファイルをダウンロードする。
+///
 /// 引数:
 /// - `url`: ダウンロード元 URL。
 /// - `output`: 保存先ファイルパス。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `Ok(())`: ダウンロード成功。
 /// - `Err(String)`: `curl` 実行失敗または非 0 終了。
+///
 /// 副作用:
 /// - 外部コマンド `curl` を実行する。
 /// - `output` の作成または上書きを行う。
@@ -551,13 +610,17 @@ fn download(url: &str, output: &Path) -> Result<(), String> {
 }
 
 /// ファイルの SHA256 チェックサムを検証する。
+///
 /// 引数:
 /// - `file_path`: 検証対象ファイル。
 /// - `sha256_path`: 期待値を含む `.sha256` ファイル。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `Ok(())`: チェックサム一致。
 /// - `Err(String)`: 期待値読込失敗、パース失敗、または不一致。
+///
 /// 副作用:
 /// - ファイルを読み込む。
 /// - 検証成功時に標準エラーへログを出力する。
@@ -581,12 +644,16 @@ fn verify_sha256(file_path: &Path, sha256_path: &Path) -> Result<(), String> {
 }
 
 /// ホスト OS に応じたコマンドで SHA256 ハッシュを計算する。
+///
 /// 引数:
 /// - `path`: ハッシュ計算対象ファイル。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `Ok(String)`: 小文字 16 進の SHA256 値。
 /// - `Err(String)`: 実行失敗、非 0 終了、または出力パース失敗。
+///
 /// 副作用:
 /// - 外部コマンド（`sha256sum` / `shasum` / `certutil`）を実行する。
 fn compute_sha256(path: &Path) -> Result<String, String> {
@@ -631,13 +698,17 @@ fn compute_sha256(path: &Path) -> Result<String, String> {
 }
 
 /// アーカイブを展開する。
+///
 /// 引数:
 /// - `archive`: 展開対象アーカイブ。
 /// - `dest`: 展開先ディレクトリ。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `Ok(())`: 展開成功。
 /// - `Err(String)`: 展開コマンド実行失敗または非 0 終了。
+///
 /// 副作用:
 /// - 外部コマンド `tar` または `unzip` を実行する。
 /// - `dest` 配下へファイルを作成する。
@@ -684,13 +755,17 @@ fn extract(archive: &Path, dest: &Path) -> Result<(), String> {
 }
 
 /// Cargo のターゲット情報から内部ターゲット名を決定する。
+///
 /// 引数: なし。
+///
 /// 環境変数依存:
 /// - `WEBRTC_C_TARGET`（設定されていれば最優先）。
 /// - `CARGO_CFG_TARGET_OS`
 /// - `CARGO_CFG_TARGET_ARCH`
+///
 /// 戻り値:
 /// - `linux` / `macos` / `windows` / `ios` / `android` 向け内部ターゲット名。
+///
 /// 副作用:
 /// - サポート外の組み合わせでは panic する。
 fn get_target_platform() -> String {
@@ -717,10 +792,14 @@ fn get_target_platform() -> String {
 }
 
 /// `/etc/os-release` から Linux ディストリビューション識別子を解決する。
+///
 /// 引数: なし。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `ubuntu-22.04` または `ubuntu-24.04`。
+///
 /// 副作用:
 /// - `/etc/os-release` を読み込む。
 /// - サポート外の場合は panic する。
@@ -743,16 +822,20 @@ fn detect_linux_distro() -> String {
 }
 
 /// `shiguredo_cmake` を使って `webrtc_c` をソースビルドし、静的ライブラリを配置する。
+///
 /// 引数:
 /// - `webrtc_dir`: C/C++ 側ソースディレクトリ。
 /// - `target_platform`: 内部ターゲット名。
 /// - `out_dir`: Cargo の出力先ディレクトリ。
 /// - `build_metadata`: `Cargo.toml` 由来のビルド設定。
+///
 /// 環境変数依存:
 /// - `WEBRTC_C_SYSROOT`（任意）。
 /// - Android 時に `ANDROID_NDK_HOME` / `ANDROID_NDK`。
+///
 /// 戻り値:
 /// - `out_dir/lib` にコピーした静的ライブラリのパス。
+///
 /// 副作用:
 /// - CMake を実行してビルドを行う。
 /// - `out_dir` 配下へビルド成果物を作成し、ファイルコピーを行う。
@@ -853,23 +936,31 @@ fn build_webrtc_c(
 }
 
 /// ターゲットが Windows 系かどうかを判定する。
+///
 /// 引数:
 /// - `target_platform`: 内部ターゲット名。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `true`: Windows 系ターゲット。
 /// - `false`: それ以外。
+///
 /// 副作用: なし。
 fn is_windows_target(target_platform: &str) -> bool {
     target_platform.starts_with("windows_")
 }
 
 /// ターゲットに対応する静的ライブラリ名を返す。
+///
 /// 引数:
 /// - `target_platform`: 内部ターゲット名。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - Windows では `webrtc_c.lib`、それ以外は `libwebrtc_c.a`。
+///
 /// 副作用: なし。
 fn static_library_filename_for_target(target_platform: &str) -> &'static str {
     if is_windows_target(target_platform) {
@@ -880,11 +971,15 @@ fn static_library_filename_for_target(target_platform: &str) -> &'static str {
 }
 
 /// Windows で `bindgen` 用 `libclang` を利用可能にする。
+///
 /// 引数:
 /// - `out_dir`: Cargo の出力先ディレクトリ（`vswhere.exe` の配置先に使用）。
+///
 /// 環境変数依存:
 /// - `LIBCLANG_PATH`（設定済みなら何もしない）。
+///
 /// 戻り値: なし。
+///
 /// 副作用:
 /// - 必要に応じて `vswhere.exe` をダウンロードする。
 /// - Visual Studio を検出し、`LIBCLANG_PATH` を設定する。
@@ -932,12 +1027,16 @@ fn ensure_windows_libclang(out_dir: &Path) {
 }
 
 /// `vswhere.exe` を実行して Visual Studio のインストール先を検出する。
+///
 /// 引数:
 /// - `vswhere_path`: 実行する `vswhere.exe` のパス。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `Ok(String)`: 検出したインストールディレクトリ。
 /// - `Err(String)`: `vswhere` 実行失敗、非 0 終了、または検出結果なし。
+///
 /// 副作用:
 /// - 外部コマンド `vswhere.exe` を実行する。
 fn find_visual_studio_installation(vswhere_path: &Path) -> Result<String, String> {
@@ -971,12 +1070,16 @@ fn find_visual_studio_installation(vswhere_path: &Path) -> Result<String, String
 }
 
 /// `local-export` 有効時に `webrtc/_build` への参照リンクを整備する。
+///
 /// 引数:
 /// - `webrtc_dir`: `webrtc` ディレクトリ。
 /// - `out_dir`: Cargo の出力先ディレクトリ。
+///
 /// 環境変数依存:
 /// - `CARGO_FEATURE_LOCAL_EXPORT`（未設定なら何もしない）。
+///
 /// 戻り値: なし。
+///
 /// 副作用:
 /// - ディレクトリ作成、既存リンクやファイルの削除、リンク作成を行う。
 /// - 失敗時に panic する。
@@ -1015,13 +1118,17 @@ fn maybe_export_local_build_dir(webrtc_dir: &Path, out_dir: &Path) {
 }
 
 /// Unix 系環境でディレクトリシンボリックリンクを作成する。
+///
 /// 引数:
 /// - `target`: リンク先ディレクトリ。
 /// - `link_path`: 作成するリンクパス。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `Ok(())`: 作成成功。
 /// - `Err(std::io::Error)`: 作成失敗。
+///
 /// 副作用:
 /// - ファイルシステム上にシンボリックリンクを作成する。
 #[cfg(unix)]
@@ -1030,13 +1137,17 @@ fn create_directory_link(target: &Path, link_path: &Path) -> std::io::Result<()>
 }
 
 /// Windows 環境でジャンクション（`mklink /J`）を作成する。
+///
 /// 引数:
 /// - `target`: リンク先ディレクトリ。
 /// - `link_path`: 作成するリンクパス。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `Ok(())`: 作成成功。
 /// - `Err(std::io::Error)`: `mklink` 実行失敗または非 0 終了。
+///
 /// 副作用:
 /// - 外部コマンド `cmd /C mklink /J` を実行する。
 /// - ファイルシステム上にジャンクションを作成する。
@@ -1061,12 +1172,16 @@ fn create_directory_link(target: &Path, link_path: &Path) -> std::io::Result<()>
 }
 
 /// Unix 系環境でディレクトリリンクを削除する。
+///
 /// 引数:
 /// - `link_path`: 削除対象リンク。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `Ok(())`: 削除成功。
 /// - `Err(std::io::Error)`: 削除失敗。
+///
 /// 副作用:
 /// - ファイルシステム上のリンクを削除する。
 #[cfg(unix)]
@@ -1075,12 +1190,16 @@ fn remove_directory_link(link_path: &Path) -> std::io::Result<()> {
 }
 
 /// Windows 環境でディレクトリリンク（ジャンクション）を削除する。
+///
 /// 引数:
 /// - `link_path`: 削除対象リンク。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `Ok(())`: 削除成功。
 /// - `Err(std::io::Error)`: 削除失敗。
+///
 /// 副作用:
 /// - ファイルシステム上のリンクを削除する。
 #[cfg(windows)]
@@ -1089,13 +1208,17 @@ fn remove_directory_link(link_path: &Path) -> std::io::Result<()> {
 }
 
 /// 2 つのパスが同じ実体を指しているかを判定する。
+///
 /// 引数:
 /// - `a`: 比較対象パス 1。
 /// - `b`: 比較対象パス 2。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `true`: 同一実体を指す。
 /// - `false`: 異なる、または正規化失敗。
+///
 /// 副作用:
 /// - `fs::canonicalize` によりファイルシステム参照を行う。
 fn paths_point_to_same_location(a: &Path, b: &Path) -> bool {
@@ -1106,12 +1229,16 @@ fn paths_point_to_same_location(a: &Path, b: &Path) -> bool {
 }
 
 /// Unix 系環境でメタデータがディレクトリリンクかどうかを判定する。
+///
 /// 引数:
 /// - `metadata`: 判定対象メタデータ。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `true`: シンボリックリンク。
 /// - `false`: それ以外。
+///
 /// 副作用: なし。
 #[cfg(unix)]
 fn is_directory_link(metadata: &std::fs::Metadata) -> bool {
@@ -1119,12 +1246,16 @@ fn is_directory_link(metadata: &std::fs::Metadata) -> bool {
 }
 
 /// Windows 環境でメタデータが再解析ポイントかどうかを判定する。
+///
 /// 引数:
 /// - `metadata`: 判定対象メタデータ。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - `true`: 再解析ポイント（リンク相当）。
 /// - `false`: それ以外。
+///
 /// 副作用: なし。
 #[cfg(windows)]
 fn is_directory_link(metadata: &std::fs::Metadata) -> bool {
@@ -1134,15 +1265,19 @@ fn is_directory_link(metadata: &std::fs::Metadata) -> bool {
 }
 
 /// C ヘッダーから Rust FFI バインディングを生成して `OUT_DIR` に書き込む。
+///
 /// 引数:
 /// - `header`: `bindgen` 入力ヘッダー。
 /// - `include_dir`: 追加インクルードディレクトリ。
+///
 /// 環境変数依存:
 /// - `OUT_DIR`
 /// - `CARGO_CFG_TARGET_OS`
 /// - `CARGO_CFG_TARGET_ARCH`
 /// - Android 時に `ANDROID_NDK_HOME` / `ANDROID_NDK`
+///
 /// 戻り値: なし。
+///
 /// 副作用:
 /// - `cargo:rerun-if-changed` を標準出力へ出力する。
 /// - `bindgen` を実行する。
@@ -1191,11 +1326,15 @@ fn generate_bindings(header: &Path, include_dir: &Path) {
 }
 
 /// Android 用 `clang --target` 値をターゲットアーキテクチャから解決する。
+///
 /// 引数:
 /// - `target_arch`: Cargo のアーキテクチャ文字列。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - 対応する Android ターゲットトリプル文字列。
+///
 /// 副作用:
 /// - 未対応アーキテクチャでは panic する。
 fn android_clang_target(target_arch: &str) -> &'static str {
@@ -1209,11 +1348,15 @@ fn android_clang_target(target_arch: &str) -> &'static str {
 }
 
 /// Android NDK から `sysroot` ディレクトリを解決する。
+///
 /// 引数:
 /// - `ndk`: Android NDK ルート。
+///
 /// 環境変数依存: なし。
+///
 /// 戻り値:
 /// - 利用可能な prebuilt に対応する `sysroot` パス。
+///
 /// 副作用:
 /// - ファイルシステムを探索する。
 /// - 必須ディレクトリが無い場合に panic する。
@@ -1237,11 +1380,15 @@ fn resolve_android_ndk_sysroot(ndk: &Path) -> PathBuf {
 }
 
 /// Cargo へリンク設定を通知する `cargo:` ディレクティブを出力する。
+///
 /// 引数:
 /// - `lib_path`: 生成済み静的ライブラリのパス。
+///
 /// 環境変数依存:
 /// - `CARGO_CFG_TARGET_OS`
+///
 /// 戻り値: なし。
+///
 /// 副作用:
 /// - 標準出力へ `cargo:rustc-link-*` 行を出力する。
 /// - ターゲット OS 不正時に panic する。
@@ -1326,11 +1473,15 @@ fn emit_link_directives(lib_path: &Path) {
 }
 
 /// Cargo が提供する `OUT_DIR` を `PathBuf` として取得する。
+///
 /// 引数: なし。
+///
 /// 環境変数依存:
 /// - `OUT_DIR`
+///
 /// 戻り値:
 /// - `OUT_DIR` のパス。
+///
 /// 副作用:
 /// - `OUT_DIR` 未設定時に panic する。
 fn get_out_dir() -> PathBuf {
