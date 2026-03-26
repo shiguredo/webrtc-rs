@@ -20,14 +20,14 @@ WEBRTC_EXPORT struct webrtc_AudioParameters_unique* webrtc_AudioParameters_new(
     int sample_rate,
     size_t channels,
     size_t frames_per_buffer) {
-  auto params = std::make_unique<webrtc::AudioParameters>(
-      sample_rate, channels, frames_per_buffer);
+  auto params = std::make_unique<webrtc::AudioParameters>(sample_rate, channels,
+                                                          frames_per_buffer);
   return reinterpret_cast<struct webrtc_AudioParameters_unique*>(
       params.release());
 }
 
-WEBRTC_EXPORT int
-webrtc_AudioParameters_get_sample_rate(struct webrtc_AudioParameters* self) {
+WEBRTC_EXPORT int webrtc_AudioParameters_get_sample_rate(
+    struct webrtc_AudioParameters* self) {
   auto params = reinterpret_cast<webrtc::AudioParameters*>(self);
   return params->sample_rate();
 }

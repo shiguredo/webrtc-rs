@@ -8,6 +8,7 @@
 
 #include "../common.h"
 #include "../common.impl.h"
+#include "api/media_stream_interface.h"
 #include "rtc_error.h"
 #include "rtp_parameters.h"
 

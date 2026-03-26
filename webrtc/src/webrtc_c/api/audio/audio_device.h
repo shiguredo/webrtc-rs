@@ -22,11 +22,14 @@ webrtc_AudioDeviceModule_Stats_new(double synthesized_samples_duration_s,
                                    double total_samples_duration_s,
                                    double total_playout_delay_s,
                                    uint64_t total_samples_count);
-WEBRTC_EXPORT double webrtc_AudioDeviceModule_Stats_get_synthesized_samples_duration_s(
+WEBRTC_EXPORT double
+webrtc_AudioDeviceModule_Stats_get_synthesized_samples_duration_s(
     struct webrtc_AudioDeviceModule_Stats* self);
-WEBRTC_EXPORT uint64_t webrtc_AudioDeviceModule_Stats_get_synthesized_samples_events(
+WEBRTC_EXPORT uint64_t
+webrtc_AudioDeviceModule_Stats_get_synthesized_samples_events(
     struct webrtc_AudioDeviceModule_Stats* self);
-WEBRTC_EXPORT double webrtc_AudioDeviceModule_Stats_get_total_samples_duration_s(
+WEBRTC_EXPORT double
+webrtc_AudioDeviceModule_Stats_get_total_samples_duration_s(
     struct webrtc_AudioDeviceModule_Stats* self);
 WEBRTC_EXPORT double webrtc_AudioDeviceModule_Stats_get_total_playout_delay_s(
     struct webrtc_AudioDeviceModule_Stats* self);

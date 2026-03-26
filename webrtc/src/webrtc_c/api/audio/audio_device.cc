@@ -44,19 +44,22 @@ webrtc_AudioDeviceModule_Stats_new(double synthesized_samples_duration_s,
       stats.release());
 }
 
-WEBRTC_EXPORT double webrtc_AudioDeviceModule_Stats_get_synthesized_samples_duration_s(
+WEBRTC_EXPORT double
+webrtc_AudioDeviceModule_Stats_get_synthesized_samples_duration_s(
     struct webrtc_AudioDeviceModule_Stats* self) {
   auto stats = reinterpret_cast<webrtc::AudioDeviceModule::Stats*>(self);
   return stats->synthesized_samples_duration_s;
 }
 
-WEBRTC_EXPORT uint64_t webrtc_AudioDeviceModule_Stats_get_synthesized_samples_events(
+WEBRTC_EXPORT uint64_t
+webrtc_AudioDeviceModule_Stats_get_synthesized_samples_events(
     struct webrtc_AudioDeviceModule_Stats* self) {
   auto stats = reinterpret_cast<webrtc::AudioDeviceModule::Stats*>(self);
   return stats->synthesized_samples_events;
 }
 
-WEBRTC_EXPORT double webrtc_AudioDeviceModule_Stats_get_total_samples_duration_s(
+WEBRTC_EXPORT double
+webrtc_AudioDeviceModule_Stats_get_total_samples_duration_s(
     struct webrtc_AudioDeviceModule_Stats* self) {
   auto stats = reinterpret_cast<webrtc::AudioDeviceModule::Stats*>(self);
   return stats->total_samples_duration_s;
@@ -73,7 +76,6 @@ WEBRTC_EXPORT uint64_t webrtc_AudioDeviceModule_Stats_get_total_samples_count(
   auto stats = reinterpret_cast<webrtc::AudioDeviceModule::Stats*>(self);
   return stats->total_samples_count;
 }
-
 }
 
 // -------------------------
@@ -786,9 +788,8 @@ class AudioDeviceModuleImpl : public webrtc::AudioDeviceModule {
       return -1;
     }
     auto c_params_ptr = webrtc_AudioParameters_unique_get(out_params);
-    auto c_params =
-        std::unique_ptr<webrtc::AudioParameters>(
-            reinterpret_cast<webrtc::AudioParameters*>(c_params_ptr));
+    auto c_params = std::unique_ptr<webrtc::AudioParameters>(
+        reinterpret_cast<webrtc::AudioParameters*>(c_params_ptr));
     if (!c_params) {
       return -1;
     }
@@ -796,8 +797,7 @@ class AudioDeviceModuleImpl : public webrtc::AudioDeviceModule {
     return 0;
   }
 
-  int GetRecordAudioParameters(
-      webrtc::AudioParameters* params) const override {
+  int GetRecordAudioParameters(webrtc::AudioParameters* params) const override {
     struct webrtc_AudioParameters_unique* out_params = nullptr;
     int ret = cbs_->GetRecordAudioParameters(&out_params, user_data_);
     if (ret != 0) {
@@ -807,9 +807,8 @@ class AudioDeviceModuleImpl : public webrtc::AudioDeviceModule {
       return -1;
     }
     auto c_params_ptr = webrtc_AudioParameters_unique_get(out_params);
-    auto c_params =
-        std::unique_ptr<webrtc::AudioParameters>(
-            reinterpret_cast<webrtc::AudioParameters*>(c_params_ptr));
+    auto c_params = std::unique_ptr<webrtc::AudioParameters>(
+        reinterpret_cast<webrtc::AudioParameters*>(c_params_ptr));
     if (!c_params) {
       return -1;
     }
@@ -824,9 +823,8 @@ class AudioDeviceModuleImpl : public webrtc::AudioDeviceModule {
       return std::nullopt;
     }
     auto stats_ptr = webrtc_AudioDeviceModule_Stats_unique_get(out_stats);
-    auto stats =
-        std::unique_ptr<webrtc::AudioDeviceModule::Stats>(
-            reinterpret_cast<webrtc::AudioDeviceModule::Stats*>(stats_ptr));
+    auto stats = std::unique_ptr<webrtc::AudioDeviceModule::Stats>(
+        reinterpret_cast<webrtc::AudioDeviceModule::Stats*>(stats_ptr));
     if (!stats) {
       return std::nullopt;
     }
