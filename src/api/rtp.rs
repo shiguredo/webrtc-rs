@@ -1322,6 +1322,14 @@ impl RtpSender {
         RtpParameters::from_raw(raw)
     }
 
+    pub fn set_track(&mut self, track: Option<&MediaStreamTrack>) -> bool {
+        let track_ptr = match track {
+            Some(t) => t.raw_ref.as_ptr(),
+            None => std::ptr::null_mut(),
+        };
+        unsafe { ffi::webrtc_RtpSenderInterface_SetTrack(self.as_ptr(), track_ptr) != 0 }
+    }
+
     pub fn set_parameters(&mut self, parameters: &RtpParameters) -> Result<()> {
         let err = unsafe {
             ffi::webrtc_RtpSenderInterface_SetParameters(self.as_ptr(), parameters.as_ptr())
