@@ -363,10 +363,7 @@ fn build_webrtc_c(
     if target_platform == "android_arm64" {
         let ndk = env::var("ANDROID_NDK_HOME")
             .or_else(|_| env::var("ANDROID_NDK"))
-            .expect(
-                "ANDROID_NDK_HOME または ANDROID_NDK 環境変数が必要です。\
-                 Android NDK r29+ のパスを設定してください",
-            );
+            .expect("ANDROID_NDK_HOME または ANDROID_NDK 環境変数が必要です。");
         let toolchain_file = PathBuf::from(&ndk)
             .join("build")
             .join("cmake")

@@ -158,12 +158,6 @@ jobs:
           sudo apt-get install -y build-essential libclang-dev clang
       - run: rustup update stable
       - run: rustup target add aarch64-linux-android
-      - name: Install Android NDK r29
-        run: |
-          echo "ANDROID_NDK=$ANDROID_NDK"
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
-          yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;29.0.14206865"
-          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/29.0.14206865" >> $GITHUB_ENV
       - name: Build shiguredo_webrtc for Android arm64
         run: cargo build --features source-build --target aarch64-linux-android
 
