@@ -88,6 +88,8 @@ impl AudioDeviceModule {
             EnableBuiltInAGC: Some(adm_enable_built_in_agc),
             EnableBuiltInNS: Some(adm_enable_built_in_ns),
             GetPlayoutUnderrunCount: Some(adm_get_playout_underrun_count),
+            GetPlayoutAudioParameters: Some(adm_get_playout_audio_parameters),
+            GetRecordAudioParameters: Some(adm_get_record_audio_parameters),
             GetStats: Some(adm_get_stats),
             OnDestroy: Some(adm_on_destroy),
         };
@@ -651,6 +653,13 @@ unsafe extern "C" fn audio_transport_pull_render_data(
 }
 
 #[derive(Debug, Clone, Copy, Default)]
+pub struct AudioDeviceModuleAudioParameters {
+    pub sample_rate: i32,
+    pub channels: usize,
+    pub frames_per_buffer: usize,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
 pub struct AudioDeviceModuleStats {
     pub synthesized_samples_duration_s: f64,
     pub synthesized_samples_events: u64,
@@ -872,6 +881,12 @@ pub trait AudioDeviceModuleHandler: Send + Sync {
     }
     fn get_playout_underrun_count(&self) -> i32 {
         -1
+    }
+    fn get_playout_audio_parameters(&self) -> Option<AudioDeviceModuleAudioParameters> {
+        None
+    }
+    fn get_record_audio_parameters(&self) -> Option<AudioDeviceModuleAudioParameters> {
+        None
     }
     fn get_stats(&self) -> Option<AudioDeviceModuleStats> {
         None
@@ -1356,6 +1371,47 @@ unsafe extern "C" fn adm_enable_built_in_ns(enable: i32, user_data: *mut c_void)
 unsafe extern "C" fn adm_get_playout_underrun_count(user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
     state.handler.get_playout_underrun_count()
+}
+
+fn write_audio_parameters(
+    out_params: *mut ffi::webrtc_AudioParameters,
+    params: AudioDeviceModuleAudioParameters,
+) -> i32 {
+    if out_params.is_null() {
+        return -1;
+    }
+    unsafe {
+        *out_params = ffi::webrtc_AudioParameters {
+            sample_rate: params.sample_rate,
+            channels: params.channels,
+            frames_per_buffer: params.frames_per_buffer,
+        };
+    }
+    0
+}
+
+unsafe extern "C" fn adm_get_playout_audio_parameters(
+    params: *mut ffi::webrtc_AudioParameters,
+    user_data: *mut c_void,
+) -> i32 {
+    let state = unsafe { adm_state(user_data) };
+    let params_value = match state.handler.get_playout_audio_parameters() {
+        Some(params_value) => params_value,
+        None => return -1,
+    };
+    write_audio_parameters(params, params_value)
+}
+
+unsafe extern "C" fn adm_get_record_audio_parameters(
+    params: *mut ffi::webrtc_AudioParameters,
+    user_data: *mut c_void,
+) -> i32 {
+    let state = unsafe { adm_state(user_data) };
+    let params_value = match state.handler.get_record_audio_parameters() {
+        Some(params_value) => params_value,
+        None => return -1,
+    };
+    write_audio_parameters(params, params_value)
 }
 
 unsafe extern "C" fn adm_get_stats(

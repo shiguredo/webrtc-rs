@@ -543,18 +543,75 @@ fn generate_bindings(header: &Path, include_dir: &Path) {
     let out_path = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR の取得に失敗しました"))
         .join("bindings.rs");
 
-    let bindings = bindgen::Builder::default()
+    let mut builder = bindgen::Builder::default()
         .header(
             header
                 .to_str()
                 .expect("ヘッダーパスを文字列に変換できませんでした"),
         )
         .clang_arg(format!("-I{}", include_dir.display()))
-        .layout_tests(false)
+        .layout_tests(false);
+
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+    if target_os == "android" {
+        let ndk = env::var("ANDROID_NDK_HOME")
+            .or_else(|_| env::var("ANDROID_NDK"))
+            .expect("ANDROID_NDK_HOME or ANDROID_NDK is required for Android bindgen");
+        let sysroot = resolve_android_ndk_sysroot(Path::new(&ndk));
+        let target = android_clang_target(&target_arch);
+        let include = sysroot.join("usr").join("include");
+        let target_include = include.join(target);
+        builder = builder
+            .clang_arg(format!("--target={target}"))
+            .clang_arg(format!("--sysroot={}", sysroot.display()))
+            .clang_arg(format!("-isystem{}", include.display()));
+        if target_include.exists() {
+            builder = builder.clang_arg(format!("-isystem{}", target_include.display()));
+        }
+    }
+
+    let bindings = builder
         .generate()
         .expect("bindgen によるバインディング生成に失敗しました");
 
     fs::write(&out_path, bindings.to_string()).expect("バインディングの書き込みに失敗しました");
+}
+
+fn android_clang_target(target_arch: &str) -> &'static str {
+    match target_arch {
+        "aarch64" => "aarch64-linux-android",
+        "arm" => "armv7a-linux-androideabi",
+        "x86_64" => "x86_64-linux-android",
+        "x86" => "i686-linux-android",
+        _ => panic!("unsupported android target arch: {}", target_arch),
+    }
+}
+
+fn resolve_android_ndk_sysroot(ndk: &Path) -> PathBuf {
+    let prebuilt = ndk.join("toolchains").join("llvm").join("prebuilt");
+    let selected = [
+        "linux-x86_64",
+        "darwin-x86_64",
+        "darwin-arm64",
+        "windows-x86_64",
+    ]
+    .iter()
+    .map(|name| prebuilt.join(name))
+    .find(|path| path.exists())
+    .or_else(|| {
+        fs::read_dir(&prebuilt)
+            .ok()?
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .find(|path| path.is_dir())
+    })
+    .unwrap_or_else(|| panic!("android ndk prebuilt dir not found: {}", prebuilt.display()));
+    let sysroot = selected.join("sysroot");
+    if !sysroot.exists() {
+        panic!("android ndk sysroot not found: {}", sysroot.display());
+    }
+    sysroot
 }
 
 fn emit_link_directives(lib_path: &Path) {
