@@ -9,6 +9,27 @@
 extern "C" {
 #endif
 
+// -------------------------
+// webrtc::AudioParameters
+// -------------------------
+
+WEBRTC_DECLARE_UNIQUE(webrtc_AudioParameters);
+
+WEBRTC_EXPORT struct webrtc_AudioParameters_unique* webrtc_AudioParameters_new(
+    int sample_rate,
+    size_t channels,
+    size_t frames_per_buffer);
+WEBRTC_EXPORT int
+webrtc_AudioParameters_get_sample_rate(struct webrtc_AudioParameters* self);
+WEBRTC_EXPORT size_t
+webrtc_AudioParameters_get_channels(struct webrtc_AudioParameters* self);
+WEBRTC_EXPORT size_t webrtc_AudioParameters_get_frames_per_buffer(
+    struct webrtc_AudioParameters* self);
+
+// -------------------------
+// webrtc::AudioTransport
+// -------------------------
+
 struct webrtc_AudioTransport;
 
 struct webrtc_AudioTransport_cbs {

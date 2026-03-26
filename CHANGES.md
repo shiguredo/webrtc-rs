@@ -22,6 +22,13 @@
   - `ToString` / `GetEncoderBitrateLimitsForResolution` を追加する
   - `fps_allocation` / `preferred_pixel_formats` / optional フィールド操作を追加する
   - @melpon
+- [CHANGE] AudioDeviceModule の `AudioParameters` / `Stats` C API を C++ の opaque API に変更する
+  - `webrtc_AudioParameters` / `webrtc_AudioDeviceModule_Stats` の公開 field を廃止する
+  - `GetPlayoutAudioParameters` / `GetRecordAudioParameters` / `GetStats` callback の out 引数を `*_unique**` に変更する
+  - `webrtc_AudioDeviceModule_GetStats` の out 引数を `webrtc_AudioDeviceModule_Stats_unique**` に変更する
+  - Rust の `AudioDeviceModuleHandler` で `get_playout_audio_parameters` / `get_record_audio_parameters` を out 引数で受ける形式に変更する
+  - Rust 型名 `AudioDeviceModuleAudioParameters` を `AudioParameters` に変更する
+  - @melpon
 
 ## 0.146.1
 

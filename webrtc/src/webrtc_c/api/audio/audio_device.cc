@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <memory>
 #include <optional>
 
 // WebRTC
@@ -17,6 +18,63 @@
 #include "../../common.impl.h"
 #include "../environment.h"
 #include "audio_device_defines.h"
+
+// -------------------------
+// webrtc::AudioDeviceModule::Stats
+// -------------------------
+
+extern "C" {
+
+WEBRTC_DEFINE_UNIQUE(webrtc_AudioDeviceModule_Stats,
+                     webrtc::AudioDeviceModule::Stats);
+
+WEBRTC_EXPORT struct webrtc_AudioDeviceModule_Stats_unique*
+webrtc_AudioDeviceModule_Stats_new(double synthesized_samples_duration_s,
+                                   uint64_t synthesized_samples_events,
+                                   double total_samples_duration_s,
+                                   double total_playout_delay_s,
+                                   uint64_t total_samples_count) {
+  auto stats = std::make_unique<webrtc::AudioDeviceModule::Stats>();
+  stats->synthesized_samples_duration_s = synthesized_samples_duration_s;
+  stats->synthesized_samples_events = synthesized_samples_events;
+  stats->total_samples_duration_s = total_samples_duration_s;
+  stats->total_playout_delay_s = total_playout_delay_s;
+  stats->total_samples_count = total_samples_count;
+  return reinterpret_cast<struct webrtc_AudioDeviceModule_Stats_unique*>(
+      stats.release());
+}
+
+WEBRTC_EXPORT double webrtc_AudioDeviceModule_Stats_get_synthesized_samples_duration_s(
+    struct webrtc_AudioDeviceModule_Stats* self) {
+  auto stats = reinterpret_cast<webrtc::AudioDeviceModule::Stats*>(self);
+  return stats->synthesized_samples_duration_s;
+}
+
+WEBRTC_EXPORT uint64_t webrtc_AudioDeviceModule_Stats_get_synthesized_samples_events(
+    struct webrtc_AudioDeviceModule_Stats* self) {
+  auto stats = reinterpret_cast<webrtc::AudioDeviceModule::Stats*>(self);
+  return stats->synthesized_samples_events;
+}
+
+WEBRTC_EXPORT double webrtc_AudioDeviceModule_Stats_get_total_samples_duration_s(
+    struct webrtc_AudioDeviceModule_Stats* self) {
+  auto stats = reinterpret_cast<webrtc::AudioDeviceModule::Stats*>(self);
+  return stats->total_samples_duration_s;
+}
+
+WEBRTC_EXPORT double webrtc_AudioDeviceModule_Stats_get_total_playout_delay_s(
+    struct webrtc_AudioDeviceModule_Stats* self) {
+  auto stats = reinterpret_cast<webrtc::AudioDeviceModule::Stats*>(self);
+  return stats->total_playout_delay_s;
+}
+
+WEBRTC_EXPORT uint64_t webrtc_AudioDeviceModule_Stats_get_total_samples_count(
+    struct webrtc_AudioDeviceModule_Stats* self) {
+  auto stats = reinterpret_cast<webrtc::AudioDeviceModule::Stats*>(self);
+  return stats->total_samples_count;
+}
+
+}
 
 // -------------------------
 // webrtc::AudioDeviceModule
@@ -106,13 +164,15 @@ int32_t DefaultReturnMinusOneI32(void* user_data) {
   return -1;
 }
 
-int DefaultGetAudioParameters(struct webrtc_AudioParameters* params,
+int DefaultGetAudioParameters(struct webrtc_AudioParameters_unique** out_params,
                               void* user_data) {
+  *out_params = nullptr;
   return -1;
 }
 
-int DefaultGetStats(struct webrtc_AudioDeviceModule_Stats* out_stats,
+int DefaultGetStats(struct webrtc_AudioDeviceModule_Stats_unique** out_stats,
                     void* user_data) {
+  *out_stats = nullptr;
   return 0;
 }
 
@@ -717,49 +777,60 @@ class AudioDeviceModuleImpl : public webrtc::AudioDeviceModule {
 #if defined(WEBRTC_IOS)
   int GetPlayoutAudioParameters(
       webrtc::AudioParameters* params) const override {
-    webrtc_AudioParameters c_params{};
-    int ret = cbs_->GetPlayoutAudioParameters(&c_params, user_data_);
+    struct webrtc_AudioParameters_unique* out_params = nullptr;
+    int ret = cbs_->GetPlayoutAudioParameters(&out_params, user_data_);
     if (ret != 0) {
       return ret;
     }
     if (params == nullptr) {
       return -1;
     }
-    *params = webrtc::AudioParameters(c_params.sample_rate,
-                                       c_params.channels,
-                                       c_params.frames_per_buffer);
+    auto c_params_ptr = webrtc_AudioParameters_unique_get(out_params);
+    auto c_params =
+        std::unique_ptr<webrtc::AudioParameters>(
+            reinterpret_cast<webrtc::AudioParameters*>(c_params_ptr));
+    if (!c_params) {
+      return -1;
+    }
+    *params = *c_params;
     return 0;
   }
 
   int GetRecordAudioParameters(
       webrtc::AudioParameters* params) const override {
-    webrtc_AudioParameters c_params{};
-    int ret = cbs_->GetRecordAudioParameters(&c_params, user_data_);
+    struct webrtc_AudioParameters_unique* out_params = nullptr;
+    int ret = cbs_->GetRecordAudioParameters(&out_params, user_data_);
     if (ret != 0) {
       return ret;
     }
     if (params == nullptr) {
       return -1;
     }
-    *params = webrtc::AudioParameters(c_params.sample_rate,
-                                       c_params.channels,
-                                       c_params.frames_per_buffer);
+    auto c_params_ptr = webrtc_AudioParameters_unique_get(out_params);
+    auto c_params =
+        std::unique_ptr<webrtc::AudioParameters>(
+            reinterpret_cast<webrtc::AudioParameters*>(c_params_ptr));
+    if (!c_params) {
+      return -1;
+    }
+    *params = *c_params;
     return 0;
   }
 #endif
 
   std::optional<Stats> GetStats() const override {
-    webrtc_AudioDeviceModule_Stats stats;
-    if (cbs_->GetStats(&stats, user_data_) == 0) {
+    struct webrtc_AudioDeviceModule_Stats_unique* out_stats = nullptr;
+    if (cbs_->GetStats(&out_stats, user_data_) == 0) {
       return std::nullopt;
     }
-    Stats out;
-    out.synthesized_samples_duration_s = stats.synthesized_samples_duration_s;
-    out.synthesized_samples_events = stats.synthesized_samples_events;
-    out.total_samples_duration_s = stats.total_samples_duration_s;
-    out.total_playout_delay_s = stats.total_playout_delay_s;
-    out.total_samples_count = stats.total_samples_count;
-    return out;
+    auto stats_ptr = webrtc_AudioDeviceModule_Stats_unique_get(out_stats);
+    auto stats =
+        std::unique_ptr<webrtc::AudioDeviceModule::Stats>(
+            reinterpret_cast<webrtc::AudioDeviceModule::Stats*>(stats_ptr));
+    if (!stats) {
+      return std::nullopt;
+    }
+    return *stats;
   }
 
  private:
@@ -808,6 +879,7 @@ WEBRTC_EXPORT extern const int webrtc_AudioDeviceModule_kDefaultDevice =
     webrtc::AudioDeviceModule::kDefaultDevice;
 
 WEBRTC_DEFINE_REFCOUNTED(webrtc_AudioDeviceModule, webrtc::AudioDeviceModule);
+
 WEBRTC_EXPORT struct webrtc_AudioDeviceModule_refcounted*
 webrtc_CreateAudioDeviceModule(struct webrtc_Environment* env, int audio_type) {
   auto environment = reinterpret_cast<webrtc::Environment*>(env);
@@ -1285,21 +1357,16 @@ WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_GetPlayoutUnderrunCount(
 
 WEBRTC_EXPORT int webrtc_AudioDeviceModule_GetStats(
     struct webrtc_AudioDeviceModule* self,
-    struct webrtc_AudioDeviceModule_Stats* out_stats) {
+    struct webrtc_AudioDeviceModule_Stats_unique** out_stats) {
   auto adm = reinterpret_cast<webrtc::AudioDeviceModule*>(self);
+  *out_stats = nullptr;
   auto stats = adm->GetStats();
   if (!stats.has_value()) {
     return 0;
   }
-  if (out_stats == nullptr) {
-    return 0;
-  }
-  out_stats->synthesized_samples_duration_s =
-      stats->synthesized_samples_duration_s;
-  out_stats->synthesized_samples_events = stats->synthesized_samples_events;
-  out_stats->total_samples_duration_s = stats->total_samples_duration_s;
-  out_stats->total_playout_delay_s = stats->total_playout_delay_s;
-  out_stats->total_samples_count = stats->total_samples_count;
+  auto out = std::make_unique<webrtc::AudioDeviceModule::Stats>(*stats);
+  *out_stats = reinterpret_cast<struct webrtc_AudioDeviceModule_Stats_unique*>(
+      out.release());
   return 1;
 }
 

@@ -2,11 +2,51 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <memory>
 #include <optional>
 
 #include <api/audio/audio_device_defines.h>
 
 #include "../../common.h"
+#include "../../common.impl.h"
+
+// -------------------------
+// webrtc::AudioParameters
+// -------------------------
+
+WEBRTC_DEFINE_UNIQUE(webrtc_AudioParameters, webrtc::AudioParameters);
+
+WEBRTC_EXPORT struct webrtc_AudioParameters_unique* webrtc_AudioParameters_new(
+    int sample_rate,
+    size_t channels,
+    size_t frames_per_buffer) {
+  auto params = std::make_unique<webrtc::AudioParameters>(
+      sample_rate, channels, frames_per_buffer);
+  return reinterpret_cast<struct webrtc_AudioParameters_unique*>(
+      params.release());
+}
+
+WEBRTC_EXPORT int
+webrtc_AudioParameters_get_sample_rate(struct webrtc_AudioParameters* self) {
+  auto params = reinterpret_cast<webrtc::AudioParameters*>(self);
+  return params->sample_rate();
+}
+
+WEBRTC_EXPORT size_t
+webrtc_AudioParameters_get_channels(struct webrtc_AudioParameters* self) {
+  auto params = reinterpret_cast<webrtc::AudioParameters*>(self);
+  return params->channels();
+}
+
+WEBRTC_EXPORT size_t webrtc_AudioParameters_get_frames_per_buffer(
+    struct webrtc_AudioParameters* self) {
+  auto params = reinterpret_cast<webrtc::AudioParameters*>(self);
+  return params->frames_per_buffer();
+}
+
+// -------------------------
+// webrtc::AudioTransport
+// -------------------------
 
 namespace {
 

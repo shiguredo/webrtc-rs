@@ -391,6 +391,105 @@ fn audio_device_module_recording_device_name_roundtrip() {
 }
 
 #[test]
+fn audio_parameters_unique_roundtrip() {
+    let raw = unsafe { ffi::webrtc_AudioParameters_new(48_000, 2, 480) };
+    assert!(!raw.is_null());
+    let params = unsafe { ffi::webrtc_AudioParameters_unique_get(raw) };
+    assert!(!params.is_null());
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioParameters_get_sample_rate(params) },
+        48_000
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioParameters_get_channels(params) },
+        2
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioParameters_get_frames_per_buffer(params) },
+        480
+    );
+    unsafe { ffi::webrtc_AudioParameters_unique_delete(raw) };
+}
+
+#[test]
+fn audio_device_module_stats_unique_roundtrip() {
+    let raw = unsafe { ffi::webrtc_AudioDeviceModule_Stats_new(1.25, 12, 3.5, 0.75, 999) };
+    assert!(!raw.is_null());
+    let stats = unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_get(raw) };
+    assert!(!stats.is_null());
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_synthesized_samples_duration_s(stats) },
+        1.25
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_synthesized_samples_events(stats) },
+        12
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_samples_duration_s(stats) },
+        3.5
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_playout_delay_s(stats) },
+        0.75
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_samples_count(stats) },
+        999
+    );
+    unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_delete(raw) };
+}
+
+#[test]
+fn audio_device_module_get_stats_returns_unique() {
+    struct TestAudioDeviceModuleGetStatsHandler;
+
+    impl AudioDeviceModuleHandler for TestAudioDeviceModuleGetStatsHandler {
+        fn get_stats(&self) -> Option<AudioDeviceModuleStats> {
+            Some(AudioDeviceModuleStats::new(1.0, 2, 3.0, 4.0, 5))
+        }
+    }
+
+    let adm = AudioDeviceModule::new_with_handler(Box::new(TestAudioDeviceModuleGetStatsHandler));
+    let mut out_stats: *mut ffi::webrtc_AudioDeviceModule_Stats_unique = std::ptr::null_mut();
+    let ret = unsafe { ffi::webrtc_AudioDeviceModule_GetStats(adm.as_ptr(), &mut out_stats) };
+    assert_eq!(ret, 1);
+    assert!(!out_stats.is_null());
+    let stats = unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_get(out_stats) };
+    assert!(!stats.is_null());
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_synthesized_samples_duration_s(stats) },
+        1.0
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_synthesized_samples_events(stats) },
+        2
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_samples_duration_s(stats) },
+        3.0
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_playout_delay_s(stats) },
+        4.0
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_samples_count(stats) },
+        5
+    );
+    unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_delete(out_stats) };
+}
+
+#[test]
+fn audio_device_module_get_stats_none_returns_zero() {
+    let adm = AudioDeviceModule::new_with_handler(Box::new(()));
+    let mut out_stats: *mut ffi::webrtc_AudioDeviceModule_Stats_unique = std::ptr::null_mut();
+    let ret = unsafe { ffi::webrtc_AudioDeviceModule_GetStats(adm.as_ptr(), &mut out_stats) };
+    assert_eq!(ret, 0);
+    assert!(out_stats.is_null());
+}
+
+#[test]
 fn adapted_video_track_source() {
     let mut src = AdaptedVideoTrackSource::new();
     let adapted = src.adapt_frame(640, 480, 1_000_000);
