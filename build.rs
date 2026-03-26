@@ -2,32 +2,65 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Cargo.toml から外部依存ライブラリの情報を取得する
-fn get_webrtc_build_metadata() -> (String, String) {
-    let cargo_toml = shiguredo_toml::from_str(include_str!("Cargo.toml"))
-        .expect("Cargo.toml のパースに失敗しました");
+struct BuildMetadata {
+    webrtc_build_version: String,
+    webrtc_base_url: String,
+    cmake_osx_deployment_target: String,
+    android_platform: String,
+}
+
+/// Cargo.toml からビルド設定を取得する
+fn get_build_metadata(manifest_dir: &Path) -> BuildMetadata {
+    let cargo_toml_path = manifest_dir.join("Cargo.toml");
+    let cargo_toml_content = fs::read_to_string(&cargo_toml_path).unwrap_or_else(|e| {
+        panic!(
+            "Failed to read Cargo.toml: path={}, error={}",
+            cargo_toml_path.display(),
+            e
+        )
+    });
+    let cargo_toml =
+        shiguredo_toml::from_str(&cargo_toml_content).expect("Failed to parse Cargo.toml");
     let metadata = shiguredo_toml::Value::Table(cargo_toml);
-    let webrtc_build = metadata
+    let package_metadata = metadata
         .get("package")
         .and_then(|v| v.get("metadata"))
-        .and_then(|v| v.get("external-dependencies"))
+        .expect("package.metadata is missing in Cargo.toml");
+    let webrtc_build = package_metadata
+        .get("external-dependencies")
         .and_then(|v| v.get("webrtc-build"))
-        .expect(
-            "Cargo.toml に [package.metadata.external-dependencies.webrtc-build] が見つかりません",
-        );
+        .expect("package.metadata.external-dependencies.webrtc-build is missing in Cargo.toml");
+    let build_config = package_metadata
+        .get("build-config")
+        .expect("package.metadata.build-config is missing in Cargo.toml");
 
-    let version = webrtc_build
+    let webrtc_build_version = webrtc_build
         .get("version")
         .and_then(|v| v.as_str())
-        .expect("webrtc-build.version が見つかりません")
+        .expect("webrtc-build.version is missing")
         .to_string();
-    let base_url = webrtc_build
+    let webrtc_base_url = webrtc_build
         .get("base-url")
         .and_then(|v| v.as_str())
-        .expect("webrtc-build.base-url が見つかりません")
+        .expect("webrtc-build.base-url is missing")
+        .to_string();
+    let cmake_osx_deployment_target = build_config
+        .get("cmake-osx-deployment-target")
+        .and_then(|v| v.as_str())
+        .expect("build-config.cmake-osx-deployment-target is missing")
+        .to_string();
+    let android_platform = build_config
+        .get("android-platform")
+        .and_then(|v| v.as_str())
+        .expect("build-config.android-platform is missing")
         .to_string();
 
-    (version, base_url)
+    BuildMetadata {
+        webrtc_build_version,
+        webrtc_base_url,
+        cmake_osx_deployment_target,
+        android_platform,
+    }
 }
 
 fn main() {
@@ -46,6 +79,7 @@ fn main() {
         env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR の取得に失敗しました"),
     );
     let webrtc_dir = manifest_dir.join("webrtc");
+    let build_metadata = get_build_metadata(&manifest_dir);
 
     // ソースファイルの変更を監視
     println!(
@@ -70,7 +104,7 @@ fn main() {
         });
         paths.lib_path
     } else {
-        build_from_source(&webrtc_dir, &target_platform, &out_dir)
+        build_from_source(&webrtc_dir, &target_platform, &out_dir, &build_metadata)
     };
 
     emit_link_directives(&lib_path);
@@ -91,10 +125,15 @@ fn should_use_prebuilt() -> bool {
 }
 
 /// ソースからビルドする（CMake + bindgen）
-fn build_from_source(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> PathBuf {
+fn build_from_source(
+    webrtc_dir: &Path,
+    target_platform: &str,
+    out_dir: &Path,
+    build_metadata: &BuildMetadata,
+) -> PathBuf {
     let header = webrtc_dir.join("src").join("webrtc_c.h");
     let include_dir = webrtc_dir.join("src");
-    let lib_path = build_webrtc_c(webrtc_dir, target_platform, out_dir);
+    let lib_path = build_webrtc_c(webrtc_dir, target_platform, out_dir, build_metadata);
     maybe_export_local_build_dir(webrtc_dir, out_dir);
     if is_windows_target(target_platform) {
         ensure_windows_libclang(out_dir);
@@ -283,7 +322,12 @@ fn detect_linux_distro() -> String {
 }
 
 /// shiguredo_cmake crate を使って webrtc_c をビルドする
-fn build_webrtc_c(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> PathBuf {
+fn build_webrtc_c(
+    webrtc_dir: &Path,
+    target_platform: &str,
+    out_dir: &Path,
+    build_metadata: &BuildMetadata,
+) -> PathBuf {
     let mut config = shiguredo_cmake::Config::new(webrtc_dir);
     let profile = "release";
     shiguredo_cmake::set_cmake_env();
@@ -292,14 +336,11 @@ fn build_webrtc_c(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> P
     config.profile("Release");
     config.out_dir(out_dir.join("_build").join(target_platform).join(profile));
 
-    // Cargo.toml から WebRTC ビルド情報を取得して CMake に渡す
-    let (webrtc_build_version, webrtc_base_url) = get_webrtc_build_metadata();
-
     // ターゲットプラットフォームを設定
     config
         .define("WEBRTC_C_TARGET", target_platform)
-        .define("WEBRTC_BUILD_VERSION", &webrtc_build_version)
-        .define("WEBRTC_BASE_URL", &webrtc_base_url)
+        .define("WEBRTC_BUILD_VERSION", &build_metadata.webrtc_build_version)
+        .define("WEBRTC_BASE_URL", &build_metadata.webrtc_base_url)
         .define("CMAKE_BUILD_TYPE", "Release")
         .define("CMAKE_EXPORT_COMPILE_COMMANDS", "ON");
 
@@ -312,7 +353,10 @@ fn build_webrtc_c(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> P
     if target_platform == "ios_arm64" {
         config.define("CMAKE_SYSTEM_NAME", "iOS");
         config.define("CMAKE_OSX_ARCHITECTURES", "arm64");
-        config.define("CMAKE_OSX_DEPLOYMENT_TARGET", "16.0");
+        config.define(
+            "CMAKE_OSX_DEPLOYMENT_TARGET",
+            &build_metadata.cmake_osx_deployment_target,
+        );
     }
 
     // Android NDK ツールチェーンの設定
@@ -335,7 +379,7 @@ fn build_webrtc_c(webrtc_dir: &Path, target_platform: &str, out_dir: &Path) -> P
         }
         config.define("CMAKE_TOOLCHAIN_FILE", toolchain_file.to_str().unwrap());
         config.define("ANDROID_ABI", "arm64-v8a");
-        config.define("ANDROID_PLATFORM", "android-24");
+        config.define("ANDROID_PLATFORM", &build_metadata.android_platform);
     }
 
     // bundled_webrtc_c_bundling ターゲットのみをビルド（all ターゲットを避ける）

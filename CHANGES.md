@@ -11,6 +11,9 @@
 
 ## develop
 
+- [UPDATE] iOS / Android 向け CMake プラットフォーム値を Cargo.toml から取得する
+  - `CMAKE_OSX_DEPLOYMENT_TARGET` と `ANDROID_PLATFORM` の固定値を `package.metadata.build-config` に移動する
+  - @melpon
 - [ADD] `PeerConnection::remove_track` を追加する
   - `PeerConnectionInterface::RemoveTrackOrError` の C API / Rust バインディングを追加する
   - @voluntas
