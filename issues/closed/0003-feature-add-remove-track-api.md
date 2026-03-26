@@ -1,6 +1,7 @@
 # libwebrtc-c に RemoveTrackOrError C API を追加する
 
 Created: 2026-03-26
+Completed: 2026-03-26
 Model: Opus 4.6
 
 ## 概要
@@ -17,3 +18,8 @@ libwebrtc-c に `webrtc_PeerConnectionInterface_RemoveTrackOrError` を追加す
 - `webrtc::PeerConnectionInterface::RemoveTrackOrError` を薄くラップする C API を追加する
 - 既存の `AddTrack` と同様のエラーハンドリングパターン (`out_rtc_error`) を使う
 - シグネチャ: `webrtc_PeerConnectionInterface_RemoveTrackOrError(self, sender, out_rtc_error)`
+
+## 解決方法
+
+`webrtc_PeerConnectionInterface_RemoveTrackOrError` を libwebrtc-c のヘッダーと実装に追加した。
+`AddTrack` と同じパターンで `RtpSenderInterface_refcounted` を受け取り、`out_rtc_error` でエラーを返す。
