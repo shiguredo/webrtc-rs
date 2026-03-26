@@ -14,116 +14,116 @@ permissions:
   actions: read
 
 jobs:
-  # ci:
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       os:
-  #         - ubuntu-24.04
-  #         - ubuntu-22.04
-  #         - macos-26
-  #         - macos-15
-  #         - windows-2025
-  #   runs-on: ${{ matrix.os }}
-  #   timeout-minutes: 30
-  #   steps:
-  #     - name: Checkout sources
-  #       uses: actions/checkout@v6
-  #     - name: Install build dependencies
-  #       if: runner.os == 'Linux'
-  #       run: |
-  #         sudo apt-get update
-  #         sudo apt-get install -y build-essential \
-  #           libclang-dev \
-  #           libx11-dev
-  #     - run: rustup update stable
-  #     # あまり役立っていない感じがするので一旦コメントアウト
-  #     # - uses: shiguredo/github-actions/.github/actions/rust-cache@main
-  #     #   with:
-  #     #     os: ${{ matrix.os }}
-  #     #     toolchain: stable
-  #     - run: cargo fmt --all --check
-  #     - run: cargo check --workspace --features source-build
-  #     - run: cargo test --workspace --features source-build
-  #     - run: cargo clippy --workspace --features source-build -- -D warnings
+  ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - ubuntu-22.04
+          - macos-26
+          - macos-15
+          - windows-2025
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+      - name: Install build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential \
+            libclang-dev \
+            libx11-dev
+      - run: rustup update stable
+      # あまり役立っていない感じがするので一旦コメントアウト
+      # - uses: shiguredo/github-actions/.github/actions/rust-cache@main
+      #   with:
+      #     os: ${{ matrix.os }}
+      #     toolchain: stable
+      - run: cargo fmt --all --check
+      - run: cargo check --workspace --features source-build
+      - run: cargo test --workspace --features source-build
+      - run: cargo clippy --workspace --features source-build -- -D warnings
 
-  # cross-compile:
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       target:
-  #         - ubuntu-24.04_armv8
-  #         - ubuntu-22.04_armv8
-  #         - raspberry-pi-os_armv8
-  #   runs-on: ubuntu-24.04
-  #   timeout-minutes: 30
-  #   steps:
-  #     - name: Checkout sources
-  #       uses: actions/checkout@v6
-  #     - name: Install build dependencies
-  #       run: |
-  #         sudo apt-get update
-  #         # bindgen がクロスコンパイル時に aarch64 用ヘッダーを参照するために gcc-aarch64-linux-gnu が必要
-  #         # cc クレートが aarch64-linux-gnu-g++ を探す warning が出るが、
-  #         # WebRTC は自前の libc++ を使うため g++-aarch64-linux-gnu は不要
-  #         sudo apt-get install -y build-essential \
-  #           libclang-dev \
-  #           clang \
-  #           debian-archive-keyring \
-  #           gcc-aarch64-linux-gnu
-  #         # cargo-shiguredo-sysroot は独自 apt 設定で sources.list のみ差し替えるため、
-  #         # Debian の keyring を trusted.gpg.d に配置しないと trixie の署名検証に失敗する。
-  #         sudo install -Dm644 /usr/share/keyrings/debian-archive-keyring.gpg \
-  #           /etc/apt/trusted.gpg.d/debian-archive-keyring.gpg
-  #     - run: rustup update stable
-  #     - run: rustup target add aarch64-unknown-linux-gnu
-  #     - name: Install cargo-shiguredo-sysroot
-  #       run: cargo install shiguredo_sysroot
-  #     - name: Install sysroot
-  #       run: cargo shiguredo-sysroot --config sysroot/${{ matrix.target }}.json
-  #     - name: Build for ${{ matrix.target }}
-  #       env:
-  #         WEBRTC_C_TARGET: ${{ matrix.target }}
-  #         WEBRTC_C_SYSROOT: ${{ github.workspace }}/target/shiguredo-sysroot/${{ matrix.target }}/sysroot
-  #       run: cargo build --features source-build --workspace --target aarch64-unknown-linux-gnu
-  #     - name: Upload build artifacts
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: arm64-binaries-${{ matrix.target }}
-  #         path: |
-  #           target/aarch64-unknown-linux-gnu/debug/whip
-  #           target/aarch64-unknown-linux-gnu/debug/whep
-  #         retention-days: 1
+  cross-compile:
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - ubuntu-24.04_armv8
+          - ubuntu-22.04_armv8
+          - raspberry-pi-os_armv8
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          # bindgen がクロスコンパイル時に aarch64 用ヘッダーを参照するために gcc-aarch64-linux-gnu が必要
+          # cc クレートが aarch64-linux-gnu-g++ を探す warning が出るが、
+          # WebRTC は自前の libc++ を使うため g++-aarch64-linux-gnu は不要
+          sudo apt-get install -y build-essential \
+            libclang-dev \
+            clang \
+            debian-archive-keyring \
+            gcc-aarch64-linux-gnu
+          # cargo-shiguredo-sysroot は独自 apt 設定で sources.list のみ差し替えるため、
+          # Debian の keyring を trusted.gpg.d に配置しないと trixie の署名検証に失敗する。
+          sudo install -Dm644 /usr/share/keyrings/debian-archive-keyring.gpg \
+            /etc/apt/trusted.gpg.d/debian-archive-keyring.gpg
+      - run: rustup update stable
+      - run: rustup target add aarch64-unknown-linux-gnu
+      - name: Install cargo-shiguredo-sysroot
+        run: cargo install shiguredo_sysroot
+      - name: Install sysroot
+        run: cargo shiguredo-sysroot --config sysroot/${{ matrix.target }}.json
+      - name: Build for ${{ matrix.target }}
+        env:
+          WEBRTC_C_TARGET: ${{ matrix.target }}
+          WEBRTC_C_SYSROOT: ${{ github.workspace }}/target/shiguredo-sysroot/${{ matrix.target }}/sysroot
+        run: cargo build --features source-build --workspace --target aarch64-unknown-linux-gnu
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-binaries-${{ matrix.target }}
+          path: |
+            target/aarch64-unknown-linux-gnu/debug/whip
+            target/aarch64-unknown-linux-gnu/debug/whep
+          retention-days: 1
 
-  # verify-linux-arm64:
-  #   needs: cross-compile
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #         - target: ubuntu-24.04_armv8
-  #           runner: ubuntu-24.04-arm
-  #         - target: ubuntu-22.04_armv8
-  #           runner: ubuntu-22.04-arm
-  #         - target: raspberry-pi-os_armv8
-  #           runner:
-  #             group: Self
-  #             labels: [self-hosted, linux, ARM64, Raspberry-Pi]
-  #   runs-on: ${{ matrix.runner }}
-  #   timeout-minutes: 10
-  #   steps:
-  #     - name: Download build artifacts
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: arm64-binaries-${{ matrix.target }}
+  verify-linux-arm64:
+    needs: cross-compile
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: ubuntu-24.04_armv8
+            runner: ubuntu-24.04-arm
+          - target: ubuntu-22.04_armv8
+            runner: ubuntu-22.04-arm
+          - target: raspberry-pi-os_armv8
+            runner:
+              group: Self
+              labels: [self-hosted, linux, ARM64, Raspberry-Pi]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: arm64-binaries-${{ matrix.target }}
 
-  #     - name: Verify binaries
-  #       run: |
-  #         chmod +x whip whep
-  #         file whip
-  #         file whep
-  #         ./whip --help
-  #         ./whep --help
+      - name: Verify binaries
+        run: |
+          chmod +x whip whep
+          file whip
+          file whep
+          ./whip --help
+          ./whep --help
 
   build-ios:
     runs-on: macos-26
@@ -166,20 +166,9 @@ jobs:
           echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/29.0.14206865" >> $GITHUB_ENV
       - name: Build shiguredo_webrtc for Android arm64
         run: cargo build --features source-build --target aarch64-linux-android
-      - name: Verify build output
-        run: |
-          OUT_DIR=$(find target/aarch64-linux-android/debug/build/shiguredo_webrtc-*/out -maxdepth 0 -type d | head -1)
-          if [ -z "$OUT_DIR" ]; then
-            echo "ERROR: OUT_DIR が見つかりません"
-            exit 1
-          fi
-          file "$OUT_DIR/lib/libwebrtc_c.a"
-          ls -lh "$OUT_DIR/lib/libwebrtc_c.a"
-          ls -lh "$OUT_DIR/bindings.rs"
 
   slack_notify:
-    # needs: [ci, cross-compile, verify-linux-arm64, cross-compile-ios, cross-compile-android]
-    needs: [build-ios, build-android]
+    needs: [ci, cross-compile, verify-linux-arm64, build-ios, build-android]
     runs-on: ubuntu-slim
     if: ${{ !cancelled() }}
     steps:
