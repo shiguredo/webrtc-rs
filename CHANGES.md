@@ -11,6 +11,9 @@
 
 ## develop
 
+- [ADD] `PeerConnection::remove_track` を追加する
+  - `PeerConnectionInterface::RemoveTrackOrError` の C API / Rust バインディングを追加する
+  - @voluntas
 - [ADD] `VideoEncoder::EncoderInfo` の全フィールドと関連型 API を追加する
   - `QpThresholds` / `ScalingSettings` / `ResolutionBitrateLimits` / `Resolution` を追加する
   - `ToString` / `GetEncoderBitrateLimitsForResolution` を追加する

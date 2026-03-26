@@ -1818,6 +1818,22 @@ impl PeerConnection {
         Ok(RtpSender::from_scoped_ref(raw_ref))
     }
 
+    pub fn remove_track(&self, sender: &RtpSender) -> Result<()> {
+        let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_RemoveTrackOrError(
+                self.raw_ref.as_ptr(),
+                sender.as_refcounted_ptr(),
+                &mut out_error,
+            );
+        }
+        if !out_error.is_null() {
+            let err = RtcError::from_unique_ptr(NonNull::new(out_error).unwrap());
+            return Err(Error::RtcError(err));
+        }
+        Ok(())
+    }
+
     pub fn get_stats<F>(&self, on_stats: F)
     where
         F: FnOnce(RTCStatsReport) + Send + 'static,
