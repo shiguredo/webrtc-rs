@@ -1120,8 +1120,6 @@ pub trait PeerConnectionObserverHandler: Send {
     fn on_data_channel(&mut self, data_channel: DataChannel) {}
 }
 
-impl PeerConnectionObserverHandler for () {}
-
 struct PeerConnectionObserverHandlerState {
     handler: Box<dyn PeerConnectionObserverHandler>,
 }
@@ -1388,8 +1386,6 @@ pub trait CreateSessionDescriptionObserverHandler: Send {
     fn on_failure(&mut self, error: RtcError) {}
 }
 
-impl CreateSessionDescriptionObserverHandler for () {}
-
 struct CreateSessionDescriptionObserverHandlerState {
     handler: Box<dyn CreateSessionDescriptionObserverHandler>,
 }
@@ -1465,8 +1461,6 @@ pub trait SetLocalDescriptionObserverHandler: Send {
     fn on_set_local_description_complete(&mut self, error: RtcError) {}
 }
 
-impl SetLocalDescriptionObserverHandler for () {}
-
 struct SetLocalDescriptionObserverHandlerState {
     handler: Box<dyn SetLocalDescriptionObserverHandler>,
 }
@@ -1532,8 +1526,6 @@ pub trait SetRemoteDescriptionObserverHandler: Send {
     #[expect(unused_variables)]
     fn on_set_remote_description_complete(&mut self, error: RtcError) {}
 }
-
-impl SetRemoteDescriptionObserverHandler for () {}
 
 struct SetRemoteDescriptionObserverHandlerState {
     handler: Box<dyn SetRemoteDescriptionObserverHandler>,

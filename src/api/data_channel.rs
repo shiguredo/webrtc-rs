@@ -110,8 +110,6 @@ pub trait DataChannelObserverHandler: Send {
     fn on_message(&mut self, data: &[u8], is_binary: bool) {}
 }
 
-impl DataChannelObserverHandler for () {}
-
 struct DataChannelObserverHandlerState {
     handler: Box<dyn DataChannelObserverHandler>,
 }

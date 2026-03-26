@@ -29,6 +29,10 @@
   - Rust の `AudioDeviceModuleHandler` で `get_playout_audio_parameters` / `get_record_audio_parameters` を out 引数で受ける形式に変更する
   - Rust 型名 `AudioDeviceModuleAudioParameters` を `AudioParameters` に変更する
   - @melpon
+- [CHANGE] 公開 handler trait の `impl ... for ()` を削除する
+  - `src` / `src/rtc_base` の公開 handler trait 15 箇所から `impl ... for ()` を削除する
+  - `src/tests.rs` の `Box::new(())` をテスト専用 `NoopHandler` へ置換する
+  - @melpon
 
 ## 0.146.1
 

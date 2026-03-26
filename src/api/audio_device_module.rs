@@ -541,8 +541,6 @@ pub trait AudioTransportHandler: Send {
     }
 }
 
-impl AudioTransportHandler for () {}
-
 struct AudioTransportHandlerState {
     handler: Box<dyn AudioTransportHandler>,
 }
@@ -988,8 +986,6 @@ pub trait AudioDeviceModuleHandler: Send + Sync {
         None
     }
 }
-
-impl AudioDeviceModuleHandler for () {}
 
 struct AudioDeviceModuleHandlerState {
     handler: Box<dyn AudioDeviceModuleHandler>,
