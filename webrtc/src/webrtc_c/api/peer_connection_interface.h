@@ -140,6 +140,10 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTrack(
     struct std_string_vector* stream_ids,
     struct webrtc_RtpSenderInterface_refcounted** out_sender,
     struct webrtc_RTCError_unique** out_rtc_error);
+WEBRTC_EXPORT void webrtc_PeerConnectionInterface_RemoveTrackOrError(
+    struct webrtc_PeerConnectionInterface* self,
+    struct webrtc_RtpSenderInterface_refcounted* sender,
+    struct webrtc_RTCError_unique** out_rtc_error);
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_CreateOffer(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_CreateSessionDescriptionObserver* observer,

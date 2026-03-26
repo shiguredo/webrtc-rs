@@ -557,6 +557,24 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTrack(
         reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error);
   }
 }
+WEBRTC_EXPORT void webrtc_PeerConnectionInterface_RemoveTrackOrError(
+    struct webrtc_PeerConnectionInterface* self,
+    struct webrtc_RtpSenderInterface_refcounted* sender,
+    struct webrtc_RTCError_unique** out_rtc_error) {
+  auto pc = reinterpret_cast<webrtc::PeerConnectionInterface*>(self);
+  auto raw_sender = webrtc_RtpSenderInterface_refcounted_get(sender);
+  auto rtp_sender =
+      reinterpret_cast<webrtc::RtpSenderInterface*>(raw_sender);
+  webrtc::scoped_refptr<webrtc::RtpSenderInterface> sender_ref(rtp_sender);
+  auto error = pc->RemoveTrackOrError(sender_ref);
+  if (error.ok()) {
+    *out_rtc_error = nullptr;
+  } else {
+    auto rtc_error = new webrtc::RTCError(error);
+    *out_rtc_error =
+        reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error);
+  }
+}
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_CreateOffer(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_CreateSessionDescriptionObserver* observer,
