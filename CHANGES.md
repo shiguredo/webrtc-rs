@@ -14,6 +14,10 @@
 - [UPDATE] iOS / Android 向け CMake プラットフォーム値を Cargo.toml から取得する
   - `CMAKE_OSX_DEPLOYMENT_TARGET` と `ANDROID_PLATFORM` の固定値を `package.metadata.build-config` に移動する
   - @melpon
+- [ADD] Android `source-build` 時に Android NDK の自動セットアップを追加する
+  - `ANDROID_NDK_HOME` / `ANDROID_NDK` が未設定または無効な場合に `target/android-sdk` へ Command-line Tools と NDK を自動インストールする
+  - Command-line Tools / NDK のバージョンを `package.metadata.build-config` から指定可能にする
+  - @melpon
 - [ADD] `PeerConnection::remove_track` を追加する
   - `PeerConnectionInterface::RemoveTrackOrError` の C API / Rust バインディングを追加する
   - @voluntas

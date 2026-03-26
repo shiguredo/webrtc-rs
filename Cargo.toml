@@ -33,11 +33,14 @@ webrtc-build = { version = "m146.7680.3.1", base-url = "https://github.com/shigu
 [package.metadata.build-config]
 cmake-osx-deployment-target = "16.0"
 android-platform = "android-24"
+android-commandlinetools-version = "14742923"
+android-ndk-version = "27.2.12479018"
 
 [build-dependencies]
 bindgen = "0.72"
 shiguredo_cmake = "4.3.0"
 shiguredo_toml = "2026.1"
+nojson = "0.3"
 
 [workspace]
 members = ["examples/*"]
