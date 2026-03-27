@@ -11,6 +11,8 @@
 
 ## develop
 
+- [ADD] `PeerConnectionFactory::get_rtp_receiver_capabilities` を追加する
+  - @voluntas
 - [UPDATE] iOS / Android 向け CMake プラットフォーム値を Cargo.toml から取得する
   - `CMAKE_OSX_DEPLOYMENT_TARGET` と `ANDROID_PLATFORM` の固定値を `package.metadata.build-config` に移動する
   - @melpon

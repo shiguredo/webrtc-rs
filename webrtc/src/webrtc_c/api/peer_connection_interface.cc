@@ -1203,6 +1203,16 @@ webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities(
       static_cast<webrtc::MediaType>(media_type)));
   return reinterpret_cast<struct webrtc_RtpCapabilities*>(caps);
 }
+WEBRTC_EXPORT struct webrtc_RtpCapabilities*
+webrtc_PeerConnectionFactoryInterface_GetRtpReceiverCapabilities(
+    struct webrtc_PeerConnectionFactoryInterface* self,
+    int media_type) {
+  auto factory =
+      reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
+  auto caps = new webrtc::RtpCapabilities(factory->GetRtpReceiverCapabilities(
+      static_cast<webrtc::MediaType>(media_type)));
+  return reinterpret_cast<struct webrtc_RtpCapabilities*>(caps);
+}
 
 WEBRTC_EXPORT struct webrtc_PeerConnectionFactoryInterface_Options*
 webrtc_PeerConnectionFactoryInterface_Options_new() {
