@@ -16,7 +16,7 @@ NSError* ToNSError(const struct objc_NSError* self) {
 }
 
 struct objc_NSString* RetainNSString(NSString* self) {
-  return reinterpret_cast<struct objc_NSString*>(CFBridgingRetain(self));
+  return (struct objc_NSString*)CFBridgingRetain(self);
 }
 
 }  // namespace
@@ -188,10 +188,6 @@ objc_AVAudioSessionCategoryOption_AllowBluetoothHFP(void) {
 WEBRTC_EXPORT uint64_t
 objc_AVAudioSessionCategoryOption_AllowBluetoothA2DP(void) {
   return static_cast<uint64_t>(AVAudioSessionCategoryOptionAllowBluetoothA2DP);
-}
-
-WEBRTC_EXPORT uint64_t objc_AVAudioSessionCategoryOption_AllowBluetooth(void) {
-  return static_cast<uint64_t>(AVAudioSessionCategoryOptionAllowBluetooth);
 }
 
 WEBRTC_EXPORT uint64_t objc_AVAudioSessionCategoryOption_AllowAirPlay(void) {

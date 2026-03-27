@@ -68,7 +68,6 @@ WEBRTC_EXPORT uint64_t
 objc_AVAudioSessionCategoryOption_AllowBluetoothHFP(void);
 WEBRTC_EXPORT uint64_t
 objc_AVAudioSessionCategoryOption_AllowBluetoothA2DP(void);
-WEBRTC_EXPORT uint64_t objc_AVAudioSessionCategoryOption_AllowBluetooth(void);
 WEBRTC_EXPORT uint64_t objc_AVAudioSessionCategoryOption_AllowAirPlay(void);
 WEBRTC_EXPORT uint64_t objc_AVAudioSessionCategoryOption_DefaultToSpeaker(void);
 WEBRTC_EXPORT uint64_t objc_AVAudioSessionCategoryOption_MixWithOthers(void);

@@ -19,18 +19,17 @@ RTCAudioSessionConfiguration* ToRTCAudioSessionConfiguration(
 
 struct webrtc_objc_RTCAudioSession* RetainRTCAudioSession(
     RTCAudioSession* self) {
-  return reinterpret_cast<struct webrtc_objc_RTCAudioSession*>(
-      CFBridgingRetain(self));
+  return (struct webrtc_objc_RTCAudioSession*)CFBridgingRetain(self);
 }
 
 struct webrtc_objc_RTCAudioSessionConfiguration*
 RetainRTCAudioSessionConfiguration(RTCAudioSessionConfiguration* self) {
-  return reinterpret_cast<struct webrtc_objc_RTCAudioSessionConfiguration*>(
-      CFBridgingRetain(self));
+  return (struct webrtc_objc_RTCAudioSessionConfiguration*)CFBridgingRetain(
+      self);
 }
 
 struct webrtc_objc_NSError* RetainNSError(NSError* self) {
-  return reinterpret_cast<struct webrtc_objc_NSError*>(CFBridgingRetain(self));
+  return (struct webrtc_objc_NSError*)CFBridgingRetain(self);
 }
 
 }  // namespace
