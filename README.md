@@ -195,6 +195,8 @@ impl FactoryHolder {
   - 音声デバイスレイヤー種別 (PlatformDefault, Dummy など)
 - `AudioDeviceModuleHandler` / `AudioDeviceModuleStats`
   - カスタム ADM handler と統計
+- `AudioParameters`
+  - 音声パラメータ (サンプルレート、チャネル数など)
 - `AudioTransport` / `AudioTransportRef` / `AudioTransportHandler`
   - 音声トランスポート
 - `MediaStreamTrack`
@@ -203,6 +205,8 @@ impl FactoryHolder {
   - I420 フォーマットの映像バッファ
 - `VideoFrame` / `VideoFrameRef`
   - 映像フレーム
+- `AudioTrackSink` / `AudioTrackSinkHandler`
+  - 音声トラックシンク
 - `VideoSink` / `VideoSinkHandler`
   - 映像フレームシンク
 - `VideoSinkWants`
