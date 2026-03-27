@@ -254,7 +254,10 @@ impl PeerConnectionFactory {
                 self.as_ptr(),
                 media_type.to_int(),
             )
-        }).expect("BUG: webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities が null を返しました");
+        })
+        .expect(
+            "BUG: webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities が null を返しました",
+        );
         RtpCapabilities::from_raw(raw)
     }
 
