@@ -11,6 +11,32 @@ extern "C" {
 #endif
 
 // -------------------------
+// webrtc::AudioDeviceModule::Stats
+// -------------------------
+
+WEBRTC_DECLARE_UNIQUE(webrtc_AudioDeviceModule_Stats);
+
+WEBRTC_EXPORT struct webrtc_AudioDeviceModule_Stats_unique*
+webrtc_AudioDeviceModule_Stats_new(double synthesized_samples_duration_s,
+                                   uint64_t synthesized_samples_events,
+                                   double total_samples_duration_s,
+                                   double total_playout_delay_s,
+                                   uint64_t total_samples_count);
+WEBRTC_EXPORT double
+webrtc_AudioDeviceModule_Stats_get_synthesized_samples_duration_s(
+    struct webrtc_AudioDeviceModule_Stats* self);
+WEBRTC_EXPORT uint64_t
+webrtc_AudioDeviceModule_Stats_get_synthesized_samples_events(
+    struct webrtc_AudioDeviceModule_Stats* self);
+WEBRTC_EXPORT double
+webrtc_AudioDeviceModule_Stats_get_total_samples_duration_s(
+    struct webrtc_AudioDeviceModule_Stats* self);
+WEBRTC_EXPORT double webrtc_AudioDeviceModule_Stats_get_total_playout_delay_s(
+    struct webrtc_AudioDeviceModule_Stats* self);
+WEBRTC_EXPORT uint64_t webrtc_AudioDeviceModule_Stats_get_total_samples_count(
+    struct webrtc_AudioDeviceModule_Stats* self);
+
+// -------------------------
 // webrtc::AudioDeviceModule
 // -------------------------
 
@@ -33,7 +59,6 @@ WEBRTC_EXPORT extern const int
 WEBRTC_EXPORT extern const int webrtc_AudioDeviceModule_kDefaultDevice;
 
 WEBRTC_DECLARE_REFCOUNTED(webrtc_AudioDeviceModule);
-struct webrtc_AudioDeviceModule_Stats;
 
 WEBRTC_EXPORT struct webrtc_AudioDeviceModule_refcounted*
 webrtc_CreateAudioDeviceModule(struct webrtc_Environment* env, int audio_type);
@@ -259,19 +284,11 @@ WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_GetPlayoutUnderrunCount(
 
 WEBRTC_EXPORT int webrtc_AudioDeviceModule_GetStats(
     struct webrtc_AudioDeviceModule* self,
-    struct webrtc_AudioDeviceModule_Stats* out_stats);
+    struct webrtc_AudioDeviceModule_Stats_unique** out_stats);
 
 // -------------------------
 // AudioDeviceModule (Callbacks)
 // -------------------------
-
-struct webrtc_AudioDeviceModule_Stats {
-  double synthesized_samples_duration_s;
-  uint64_t synthesized_samples_events;
-  double total_samples_duration_s;
-  double total_playout_delay_s;
-  uint64_t total_samples_count;
-};
 
 struct webrtc_AudioDeviceModule_cbs {
   int32_t (*ActiveAudioLayer)(int* audio_layer, void* user_data);
@@ -357,8 +374,16 @@ struct webrtc_AudioDeviceModule_cbs {
   int32_t (*EnableBuiltInNS)(int enable, void* user_data);
 
   int32_t (*GetPlayoutUnderrunCount)(void* user_data);
-  int (*GetStats)(struct webrtc_AudioDeviceModule_Stats* out_stats,
+
+  int (*GetStats)(struct webrtc_AudioDeviceModule_Stats_unique** out_stats,
                   void* user_data);
+
+  int (*GetPlayoutAudioParameters)(
+      struct webrtc_AudioParameters_unique** out_params,
+      void* user_data);
+  int (*GetRecordAudioParameters)(
+      struct webrtc_AudioParameters_unique** out_params,
+      void* user_data);
 
   void (*OnDestroy)(void* user_data);
 };

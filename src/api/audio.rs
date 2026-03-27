@@ -3,6 +3,7 @@ use crate::ref_count::{
     MediaStreamTrackHandle,
 };
 use crate::{MediaStreamTrack, ScopedRef, ffi};
+use std::os::raw::c_void;
 use std::ptr::NonNull;
 
 /// webrtc::AudioDecoderFactory のラッパー。
@@ -91,13 +92,114 @@ impl AudioTrack {
             .expect("BUG: AudioTrackInterface から MediaStreamTrackInterface へのキャストが null を返しました");
         MediaStreamTrack::from_scoped_ref(ScopedRef::<MediaStreamTrackHandle>::from_raw(raw))
     }
+
+    /// AudioTrack に AudioTrackSink を登録する。
+    pub fn add_sink(&mut self, sink: &AudioTrackSink) {
+        unsafe {
+            ffi::webrtc_AudioTrackInterface_AddSink(self.raw_ref.as_ptr(), sink.as_ptr());
+        }
+    }
+
+    /// AudioTrack から AudioTrackSink を解除する。
+    pub fn remove_sink(&mut self, sink: &AudioTrackSink) {
+        unsafe {
+            ffi::webrtc_AudioTrackInterface_RemoveSink(self.raw_ref.as_ptr(), sink.as_ptr());
+        }
+    }
 }
 
 unsafe impl Send for AudioTrack {}
-// AudioTracklInterface の実体はシーケンシャルにする Proxy 経由で
+// AudioTrackInterface の実体はシーケンシャルにする Proxy 経由で
 // アクセスするためスレッドセーフに使用できる。
 // ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/pc/media_stream_track_proxy.h;l=26-40;drc=ef55be496e45889ace33ace4b05094ca19cb499b
 unsafe impl Sync for AudioTrack {}
+
+/// 音声データを受信するためのコールバックハンドラ。
+pub trait AudioTrackSinkHandler: Send {
+    /// 音声データを受信した際に呼ばれる。
+    fn on_data(
+        &mut self,
+        audio_data: &[u8],
+        bits_per_sample: i32,
+        sample_rate: i32,
+        number_of_channels: usize,
+        number_of_frames: usize,
+    );
+}
+
+struct AudioTrackSinkHandlerState {
+    handler: Box<dyn AudioTrackSinkHandler>,
+}
+
+unsafe extern "C" fn audio_track_sink_on_data(
+    audio_data: *const c_void,
+    bits_per_sample: i32,
+    sample_rate: i32,
+    number_of_channels: usize,
+    number_of_frames: usize,
+    user_data: *mut c_void,
+) {
+    let state = unsafe { &mut *(user_data as *mut AudioTrackSinkHandlerState) };
+    let byte_len = number_of_frames * number_of_channels * (bits_per_sample as usize) / 8;
+    let data = if audio_data.is_null() || byte_len == 0 {
+        &[]
+    } else {
+        unsafe { std::slice::from_raw_parts(audio_data as *const u8, byte_len) }
+    };
+    state.handler.on_data(
+        data,
+        bits_per_sample,
+        sample_rate,
+        number_of_channels,
+        number_of_frames,
+    );
+}
+
+unsafe extern "C" fn audio_track_sink_on_destroy(user_data: *mut c_void) {
+    assert!(
+        !user_data.is_null(),
+        "audio_track_sink_on_destroy: user_data is null"
+    );
+    let _ = unsafe { Box::from_raw(user_data as *mut AudioTrackSinkHandlerState) };
+}
+
+/// webrtc::AudioTrackSinkInterface のラッパー。
+pub struct AudioTrackSink {
+    raw: NonNull<ffi::webrtc_AudioTrackSinkInterface>,
+}
+
+impl AudioTrackSink {
+    pub fn new_with_handler(handler: Box<dyn AudioTrackSinkHandler>) -> Self {
+        let state = Box::new(AudioTrackSinkHandlerState { handler });
+        let user_data = Box::into_raw(state) as *mut c_void;
+        let cbs = ffi::webrtc_AudioTrackSinkInterface_cbs {
+            OnData: Some(audio_track_sink_on_data),
+            OnDestroy: Some(audio_track_sink_on_destroy),
+        };
+        let raw =
+            match NonNull::new(unsafe { ffi::webrtc_AudioTrackSinkInterface_new(&cbs, user_data) })
+            {
+                Some(raw) => raw,
+                None => {
+                    let _ = unsafe { Box::from_raw(user_data as *mut AudioTrackSinkHandlerState) };
+                    panic!("BUG: webrtc_AudioTrackSinkInterface_new が null を返しました");
+                }
+            };
+        Self { raw }
+    }
+
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_AudioTrackSinkInterface {
+        self.raw.as_ptr()
+    }
+}
+
+impl Drop for AudioTrackSink {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_AudioTrackSinkInterface_delete(self.raw.as_ptr()) };
+    }
+}
+
+unsafe impl Send for AudioTrackSink {}
 
 /// webrtc::AudioProcessingBuilderInterface のラッパー。
 pub struct AudioProcessingBuilder {

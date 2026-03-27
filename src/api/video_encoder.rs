@@ -7,6 +7,729 @@ use std::marker::PhantomData;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VideoFrameBufferType {
+    Native,
+    I420,
+    I420A,
+    I422,
+    I444,
+    I010,
+    I210,
+    I410,
+    Nv12,
+    Unknown(i32),
+}
+
+impl VideoFrameBufferType {
+    fn from_raw(value: i32) -> Self {
+        unsafe {
+            if value == ffi::webrtc_VideoFrameBuffer_Type_kNative {
+                Self::Native
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI420 {
+                Self::I420
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI420A {
+                Self::I420A
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI422 {
+                Self::I422
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI444 {
+                Self::I444
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI010 {
+                Self::I010
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI210 {
+                Self::I210
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI410 {
+                Self::I410
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kNV12 {
+                Self::Nv12
+            } else {
+                Self::Unknown(value)
+            }
+        }
+    }
+
+    fn to_raw(self) -> i32 {
+        unsafe {
+            match self {
+                Self::Native => ffi::webrtc_VideoFrameBuffer_Type_kNative,
+                Self::I420 => ffi::webrtc_VideoFrameBuffer_Type_kI420,
+                Self::I420A => ffi::webrtc_VideoFrameBuffer_Type_kI420A,
+                Self::I422 => ffi::webrtc_VideoFrameBuffer_Type_kI422,
+                Self::I444 => ffi::webrtc_VideoFrameBuffer_Type_kI444,
+                Self::I010 => ffi::webrtc_VideoFrameBuffer_Type_kI010,
+                Self::I210 => ffi::webrtc_VideoFrameBuffer_Type_kI210,
+                Self::I410 => ffi::webrtc_VideoFrameBuffer_Type_kI410,
+                Self::Nv12 => ffi::webrtc_VideoFrameBuffer_Type_kNV12,
+                Self::Unknown(v) => v,
+            }
+        }
+    }
+}
+
+pub struct VideoEncoderFramerateFractionInlinedVectorRef<'a> {
+    raw: NonNull<ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector>,
+    _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_EncoderInfo>,
+}
+
+impl<'a> VideoEncoderFramerateFractionInlinedVectorRef<'a> {
+    /// # Safety
+    /// `raw` は有効な `webrtc_VideoEncoder_FramerateFraction_inlined_vector` を指す必要があります。
+    pub unsafe fn from_raw(
+        raw: NonNull<ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector>,
+    ) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        let len = unsafe {
+            ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector_size(self.raw.as_ptr())
+        };
+        len.max(0) as usize
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn get(&self, index: usize) -> Option<u8> {
+        if index >= self.len() {
+            return None;
+        }
+        let raw = unsafe {
+            ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector_get(
+                self.raw.as_ptr(),
+                index as i32,
+            )
+        };
+        let raw = NonNull::new(raw)?;
+        let value = unsafe { ffi::webrtc_VideoEncoder_FramerateFraction_value(raw.as_ptr()) };
+        Some(value.clamp(0, u8::MAX as i32) as u8)
+    }
+
+    pub fn push(&mut self, value: u8) {
+        unsafe {
+            ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector_push_back_value(
+                self.raw.as_ptr(),
+                value as i32,
+            )
+        };
+    }
+
+    pub fn set(&mut self, index: usize, value: u8) -> bool {
+        if index >= self.len() {
+            return false;
+        }
+        unsafe {
+            ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector_set_value(
+                self.raw.as_ptr(),
+                index as i32,
+                value as i32,
+            )
+        };
+        true
+    }
+
+    pub fn resize(&mut self, len: usize) {
+        let len = i32::try_from(len).unwrap_or(i32::MAX);
+        unsafe {
+            ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector_resize(self.raw.as_ptr(), len)
+        };
+    }
+
+    pub fn clear(&mut self) {
+        unsafe {
+            ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector_clear(self.raw.as_ptr())
+        };
+    }
+}
+
+unsafe impl<'a> Send for VideoEncoderFramerateFractionInlinedVectorRef<'a> {}
+
+pub struct VideoFrameBufferTypeInlinedVectorRef<'a> {
+    raw: NonNull<ffi::webrtc_VideoFrameBuffer_Type_inlined_vector>,
+    _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_EncoderInfo>,
+}
+
+impl<'a> VideoFrameBufferTypeInlinedVectorRef<'a> {
+    /// # Safety
+    /// `raw` は有効な `webrtc_VideoFrameBuffer_Type_inlined_vector` を指す必要があります。
+    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoFrameBuffer_Type_inlined_vector>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        let len =
+            unsafe { ffi::webrtc_VideoFrameBuffer_Type_inlined_vector_size(self.raw.as_ptr()) };
+        len.max(0) as usize
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn get(&self, index: usize) -> Option<VideoFrameBufferType> {
+        if index >= self.len() {
+            return None;
+        }
+        let raw = unsafe {
+            ffi::webrtc_VideoFrameBuffer_Type_inlined_vector_get(self.raw.as_ptr(), index as i32)
+        };
+        let raw = NonNull::new(raw)?;
+        let value = unsafe { ffi::webrtc_VideoFrameBuffer_Type_value(raw.as_ptr()) };
+        Some(VideoFrameBufferType::from_raw(value))
+    }
+
+    pub fn push(&mut self, value: VideoFrameBufferType) {
+        unsafe {
+            ffi::webrtc_VideoFrameBuffer_Type_inlined_vector_push_back_value(
+                self.raw.as_ptr(),
+                value.to_raw(),
+            )
+        };
+    }
+
+    pub fn set(&mut self, index: usize, value: VideoFrameBufferType) -> bool {
+        if index >= self.len() {
+            return false;
+        }
+        unsafe {
+            ffi::webrtc_VideoFrameBuffer_Type_inlined_vector_set_value(
+                self.raw.as_ptr(),
+                index as i32,
+                value.to_raw(),
+            )
+        };
+        true
+    }
+
+    pub fn resize(&mut self, len: usize) {
+        let len = i32::try_from(len).unwrap_or(i32::MAX);
+        unsafe { ffi::webrtc_VideoFrameBuffer_Type_inlined_vector_resize(self.raw.as_ptr(), len) };
+    }
+
+    pub fn clear(&mut self) {
+        unsafe { ffi::webrtc_VideoFrameBuffer_Type_inlined_vector_clear(self.raw.as_ptr()) };
+    }
+}
+
+unsafe impl<'a> Send for VideoFrameBufferTypeInlinedVectorRef<'a> {}
+
+pub struct VideoEncoderQpThresholdsRef<'a> {
+    raw: NonNull<ffi::webrtc_VideoEncoder_QpThresholds>,
+    _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_QpThresholds>,
+}
+
+impl<'a> VideoEncoderQpThresholdsRef<'a> {
+    /// # Safety
+    /// `raw` は有効な `webrtc_VideoEncoder_QpThresholds` を指す必要があります。
+    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoEncoder_QpThresholds>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn low(&self) -> i32 {
+        unsafe { ffi::webrtc_VideoEncoder_QpThresholds_get_low(self.raw.as_ptr()) }
+    }
+
+    pub fn set_low(&mut self, value: i32) {
+        unsafe { ffi::webrtc_VideoEncoder_QpThresholds_set_low(self.raw.as_ptr(), value) };
+    }
+
+    pub fn high(&self) -> i32 {
+        unsafe { ffi::webrtc_VideoEncoder_QpThresholds_get_high(self.raw.as_ptr()) }
+    }
+
+    pub fn set_high(&mut self, value: i32) {
+        unsafe { ffi::webrtc_VideoEncoder_QpThresholds_set_high(self.raw.as_ptr(), value) };
+    }
+}
+
+unsafe impl<'a> Send for VideoEncoderQpThresholdsRef<'a> {}
+
+pub struct VideoEncoderQpThresholds {
+    raw: NonNull<ffi::webrtc_VideoEncoder_QpThresholds>,
+}
+
+impl Default for VideoEncoderQpThresholds {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl VideoEncoderQpThresholds {
+    pub fn new() -> Self {
+        let raw = NonNull::new(unsafe { ffi::webrtc_VideoEncoder_QpThresholds_new() })
+            .expect("BUG: webrtc_VideoEncoder_QpThresholds_new が null を返しました");
+        Self { raw }
+    }
+
+    pub fn low(&self) -> i32 {
+        self.as_ref().low()
+    }
+
+    pub fn set_low(&mut self, value: i32) {
+        self.as_ref().set_low(value);
+    }
+
+    pub fn high(&self) -> i32 {
+        self.as_ref().high()
+    }
+
+    pub fn set_high(&mut self, value: i32) {
+        self.as_ref().set_high(value);
+    }
+
+    pub fn as_ref(&self) -> VideoEncoderQpThresholdsRef<'_> {
+        unsafe { VideoEncoderQpThresholdsRef::from_raw(self.raw) }
+    }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoEncoder_QpThresholds {
+        self.raw.as_ptr()
+    }
+}
+
+impl Drop for VideoEncoderQpThresholds {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_VideoEncoder_QpThresholds_delete(self.raw.as_ptr()) };
+    }
+}
+
+unsafe impl Send for VideoEncoderQpThresholds {}
+
+pub struct VideoEncoderScalingSettingsRef<'a> {
+    raw: NonNull<ffi::webrtc_VideoEncoder_ScalingSettings>,
+    _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_ScalingSettings>,
+}
+
+impl<'a> VideoEncoderScalingSettingsRef<'a> {
+    /// # Safety
+    /// `raw` は有効な `webrtc_VideoEncoder_ScalingSettings` を指す必要があります。
+    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoEncoder_ScalingSettings>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn thresholds(&self) -> Option<VideoEncoderQpThresholds> {
+        let mut has = 0;
+        let value = VideoEncoderQpThresholds::new();
+        unsafe {
+            ffi::webrtc_VideoEncoder_ScalingSettings_get_thresholds(
+                self.raw.as_ptr(),
+                &mut has,
+                value.as_ptr(),
+            );
+        }
+        if has == 0 { None } else { Some(value) }
+    }
+
+    pub fn set_thresholds(&mut self, value: Option<&VideoEncoderQpThresholds>) {
+        match value {
+            Some(v) => unsafe {
+                ffi::webrtc_VideoEncoder_ScalingSettings_set_thresholds(
+                    self.raw.as_ptr(),
+                    1,
+                    v.as_ptr(),
+                );
+            },
+            None => unsafe {
+                ffi::webrtc_VideoEncoder_ScalingSettings_set_thresholds(
+                    self.raw.as_ptr(),
+                    0,
+                    std::ptr::null(),
+                );
+            },
+        }
+    }
+
+    pub fn min_pixels_per_frame(&self) -> i32 {
+        unsafe {
+            ffi::webrtc_VideoEncoder_ScalingSettings_get_min_pixels_per_frame(self.raw.as_ptr())
+        }
+    }
+
+    pub fn set_min_pixels_per_frame(&mut self, value: i32) {
+        unsafe {
+            ffi::webrtc_VideoEncoder_ScalingSettings_set_min_pixels_per_frame(
+                self.raw.as_ptr(),
+                value,
+            )
+        };
+    }
+}
+
+unsafe impl<'a> Send for VideoEncoderScalingSettingsRef<'a> {}
+
+pub struct VideoEncoderScalingSettings {
+    raw: NonNull<ffi::webrtc_VideoEncoder_ScalingSettings>,
+}
+
+impl Default for VideoEncoderScalingSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl VideoEncoderScalingSettings {
+    pub fn new() -> Self {
+        let raw = NonNull::new(unsafe { ffi::webrtc_VideoEncoder_ScalingSettings_new() })
+            .expect("BUG: webrtc_VideoEncoder_ScalingSettings_new が null を返しました");
+        Self { raw }
+    }
+
+    pub fn thresholds(&self) -> Option<VideoEncoderQpThresholds> {
+        self.as_ref().thresholds()
+    }
+
+    pub fn set_thresholds(&mut self, value: Option<&VideoEncoderQpThresholds>) {
+        self.as_ref().set_thresholds(value);
+    }
+
+    pub fn min_pixels_per_frame(&self) -> i32 {
+        self.as_ref().min_pixels_per_frame()
+    }
+
+    pub fn set_min_pixels_per_frame(&mut self, value: i32) {
+        self.as_ref().set_min_pixels_per_frame(value);
+    }
+
+    pub fn as_ref(&self) -> VideoEncoderScalingSettingsRef<'_> {
+        unsafe { VideoEncoderScalingSettingsRef::from_raw(self.raw) }
+    }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoEncoder_ScalingSettings {
+        self.raw.as_ptr()
+    }
+}
+
+impl Drop for VideoEncoderScalingSettings {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_VideoEncoder_ScalingSettings_delete(self.raw.as_ptr()) };
+    }
+}
+
+unsafe impl Send for VideoEncoderScalingSettings {}
+
+pub struct VideoEncoderResolutionBitrateLimitsRef<'a> {
+    raw: NonNull<ffi::webrtc_VideoEncoder_ResolutionBitrateLimits>,
+    _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_ResolutionBitrateLimits>,
+}
+
+impl<'a> VideoEncoderResolutionBitrateLimitsRef<'a> {
+    /// # Safety
+    /// `raw` は有効な `webrtc_VideoEncoder_ResolutionBitrateLimits` を指す必要があります。
+    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoEncoder_ResolutionBitrateLimits>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn frame_size_pixels(&self) -> i32 {
+        unsafe {
+            ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_get_frame_size_pixels(
+                self.raw.as_ptr(),
+            )
+        }
+    }
+
+    pub fn set_frame_size_pixels(&mut self, value: i32) {
+        unsafe {
+            ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_set_frame_size_pixels(
+                self.raw.as_ptr(),
+                value,
+            )
+        };
+    }
+
+    pub fn min_start_bitrate_bps(&self) -> i32 {
+        unsafe {
+            ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_get_min_start_bitrate_bps(
+                self.raw.as_ptr(),
+            )
+        }
+    }
+
+    pub fn set_min_start_bitrate_bps(&mut self, value: i32) {
+        unsafe {
+            ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_set_min_start_bitrate_bps(
+                self.raw.as_ptr(),
+                value,
+            )
+        };
+    }
+
+    pub fn min_bitrate_bps(&self) -> i32 {
+        unsafe {
+            ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_get_min_bitrate_bps(self.raw.as_ptr())
+        }
+    }
+
+    pub fn set_min_bitrate_bps(&mut self, value: i32) {
+        unsafe {
+            ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_set_min_bitrate_bps(
+                self.raw.as_ptr(),
+                value,
+            )
+        };
+    }
+
+    pub fn max_bitrate_bps(&self) -> i32 {
+        unsafe {
+            ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_get_max_bitrate_bps(self.raw.as_ptr())
+        }
+    }
+
+    pub fn set_max_bitrate_bps(&mut self, value: i32) {
+        unsafe {
+            ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_set_max_bitrate_bps(
+                self.raw.as_ptr(),
+                value,
+            )
+        };
+    }
+}
+
+unsafe impl<'a> Send for VideoEncoderResolutionBitrateLimitsRef<'a> {}
+
+pub struct VideoEncoderResolutionBitrateLimits {
+    raw: NonNull<ffi::webrtc_VideoEncoder_ResolutionBitrateLimits>,
+}
+
+impl VideoEncoderResolutionBitrateLimits {
+    pub fn new(
+        frame_size_pixels: i32,
+        min_start_bitrate_bps: i32,
+        min_bitrate_bps: i32,
+        max_bitrate_bps: i32,
+    ) -> Self {
+        let raw = unsafe {
+            ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_new(
+                frame_size_pixels,
+                min_start_bitrate_bps,
+                min_bitrate_bps,
+                max_bitrate_bps,
+            )
+        };
+        let raw = NonNull::new(raw)
+            .expect("BUG: webrtc_VideoEncoder_ResolutionBitrateLimits_new が null を返しました");
+        Self { raw }
+    }
+
+    pub fn frame_size_pixels(&self) -> i32 {
+        self.as_ref().frame_size_pixels()
+    }
+
+    pub fn set_frame_size_pixels(&mut self, value: i32) {
+        self.as_ref().set_frame_size_pixels(value);
+    }
+
+    pub fn min_start_bitrate_bps(&self) -> i32 {
+        self.as_ref().min_start_bitrate_bps()
+    }
+
+    pub fn set_min_start_bitrate_bps(&mut self, value: i32) {
+        self.as_ref().set_min_start_bitrate_bps(value);
+    }
+
+    pub fn min_bitrate_bps(&self) -> i32 {
+        self.as_ref().min_bitrate_bps()
+    }
+
+    pub fn set_min_bitrate_bps(&mut self, value: i32) {
+        self.as_ref().set_min_bitrate_bps(value);
+    }
+
+    pub fn max_bitrate_bps(&self) -> i32 {
+        self.as_ref().max_bitrate_bps()
+    }
+
+    pub fn set_max_bitrate_bps(&mut self, value: i32) {
+        self.as_ref().set_max_bitrate_bps(value);
+    }
+
+    pub fn as_ref(&self) -> VideoEncoderResolutionBitrateLimitsRef<'_> {
+        unsafe { VideoEncoderResolutionBitrateLimitsRef::from_raw(self.raw) }
+    }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoEncoder_ResolutionBitrateLimits {
+        self.raw.as_ptr()
+    }
+}
+
+impl Drop for VideoEncoderResolutionBitrateLimits {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_delete(self.raw.as_ptr()) };
+    }
+}
+
+unsafe impl Send for VideoEncoderResolutionBitrateLimits {}
+
+pub struct VideoEncoderResolutionBitrateLimitsVectorRef<'a> {
+    raw: NonNull<ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_vector>,
+    _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_EncoderInfo>,
+}
+
+impl<'a> VideoEncoderResolutionBitrateLimitsVectorRef<'a> {
+    /// # Safety
+    /// `raw` は有効な `webrtc_VideoEncoder_ResolutionBitrateLimits_vector` を指す必要があります。
+    pub unsafe fn from_raw(
+        raw: NonNull<ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_vector>,
+    ) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        let len = unsafe {
+            ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_vector_size(self.raw.as_ptr())
+        };
+        len.max(0) as usize
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn get(&self, index: usize) -> Option<VideoEncoderResolutionBitrateLimitsRef<'_>> {
+        if index >= self.len() {
+            return None;
+        }
+        let raw = unsafe {
+            ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_vector_get(
+                self.raw.as_ptr(),
+                index as i32,
+            )
+        };
+        let raw = NonNull::new(raw)?;
+        Some(unsafe { VideoEncoderResolutionBitrateLimitsRef::from_raw(raw) })
+    }
+
+    pub fn set(&mut self, index: usize, value: &VideoEncoderResolutionBitrateLimits) -> bool {
+        if index >= self.len() {
+            return false;
+        }
+        unsafe {
+            ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_vector_set(
+                self.raw.as_ptr(),
+                index as i32,
+                value.as_ptr(),
+            )
+        };
+        true
+    }
+
+    pub fn push(&mut self, value: &VideoEncoderResolutionBitrateLimits) {
+        unsafe {
+            ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_vector_push_back(
+                self.raw.as_ptr(),
+                value.as_ptr(),
+            )
+        };
+    }
+
+    pub fn clear(&mut self) {
+        unsafe { ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_vector_clear(self.raw.as_ptr()) };
+    }
+}
+
+unsafe impl<'a> Send for VideoEncoderResolutionBitrateLimitsVectorRef<'a> {}
+
+pub struct VideoEncoderResolutionRef<'a> {
+    raw: NonNull<ffi::webrtc_VideoEncoder_Resolution>,
+    _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_Resolution>,
+}
+
+impl<'a> VideoEncoderResolutionRef<'a> {
+    /// # Safety
+    /// `raw` は有効な `webrtc_VideoEncoder_Resolution` を指す必要があります。
+    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoEncoder_Resolution>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn width(&self) -> i32 {
+        unsafe { ffi::webrtc_VideoEncoder_Resolution_get_width(self.raw.as_ptr()) }
+    }
+
+    pub fn set_width(&mut self, value: i32) {
+        unsafe { ffi::webrtc_VideoEncoder_Resolution_set_width(self.raw.as_ptr(), value) };
+    }
+
+    pub fn height(&self) -> i32 {
+        unsafe { ffi::webrtc_VideoEncoder_Resolution_get_height(self.raw.as_ptr()) }
+    }
+
+    pub fn set_height(&mut self, value: i32) {
+        unsafe { ffi::webrtc_VideoEncoder_Resolution_set_height(self.raw.as_ptr(), value) };
+    }
+}
+
+unsafe impl<'a> Send for VideoEncoderResolutionRef<'a> {}
+
+pub struct VideoEncoderResolution {
+    raw: NonNull<ffi::webrtc_VideoEncoder_Resolution>,
+}
+
+impl Default for VideoEncoderResolution {
+    fn default() -> Self {
+        Self::new(0, 0)
+    }
+}
+
+impl VideoEncoderResolution {
+    pub fn new(width: i32, height: i32) -> Self {
+        let raw = NonNull::new(unsafe { ffi::webrtc_VideoEncoder_Resolution_new(width, height) })
+            .expect("BUG: webrtc_VideoEncoder_Resolution_new が null を返しました");
+        Self { raw }
+    }
+
+    pub fn width(&self) -> i32 {
+        self.as_ref().width()
+    }
+
+    pub fn set_width(&mut self, value: i32) {
+        self.as_ref().set_width(value);
+    }
+
+    pub fn height(&self) -> i32 {
+        self.as_ref().height()
+    }
+
+    pub fn set_height(&mut self, value: i32) {
+        self.as_ref().set_height(value);
+    }
+
+    pub fn as_ref(&self) -> VideoEncoderResolutionRef<'_> {
+        unsafe { VideoEncoderResolutionRef::from_raw(self.raw) }
+    }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoEncoder_Resolution {
+        self.raw.as_ptr()
+    }
+}
+
+impl Drop for VideoEncoderResolution {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_VideoEncoder_Resolution_delete(self.raw.as_ptr()) };
+    }
+}
+
+unsafe impl Send for VideoEncoderResolution {}
+
 pub struct VideoEncoderEncoderInfo {
     raw_unique: NonNull<ffi::webrtc_VideoEncoder_EncoderInfo_unique>,
 }
@@ -22,6 +745,10 @@ impl VideoEncoderEncoderInfo {
         let raw = NonNull::new(unsafe { ffi::webrtc_VideoEncoder_EncoderInfo_new() })
             .expect("webrtc_VideoEncoder_EncoderInfo_new が null を返しました");
         Self { raw_unique: raw }
+    }
+
+    pub fn max_framerate_fraction() -> u8 {
+        unsafe { ffi::webrtc_VideoEncoder_EncoderInfo_MaxFramerateFraction.clamp(0, 255) as u8 }
     }
 
     pub fn implementation_name(&self) -> Result<String> {
@@ -42,6 +769,83 @@ impl VideoEncoderEncoderInfo {
         }
     }
 
+    pub fn scaling_settings(&self) -> VideoEncoderScalingSettingsRef<'_> {
+        let raw =
+            unsafe { ffi::webrtc_VideoEncoder_EncoderInfo_get_scaling_settings(self.as_ptr()) };
+        let raw = NonNull::new(raw).expect(
+            "BUG: webrtc_VideoEncoder_EncoderInfo_get_scaling_settings が null を返しました",
+        );
+        unsafe { VideoEncoderScalingSettingsRef::from_raw(raw) }
+    }
+
+    pub fn set_scaling_settings(&mut self, value: &VideoEncoderScalingSettings) {
+        unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_set_scaling_settings(self.as_ptr(), value.as_ptr())
+        };
+    }
+
+    pub fn requested_resolution_alignment(&self) -> u32 {
+        unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_get_requested_resolution_alignment(self.as_ptr())
+        }
+    }
+
+    pub fn set_requested_resolution_alignment(&mut self, value: u32) {
+        unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_set_requested_resolution_alignment(
+                self.as_ptr(),
+                value,
+            );
+        }
+    }
+
+    pub fn apply_alignment_to_all_simulcast_layers(&self) -> bool {
+        unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_get_apply_alignment_to_all_simulcast_layers(
+                self.as_ptr(),
+            ) != 0
+        }
+    }
+
+    pub fn set_apply_alignment_to_all_simulcast_layers(&mut self, value: bool) {
+        unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_set_apply_alignment_to_all_simulcast_layers(
+                self.as_ptr(),
+                if value { 1 } else { 0 },
+            )
+        };
+    }
+
+    pub fn supports_native_handle(&self) -> bool {
+        unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_get_supports_native_handle(self.as_ptr()) != 0
+        }
+    }
+
+    pub fn set_supports_native_handle(&mut self, value: bool) {
+        unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_set_supports_native_handle(
+                self.as_ptr(),
+                if value { 1 } else { 0 },
+            )
+        };
+    }
+
+    pub fn has_trusted_rate_controller(&self) -> bool {
+        unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_get_has_trusted_rate_controller(self.as_ptr()) != 0
+        }
+    }
+
+    pub fn set_has_trusted_rate_controller(&mut self, value: bool) {
+        unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_set_has_trusted_rate_controller(
+                self.as_ptr(),
+                if value { 1 } else { 0 },
+            )
+        };
+    }
+
     pub fn is_hardware_accelerated(&self) -> bool {
         unsafe {
             ffi::webrtc_VideoEncoder_EncoderInfo_get_is_hardware_accelerated(self.as_ptr()) != 0
@@ -55,6 +859,164 @@ impl VideoEncoderEncoderInfo {
                 if value { 1 } else { 0 },
             );
         }
+    }
+
+    pub fn fps_allocation(
+        &self,
+        spatial_index: usize,
+    ) -> Option<VideoEncoderFramerateFractionInlinedVectorRef<'_>> {
+        let spatial_index = i32::try_from(spatial_index).ok()?;
+        let raw = unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_get_fps_allocation(self.as_ptr(), spatial_index)
+        };
+        let raw = NonNull::new(raw)?;
+        Some(unsafe { VideoEncoderFramerateFractionInlinedVectorRef::from_raw(raw) })
+    }
+
+    pub fn resolution_bitrate_limits(
+        &mut self,
+    ) -> VideoEncoderResolutionBitrateLimitsVectorRef<'_> {
+        let raw = unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_get_resolution_bitrate_limits(self.as_ptr())
+        };
+        let raw = NonNull::new(raw).expect(
+            "BUG: webrtc_VideoEncoder_EncoderInfo_get_resolution_bitrate_limits が null を返しました",
+        );
+        unsafe { VideoEncoderResolutionBitrateLimitsVectorRef::from_raw(raw) }
+    }
+
+    pub fn get_encoder_bitrate_limits_for_resolution(
+        &self,
+        frame_size_pixels: i32,
+    ) -> Option<VideoEncoderResolutionBitrateLimits> {
+        let mut has = 0;
+        let value = VideoEncoderResolutionBitrateLimits::new(0, 0, 0, 0);
+        unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_GetEncoderBitrateLimitsForResolution(
+                self.as_ptr(),
+                frame_size_pixels,
+                &mut has,
+                value.as_ptr(),
+            );
+        }
+        if has == 0 { None } else { Some(value) }
+    }
+
+    pub fn supports_simulcast(&self) -> bool {
+        unsafe { ffi::webrtc_VideoEncoder_EncoderInfo_get_supports_simulcast(self.as_ptr()) != 0 }
+    }
+
+    pub fn set_supports_simulcast(&mut self, value: bool) {
+        unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_set_supports_simulcast(
+                self.as_ptr(),
+                if value { 1 } else { 0 },
+            )
+        };
+    }
+
+    pub fn preferred_pixel_formats(&self) -> VideoFrameBufferTypeInlinedVectorRef<'_> {
+        let raw = unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_get_preferred_pixel_formats(self.as_ptr())
+        };
+        let raw = NonNull::new(raw).expect(
+            "BUG: webrtc_VideoEncoder_EncoderInfo_get_preferred_pixel_formats が null を返しました",
+        );
+        unsafe { VideoFrameBufferTypeInlinedVectorRef::from_raw(raw) }
+    }
+
+    pub fn is_qp_trusted(&self) -> Option<bool> {
+        let mut has = 0;
+        let mut value = 0;
+        unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_get_is_qp_trusted(
+                self.as_ptr(),
+                &mut has,
+                &mut value,
+            );
+        }
+        if has == 0 { None } else { Some(value != 0) }
+    }
+
+    pub fn set_is_qp_trusted(&mut self, value: Option<bool>) {
+        match value {
+            Some(v) => {
+                let value = if v { 1 } else { 0 };
+                unsafe {
+                    ffi::webrtc_VideoEncoder_EncoderInfo_set_is_qp_trusted(
+                        self.as_ptr(),
+                        1,
+                        &value,
+                    );
+                }
+            }
+            None => unsafe {
+                ffi::webrtc_VideoEncoder_EncoderInfo_set_is_qp_trusted(
+                    self.as_ptr(),
+                    0,
+                    std::ptr::null(),
+                );
+            },
+        }
+    }
+
+    pub fn min_qp(&self) -> Option<i32> {
+        let mut has = 0;
+        let mut value = 0;
+        unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_get_min_qp(self.as_ptr(), &mut has, &mut value)
+        };
+        if has == 0 { None } else { Some(value) }
+    }
+
+    pub fn set_min_qp(&mut self, value: Option<i32>) {
+        match value {
+            Some(v) => unsafe {
+                ffi::webrtc_VideoEncoder_EncoderInfo_set_min_qp(self.as_ptr(), 1, &v);
+            },
+            None => unsafe {
+                ffi::webrtc_VideoEncoder_EncoderInfo_set_min_qp(self.as_ptr(), 0, std::ptr::null());
+            },
+        }
+    }
+
+    pub fn mapped_resolution(&self) -> Option<VideoEncoderResolution> {
+        let mut has = 0;
+        let value = VideoEncoderResolution::new(0, 0);
+        unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_get_mapped_resolution(
+                self.as_ptr(),
+                &mut has,
+                value.as_ptr(),
+            )
+        };
+        if has == 0 { None } else { Some(value) }
+    }
+
+    pub fn set_mapped_resolution(&mut self, value: Option<&VideoEncoderResolution>) {
+        match value {
+            Some(v) => unsafe {
+                ffi::webrtc_VideoEncoder_EncoderInfo_set_mapped_resolution(
+                    self.as_ptr(),
+                    1,
+                    v.as_ptr(),
+                );
+            },
+            None => unsafe {
+                ffi::webrtc_VideoEncoder_EncoderInfo_set_mapped_resolution(
+                    self.as_ptr(),
+                    0,
+                    std::ptr::null(),
+                );
+            },
+        }
+    }
+
+    pub fn to_string(&self) -> Result<String> {
+        let raw = unsafe { ffi::webrtc_VideoEncoder_EncoderInfo_ToString(self.as_ptr()) };
+        let raw = NonNull::new(raw)
+            .expect("BUG: webrtc_VideoEncoder_EncoderInfo_ToString が null を返しました");
+        CxxString::from_unique(raw).to_string()
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_VideoEncoder_EncoderInfo {
@@ -724,8 +1686,6 @@ pub trait VideoEncoderEncodedImageCallbackHandler: Send {
     }
 }
 
-impl VideoEncoderEncodedImageCallbackHandler for () {}
-
 pub struct VideoEncoderEncodedImageCallback {
     raw: NonNull<ffi::webrtc_VideoEncoder_EncodedImageCallback>,
 }
@@ -857,8 +1817,6 @@ pub trait VideoEncoderHandler: Send {
     }
 }
 
-impl VideoEncoderHandler for () {}
-
 pub trait VideoEncoderFactoryHandler: Send {
     fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
         Vec::new()
@@ -873,8 +1831,6 @@ pub trait VideoEncoderFactoryHandler: Send {
         None
     }
 }
-
-impl VideoEncoderFactoryHandler for () {}
 
 struct VideoEncoderHandlerState {
     handler: Box<dyn VideoEncoderHandler>,

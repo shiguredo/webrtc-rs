@@ -92,8 +92,6 @@ pub trait SSLCertificateVerifierHandler: Send {
     }
 }
 
-impl SSLCertificateVerifierHandler for () {}
-
 struct SSLCertificateVerifierHandlerState {
     handler: Box<dyn SSLCertificateVerifierHandler>,
 }

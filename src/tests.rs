@@ -6,6 +6,17 @@ use std::sync::{
 };
 use std::time::Duration;
 
+struct NoopHandler;
+
+impl AudioDeviceModuleHandler for NoopHandler {}
+impl PeerConnectionObserverHandler for NoopHandler {}
+impl DtlsTransportObserverHandler for NoopHandler {}
+impl CreateSessionDescriptionObserverHandler for NoopHandler {}
+impl SetLocalDescriptionObserverHandler for NoopHandler {}
+impl SetRemoteDescriptionObserverHandler for NoopHandler {}
+impl VideoEncoderHandler for NoopHandler {}
+impl VideoDecoderHandler for NoopHandler {}
+
 #[test]
 fn create_and_drop_environment() {
     let _env = Environment::new();
@@ -391,6 +402,105 @@ fn audio_device_module_recording_device_name_roundtrip() {
 }
 
 #[test]
+fn audio_parameters_unique_roundtrip() {
+    let raw = unsafe { ffi::webrtc_AudioParameters_new(48_000, 2, 480) };
+    assert!(!raw.is_null());
+    let params = unsafe { ffi::webrtc_AudioParameters_unique_get(raw) };
+    assert!(!params.is_null());
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioParameters_get_sample_rate(params) },
+        48_000
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioParameters_get_channels(params) },
+        2
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioParameters_get_frames_per_buffer(params) },
+        480
+    );
+    unsafe { ffi::webrtc_AudioParameters_unique_delete(raw) };
+}
+
+#[test]
+fn audio_device_module_stats_unique_roundtrip() {
+    let raw = unsafe { ffi::webrtc_AudioDeviceModule_Stats_new(1.25, 12, 3.5, 0.75, 999) };
+    assert!(!raw.is_null());
+    let stats = unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_get(raw) };
+    assert!(!stats.is_null());
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_synthesized_samples_duration_s(stats) },
+        1.25
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_synthesized_samples_events(stats) },
+        12
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_samples_duration_s(stats) },
+        3.5
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_playout_delay_s(stats) },
+        0.75
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_samples_count(stats) },
+        999
+    );
+    unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_delete(raw) };
+}
+
+#[test]
+fn audio_device_module_get_stats_returns_unique() {
+    struct TestAudioDeviceModuleGetStatsHandler;
+
+    impl AudioDeviceModuleHandler for TestAudioDeviceModuleGetStatsHandler {
+        fn get_stats(&self) -> Option<AudioDeviceModuleStats> {
+            Some(AudioDeviceModuleStats::new(1.0, 2, 3.0, 4.0, 5))
+        }
+    }
+
+    let adm = AudioDeviceModule::new_with_handler(Box::new(TestAudioDeviceModuleGetStatsHandler));
+    let mut out_stats: *mut ffi::webrtc_AudioDeviceModule_Stats_unique = std::ptr::null_mut();
+    let ret = unsafe { ffi::webrtc_AudioDeviceModule_GetStats(adm.as_ptr(), &mut out_stats) };
+    assert_eq!(ret, 1);
+    assert!(!out_stats.is_null());
+    let stats = unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_get(out_stats) };
+    assert!(!stats.is_null());
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_synthesized_samples_duration_s(stats) },
+        1.0
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_synthesized_samples_events(stats) },
+        2
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_samples_duration_s(stats) },
+        3.0
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_playout_delay_s(stats) },
+        4.0
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_samples_count(stats) },
+        5
+    );
+    unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_delete(out_stats) };
+}
+
+#[test]
+fn audio_device_module_get_stats_none_returns_zero() {
+    let adm = AudioDeviceModule::new_with_handler(Box::new(NoopHandler));
+    let mut out_stats: *mut ffi::webrtc_AudioDeviceModule_Stats_unique = std::ptr::null_mut();
+    let ret = unsafe { ffi::webrtc_AudioDeviceModule_GetStats(adm.as_ptr(), &mut out_stats) };
+    assert_eq!(ret, 0);
+    assert!(out_stats.is_null());
+}
+
+#[test]
 fn adapted_video_track_source() {
     let mut src = AdaptedVideoTrackSource::new();
     let adapted = src.adapt_frame(640, 480, 1_000_000);
@@ -742,7 +852,7 @@ fn rtp_sender_get_set_parameters() {
         .expect("VideoTrack の生成に失敗しました");
 
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
     let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
         .expect("PeerConnection の生成に失敗しました");
@@ -804,13 +914,67 @@ fn peer_connection_create_and_transceiver() {
 
     // PC 用の構成と observer/dependencies を準備する。
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
 
     // PeerConnection を生成し、取得できることを確認する。
     let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
         .expect("PeerConnection の生成に失敗しました");
     assert!(!pc.as_ptr().is_null());
+
+    drop(pc);
+    drop(pc_deps);
+    drop(factory);
+    drop(deps_factory);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
+fn peer_connection_lookup_dtls_transport() {
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc);
+    deps_factory.set_audio_decoder_factory(&dec);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
+    let mut pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+        .expect("PeerConnection の生成に失敗しました");
+
+    let mut transceiver_init = RtpTransceiverInit::new();
+    transceiver_init.set_direction(RtpTransceiverDirection::SendRecv);
+    let _ = pc
+        .add_transceiver(MediaType::Audio, &mut transceiver_init)
+        .expect("transceiver の追加に失敗しました");
+
+    if let Some(dtls_transport) = pc.lookup_dtls_transport_by_mid("0") {
+        let observer = DtlsTransportObserver::new_with_handler(Box::new(NoopHandler));
+        let _ = dtls_transport.state();
+        dtls_transport.register_observer(&observer);
+        dtls_transport.unregister_observer();
+    }
 
     drop(pc);
     drop(pc_deps);
@@ -853,7 +1017,7 @@ fn peer_connection_create_with_proxy_allocator() {
     assert!(!socket_factory.as_ptr().is_null());
 
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
     pc_deps.set_proxy(
         network_manager,
@@ -922,7 +1086,7 @@ fn video_track_and_transceiver_with_track() {
 
     // PeerConnection を作成し、トラック付きで transceiver を追加する。
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
     let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
         .expect("PeerConnection の生成に失敗しました");
@@ -949,7 +1113,7 @@ fn video_track_and_transceiver_with_track() {
 
 #[test]
 fn peer_connection_observer_and_dependencies() {
-    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let deps = PeerConnectionDependencies::new(&observer);
     assert!(!deps.as_ptr().is_null());
     drop(deps);
@@ -974,7 +1138,7 @@ fn peer_connection_dependencies_set_tls_cert_verifier() {
     }
 
     let dropped = Arc::new(AtomicBool::new(false));
-    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let mut deps = PeerConnectionDependencies::new(&observer);
     let verifier = SSLCertificateVerifier::new_with_handler(Box::new(TestVerifier {
         dropped: dropped.clone(),
@@ -990,9 +1154,9 @@ fn peer_connection_dependencies_set_tls_cert_verifier() {
 
 #[test]
 fn create_and_set_local_description_observers() {
-    let _create_obs = CreateSessionDescriptionObserver::new_with_handler(Box::new(()));
-    let _set_local = SetLocalDescriptionObserver::new_with_handler(Box::new(()));
-    let _set_remote = SetRemoteDescriptionObserver::new_with_handler(Box::new(()));
+    let _create_obs = CreateSessionDescriptionObserver::new_with_handler(Box::new(NoopHandler));
+    let _set_local = SetLocalDescriptionObserver::new_with_handler(Box::new(NoopHandler));
+    let _set_remote = SetRemoteDescriptionObserver::new_with_handler(Box::new(NoopHandler));
 }
 
 // VideoEncoderFactory でカスタムエンコーダーを登録して encode を呼び、
@@ -1068,6 +1232,175 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
         factory.create(env.as_ref(), format.as_ref()).is_none(),
         "2 回目の create は None を返す想定です"
     );
+}
+
+#[test]
+fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
+    struct TestVideoEncoderHandler;
+    impl VideoEncoderHandler for TestVideoEncoderHandler {
+        fn get_encoder_info(&mut self) -> VideoEncoderEncoderInfo {
+            let mut info = VideoEncoderEncoderInfo::new();
+            info.set_implementation_name("encoder-info-full");
+
+            let mut scaling = VideoEncoderScalingSettings::new();
+            let mut thresholds = VideoEncoderQpThresholds::new();
+            thresholds.set_low(11);
+            thresholds.set_high(33);
+            scaling.set_thresholds(Some(&thresholds));
+            scaling.set_min_pixels_per_frame(12345);
+            info.set_scaling_settings(&scaling);
+
+            info.set_requested_resolution_alignment(4);
+            info.set_apply_alignment_to_all_simulcast_layers(true);
+            info.set_supports_native_handle(true);
+            info.set_has_trusted_rate_controller(true);
+            info.set_is_hardware_accelerated(true);
+
+            if let Some(mut fps0) = info.fps_allocation(0) {
+                fps0.clear();
+                fps0.push(128);
+                fps0.push(255);
+            } else {
+                panic!("fps_allocation(0) が取得できません");
+            }
+            if let Some(mut fps1) = info.fps_allocation(1) {
+                fps1.clear();
+                fps1.push(64);
+            } else {
+                panic!("fps_allocation(1) が取得できません");
+            }
+
+            let limits0 =
+                VideoEncoderResolutionBitrateLimits::new(640 * 360, 100000, 80000, 500000);
+            let limits1 =
+                VideoEncoderResolutionBitrateLimits::new(1280 * 720, 300000, 200000, 1500000);
+            {
+                let mut limits = info.resolution_bitrate_limits();
+                limits.clear();
+                limits.push(&limits0);
+                limits.push(&limits1);
+            }
+
+            info.set_supports_simulcast(true);
+            {
+                let mut preferred = info.preferred_pixel_formats();
+                preferred.clear();
+                preferred.push(VideoFrameBufferType::I420);
+                preferred.push(VideoFrameBufferType::Nv12);
+            }
+
+            info.set_is_qp_trusted(Some(true));
+            info.set_min_qp(Some(9));
+            let mapped = VideoEncoderResolution::new(1280, 720);
+            info.set_mapped_resolution(Some(&mapped));
+            info
+        }
+    }
+
+    let encoder = VideoEncoder::new_with_handler(Box::new(TestVideoEncoderHandler));
+    let mut info = encoder.get_encoder_info();
+
+    assert_eq!(
+        info.implementation_name()
+            .expect("implementation_name の取得に失敗しました"),
+        "encoder-info-full"
+    );
+    assert_eq!(info.requested_resolution_alignment(), 4);
+    assert!(info.apply_alignment_to_all_simulcast_layers());
+    assert!(info.supports_native_handle());
+    assert!(info.has_trusted_rate_controller());
+    assert!(info.is_hardware_accelerated());
+    assert!(info.supports_simulcast());
+
+    let scaling = info.scaling_settings();
+    let thresholds = scaling.thresholds().expect("thresholds が None です");
+    assert_eq!(thresholds.low(), 11);
+    assert_eq!(thresholds.high(), 33);
+    assert_eq!(scaling.min_pixels_per_frame(), 12345);
+
+    let mut fps0 = info
+        .fps_allocation(0)
+        .expect("fps_allocation(0) が None です");
+    assert_eq!(fps0.len(), 2);
+    assert_eq!(fps0.get(0), Some(128));
+    assert_eq!(fps0.get(1), Some(255));
+    assert!(fps0.set(1, 200));
+    assert_eq!(fps0.get(1), Some(200));
+
+    let fps1 = info
+        .fps_allocation(1)
+        .expect("fps_allocation(1) が None です");
+    assert_eq!(fps1.len(), 1);
+    assert_eq!(fps1.get(0), Some(64));
+
+    {
+        let mut limits = info.resolution_bitrate_limits();
+        assert_eq!(limits.len(), 2);
+        let limits0 = limits
+            .get(0)
+            .expect("resolution_bitrate_limits[0] が None です");
+        assert_eq!(limits0.frame_size_pixels(), 640 * 360);
+        assert_eq!(limits0.min_start_bitrate_bps(), 100000);
+        assert_eq!(limits0.min_bitrate_bps(), 80000);
+        assert_eq!(limits0.max_bitrate_bps(), 500000);
+
+        let replacement =
+            VideoEncoderResolutionBitrateLimits::new(1920 * 1080, 500000, 400000, 2500000);
+        assert!(
+            limits.set(1, &replacement),
+            "resolution_bitrate_limits.set(1) が失敗しました"
+        );
+        let limits1 = limits
+            .get(1)
+            .expect("resolution_bitrate_limits[1] が None です");
+        assert_eq!(limits1.frame_size_pixels(), 1920 * 1080);
+        assert_eq!(limits1.min_start_bitrate_bps(), 500000);
+        assert_eq!(limits1.min_bitrate_bps(), 400000);
+        assert_eq!(limits1.max_bitrate_bps(), 2500000);
+    }
+
+    let mut preferred = info.preferred_pixel_formats();
+    assert_eq!(preferred.len(), 2);
+    assert_eq!(preferred.get(0), Some(VideoFrameBufferType::I420));
+    assert_eq!(preferred.get(1), Some(VideoFrameBufferType::Nv12));
+    assert!(preferred.set(1, VideoFrameBufferType::I420A));
+    assert_eq!(preferred.get(1), Some(VideoFrameBufferType::I420A));
+
+    assert_eq!(info.is_qp_trusted(), Some(true));
+    assert_eq!(info.min_qp(), Some(9));
+    let mapped = info
+        .mapped_resolution()
+        .expect("mapped_resolution が None です");
+    assert_eq!(mapped.width(), 1280);
+    assert_eq!(mapped.height(), 720);
+
+    let info_text = info.to_string().expect("ToString に失敗しました");
+    assert!(!info_text.is_empty(), "ToString の結果が空です");
+    assert!(
+        info_text.contains("encoder-info-full"),
+        "ToString に implementation_name が含まれていません: {}",
+        info_text
+    );
+
+    let limits = info
+        .get_encoder_bitrate_limits_for_resolution(640 * 360)
+        .expect("GetEncoderBitrateLimitsForResolution(640x360) が None です");
+    assert_eq!(limits.frame_size_pixels(), 640 * 360);
+    assert_eq!(limits.min_start_bitrate_bps(), 100000);
+    assert_eq!(limits.min_bitrate_bps(), 80000);
+    assert_eq!(limits.max_bitrate_bps(), 500000);
+
+    info.set_is_qp_trusted(None);
+    assert_eq!(info.is_qp_trusted(), None);
+    info.set_min_qp(None);
+    assert_eq!(info.min_qp(), None);
+    info.set_mapped_resolution(None);
+    assert!(info.mapped_resolution().is_none());
+
+    let mut scaling_none = VideoEncoderScalingSettings::new();
+    scaling_none.set_thresholds(None);
+    info.set_scaling_settings(&scaling_none);
+    assert!(info.scaling_settings().thresholds().is_none());
 }
 
 #[test]
@@ -1153,7 +1486,7 @@ fn video_encoder_factory_create_calls_create_callback() {
                     .expect("SdpVideoFormatRef::name に失敗しました"),
                 "H264"
             );
-            Some(Box::new(()))
+            Some(Box::new(NoopHandler))
         }
     }
 
@@ -1190,7 +1523,7 @@ fn video_decoder_factory_create_calls_create_callback() {
                     .expect("SdpVideoFormatRef::name に失敗しました"),
                 "H264"
             );
-            Some(Box::new(()))
+            Some(Box::new(NoopHandler))
         }
     }
 

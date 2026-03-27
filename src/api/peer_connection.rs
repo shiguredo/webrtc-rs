@@ -1120,8 +1120,6 @@ pub trait PeerConnectionObserverHandler: Send {
     fn on_data_channel(&mut self, data_channel: DataChannel) {}
 }
 
-impl PeerConnectionObserverHandler for () {}
-
 struct PeerConnectionObserverHandlerState {
     handler: Box<dyn PeerConnectionObserverHandler>,
 }
@@ -1388,8 +1386,6 @@ pub trait CreateSessionDescriptionObserverHandler: Send {
     fn on_failure(&mut self, error: RtcError) {}
 }
 
-impl CreateSessionDescriptionObserverHandler for () {}
-
 struct CreateSessionDescriptionObserverHandlerState {
     handler: Box<dyn CreateSessionDescriptionObserverHandler>,
 }
@@ -1465,8 +1461,6 @@ pub trait SetLocalDescriptionObserverHandler: Send {
     fn on_set_local_description_complete(&mut self, error: RtcError) {}
 }
 
-impl SetLocalDescriptionObserverHandler for () {}
-
 struct SetLocalDescriptionObserverHandlerState {
     handler: Box<dyn SetLocalDescriptionObserverHandler>,
 }
@@ -1532,8 +1526,6 @@ pub trait SetRemoteDescriptionObserverHandler: Send {
     #[expect(unused_variables)]
     fn on_set_remote_description_complete(&mut self, error: RtcError) {}
 }
-
-impl SetRemoteDescriptionObserverHandler for () {}
 
 struct SetRemoteDescriptionObserverHandlerState {
     handler: Box<dyn SetRemoteDescriptionObserverHandler>,
@@ -1816,6 +1808,22 @@ impl PeerConnection {
         assert!(!out_sender.is_null());
         let raw_ref = ScopedRef::<RtpSenderHandle>::from_raw(NonNull::new(out_sender).unwrap());
         Ok(RtpSender::from_scoped_ref(raw_ref))
+    }
+
+    pub fn remove_track(&self, sender: &RtpSender) -> Result<()> {
+        let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_RemoveTrackOrError(
+                self.raw_ref.as_ptr(),
+                sender.as_refcounted_ptr(),
+                &mut out_error,
+            );
+        }
+        if !out_error.is_null() {
+            let err = RtcError::from_unique_ptr(NonNull::new(out_error).unwrap());
+            return Err(Error::RtcError(err));
+        }
+        Ok(())
     }
 
     pub fn get_stats<F>(&self, on_stats: F)
