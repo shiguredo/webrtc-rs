@@ -11,6 +11,10 @@
 
 ## develop
 
+## 0.146.2
+
+**リリース日**: 2026-03-27
+
 - [ADD] `PeerConnectionFactory::get_rtp_receiver_capabilities` を追加する
   - @voluntas
 - [UPDATE] iOS / Android 向け CMake プラットフォーム値を Cargo.toml から取得する
