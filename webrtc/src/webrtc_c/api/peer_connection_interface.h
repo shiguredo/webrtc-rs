@@ -140,6 +140,10 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTrack(
     struct std_string_vector* stream_ids,
     struct webrtc_RtpSenderInterface_refcounted** out_sender,
     struct webrtc_RTCError_unique** out_rtc_error);
+WEBRTC_EXPORT void webrtc_PeerConnectionInterface_RemoveTrackOrError(
+    struct webrtc_PeerConnectionInterface* self,
+    struct webrtc_RtpSenderInterface_refcounted* sender,
+    struct webrtc_RTCError_unique** out_rtc_error);
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_CreateOffer(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_CreateSessionDescriptionObserver* observer,
@@ -417,6 +421,10 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateAudioTrack(
     struct webrtc_AudioTrackInterface_refcounted** out_track);
 WEBRTC_EXPORT struct webrtc_RtpCapabilities*
 webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities(
+    struct webrtc_PeerConnectionFactoryInterface* self,
+    int media_type);
+WEBRTC_EXPORT struct webrtc_RtpCapabilities*
+webrtc_PeerConnectionFactoryInterface_GetRtpReceiverCapabilities(
     struct webrtc_PeerConnectionFactoryInterface* self,
     int media_type);
 

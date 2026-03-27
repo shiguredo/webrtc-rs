@@ -57,6 +57,7 @@
 #include "../rtc_base/ssl_identity.h"
 #include "../rtc_base/thread.h"
 #include "../std.h"
+#include "api/rtp_sender_interface.h"
 #include "audio/audio_processing.h"
 #include "audio_codecs/audio_decoder_factory.h"
 #include "audio_codecs/audio_encoder_factory.h"
@@ -553,6 +554,23 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTrack(
   } else {
     *out_sender = nullptr;
     auto rtc_error = new webrtc::RTCError(r.error());
+    *out_rtc_error =
+        reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error);
+  }
+}
+WEBRTC_EXPORT void webrtc_PeerConnectionInterface_RemoveTrackOrError(
+    struct webrtc_PeerConnectionInterface* self,
+    struct webrtc_RtpSenderInterface_refcounted* sender,
+    struct webrtc_RTCError_unique** out_rtc_error) {
+  auto pc = reinterpret_cast<webrtc::PeerConnectionInterface*>(self);
+  auto raw_sender = webrtc_RtpSenderInterface_refcounted_get(sender);
+  auto rtp_sender = reinterpret_cast<webrtc::RtpSenderInterface*>(raw_sender);
+  webrtc::scoped_refptr<webrtc::RtpSenderInterface> sender_ref(rtp_sender);
+  auto error = pc->RemoveTrackOrError(sender_ref);
+  if (error.ok()) {
+    *out_rtc_error = nullptr;
+  } else {
+    auto rtc_error = new webrtc::RTCError(error);
     *out_rtc_error =
         reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error);
   }
@@ -1182,6 +1200,16 @@ webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities(
   auto factory =
       reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
   auto caps = new webrtc::RtpCapabilities(factory->GetRtpSenderCapabilities(
+      static_cast<webrtc::MediaType>(media_type)));
+  return reinterpret_cast<struct webrtc_RtpCapabilities*>(caps);
+}
+WEBRTC_EXPORT struct webrtc_RtpCapabilities*
+webrtc_PeerConnectionFactoryInterface_GetRtpReceiverCapabilities(
+    struct webrtc_PeerConnectionFactoryInterface* self,
+    int media_type) {
+  auto factory =
+      reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
+  auto caps = new webrtc::RtpCapabilities(factory->GetRtpReceiverCapabilities(
       static_cast<webrtc::MediaType>(media_type)));
   return reinterpret_cast<struct webrtc_RtpCapabilities*>(caps);
 }

@@ -78,8 +78,6 @@ pub trait DtlsTransportObserverHandler: Send {
     fn on_error(&mut self) {}
 }
 
-impl DtlsTransportObserverHandler for () {}
-
 struct DtlsTransportObserverHandlerState {
     handler: Box<dyn DtlsTransportObserverHandler>,
 }

@@ -88,6 +88,8 @@ impl AudioDeviceModule {
             EnableBuiltInAGC: Some(adm_enable_built_in_agc),
             EnableBuiltInNS: Some(adm_enable_built_in_ns),
             GetPlayoutUnderrunCount: Some(adm_get_playout_underrun_count),
+            GetPlayoutAudioParameters: Some(adm_get_playout_audio_parameters),
+            GetRecordAudioParameters: Some(adm_get_record_audio_parameters),
             GetStats: Some(adm_get_stats),
             OnDestroy: Some(adm_on_destroy),
         };
@@ -539,8 +541,6 @@ pub trait AudioTransportHandler: Send {
     }
 }
 
-impl AudioTransportHandler for () {}
-
 struct AudioTransportHandlerState {
     handler: Box<dyn AudioTransportHandler>,
 }
@@ -650,13 +650,114 @@ unsafe extern "C" fn audio_transport_pull_render_data(
     );
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug)]
+pub struct AudioParameters {
+    raw: NonNull<ffi::webrtc_AudioParameters_unique>,
+}
+
+impl AudioParameters {
+    pub fn new(sample_rate: i32, channels: usize, frames_per_buffer: usize) -> Self {
+        let raw = NonNull::new(unsafe {
+            ffi::webrtc_AudioParameters_new(sample_rate, channels, frames_per_buffer)
+        })
+        .expect("AudioParameters::new: webrtc_AudioParameters_new が null を返しました");
+        Self { raw }
+    }
+
+    pub fn sample_rate(&self) -> i32 {
+        unsafe { ffi::webrtc_AudioParameters_get_sample_rate(self.as_ptr()) }
+    }
+
+    pub fn channels(&self) -> usize {
+        unsafe { ffi::webrtc_AudioParameters_get_channels(self.as_ptr()) }
+    }
+
+    pub fn frames_per_buffer(&self) -> usize {
+        unsafe { ffi::webrtc_AudioParameters_get_frames_per_buffer(self.as_ptr()) }
+    }
+
+    fn as_ptr(&self) -> *mut ffi::webrtc_AudioParameters {
+        unsafe { ffi::webrtc_AudioParameters_unique_get(self.raw.as_ptr()) }
+    }
+
+    fn into_raw(self) -> *mut ffi::webrtc_AudioParameters_unique {
+        let raw = self.raw.as_ptr();
+        std::mem::forget(self);
+        raw
+    }
+}
+
+impl Drop for AudioParameters {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_AudioParameters_unique_delete(self.raw.as_ptr()) };
+    }
+}
+
+#[derive(Debug)]
 pub struct AudioDeviceModuleStats {
-    pub synthesized_samples_duration_s: f64,
-    pub synthesized_samples_events: u64,
-    pub total_samples_duration_s: f64,
-    pub total_playout_delay_s: f64,
-    pub total_samples_count: u64,
+    raw: NonNull<ffi::webrtc_AudioDeviceModule_Stats_unique>,
+}
+
+impl AudioDeviceModuleStats {
+    pub fn new(
+        synthesized_samples_duration_s: f64,
+        synthesized_samples_events: u64,
+        total_samples_duration_s: f64,
+        total_playout_delay_s: f64,
+        total_samples_count: u64,
+    ) -> Self {
+        let raw = NonNull::new(unsafe {
+            ffi::webrtc_AudioDeviceModule_Stats_new(
+                synthesized_samples_duration_s,
+                synthesized_samples_events,
+                total_samples_duration_s,
+                total_playout_delay_s,
+                total_samples_count,
+            )
+        })
+        .expect(
+            "AudioDeviceModuleStats::new: webrtc_AudioDeviceModule_Stats_new が null を返しました",
+        );
+        Self { raw }
+    }
+
+    pub fn synthesized_samples_duration_s(&self) -> f64 {
+        unsafe {
+            ffi::webrtc_AudioDeviceModule_Stats_get_synthesized_samples_duration_s(self.as_ptr())
+        }
+    }
+
+    pub fn synthesized_samples_events(&self) -> u64 {
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_synthesized_samples_events(self.as_ptr()) }
+    }
+
+    pub fn total_samples_duration_s(&self) -> f64 {
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_samples_duration_s(self.as_ptr()) }
+    }
+
+    pub fn total_playout_delay_s(&self) -> f64 {
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_playout_delay_s(self.as_ptr()) }
+    }
+
+    pub fn total_samples_count(&self) -> u64 {
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_samples_count(self.as_ptr()) }
+    }
+
+    fn as_ptr(&self) -> *mut ffi::webrtc_AudioDeviceModule_Stats {
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_get(self.raw.as_ptr()) }
+    }
+
+    fn into_raw(self) -> *mut ffi::webrtc_AudioDeviceModule_Stats_unique {
+        let raw = self.raw.as_ptr();
+        std::mem::forget(self);
+        raw
+    }
+}
+
+impl Drop for AudioDeviceModuleStats {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_delete(self.raw.as_ptr()) };
+    }
 }
 
 pub trait AudioDeviceModuleHandler: Send + Sync {
@@ -873,12 +974,18 @@ pub trait AudioDeviceModuleHandler: Send + Sync {
     fn get_playout_underrun_count(&self) -> i32 {
         -1
     }
+    fn get_playout_audio_parameters(&self, params: &mut Option<AudioParameters>) -> i32 {
+        *params = None;
+        -1
+    }
+    fn get_record_audio_parameters(&self, params: &mut Option<AudioParameters>) -> i32 {
+        *params = None;
+        -1
+    }
     fn get_stats(&self) -> Option<AudioDeviceModuleStats> {
         None
     }
 }
-
-impl AudioDeviceModuleHandler for () {}
 
 struct AudioDeviceModuleHandlerState {
     handler: Box<dyn AudioDeviceModuleHandler>,
@@ -1358,8 +1465,56 @@ unsafe extern "C" fn adm_get_playout_underrun_count(user_data: *mut c_void) -> i
     state.handler.get_playout_underrun_count()
 }
 
+unsafe extern "C" fn adm_get_playout_audio_parameters(
+    out_params: *mut *mut ffi::webrtc_AudioParameters_unique,
+    user_data: *mut c_void,
+) -> i32 {
+    let state = unsafe { adm_state(user_data) };
+    let mut params = None;
+    let ret = state.handler.get_playout_audio_parameters(&mut params);
+    if ret != 0 {
+        return ret;
+    }
+    let params = match params {
+        Some(params) => params,
+        None => return -1,
+    };
+    assert!(
+        !out_params.is_null(),
+        "adm_get_playout_audio_parameters: out_params is null"
+    );
+    unsafe {
+        *out_params = params.into_raw();
+    }
+    0
+}
+
+unsafe extern "C" fn adm_get_record_audio_parameters(
+    out_params: *mut *mut ffi::webrtc_AudioParameters_unique,
+    user_data: *mut c_void,
+) -> i32 {
+    let state = unsafe { adm_state(user_data) };
+    let mut params = None;
+    let ret = state.handler.get_record_audio_parameters(&mut params);
+    if ret != 0 {
+        return ret;
+    }
+    let params = match params {
+        Some(params) => params,
+        None => return -1,
+    };
+    assert!(
+        !out_params.is_null(),
+        "adm_get_record_audio_parameters: out_params is null"
+    );
+    unsafe {
+        *out_params = params.into_raw();
+    }
+    0
+}
+
 unsafe extern "C" fn adm_get_stats(
-    out_stats: *mut ffi::webrtc_AudioDeviceModule_Stats,
+    out_stats: *mut *mut ffi::webrtc_AudioDeviceModule_Stats_unique,
     user_data: *mut c_void,
 ) -> i32 {
     let state = unsafe { adm_state(user_data) };
@@ -1367,17 +1522,9 @@ unsafe extern "C" fn adm_get_stats(
         Some(stats) => stats,
         None => return 0,
     };
-    if out_stats.is_null() {
-        return 0;
-    }
+    assert!(!out_stats.is_null(), "adm_get_stats: out_stats is null");
     unsafe {
-        *out_stats = ffi::webrtc_AudioDeviceModule_Stats {
-            synthesized_samples_duration_s: stats.synthesized_samples_duration_s,
-            synthesized_samples_events: stats.synthesized_samples_events,
-            total_samples_duration_s: stats.total_samples_duration_s,
-            total_playout_delay_s: stats.total_playout_delay_s,
-            total_samples_count: stats.total_samples_count,
-        };
+        *out_stats = stats.into_raw();
     }
     1
 }

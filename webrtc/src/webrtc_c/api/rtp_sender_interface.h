@@ -20,6 +20,9 @@ WEBRTC_EXPORT struct webrtc_RTCError_unique*
 webrtc_RtpSenderInterface_SetParameters(
     struct webrtc_RtpSenderInterface* self,
     const struct webrtc_RtpParameters* parameters);
+WEBRTC_EXPORT int webrtc_RtpSenderInterface_SetTrack(
+    struct webrtc_RtpSenderInterface* self,
+    struct webrtc_MediaStreamTrackInterface* track);
 
 #if defined(__cplusplus)
 }
