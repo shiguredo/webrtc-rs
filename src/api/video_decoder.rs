@@ -220,8 +220,6 @@ pub trait VideoDecoderHandler: Send {
     }
 }
 
-impl VideoDecoderHandler for () {}
-
 pub trait VideoDecoderFactoryHandler: Send {
     fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
         Vec::new()
@@ -236,8 +234,6 @@ pub trait VideoDecoderFactoryHandler: Send {
         None
     }
 }
-
-impl VideoDecoderFactoryHandler for () {}
 
 struct VideoDecoderHandlerState {
     handler: Box<dyn VideoDecoderHandler>,

@@ -11,6 +11,13 @@
 
 ## develop
 
+- [UPDATE] iOS / Android 向け CMake プラットフォーム値を Cargo.toml から取得する
+  - `CMAKE_OSX_DEPLOYMENT_TARGET` と `ANDROID_PLATFORM` の固定値を `package.metadata.build-config` に移動する
+  - @melpon
+- [ADD] Android `source-build` 時に Android NDK の自動セットアップを追加する
+  - `ANDROID_NDK_HOME` / `ANDROID_NDK` が未設定または無効な場合に `target/android-sdk` へ Command-line Tools と NDK を自動インストールする
+  - Command-line Tools / NDK のバージョンを `package.metadata.build-config` から指定可能にする
+  - @melpon
 - [ADD] `PeerConnection::remove_track` を追加する
   - `PeerConnectionInterface::RemoveTrackOrError` の C API / Rust バインディングを追加する
   - @voluntas
@@ -21,6 +28,17 @@
   - `QpThresholds` / `ScalingSettings` / `ResolutionBitrateLimits` / `Resolution` を追加する
   - `ToString` / `GetEncoderBitrateLimitsForResolution` を追加する
   - `fps_allocation` / `preferred_pixel_formats` / optional フィールド操作を追加する
+  - @melpon
+- [CHANGE] AudioDeviceModule の `AudioParameters` / `Stats` C API を C++ の opaque API に変更する
+  - `webrtc_AudioParameters` / `webrtc_AudioDeviceModule_Stats` の公開 field を廃止する
+  - `GetPlayoutAudioParameters` / `GetRecordAudioParameters` / `GetStats` callback の out 引数を `*_unique**` に変更する
+  - `webrtc_AudioDeviceModule_GetStats` の out 引数を `webrtc_AudioDeviceModule_Stats_unique**` に変更する
+  - Rust の `AudioDeviceModuleHandler` で `get_playout_audio_parameters` / `get_record_audio_parameters` を out 引数で受ける形式に変更する
+  - Rust 型名 `AudioDeviceModuleAudioParameters` を `AudioParameters` に変更する
+  - @melpon
+- [CHANGE] 公開 handler trait の `impl ... for ()` を削除する
+  - `src` / `src/rtc_base` の公開 handler trait 15 箇所から `impl ... for ()` を削除する
+  - `src/tests.rs` の `Box::new(())` をテスト専用 `NoopHandler` へ置換する
   - @melpon
 
 ## 0.146.1

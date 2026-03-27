@@ -6,6 +6,17 @@ use std::sync::{
 };
 use std::time::Duration;
 
+struct NoopHandler;
+
+impl AudioDeviceModuleHandler for NoopHandler {}
+impl PeerConnectionObserverHandler for NoopHandler {}
+impl DtlsTransportObserverHandler for NoopHandler {}
+impl CreateSessionDescriptionObserverHandler for NoopHandler {}
+impl SetLocalDescriptionObserverHandler for NoopHandler {}
+impl SetRemoteDescriptionObserverHandler for NoopHandler {}
+impl VideoEncoderHandler for NoopHandler {}
+impl VideoDecoderHandler for NoopHandler {}
+
 #[test]
 fn create_and_drop_environment() {
     let _env = Environment::new();
@@ -391,6 +402,105 @@ fn audio_device_module_recording_device_name_roundtrip() {
 }
 
 #[test]
+fn audio_parameters_unique_roundtrip() {
+    let raw = unsafe { ffi::webrtc_AudioParameters_new(48_000, 2, 480) };
+    assert!(!raw.is_null());
+    let params = unsafe { ffi::webrtc_AudioParameters_unique_get(raw) };
+    assert!(!params.is_null());
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioParameters_get_sample_rate(params) },
+        48_000
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioParameters_get_channels(params) },
+        2
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioParameters_get_frames_per_buffer(params) },
+        480
+    );
+    unsafe { ffi::webrtc_AudioParameters_unique_delete(raw) };
+}
+
+#[test]
+fn audio_device_module_stats_unique_roundtrip() {
+    let raw = unsafe { ffi::webrtc_AudioDeviceModule_Stats_new(1.25, 12, 3.5, 0.75, 999) };
+    assert!(!raw.is_null());
+    let stats = unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_get(raw) };
+    assert!(!stats.is_null());
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_synthesized_samples_duration_s(stats) },
+        1.25
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_synthesized_samples_events(stats) },
+        12
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_samples_duration_s(stats) },
+        3.5
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_playout_delay_s(stats) },
+        0.75
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_samples_count(stats) },
+        999
+    );
+    unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_delete(raw) };
+}
+
+#[test]
+fn audio_device_module_get_stats_returns_unique() {
+    struct TestAudioDeviceModuleGetStatsHandler;
+
+    impl AudioDeviceModuleHandler for TestAudioDeviceModuleGetStatsHandler {
+        fn get_stats(&self) -> Option<AudioDeviceModuleStats> {
+            Some(AudioDeviceModuleStats::new(1.0, 2, 3.0, 4.0, 5))
+        }
+    }
+
+    let adm = AudioDeviceModule::new_with_handler(Box::new(TestAudioDeviceModuleGetStatsHandler));
+    let mut out_stats: *mut ffi::webrtc_AudioDeviceModule_Stats_unique = std::ptr::null_mut();
+    let ret = unsafe { ffi::webrtc_AudioDeviceModule_GetStats(adm.as_ptr(), &mut out_stats) };
+    assert_eq!(ret, 1);
+    assert!(!out_stats.is_null());
+    let stats = unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_get(out_stats) };
+    assert!(!stats.is_null());
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_synthesized_samples_duration_s(stats) },
+        1.0
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_synthesized_samples_events(stats) },
+        2
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_samples_duration_s(stats) },
+        3.0
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_playout_delay_s(stats) },
+        4.0
+    );
+    assert_eq!(
+        unsafe { ffi::webrtc_AudioDeviceModule_Stats_get_total_samples_count(stats) },
+        5
+    );
+    unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_delete(out_stats) };
+}
+
+#[test]
+fn audio_device_module_get_stats_none_returns_zero() {
+    let adm = AudioDeviceModule::new_with_handler(Box::new(NoopHandler));
+    let mut out_stats: *mut ffi::webrtc_AudioDeviceModule_Stats_unique = std::ptr::null_mut();
+    let ret = unsafe { ffi::webrtc_AudioDeviceModule_GetStats(adm.as_ptr(), &mut out_stats) };
+    assert_eq!(ret, 0);
+    assert!(out_stats.is_null());
+}
+
+#[test]
 fn adapted_video_track_source() {
     let mut src = AdaptedVideoTrackSource::new();
     let adapted = src.adapt_frame(640, 480, 1_000_000);
@@ -742,7 +852,7 @@ fn rtp_sender_get_set_parameters() {
         .expect("VideoTrack の生成に失敗しました");
 
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
     let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
         .expect("PeerConnection の生成に失敗しました");
@@ -804,7 +914,7 @@ fn peer_connection_create_and_transceiver() {
 
     // PC 用の構成と observer/dependencies を準備する。
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
 
     // PeerConnection を生成し、取得できることを確認する。
@@ -848,7 +958,7 @@ fn peer_connection_lookup_dtls_transport() {
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
     let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
         .expect("PeerConnection の生成に失敗しました");
@@ -860,7 +970,7 @@ fn peer_connection_lookup_dtls_transport() {
         .expect("transceiver の追加に失敗しました");
 
     if let Some(dtls_transport) = pc.lookup_dtls_transport_by_mid("0") {
-        let observer = DtlsTransportObserver::new_with_handler(Box::new(()));
+        let observer = DtlsTransportObserver::new_with_handler(Box::new(NoopHandler));
         let _ = dtls_transport.state();
         dtls_transport.register_observer(&observer);
         dtls_transport.unregister_observer();
@@ -907,7 +1017,7 @@ fn peer_connection_create_with_proxy_allocator() {
     assert!(!socket_factory.as_ptr().is_null());
 
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
     pc_deps.set_proxy(
         network_manager,
@@ -976,7 +1086,7 @@ fn video_track_and_transceiver_with_track() {
 
     // PeerConnection を作成し、トラック付きで transceiver を追加する。
     let mut pc_config = PeerConnectionRtcConfiguration::new();
-    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
     let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
         .expect("PeerConnection の生成に失敗しました");
@@ -1003,7 +1113,7 @@ fn video_track_and_transceiver_with_track() {
 
 #[test]
 fn peer_connection_observer_and_dependencies() {
-    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let deps = PeerConnectionDependencies::new(&observer);
     assert!(!deps.as_ptr().is_null());
     drop(deps);
@@ -1028,7 +1138,7 @@ fn peer_connection_dependencies_set_tls_cert_verifier() {
     }
 
     let dropped = Arc::new(AtomicBool::new(false));
-    let observer = PeerConnectionObserver::new_with_handler(Box::new(()));
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let mut deps = PeerConnectionDependencies::new(&observer);
     let verifier = SSLCertificateVerifier::new_with_handler(Box::new(TestVerifier {
         dropped: dropped.clone(),
@@ -1044,9 +1154,9 @@ fn peer_connection_dependencies_set_tls_cert_verifier() {
 
 #[test]
 fn create_and_set_local_description_observers() {
-    let _create_obs = CreateSessionDescriptionObserver::new_with_handler(Box::new(()));
-    let _set_local = SetLocalDescriptionObserver::new_with_handler(Box::new(()));
-    let _set_remote = SetRemoteDescriptionObserver::new_with_handler(Box::new(()));
+    let _create_obs = CreateSessionDescriptionObserver::new_with_handler(Box::new(NoopHandler));
+    let _set_local = SetLocalDescriptionObserver::new_with_handler(Box::new(NoopHandler));
+    let _set_remote = SetRemoteDescriptionObserver::new_with_handler(Box::new(NoopHandler));
 }
 
 // VideoEncoderFactory でカスタムエンコーダーを登録して encode を呼び、
@@ -1376,7 +1486,7 @@ fn video_encoder_factory_create_calls_create_callback() {
                     .expect("SdpVideoFormatRef::name に失敗しました"),
                 "H264"
             );
-            Some(Box::new(()))
+            Some(Box::new(NoopHandler))
         }
     }
 
@@ -1413,7 +1523,7 @@ fn video_decoder_factory_create_calls_create_callback() {
                     .expect("SdpVideoFormatRef::name に失敗しました"),
                 "H264"
             );
-            Some(Box::new(()))
+            Some(Box::new(NoopHandler))
         }
     }
 

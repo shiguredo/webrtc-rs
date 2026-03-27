@@ -11,11 +11,6 @@ pub trait VideoSinkHandler: Send {
     fn on_discarded_frame(&mut self) {}
 }
 
-impl VideoSinkHandler for () {
-    #[expect(unused_variables)]
-    fn on_frame(&mut self, frame: VideoFrameRef<'_>) {}
-}
-
 struct VideoSinkHandlerState {
     handler: Box<dyn VideoSinkHandler>,
 }

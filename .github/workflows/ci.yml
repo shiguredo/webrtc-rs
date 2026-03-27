@@ -125,8 +125,44 @@ jobs:
           ./whip --help
           ./whep --help
 
+  build-ios:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+      - run: rustup update stable
+      - run: rustup target add aarch64-apple-ios
+      - name: Build shiguredo_webrtc for iOS arm64
+        run: cargo build --features source-build --target aarch64-apple-ios
+      - name: Verify build output
+        run: |
+          OUT_DIR=$(find target/aarch64-apple-ios/debug/build/shiguredo_webrtc-*/out -maxdepth 0 -type d | head -1)
+          if [ -z "$OUT_DIR" ]; then
+            echo "ERROR: OUT_DIR が見つかりません"
+            exit 1
+          fi
+          file "$OUT_DIR/lib/libwebrtc_c.a"
+          ls -lh "$OUT_DIR/lib/libwebrtc_c.a"
+          ls -lh "$OUT_DIR/bindings.rs"
+
+  build-android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libclang-dev clang
+      - run: rustup update stable
+      - run: rustup target add aarch64-linux-android
+      - name: Build shiguredo_webrtc for Android arm64
+        run: cargo build --features source-build --target aarch64-linux-android
+
   slack_notify:
-    needs: [ci, cross-compile, verify-linux-arm64]
+    needs: [ci, cross-compile, verify-linux-arm64, build-ios, build-android]
     runs-on: ubuntu-slim
     if: ${{ !cancelled() }}
     steps:

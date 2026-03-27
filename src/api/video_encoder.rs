@@ -1686,8 +1686,6 @@ pub trait VideoEncoderEncodedImageCallbackHandler: Send {
     }
 }
 
-impl VideoEncoderEncodedImageCallbackHandler for () {}
-
 pub struct VideoEncoderEncodedImageCallback {
     raw: NonNull<ffi::webrtc_VideoEncoder_EncodedImageCallback>,
 }
@@ -1819,8 +1817,6 @@ pub trait VideoEncoderHandler: Send {
     }
 }
 
-impl VideoEncoderHandler for () {}
-
 pub trait VideoEncoderFactoryHandler: Send {
     fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
         Vec::new()
@@ -1835,8 +1831,6 @@ pub trait VideoEncoderFactoryHandler: Send {
         None
     }
 }
-
-impl VideoEncoderFactoryHandler for () {}
 
 struct VideoEncoderHandlerState {
     handler: Box<dyn VideoEncoderHandler>,
