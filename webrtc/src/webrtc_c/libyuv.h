@@ -12,6 +12,9 @@ extern "C" {
 // libyuv
 // -------------------------
 
+WEBRTC_EXPORT extern const uint32_t libyuv_FOURCC_ARGB;
+WEBRTC_EXPORT extern const uint32_t libyuv_FOURCC_BGRA;
+
 WEBRTC_EXPORT int libyuv_ABGRToI420(const uint8_t* src_abgr,
                                     int src_stride_abgr,
                                     uint8_t* dst_y,
@@ -22,8 +25,6 @@ WEBRTC_EXPORT int libyuv_ABGRToI420(const uint8_t* src_abgr,
                                     int dst_stride_v,
                                     int width,
                                     int height);
-WEBRTC_EXPORT extern const uint32_t libyuv_FOURCC_ARGB;
-WEBRTC_EXPORT extern const uint32_t libyuv_FOURCC_BGRA;
 WEBRTC_EXPORT int libyuv_ConvertFromI420(const uint8_t* src_y,
                                          int src_stride_y,
                                          const uint8_t* src_u,
@@ -72,6 +73,22 @@ WEBRTC_EXPORT int libyuv_YUY2ToI420(const uint8_t* src_yuy2,
                                     int dst_stride_v,
                                     int width,
                                     int height);
+
+WEBRTC_EXPORT int libyuv_I420Rotate(const uint8_t* src_y,
+                                    int src_stride_y,
+                                    const uint8_t* src_u,
+                                    int src_stride_u,
+                                    const uint8_t* src_v,
+                                    int src_stride_v,
+                                    uint8_t* dst_y,
+                                    int dst_stride_y,
+                                    uint8_t* dst_u,
+                                    int dst_stride_u,
+                                    uint8_t* dst_v,
+                                    int dst_stride_v,
+                                    int width,
+                                    int height,
+                                    int mode);
 
 #if defined(__cplusplus)
 }

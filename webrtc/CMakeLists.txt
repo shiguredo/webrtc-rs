@@ -582,6 +582,11 @@ elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
 elseif (WEBRTC_C_TARGET STREQUAL "ios_arm64")
   enable_language(OBJCXX)
 
+  target_sources(webrtc_c
+    PRIVATE
+      src/webrtc_c/sdk/objc/components/audio/audio_session.mm
+  )
+
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
     target_compile_options(${target} PRIVATE -fconstant-string-class=NSConstantString)
     target_compile_definitions(${target}
@@ -678,6 +683,14 @@ elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_RASPBERRY_PI)
   endforeach()
 
 elseif (WEBRTC_C_TARGET STREQUAL "android_arm64")
+  target_sources(webrtc_c
+    PRIVATE
+      src/webrtc_c/jni_export.cc
+      src/webrtc_c/sdk/android/src/jni/jvm.cc
+      src/webrtc_c/sdk/android/native_api/audio_device_module/audio_device_android.cc
+      src/webrtc_c/sdk/android/native_api/jni/class_loader.cc
+  )
+
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
     target_compile_definitions(${target}
       PRIVATE

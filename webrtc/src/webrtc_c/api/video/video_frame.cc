@@ -20,8 +20,15 @@
 // -------------------------
 
 extern "C" {
+
 WEBRTC_EXPORT const int webrtc_VideoRotation_0 =
     static_cast<int>(webrtc::kVideoRotation_0);
+WEBRTC_EXPORT const int webrtc_VideoRotation_90 =
+    static_cast<int>(webrtc::kVideoRotation_90);
+WEBRTC_EXPORT const int webrtc_VideoRotation_180 =
+    static_cast<int>(webrtc::kVideoRotation_180);
+WEBRTC_EXPORT const int webrtc_VideoRotation_270 =
+    static_cast<int>(webrtc::kVideoRotation_270);
 
 WEBRTC_DEFINE_UNIQUE(webrtc_VideoFrame, webrtc::VideoFrame);
 WEBRTC_EXPORT struct webrtc_VideoFrame_unique* webrtc_VideoFrame_Create(
@@ -60,10 +67,16 @@ webrtc_VideoFrame_timestamp_rtp(const struct webrtc_VideoFrame* self) {
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
   return frame->rtp_timestamp();
 }
+WEBRTC_EXPORT int webrtc_VideoFrame_rotation(
+    const struct webrtc_VideoFrame* self) {
+  auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
+  return static_cast<int>(frame->rotation());
+}
 WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted*
 webrtc_VideoFrame_video_frame_buffer(const struct webrtc_VideoFrame* self) {
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
   auto buf = frame->video_frame_buffer()->ToI420();
   return reinterpret_cast<struct webrtc_I420Buffer_refcounted*>(buf.release());
 }
+
 }

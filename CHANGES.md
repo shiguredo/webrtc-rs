@@ -29,6 +29,11 @@
   - `ToString` / `GetEncoderBitrateLimitsForResolution` を追加する
   - `fps_allocation` / `preferred_pixel_formats` / optional フィールド操作を追加する
   - @melpon
+- [ADD] Android / iOS のネイティブ API 呼び出しを 1 対 1 の C API として追加する
+  - Android は `jvm` ラッパー (`webrtc_jni_*`) と `jni_export` ラッパー (`jni_*`) を分離し、`libwebrtc` の公開経路を維持する
+  - `webrtc_InitClassLoader` / `webrtc_CreateJavaAudioDeviceModule` を追加する
+  - `webrtc_objc_RTCAudioSession*` / `webrtc_objc_RTCAudioSessionConfiguration*` の C API を追加する
+  - @melpon
 - [CHANGE] AudioDeviceModule の `AudioParameters` / `Stats` C API を C++ の opaque API に変更する
   - `webrtc_AudioParameters` / `webrtc_AudioDeviceModule_Stats` の公開 field を廃止する
   - `GetPlayoutAudioParameters` / `GetRecordAudioParameters` / `GetStats` callback の out 引数を `*_unique**` に変更する
