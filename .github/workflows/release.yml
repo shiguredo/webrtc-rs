@@ -224,7 +224,7 @@ jobs:
           cp "$OUT_DIR/bindings.rs" staging/
           tar czf "libwebrtc_c-android_arm64.tar.gz" -C staging .
       - name: Verify packaged files
-        run: tar tzf "libwebrtc_c-android_arm64.tar.gz" | grep "^bindings.rs$"
+        run: tar tzf "libwebrtc_c-android_arm64.tar.gz" | grep "bindings\.rs$"
       - name: Generate SHA256 checksum
         run: shasum -a 256 "libwebrtc_c-android_arm64.tar.gz" > "libwebrtc_c-android_arm64.tar.gz.sha256"
       - name: Upload to GitHub Release
@@ -264,7 +264,7 @@ jobs:
           cp "$OUT_DIR/bindings.rs" staging/
           tar czf "libwebrtc_c-ios_arm64.tar.gz" -C staging .
       - name: Verify packaged files
-        run: tar tzf "libwebrtc_c-ios_arm64.tar.gz" | grep "^bindings.rs$"
+        run: tar tzf "libwebrtc_c-ios_arm64.tar.gz" | grep "bindings\.rs$"
       - name: Generate SHA256 checksum
         run: shasum -a 256 "libwebrtc_c-ios_arm64.tar.gz" > "libwebrtc_c-ios_arm64.tar.gz.sha256"
       - name: Upload to GitHub Release
