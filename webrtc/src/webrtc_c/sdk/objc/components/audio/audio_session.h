@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#include "../../../../common.h"
+#include "../../../../objc.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -10,7 +10,6 @@ extern "C" {
 
 struct webrtc_objc_RTCAudioSession;
 struct webrtc_objc_RTCAudioSessionConfiguration;
-struct webrtc_objc_NSError;
 
 WEBRTC_EXPORT struct webrtc_objc_RTCAudioSession*
 webrtc_objc_RTCAudioSession_sharedInstance(void);
@@ -24,14 +23,14 @@ WEBRTC_EXPORT int webrtc_objc_RTCAudioSession_setConfiguration_active_error(
     struct webrtc_objc_RTCAudioSession* self,
     struct webrtc_objc_RTCAudioSessionConfiguration* configuration,
     int active,
-    struct webrtc_objc_NSError** out_error);
+    struct objc_NSError** out_error);
 WEBRTC_EXPORT int webrtc_objc_RTCAudioSession_setActive_error(
     struct webrtc_objc_RTCAudioSession* self,
     int active,
-    struct webrtc_objc_NSError** out_error);
+    struct objc_NSError** out_error);
 
 typedef void (*webrtc_objc_RTCAudioSession_initializeInput_callback)(
-    struct webrtc_objc_NSError* error,
+    struct objc_NSError* error,
     void* user_data);
 
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSession_initializeInput(
@@ -55,9 +54,6 @@ WEBRTC_EXPORT void webrtc_objc_RTCAudioSessionConfiguration_setMode(
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSessionConfiguration_setCategoryOptions(
     struct webrtc_objc_RTCAudioSessionConfiguration* self,
     uint64_t category_options);
-
-WEBRTC_EXPORT void webrtc_objc_NSError_release(
-    struct webrtc_objc_NSError* self);
 
 #if defined(__cplusplus)
 }

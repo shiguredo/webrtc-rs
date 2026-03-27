@@ -28,8 +28,8 @@ RetainRTCAudioSessionConfiguration(RTCAudioSessionConfiguration* self) {
       self);
 }
 
-struct webrtc_objc_NSError* RetainNSError(NSError* self) {
-  return (struct webrtc_objc_NSError*)CFBridgingRetain(self);
+struct objc_NSError* RetainNSError(NSError* self) {
+  return (struct objc_NSError*)CFBridgingRetain(self);
 }
 
 }  // namespace
@@ -60,7 +60,7 @@ WEBRTC_EXPORT int webrtc_objc_RTCAudioSession_setConfiguration_active_error(
     struct webrtc_objc_RTCAudioSession* self,
     struct webrtc_objc_RTCAudioSessionConfiguration* configuration,
     int active,
-    struct webrtc_objc_NSError** out_error) {
+    struct objc_NSError** out_error) {
   NSError* error = nil;
   BOOL ok = [ToRTCAudioSession(self)
       setConfiguration:ToRTCAudioSessionConfiguration(configuration)
@@ -75,7 +75,7 @@ WEBRTC_EXPORT int webrtc_objc_RTCAudioSession_setConfiguration_active_error(
 WEBRTC_EXPORT int webrtc_objc_RTCAudioSession_setActive_error(
     struct webrtc_objc_RTCAudioSession* self,
     int active,
-    struct webrtc_objc_NSError** out_error) {
+    struct objc_NSError** out_error) {
   NSError* error = nil;
   BOOL ok = [ToRTCAudioSession(self) setActive:active != 0 error:&error];
   if (out_error != nullptr) {
@@ -135,8 +135,4 @@ WEBRTC_EXPORT void webrtc_objc_RTCAudioSessionConfiguration_setCategoryOptions(
       static_cast<AVAudioSessionCategoryOptions>(category_options);
 }
 
-WEBRTC_EXPORT void webrtc_objc_NSError_release(
-    struct webrtc_objc_NSError* self) {
-  CFBridgingRelease(reinterpret_cast<CFTypeRef>(self));
-}
 }
