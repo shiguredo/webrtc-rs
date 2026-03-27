@@ -31,6 +31,7 @@
   - @melpon
 - [ADD] Android / iOS のネイティブ API 呼び出しを 1 対 1 の C API として追加する
   - Android は `jvm` ラッパー (`webrtc_jni_*`) と `jni_export` ラッパー (`jni_*`) を分離し、`libwebrtc` の公開経路を維持する
+  - iOS は `objc.{h,mm}` で標準ライブラリの関数と定数の C API を追加する
   - `webrtc_InitClassLoader` / `webrtc_CreateJavaAudioDeviceModule` を追加する
   - `webrtc_objc_RTCAudioSession*` / `webrtc_objc_RTCAudioSessionConfiguration*` の C API を追加する
   - @melpon

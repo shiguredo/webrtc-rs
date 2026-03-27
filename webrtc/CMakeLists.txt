@@ -584,6 +584,7 @@ elseif (WEBRTC_C_TARGET STREQUAL "ios_arm64")
 
   target_sources(webrtc_c
     PRIVATE
+      src/webrtc_c/objc.mm
       src/webrtc_c/sdk/objc/components/audio/audio_session.mm
   )
 

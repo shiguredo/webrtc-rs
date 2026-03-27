@@ -78,5 +78,4 @@ webrtc_VideoFrame_video_frame_buffer(const struct webrtc_VideoFrame* self) {
   auto buf = frame->video_frame_buffer()->ToI420();
   return reinterpret_cast<struct webrtc_I420Buffer_refcounted*>(buf.release());
 }
-
 }

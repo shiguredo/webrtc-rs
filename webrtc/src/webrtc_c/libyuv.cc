@@ -122,5 +122,4 @@ WEBRTC_EXPORT int libyuv_I420Rotate(const uint8_t* src_y,
                             dst_stride_u, dst_v, dst_stride_v, width, height,
                             (libyuv::RotationMode)mode);
 }
-
 }
