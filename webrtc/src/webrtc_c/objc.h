@@ -20,8 +20,7 @@ struct objc_NSString;
 WEBRTC_EXPORT objc_Class objc_NSString_class(void);
 WEBRTC_EXPORT struct objc_NSString* objc_NSString_stringWithUTF8String(
     const char* utf8);
-WEBRTC_EXPORT const char* objc_NSString_UTF8String(
-    const struct objc_NSString* self);
+WEBRTC_EXPORT const char* objc_NSString_UTF8String(struct objc_NSString* self);
 WEBRTC_EXPORT void objc_NSString_release(struct objc_NSString* self);
 
 // -------------------------
@@ -31,11 +30,11 @@ WEBRTC_EXPORT void objc_NSString_release(struct objc_NSString* self);
 struct objc_NSError;
 
 WEBRTC_EXPORT objc_Class objc_NSError_class(void);
-WEBRTC_EXPORT int64_t objc_NSError_code(const struct objc_NSError* self);
+WEBRTC_EXPORT int64_t objc_NSError_code(struct objc_NSError* self);
 WEBRTC_EXPORT struct objc_NSString* objc_NSError_domain(
-    const struct objc_NSError* self);
+    struct objc_NSError* self);
 WEBRTC_EXPORT struct objc_NSString* objc_NSError_localizedDescription(
-    const struct objc_NSError* self);
+    struct objc_NSError* self);
 WEBRTC_EXPORT void objc_NSError_release(struct objc_NSError* self);
 
 // -------------------------

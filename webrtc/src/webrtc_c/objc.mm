@@ -7,12 +7,12 @@
 
 namespace {
 
-NSString* ToNSString(const struct objc_NSString* self) {
-  return (__bridge NSString*)(const void*)self;
+NSString* ToNSString(struct objc_NSString* self) {
+  return (__bridge NSString*)self;
 }
 
-NSError* ToNSError(const struct objc_NSError* self) {
-  return (__bridge NSError*)(const void*)self;
+NSError* ToNSError(struct objc_NSError* self) {
+  return (__bridge NSError*)self;
 }
 
 struct objc_NSString* RetainNSString(NSString* self) {
@@ -43,11 +43,7 @@ WEBRTC_EXPORT struct objc_NSString* objc_NSString_stringWithUTF8String(
   return RetainNSString(value);
 }
 
-WEBRTC_EXPORT const char* objc_NSString_UTF8String(
-    const struct objc_NSString* self) {
-  if (self == nullptr) {
-    return nullptr;
-  }
+WEBRTC_EXPORT const char* objc_NSString_UTF8String(struct objc_NSString* self) {
   return [ToNSString(self) UTF8String];
 }
 
@@ -66,33 +62,21 @@ WEBRTC_EXPORT objc_Class objc_NSError_class(void) {
   return (objc_Class)(__bridge void*)[NSError class];
 }
 
-WEBRTC_EXPORT int64_t objc_NSError_code(const struct objc_NSError* self) {
-  if (self == nullptr) {
-    return 0;
-  }
+WEBRTC_EXPORT int64_t objc_NSError_code(struct objc_NSError* self) {
   return static_cast<int64_t>(ToNSError(self).code);
 }
 
 WEBRTC_EXPORT struct objc_NSString* objc_NSError_domain(
-    const struct objc_NSError* self) {
-  if (self == nullptr) {
-    return nullptr;
-  }
+    struct objc_NSError* self) {
   return RetainNSString(ToNSError(self).domain);
 }
 
 WEBRTC_EXPORT struct objc_NSString* objc_NSError_localizedDescription(
-    const struct objc_NSError* self) {
-  if (self == nullptr) {
-    return nullptr;
-  }
+    struct objc_NSError* self) {
   return RetainNSString(ToNSError(self).localizedDescription);
 }
 
 WEBRTC_EXPORT void objc_NSError_release(struct objc_NSError* self) {
-  if (self == nullptr) {
-    return;
-  }
   CFBridgingRelease(reinterpret_cast<CFTypeRef>(self));
 }
 
