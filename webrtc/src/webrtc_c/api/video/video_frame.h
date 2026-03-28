@@ -14,6 +14,9 @@ extern "C" {
 // -------------------------
 
 WEBRTC_EXPORT extern const int webrtc_VideoRotation_0;
+WEBRTC_EXPORT extern const int webrtc_VideoRotation_90;
+WEBRTC_EXPORT extern const int webrtc_VideoRotation_180;
+WEBRTC_EXPORT extern const int webrtc_VideoRotation_270;
 
 WEBRTC_DECLARE_UNIQUE(webrtc_VideoFrame);
 WEBRTC_EXPORT struct webrtc_VideoFrame_unique* webrtc_VideoFrame_Create(
@@ -28,6 +31,8 @@ WEBRTC_EXPORT int64_t
 webrtc_VideoFrame_timestamp_us(const struct webrtc_VideoFrame* self);
 WEBRTC_EXPORT uint32_t
 webrtc_VideoFrame_timestamp_rtp(const struct webrtc_VideoFrame* self);
+WEBRTC_EXPORT int webrtc_VideoFrame_rotation(
+    const struct webrtc_VideoFrame* self);
 WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted*
 webrtc_VideoFrame_video_frame_buffer(const struct webrtc_VideoFrame* self);
 

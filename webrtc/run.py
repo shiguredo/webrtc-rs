@@ -4,11 +4,21 @@ import argparse
 import shutil
 import subprocess
 import sys
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import List
 
 
-SUPPORTED_EXTENSIONS = {".h", ".c", ".cc", ".cpp", ".m", ".mm"}
+SUPPORTED_EXTENSIONS = [".h", ".c", ".cc", ".cpp", ".m", ".mm"]
+IWYU_EXCLUDED_GLOBS = [
+    "android.h",
+    "ios.h",
+    "jni_export.cc",
+    "jni_export.h",
+    "objc.h",
+    "objc.mm",
+    "sdk/**",
+]
 
 
 def find_tool(base_name: str) -> str:
@@ -24,12 +34,21 @@ def find_tool(base_name: str) -> str:
 
 
 def collect_files(root: Path) -> List[Path]:
-    files = [
-        path
-        for path in root.rglob("*")
-        if path.is_file() and path.suffix in SUPPORTED_EXTENSIONS
-    ]
+    files = []
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        if path.suffix not in SUPPORTED_EXTENSIONS:
+            continue
+        files.append(path)
     return sorted(files)
+
+
+def is_iwyu_target(relative_path: Path) -> bool:
+    relative_posix = relative_path.as_posix()
+    return not any(
+        fnmatchcase(relative_posix, pattern) for pattern in IWYU_EXCLUDED_GLOBS
+    )
 
 
 def chunk_paths(paths: List[Path], chunk_size: int) -> List[List[Path]]:
@@ -80,7 +99,9 @@ def do_iwyu(target: str, profile: str, check: bool) -> None:
         sys.exit(1)
 
     root = webrtc_dir / "src" / "webrtc_c"
-    files = collect_files(root)
+    files = [
+        path for path in collect_files(root) if is_iwyu_target(path.relative_to(root))
+    ]
     if not files:
         print("対象ファイルが見つかりません。", file=sys.stderr)
         return
