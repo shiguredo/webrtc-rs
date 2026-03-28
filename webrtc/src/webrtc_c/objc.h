@@ -8,13 +8,16 @@
 extern "C" {
 #endif
 
+struct _objc_Class;
+typedef struct _objc_Class* objc_Class;
+
 // -------------------------
 // Foundation/NSString
 // -------------------------
 
 struct objc_NSString;
 
-WEBRTC_EXPORT const void* objc_NSString_class(void);
+WEBRTC_EXPORT objc_Class objc_NSString_class(void);
 WEBRTC_EXPORT struct objc_NSString* objc_NSString_stringWithUTF8String(
     const char* utf8);
 WEBRTC_EXPORT const char* objc_NSString_UTF8String(
@@ -27,7 +30,7 @@ WEBRTC_EXPORT void objc_NSString_release(struct objc_NSString* self);
 
 struct objc_NSError;
 
-WEBRTC_EXPORT const void* objc_NSError_class(void);
+WEBRTC_EXPORT objc_Class objc_NSError_class(void);
 WEBRTC_EXPORT int64_t objc_NSError_code(const struct objc_NSError* self);
 WEBRTC_EXPORT struct objc_NSString* objc_NSError_domain(
     const struct objc_NSError* self);

@@ -27,8 +27,8 @@ extern "C" {
 // Foundation/NSString
 // -------------------------
 
-WEBRTC_EXPORT const void* objc_NSString_class(void) {
-  return (__bridge const void*)[NSString class];
+WEBRTC_EXPORT objc_Class objc_NSString_class(void) {
+  return (objc_Class)(__bridge void*)[NSString class];
 }
 
 WEBRTC_EXPORT struct objc_NSString* objc_NSString_stringWithUTF8String(
@@ -62,8 +62,8 @@ WEBRTC_EXPORT void objc_NSString_release(struct objc_NSString* self) {
 // Foundation/NSError
 // -------------------------
 
-WEBRTC_EXPORT const void* objc_NSError_class(void) {
-  return (__bridge const void*)[NSError class];
+WEBRTC_EXPORT objc_Class objc_NSError_class(void) {
+  return (objc_Class)(__bridge void*)[NSError class];
 }
 
 WEBRTC_EXPORT int64_t objc_NSError_code(const struct objc_NSError* self) {
