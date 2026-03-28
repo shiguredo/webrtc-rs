@@ -47,10 +47,10 @@ webrtc_objc_RTCAudioSessionConfiguration_setWebRTCConfiguration(
     struct webrtc_objc_RTCAudioSessionConfiguration* configuration);
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSessionConfiguration_setCategory(
     struct webrtc_objc_RTCAudioSessionConfiguration* self,
-    const void* category);
+    objc_AVAudioSessionCategory category);
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSessionConfiguration_setMode(
     struct webrtc_objc_RTCAudioSessionConfiguration* self,
-    const void* mode);
+    objc_AVAudioSessionMode mode);
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSessionConfiguration_setCategoryOptions(
     struct webrtc_objc_RTCAudioSessionConfiguration* self,
     uint64_t category_options);

@@ -9,12 +9,12 @@
 namespace {
 
 RTCAudioSession* ToRTCAudioSession(struct webrtc_objc_RTCAudioSession* self) {
-  return (__bridge RTCAudioSession*)(void*)self;
+  return (__bridge RTCAudioSession*)self;
 }
 
 RTCAudioSessionConfiguration* ToRTCAudioSessionConfiguration(
     struct webrtc_objc_RTCAudioSessionConfiguration* self) {
-  return (__bridge RTCAudioSessionConfiguration*)(void*)self;
+  return (__bridge RTCAudioSessionConfiguration*)self;
 }
 
 struct webrtc_objc_RTCAudioSession* RetainRTCAudioSession(
@@ -118,14 +118,15 @@ webrtc_objc_RTCAudioSessionConfiguration_setWebRTCConfiguration(
 
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSessionConfiguration_setCategory(
     struct webrtc_objc_RTCAudioSessionConfiguration* self,
-    const void* category) {
-  ToRTCAudioSessionConfiguration(self).category = (__bridge NSString*)category;
+    objc_AVAudioSessionCategory category) {
+  ToRTCAudioSessionConfiguration(self).category =
+      (__bridge AVAudioSessionCategory)category;
 }
 
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSessionConfiguration_setMode(
     struct webrtc_objc_RTCAudioSessionConfiguration* self,
-    const void* mode) {
-  ToRTCAudioSessionConfiguration(self).mode = (__bridge NSString*)mode;
+    objc_AVAudioSessionMode mode) {
+  ToRTCAudioSessionConfiguration(self).mode = (__bridge AVAudioSessionMode)mode;
 }
 
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSessionConfiguration_setCategoryOptions(
@@ -134,5 +135,4 @@ WEBRTC_EXPORT void webrtc_objc_RTCAudioSessionConfiguration_setCategoryOptions(
   ToRTCAudioSessionConfiguration(self).categoryOptions =
       static_cast<AVAudioSessionCategoryOptions>(category_options);
 }
-
 }
