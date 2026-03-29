@@ -112,7 +112,11 @@ fn rgb_to_ansi256(r: u8, g: u8, b: u8) -> i32 {
 }
 
 fn render_frame(frame: VideoFrameRef, width: i32, height: i32) {
-    let src = frame.buffer();
+    let mut src = frame.buffer();
+    let src = match src.to_i420() {
+        Some(src) => src,
+        None => return,
+    };
     let mut scaled = I420Buffer::new(width, height);
     scaled.scale_from(&src);
 

@@ -9,11 +9,12 @@
 #include <api/scoped_refptr.h>
 #include <api/video/i420_buffer.h>
 #include <api/video/video_frame.h>
+#include <api/video/video_frame_buffer.h>
 #include <api/video/video_rotation.h>
 
 #include "../../common.h"
 #include "../../common.impl.h"
-#include "i420_buffer.h"
+#include "video_frame_buffer.h"
 
 // -------------------------
 // webrtc::VideoFrame
@@ -32,12 +33,13 @@ WEBRTC_EXPORT const int webrtc_VideoRotation_270 =
 
 WEBRTC_DEFINE_UNIQUE(webrtc_VideoFrame, webrtc::VideoFrame);
 WEBRTC_EXPORT struct webrtc_VideoFrame_unique* webrtc_VideoFrame_Create(
-    struct webrtc_I420Buffer_refcounted* buffer,
+    struct webrtc_VideoFrameBuffer_refcounted* buffer,
     int rotation,
     int64_t timestamp_us,
     uint32_t timestamp_rtp) {
-  webrtc::scoped_refptr<webrtc::I420Buffer> buf(
-      reinterpret_cast<webrtc::I420Buffer*>(buffer));
+  auto raw = webrtc_VideoFrameBuffer_refcounted_get(buffer);
+  webrtc::scoped_refptr<webrtc::VideoFrameBuffer> buf(
+      reinterpret_cast<webrtc::VideoFrameBuffer*>(raw));
   auto frame = std::make_unique<webrtc::VideoFrame>(
       webrtc::VideoFrame::Builder()
           .set_video_frame_buffer(buf)
@@ -72,10 +74,11 @@ WEBRTC_EXPORT int webrtc_VideoFrame_rotation(
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
   return static_cast<int>(frame->rotation());
 }
-WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted*
+WEBRTC_EXPORT struct webrtc_VideoFrameBuffer_refcounted*
 webrtc_VideoFrame_video_frame_buffer(const struct webrtc_VideoFrame* self) {
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
-  auto buf = frame->video_frame_buffer()->ToI420();
-  return reinterpret_cast<struct webrtc_I420Buffer_refcounted*>(buf.release());
+  auto buf = frame->video_frame_buffer();
+  return reinterpret_cast<struct webrtc_VideoFrameBuffer_refcounted*>(
+      buf.release());
 }
 }

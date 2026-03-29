@@ -1,7 +1,8 @@
-use crate::ref_count::{EncodedImageBufferHandle, I420BufferHandle};
+use crate::ref_count::{EncodedImageBufferHandle, I420BufferHandle, VideoFrameBufferHandle};
 use crate::{CxxString, CxxStringRef, Error, MapStringString, Result, ScopedRef, ffi};
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::os::raw::c_void;
 use std::ptr::NonNull;
 use std::slice;
 
@@ -409,8 +410,242 @@ impl I420Buffer {
         self.raw_ref.as_refcounted_ptr()
     }
 
+    fn from_raw_ref(raw_ref: NonNull<ffi::webrtc_I420Buffer_refcounted>) -> Self {
+        let raw_ref = ScopedRef::<I420BufferHandle>::from_raw(raw_ref);
+        Self { raw_ref }
+    }
+
+    fn into_raw_refcounted(self) -> *mut ffi::webrtc_I420Buffer_refcounted {
+        let this = std::mem::ManuallyDrop::new(self);
+        this.raw_ref.as_refcounted_ptr()
+    }
+
+    pub fn cast_to_video_frame_buffer(&self) -> VideoFrameBuffer {
+        let raw_ref = NonNull::new(unsafe {
+            ffi::webrtc_I420Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer(
+                self.raw_ref.as_refcounted_ptr(),
+            )
+        })
+        .expect("BUG: webrtc_I420Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer returned null");
+        let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(raw_ref);
+        VideoFrameBuffer { raw_ref }
+    }
+
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_I420Buffer> {
         self.raw_ref.raw()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VideoFrameBufferKind {
+    Native,
+    I420,
+    I420A,
+    I422,
+    I444,
+    I010,
+    I210,
+    I410,
+    Nv12,
+    Unknown(i32),
+}
+
+impl VideoFrameBufferKind {
+    pub(crate) fn from_raw(value: i32) -> Self {
+        unsafe {
+            if value == ffi::webrtc_VideoFrameBuffer_Type_kNative {
+                Self::Native
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI420 {
+                Self::I420
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI420A {
+                Self::I420A
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI422 {
+                Self::I422
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI444 {
+                Self::I444
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI010 {
+                Self::I010
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI210 {
+                Self::I210
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI410 {
+                Self::I410
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kNV12 {
+                Self::Nv12
+            } else {
+                Self::Unknown(value)
+            }
+        }
+    }
+
+    pub(crate) fn to_raw(self) -> i32 {
+        unsafe {
+            match self {
+                Self::Native => ffi::webrtc_VideoFrameBuffer_Type_kNative,
+                Self::I420 => ffi::webrtc_VideoFrameBuffer_Type_kI420,
+                Self::I420A => ffi::webrtc_VideoFrameBuffer_Type_kI420A,
+                Self::I422 => ffi::webrtc_VideoFrameBuffer_Type_kI422,
+                Self::I444 => ffi::webrtc_VideoFrameBuffer_Type_kI444,
+                Self::I010 => ffi::webrtc_VideoFrameBuffer_Type_kI010,
+                Self::I210 => ffi::webrtc_VideoFrameBuffer_Type_kI210,
+                Self::I410 => ffi::webrtc_VideoFrameBuffer_Type_kI410,
+                Self::Nv12 => ffi::webrtc_VideoFrameBuffer_Type_kNV12,
+                Self::Unknown(v) => v,
+            }
+        }
+    }
+}
+
+pub trait VideoFrameBufferHandler: Send {
+    fn kind(&mut self) -> VideoFrameBufferKind {
+        VideoFrameBufferKind::Native
+    }
+    fn width(&mut self) -> i32;
+    fn height(&mut self) -> i32;
+    fn to_i420(&mut self) -> Option<I420Buffer>;
+}
+
+struct VideoFrameBufferHandlerState {
+    handler: Box<dyn VideoFrameBufferHandler>,
+    #[cfg(debug_assertions)]
+    callback_thread: Option<std::thread::ThreadId>,
+}
+
+#[cfg(debug_assertions)]
+fn assert_video_frame_buffer_handler_thread(state: &mut VideoFrameBufferHandlerState) {
+    let current = std::thread::current().id();
+    if let Some(thread) = state.callback_thread {
+        assert_eq!(
+            thread, current,
+            "video_frame_buffer callback called from multiple threads",
+        );
+    } else {
+        state.callback_thread = Some(current);
+    }
+}
+
+unsafe extern "C" fn video_frame_buffer_type(user_data: *mut c_void) -> i32 {
+    assert!(
+        !user_data.is_null(),
+        "video_frame_buffer_type: user_data is null"
+    );
+    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
+    #[cfg(debug_assertions)]
+    assert_video_frame_buffer_handler_thread(state);
+    state.handler.kind().to_raw()
+}
+
+unsafe extern "C" fn video_frame_buffer_width(user_data: *mut c_void) -> i32 {
+    assert!(
+        !user_data.is_null(),
+        "video_frame_buffer_width: user_data is null"
+    );
+    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
+    #[cfg(debug_assertions)]
+    assert_video_frame_buffer_handler_thread(state);
+    state.handler.width()
+}
+
+unsafe extern "C" fn video_frame_buffer_height(user_data: *mut c_void) -> i32 {
+    assert!(
+        !user_data.is_null(),
+        "video_frame_buffer_height: user_data is null"
+    );
+    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
+    #[cfg(debug_assertions)]
+    assert_video_frame_buffer_handler_thread(state);
+    state.handler.height()
+}
+
+unsafe extern "C" fn video_frame_buffer_to_i420(
+    user_data: *mut c_void,
+) -> *mut ffi::webrtc_I420Buffer_refcounted {
+    assert!(
+        !user_data.is_null(),
+        "video_frame_buffer_to_i420: user_data is null"
+    );
+    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
+    #[cfg(debug_assertions)]
+    assert_video_frame_buffer_handler_thread(state);
+    match state.handler.to_i420() {
+        Some(buffer) => buffer.into_raw_refcounted(),
+        None => std::ptr::null_mut(),
+    }
+}
+
+unsafe extern "C" fn video_frame_buffer_on_destroy(user_data: *mut c_void) {
+    assert!(
+        !user_data.is_null(),
+        "video_frame_buffer_on_destroy: user_data is null"
+    );
+    let _ = unsafe { Box::from_raw(user_data as *mut VideoFrameBufferHandlerState) };
+}
+
+/// webrtc::VideoFrameBuffer のラッパー。
+pub struct VideoFrameBuffer {
+    raw_ref: ScopedRef<VideoFrameBufferHandle>,
+}
+
+impl VideoFrameBuffer {
+    pub fn new_with_handler(handler: Box<dyn VideoFrameBufferHandler>) -> Self {
+        let state = Box::new(VideoFrameBufferHandlerState {
+            handler,
+            #[cfg(debug_assertions)]
+            callback_thread: None,
+        });
+        let user_data = Box::into_raw(state) as *mut c_void;
+        let cbs = ffi::webrtc_VideoFrameBuffer_cbs {
+            type_: Some(video_frame_buffer_type),
+            width: Some(video_frame_buffer_width),
+            height: Some(video_frame_buffer_height),
+            ToI420: Some(video_frame_buffer_to_i420),
+            OnDestroy: Some(video_frame_buffer_on_destroy),
+        };
+        let raw_ref = match NonNull::new(unsafe {
+            ffi::webrtc_VideoFrameBuffer_make_ref_counted(&cbs, user_data)
+        }) {
+            Some(raw_ref) => raw_ref,
+            None => {
+                let _ = unsafe { Box::from_raw(user_data as *mut VideoFrameBufferHandlerState) };
+                panic!("BUG: webrtc_VideoFrameBuffer_make_ref_counted returned null");
+            }
+        };
+        let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(raw_ref);
+        Self { raw_ref }
+    }
+
+    pub fn width(&self) -> i32 {
+        unsafe { ffi::webrtc_VideoFrameBuffer_width(self.raw().as_ptr()) }
+    }
+
+    pub fn height(&self) -> i32 {
+        unsafe { ffi::webrtc_VideoFrameBuffer_height(self.raw().as_ptr()) }
+    }
+
+    pub fn kind(&self) -> VideoFrameBufferKind {
+        let value = unsafe { ffi::webrtc_VideoFrameBuffer_type(self.raw().as_ptr()) };
+        VideoFrameBufferKind::from_raw(value)
+    }
+
+    pub fn to_i420(&mut self) -> Option<I420Buffer> {
+        let raw_ref =
+            NonNull::new(unsafe { ffi::webrtc_VideoFrameBuffer_ToI420(self.raw().as_ptr()) })?;
+        Some(I420Buffer::from_raw_ref(raw_ref))
+    }
+
+    pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_VideoFrameBuffer_refcounted {
+        self.raw_ref.as_refcounted_ptr()
+    }
+
+    pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_VideoFrameBuffer> {
+        self.raw_ref.raw()
+    }
+}
+
+impl Clone for VideoFrameBuffer {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
     }
 }
 
@@ -420,7 +655,7 @@ pub struct VideoFrame {
 }
 
 impl VideoFrame {
-    pub fn from_i420(buffer: &I420Buffer, timestamp_us: i64, timestamp_rtp: u32) -> Self {
+    pub fn from_buffer(buffer: &VideoFrameBuffer, timestamp_us: i64, timestamp_rtp: u32) -> Self {
         let raw = NonNull::new(unsafe {
             ffi::webrtc_VideoFrame_Create(
                 buffer.as_refcounted_ptr(),
@@ -449,8 +684,8 @@ impl VideoFrame {
         self.as_ref().rtp_timestamp()
     }
 
-    /// I420Buffer を取得する。
-    pub fn buffer(&self) -> I420Buffer {
+    /// VideoFrameBuffer を取得する。
+    pub fn buffer(&self) -> VideoFrameBuffer {
         self.as_ref().buffer()
     }
 
@@ -505,12 +740,12 @@ impl<'a> VideoFrameRef<'a> {
         unsafe { ffi::webrtc_VideoFrame_timestamp_rtp(self.raw.as_ptr()) }
     }
 
-    pub fn buffer(&self) -> I420Buffer {
+    pub fn buffer(&self) -> VideoFrameBuffer {
         let buf =
             NonNull::new(unsafe { ffi::webrtc_VideoFrame_video_frame_buffer(self.raw.as_ptr()) })
                 .expect("BUG: webrtc_VideoFrame_video_frame_buffer が null を返しました");
-        let raw_ref = ScopedRef::<I420BufferHandle>::from_raw(buf);
-        I420Buffer { raw_ref }
+        let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(buf);
+        VideoFrameBuffer { raw_ref }
     }
 
     pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoFrame {

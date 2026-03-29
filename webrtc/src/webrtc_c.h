@@ -25,6 +25,7 @@
 #include "webrtc_c/api/video/encoded_image.h"
 #include "webrtc_c/api/video/i420_buffer.h"
 #include "webrtc_c/api/video/video_frame.h"
+#include "webrtc_c/api/video/video_frame_buffer.h"
 #include "webrtc_c/api/video/video_sink_interface.h"
 #include "webrtc_c/api/video/video_source_interface.h"
 #include "webrtc_c/api/video_codecs/sdp_video_format.h"

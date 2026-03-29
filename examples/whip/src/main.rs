@@ -255,21 +255,22 @@ fn tick_once(
 
     if let Some(buffer) = abgr_to_i420(u32_slice_as_u8_slice(image), width, height) {
         let timestamp_us = elapsed_ms * 1000;
-        let frame = VideoFrame::from_i420(&buffer, timestamp_us, 0);
         let AdaptFrameResult { applied, size } = source.adapt_frame(width, height, timestamp_us);
         let frame = if applied
-            && (size.adapted_width != frame.width() || size.adapted_height != frame.height())
+            && (size.adapted_width != buffer.width() || size.adapted_height != buffer.height())
         {
             let mut scaled = I420Buffer::new(size.adapted_width, size.adapted_height);
             scaled.scale_from(&buffer);
-            VideoFrame::from_i420(
-                &scaled,
+            let scaled_buffer = scaled.cast_to_video_frame_buffer();
+            VideoFrame::from_buffer(
+                &scaled_buffer,
                 timestamp_aligner.translate(timestamp_us, time_millis() * 1000),
                 0,
             )
         } else {
-            VideoFrame::from_i420(
-                &buffer,
+            let frame_buffer = buffer.cast_to_video_frame_buffer();
+            VideoFrame::from_buffer(
+                &frame_buffer,
                 timestamp_aligner.translate(timestamp_us, time_millis() * 1000),
                 0,
             )

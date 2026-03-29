@@ -1,70 +1,11 @@
 use super::video_codec_common::{
     EncodedImageRef, SdpVideoFormat, SdpVideoFormatRef, VideoCodecRef, VideoCodecStatus,
-    VideoCodecType, VideoFrameRef, VideoFrameTypeVectorRef,
+    VideoCodecType, VideoFrameBufferKind, VideoFrameRef, VideoFrameTypeVectorRef,
 };
 use crate::{CxxString, EnvironmentRef, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VideoFrameBufferType {
-    Native,
-    I420,
-    I420A,
-    I422,
-    I444,
-    I010,
-    I210,
-    I410,
-    Nv12,
-    Unknown(i32),
-}
-
-impl VideoFrameBufferType {
-    fn from_raw(value: i32) -> Self {
-        unsafe {
-            if value == ffi::webrtc_VideoFrameBuffer_Type_kNative {
-                Self::Native
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI420 {
-                Self::I420
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI420A {
-                Self::I420A
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI422 {
-                Self::I422
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI444 {
-                Self::I444
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI010 {
-                Self::I010
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI210 {
-                Self::I210
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI410 {
-                Self::I410
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kNV12 {
-                Self::Nv12
-            } else {
-                Self::Unknown(value)
-            }
-        }
-    }
-
-    fn to_raw(self) -> i32 {
-        unsafe {
-            match self {
-                Self::Native => ffi::webrtc_VideoFrameBuffer_Type_kNative,
-                Self::I420 => ffi::webrtc_VideoFrameBuffer_Type_kI420,
-                Self::I420A => ffi::webrtc_VideoFrameBuffer_Type_kI420A,
-                Self::I422 => ffi::webrtc_VideoFrameBuffer_Type_kI422,
-                Self::I444 => ffi::webrtc_VideoFrameBuffer_Type_kI444,
-                Self::I010 => ffi::webrtc_VideoFrameBuffer_Type_kI010,
-                Self::I210 => ffi::webrtc_VideoFrameBuffer_Type_kI210,
-                Self::I410 => ffi::webrtc_VideoFrameBuffer_Type_kI410,
-                Self::Nv12 => ffi::webrtc_VideoFrameBuffer_Type_kNV12,
-                Self::Unknown(v) => v,
-            }
-        }
-    }
-}
 
 pub struct VideoEncoderFramerateFractionInlinedVectorRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector>,
@@ -148,12 +89,12 @@ impl<'a> VideoEncoderFramerateFractionInlinedVectorRef<'a> {
 
 unsafe impl<'a> Send for VideoEncoderFramerateFractionInlinedVectorRef<'a> {}
 
-pub struct VideoFrameBufferTypeInlinedVectorRef<'a> {
+pub struct VideoFrameBufferKindInlinedVectorRef<'a> {
     raw: NonNull<ffi::webrtc_VideoFrameBuffer_Type_inlined_vector>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_EncoderInfo>,
 }
 
-impl<'a> VideoFrameBufferTypeInlinedVectorRef<'a> {
+impl<'a> VideoFrameBufferKindInlinedVectorRef<'a> {
     /// # Safety
     /// `raw` は有効な `webrtc_VideoFrameBuffer_Type_inlined_vector` を指す必要があります。
     pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoFrameBuffer_Type_inlined_vector>) -> Self {
@@ -173,7 +114,7 @@ impl<'a> VideoFrameBufferTypeInlinedVectorRef<'a> {
         self.len() == 0
     }
 
-    pub fn get(&self, index: usize) -> Option<VideoFrameBufferType> {
+    pub fn get(&self, index: usize) -> Option<VideoFrameBufferKind> {
         if index >= self.len() {
             return None;
         }
@@ -182,10 +123,10 @@ impl<'a> VideoFrameBufferTypeInlinedVectorRef<'a> {
         };
         let raw = NonNull::new(raw)?;
         let value = unsafe { ffi::webrtc_VideoFrameBuffer_Type_value(raw.as_ptr()) };
-        Some(VideoFrameBufferType::from_raw(value))
+        Some(VideoFrameBufferKind::from_raw(value))
     }
 
-    pub fn push(&mut self, value: VideoFrameBufferType) {
+    pub fn push(&mut self, value: VideoFrameBufferKind) {
         unsafe {
             ffi::webrtc_VideoFrameBuffer_Type_inlined_vector_push_back_value(
                 self.raw.as_ptr(),
@@ -194,7 +135,7 @@ impl<'a> VideoFrameBufferTypeInlinedVectorRef<'a> {
         };
     }
 
-    pub fn set(&mut self, index: usize, value: VideoFrameBufferType) -> bool {
+    pub fn set(&mut self, index: usize, value: VideoFrameBufferKind) -> bool {
         if index >= self.len() {
             return false;
         }
@@ -218,7 +159,7 @@ impl<'a> VideoFrameBufferTypeInlinedVectorRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for VideoFrameBufferTypeInlinedVectorRef<'a> {}
+unsafe impl<'a> Send for VideoFrameBufferKindInlinedVectorRef<'a> {}
 
 pub struct VideoEncoderQpThresholdsRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_QpThresholds>,
@@ -915,14 +856,14 @@ impl VideoEncoderEncoderInfo {
         };
     }
 
-    pub fn preferred_pixel_formats(&self) -> VideoFrameBufferTypeInlinedVectorRef<'_> {
+    pub fn preferred_pixel_formats(&self) -> VideoFrameBufferKindInlinedVectorRef<'_> {
         let raw = unsafe {
             ffi::webrtc_VideoEncoder_EncoderInfo_get_preferred_pixel_formats(self.as_ptr())
         };
         let raw = NonNull::new(raw).expect(
             "BUG: webrtc_VideoEncoder_EncoderInfo_get_preferred_pixel_formats が null を返しました",
         );
-        unsafe { VideoFrameBufferTypeInlinedVectorRef::from_raw(raw) }
+        unsafe { VideoFrameBufferKindInlinedVectorRef::from_raw(raw) }
     }
 
     pub fn is_qp_trusted(&self) -> Option<bool> {

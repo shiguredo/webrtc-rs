@@ -17,6 +17,10 @@
 
 extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_I420Buffer, webrtc::I420Buffer);
+WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_I420Buffer,
+                              webrtc_VideoFrameBuffer,
+                              webrtc::I420Buffer,
+                              webrtc::VideoFrameBuffer);
 WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted* webrtc_I420Buffer_Create(
     int width,
     int height) {

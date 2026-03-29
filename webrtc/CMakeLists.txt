@@ -367,6 +367,7 @@ add_library(webrtc_c
     src/webrtc_c/api/video/encoded_image.cc
     src/webrtc_c/api/video/i420_buffer.cc
     src/webrtc_c/api/video/video_frame.cc
+    src/webrtc_c/api/video/video_frame_buffer.cc
     src/webrtc_c/api/video/video_sink_interface.cc
     src/webrtc_c/api/video/video_source_interface.cc
     src/webrtc_c/api/video_codecs/video_codec.cc

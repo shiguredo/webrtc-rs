@@ -169,6 +169,22 @@ impl RefCountedHandle for I420BufferHandle {
     }
 }
 
+pub(crate) struct VideoFrameBufferHandle;
+impl RefCountedHandle for VideoFrameBufferHandle {
+    type Refcounted = ffi::webrtc_VideoFrameBuffer_refcounted;
+    type Raw = ffi::webrtc_VideoFrameBuffer;
+
+    unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
+        unsafe { ffi::webrtc_VideoFrameBuffer_refcounted_get(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *mut Self::Raw) {
+        unsafe { ffi::webrtc_VideoFrameBuffer_AddRef(raw) };
+    }
+    unsafe fn release(raw: *mut Self::Raw) {
+        unsafe { ffi::webrtc_VideoFrameBuffer_Release(raw) };
+    }
+}
+
 pub(crate) struct EncodedImageBufferHandle;
 impl RefCountedHandle for EncodedImageBufferHandle {
     type Refcounted = ffi::webrtc_EncodedImageBuffer_refcounted;
