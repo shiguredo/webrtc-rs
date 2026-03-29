@@ -24,6 +24,8 @@ WEBRTC_EXPORT struct webrtc_VideoFrame_unique* webrtc_VideoFrame_Create(
     int rotation,
     int64_t timestamp_us,
     uint32_t timestamp_rtp);
+WEBRTC_EXPORT struct webrtc_VideoFrame_unique* webrtc_VideoFrame_copy(
+    const struct webrtc_VideoFrame* self);
 WEBRTC_EXPORT int webrtc_VideoFrame_width(const struct webrtc_VideoFrame* self);
 WEBRTC_EXPORT int webrtc_VideoFrame_height(
     const struct webrtc_VideoFrame* self);

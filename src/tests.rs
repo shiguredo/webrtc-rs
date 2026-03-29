@@ -243,6 +243,54 @@ fn i420_buffer_mutable_planes_and_video_frame_rtp_timestamp() {
 }
 
 #[test]
+fn video_frame_clone() {
+    let mut buf = I420Buffer::new(4, 4);
+    buf.y_data_mut().fill(0x44);
+    buf.u_data_mut().fill(0x55);
+    buf.v_data_mut().fill(0x66);
+
+    let frame_buffer = buf.cast_to_video_frame_buffer();
+    let frame = VideoFrame::from_buffer(&frame_buffer, 11111, 22222);
+    let cloned = frame.clone();
+
+    assert_eq!(cloned.width(), frame.width());
+    assert_eq!(cloned.height(), frame.height());
+    assert_eq!(cloned.timestamp_us(), frame.timestamp_us());
+    assert_eq!(cloned.rtp_timestamp(), frame.rtp_timestamp());
+    assert_ne!(cloned.as_ref().as_ptr(), frame.as_ref().as_ptr());
+
+    let mut copied = cloned.buffer();
+    let copied = copied
+        .to_i420()
+        .expect("clone した VideoFrame の buffer 変換に失敗しました");
+    assert_eq!(copied.y_data()[0], 0x44);
+}
+
+#[test]
+fn video_frame_ref_to_owned() {
+    let mut buf = I420Buffer::new(4, 4);
+    buf.y_data_mut().fill(0x77);
+    buf.u_data_mut().fill(0x88);
+    buf.v_data_mut().fill(0x99);
+
+    let frame_buffer = buf.cast_to_video_frame_buffer();
+    let frame = VideoFrame::from_buffer(&frame_buffer, 33333, 44444);
+    let copied = frame.as_ref().to_owned();
+
+    assert_eq!(copied.width(), frame.width());
+    assert_eq!(copied.height(), frame.height());
+    assert_eq!(copied.timestamp_us(), frame.timestamp_us());
+    assert_eq!(copied.rtp_timestamp(), frame.rtp_timestamp());
+    assert_ne!(copied.as_ref().as_ptr(), frame.as_ref().as_ptr());
+
+    let mut copied_buffer = copied.buffer();
+    let copied_i420 = copied_buffer
+        .to_i420()
+        .expect("to_owned した VideoFrame の buffer 変換に失敗しました");
+    assert_eq!(copied_i420.y_data()[0], 0x77);
+}
+
+#[test]
 fn i420_buffer_chroma_dimensions_for_odd_size() {
     let width = 5;
     let height = 3;

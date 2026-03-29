@@ -19,6 +19,10 @@
   - `I420Buffer` / `NV12Buffer` の C API と Rust API から、4:2:0 の chroma 解像度を切り上げ半分で取得できるようにする
   - `u_data` / `v_data` / `uv_data` の平面長計算を `chroma_height` 利用へ統一する
   - @melpon
+- [ADD] `VideoFrame` の複製 API を追加する
+  - C API `webrtc_VideoFrame_copy` を追加する
+  - Rust 側で `VideoFrame: Clone` と `VideoFrameRef::to_owned` を追加する
+  - @melpon
 - [CHANGE] `VideoFrame` の生成 API を `VideoFrameBuffer` ベースに変更する
   - `VideoFrameBuffer` / `VideoFrameBufferHandler` を追加し、Rust 実装の native バッファを `kNative` として扱えるようにする
   - `VideoFrameBufferKind` と `VideoFrameBuffer::kind` / `VideoFrameBufferHandler::kind` を追加し、バッファ種別を Rust 側で扱えるようにする

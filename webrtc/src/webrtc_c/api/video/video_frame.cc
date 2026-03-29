@@ -49,6 +49,15 @@ WEBRTC_EXPORT struct webrtc_VideoFrame_unique* webrtc_VideoFrame_Create(
           .build());
   return reinterpret_cast<struct webrtc_VideoFrame_unique*>(frame.release());
 }
+WEBRTC_EXPORT struct webrtc_VideoFrame_unique* webrtc_VideoFrame_copy(
+    const struct webrtc_VideoFrame* self) {
+  auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
+  if (frame == nullptr) {
+    return nullptr;
+  }
+  auto copied = std::make_unique<webrtc::VideoFrame>(*frame);
+  return reinterpret_cast<struct webrtc_VideoFrame_unique*>(copied.release());
+}
 WEBRTC_EXPORT int webrtc_VideoFrame_width(
     const struct webrtc_VideoFrame* self) {
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);

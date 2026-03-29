@@ -908,6 +908,16 @@ impl VideoFrame {
     }
 }
 
+impl Clone for VideoFrame {
+    fn clone(&self) -> Self {
+        let raw = unsafe { ffi::webrtc_VideoFrame_copy(self.raw().as_ptr()) };
+        Self {
+            raw_unique: NonNull::new(raw)
+                .expect("BUG: webrtc_VideoFrame_copy が null を返しました"),
+        }
+    }
+}
+
 impl Drop for VideoFrame {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoFrame_unique_delete(self.raw_unique.as_ptr()) };
@@ -954,6 +964,14 @@ impl<'a> VideoFrameRef<'a> {
                 .expect("BUG: webrtc_VideoFrame_video_frame_buffer が null を返しました");
         let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(buf);
         VideoFrameBuffer { raw_ref }
+    }
+
+    pub fn to_owned(&self) -> VideoFrame {
+        let raw = unsafe { ffi::webrtc_VideoFrame_copy(self.raw.as_ptr()) };
+        VideoFrame {
+            raw_unique: NonNull::new(raw)
+                .expect("BUG: webrtc_VideoFrame_copy が null を返しました"),
+        }
     }
 
     pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoFrame {
