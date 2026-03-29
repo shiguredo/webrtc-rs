@@ -312,6 +312,14 @@ impl I420Buffer {
         unsafe { ffi::webrtc_I420Buffer_height(self.raw().as_ptr()) }
     }
 
+    pub fn chroma_width(&self) -> i32 {
+        unsafe { ffi::webrtc_I420Buffer_chroma_width(self.raw().as_ptr()) }
+    }
+
+    pub fn chroma_height(&self) -> i32 {
+        unsafe { ffi::webrtc_I420Buffer_chroma_height(self.raw().as_ptr()) }
+    }
+
     pub fn stride_y(&self) -> i32 {
         let raw = self.raw();
         unsafe { ffi::webrtc_I420Buffer_StrideY(raw.as_ptr()) }
@@ -357,7 +365,7 @@ impl I420Buffer {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataU(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_I420Buffer_StrideU(raw.as_ptr()) } as usize;
-        let h = (self.height() as usize).div_ceil(2);
+        let h = self.chroma_height() as usize;
         unsafe { slice::from_raw_parts(ptr, stride * h) }
     }
 
@@ -366,7 +374,7 @@ impl I420Buffer {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataU(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_I420Buffer_StrideU(raw.as_ptr()) } as usize;
-        let h = (self.height() as usize).div_ceil(2);
+        let h = self.chroma_height() as usize;
         unsafe { slice::from_raw_parts_mut(ptr, stride * h) }
     }
 
@@ -375,7 +383,7 @@ impl I420Buffer {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataV(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) } as usize;
-        let h = (self.height() as usize).div_ceil(2);
+        let h = self.chroma_height() as usize;
         unsafe { slice::from_raw_parts(ptr, stride * h) }
     }
 
@@ -384,7 +392,7 @@ impl I420Buffer {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataV(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) } as usize;
-        let h = (self.height() as usize).div_ceil(2);
+        let h = self.chroma_height() as usize;
         unsafe { slice::from_raw_parts_mut(ptr, stride * h) }
     }
 
@@ -437,6 +445,14 @@ impl NV12Buffer {
 
     pub fn height(&self) -> i32 {
         unsafe { ffi::webrtc_NV12Buffer_height(self.raw().as_ptr()) }
+    }
+
+    pub fn chroma_width(&self) -> i32 {
+        unsafe { ffi::webrtc_NV12Buffer_chroma_width(self.raw().as_ptr()) }
+    }
+
+    pub fn chroma_height(&self) -> i32 {
+        unsafe { ffi::webrtc_NV12Buffer_chroma_height(self.raw().as_ptr()) }
     }
 
     pub fn stride_y(&self) -> i32 {
@@ -494,7 +510,7 @@ impl NV12Buffer {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_NV12Buffer_MutableDataUV(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_NV12Buffer_StrideUV(raw.as_ptr()) } as usize;
-        let h = (self.height() as usize).div_ceil(2);
+        let h = self.chroma_height() as usize;
         unsafe { slice::from_raw_parts(ptr, stride * h) }
     }
 
@@ -503,7 +519,7 @@ impl NV12Buffer {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_NV12Buffer_MutableDataUV(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_NV12Buffer_StrideUV(raw.as_ptr()) } as usize;
-        let h = (self.height() as usize).div_ceil(2);
+        let h = self.chroma_height() as usize;
         unsafe { slice::from_raw_parts_mut(ptr, stride * h) }
     }
 

@@ -243,6 +243,24 @@ fn i420_buffer_mutable_planes_and_video_frame_rtp_timestamp() {
 }
 
 #[test]
+fn i420_buffer_chroma_dimensions_for_odd_size() {
+    let width = 5;
+    let height = 3;
+    let buf = I420Buffer::new(width, height);
+
+    assert_eq!(buf.chroma_width(), 3);
+    assert_eq!(buf.chroma_height(), 2);
+    assert_eq!(
+        buf.u_data().len(),
+        (buf.stride_u() as usize) * (buf.chroma_height() as usize)
+    );
+    assert_eq!(
+        buf.v_data().len(),
+        (buf.stride_v() as usize) * (buf.chroma_height() as usize)
+    );
+}
+
+#[test]
 fn nv12_buffer_planes_kind_and_to_i420() {
     let width = 4;
     let height = 3;
@@ -273,6 +291,20 @@ fn nv12_buffer_planes_kind_and_to_i420() {
     assert_eq!(i420.y_data(), buf.y_data());
     assert!(i420.u_data().iter().all(|&v| v == 0x44));
     assert!(i420.v_data().iter().all(|&v| v == 0x88));
+}
+
+#[test]
+fn nv12_buffer_chroma_dimensions_for_odd_size() {
+    let width = 5;
+    let height = 3;
+    let buf = NV12Buffer::new(width, height);
+
+    assert_eq!(buf.chroma_width(), 3);
+    assert_eq!(buf.chroma_height(), 2);
+    assert_eq!(
+        buf.uv_data().len(),
+        (buf.stride_uv() as usize) * (buf.chroma_height() as usize)
+    );
 }
 
 #[test]

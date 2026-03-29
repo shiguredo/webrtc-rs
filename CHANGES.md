@@ -15,6 +15,10 @@
   - `NV12Buffer` を追加し、`y_data` / `uv_data` の参照と `crop_and_scale_from` を利用できるようにする
   - `NV12Buffer` から `VideoFrameBuffer` への変換と `kind == Nv12` の取り扱いを追加する
   - @melpon
+- [ADD] `I420Buffer` / `NV12Buffer` に `chroma_width` / `chroma_height` を追加する
+  - `I420Buffer` / `NV12Buffer` の C API と Rust API から、4:2:0 の chroma 解像度を切り上げ半分で取得できるようにする
+  - `u_data` / `v_data` / `uv_data` の平面長計算を `chroma_height` 利用へ統一する
+  - @melpon
 - [CHANGE] `VideoFrame` の生成 API を `VideoFrameBuffer` ベースに変更する
   - `VideoFrameBuffer` / `VideoFrameBufferHandler` を追加し、Rust 実装の native バッファを `kNative` として扱えるようにする
   - `VideoFrameBufferKind` と `VideoFrameBuffer::kind` / `VideoFrameBufferHandler::kind` を追加し、バッファ種別を Rust 側で扱えるようにする

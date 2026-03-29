@@ -21,6 +21,10 @@ WEBRTC_EXPORT struct webrtc_NV12Buffer_refcounted* webrtc_NV12Buffer_Create(
 WEBRTC_EXPORT int webrtc_NV12Buffer_width(const struct webrtc_NV12Buffer* self);
 WEBRTC_EXPORT int webrtc_NV12Buffer_height(
     const struct webrtc_NV12Buffer* self);
+WEBRTC_EXPORT int webrtc_NV12Buffer_chroma_width(
+    const struct webrtc_NV12Buffer* self);
+WEBRTC_EXPORT int webrtc_NV12Buffer_chroma_height(
+    const struct webrtc_NV12Buffer* self);
 WEBRTC_EXPORT uint8_t* webrtc_NV12Buffer_MutableDataY(
     struct webrtc_NV12Buffer* self);
 WEBRTC_EXPORT uint8_t* webrtc_NV12Buffer_MutableDataUV(

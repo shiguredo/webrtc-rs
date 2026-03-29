@@ -21,6 +21,10 @@ WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted* webrtc_I420Buffer_Create(
 WEBRTC_EXPORT int webrtc_I420Buffer_width(const struct webrtc_I420Buffer* self);
 WEBRTC_EXPORT int webrtc_I420Buffer_height(
     const struct webrtc_I420Buffer* self);
+WEBRTC_EXPORT int webrtc_I420Buffer_chroma_width(
+    const struct webrtc_I420Buffer* self);
+WEBRTC_EXPORT int webrtc_I420Buffer_chroma_height(
+    const struct webrtc_I420Buffer* self);
 WEBRTC_EXPORT uint8_t* webrtc_I420Buffer_MutableDataY(
     struct webrtc_I420Buffer* self);
 WEBRTC_EXPORT uint8_t* webrtc_I420Buffer_MutableDataU(
