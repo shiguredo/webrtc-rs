@@ -625,11 +625,11 @@ impl<T: Any> VideoFrameBufferHandlerAny for T {
 }
 
 pub trait VideoFrameBufferHandler: Send + VideoFrameBufferHandlerAny {
-    fn kind(&mut self) -> VideoFrameBufferKind {
+    fn kind(&self) -> VideoFrameBufferKind {
         VideoFrameBufferKind::Native
     }
-    fn width(&mut self) -> i32;
-    fn height(&mut self) -> i32;
+    fn width(&self) -> i32;
+    fn height(&self) -> i32;
     fn to_i420(&mut self) -> Option<I420Buffer>;
     // None を返すとデフォルトの実装が呼ばれる。
     // デフォルトの実装は to_i420() で I420Buffer を作成してからそれをクロップ＆スケールする。

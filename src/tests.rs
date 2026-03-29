@@ -388,11 +388,11 @@ fn video_frame_buffer_handler_native_roundtrip() {
     struct NativeBufferHandler;
 
     impl VideoFrameBufferHandler for NativeBufferHandler {
-        fn width(&mut self) -> i32 {
+        fn width(&self) -> i32 {
             2
         }
 
-        fn height(&mut self) -> i32 {
+        fn height(&self) -> i32 {
             2
         }
 
@@ -434,15 +434,15 @@ fn video_frame_buffer_handler_custom_type_roundtrip() {
     struct I420TypeBufferHandler;
 
     impl VideoFrameBufferHandler for I420TypeBufferHandler {
-        fn kind(&mut self) -> VideoFrameBufferKind {
+        fn kind(&self) -> VideoFrameBufferKind {
             VideoFrameBufferKind::I420
         }
 
-        fn width(&mut self) -> i32 {
+        fn width(&self) -> i32 {
             2
         }
 
-        fn height(&mut self) -> i32 {
+        fn height(&self) -> i32 {
             2
         }
 
@@ -473,11 +473,11 @@ fn video_frame_buffer_handler_to_i420_none() {
     struct NoI420BufferHandler;
 
     impl VideoFrameBufferHandler for NoI420BufferHandler {
-        fn width(&mut self) -> i32 {
+        fn width(&self) -> i32 {
             2
         }
 
-        fn height(&mut self) -> i32 {
+        fn height(&self) -> i32 {
             2
         }
 
@@ -524,11 +524,11 @@ fn video_frame_buffer_handler_crop_and_scale_callback() {
     }
 
     impl VideoFrameBufferHandler for CropAndScaleBufferHandler {
-        fn width(&mut self) -> i32 {
+        fn width(&self) -> i32 {
             8
         }
 
-        fn height(&mut self) -> i32 {
+        fn height(&self) -> i32 {
             8
         }
 
@@ -584,11 +584,11 @@ fn video_frame_buffer_handler_crop_and_scale_fallback() {
     struct NoCropAndScaleBufferHandler;
 
     impl VideoFrameBufferHandler for NoCropAndScaleBufferHandler {
-        fn width(&mut self) -> i32 {
+        fn width(&self) -> i32 {
             4
         }
 
-        fn height(&mut self) -> i32 {
+        fn height(&self) -> i32 {
             4
         }
 
@@ -616,11 +616,11 @@ fn video_frame_buffer_as_native_roundtrip() {
     }
 
     impl VideoFrameBufferHandler for DowncastBufferHandler {
-        fn width(&mut self) -> i32 {
+        fn width(&self) -> i32 {
             2
         }
 
-        fn height(&mut self) -> i32 {
+        fn height(&self) -> i32 {
             2
         }
 
@@ -663,11 +663,11 @@ fn video_frame_buffer_as_native_clone_and_frame_buffer() {
     }
 
     impl VideoFrameBufferHandler for DowncastBufferHandler {
-        fn width(&mut self) -> i32 {
+        fn width(&self) -> i32 {
             2
         }
 
-        fn height(&mut self) -> i32 {
+        fn height(&self) -> i32 {
             2
         }
 
@@ -706,11 +706,11 @@ fn video_frame_buffer_as_native_returns_none_for_builtin_buffers() {
     struct NativeBufferHandler;
 
     impl VideoFrameBufferHandler for NativeBufferHandler {
-        fn width(&mut self) -> i32 {
+        fn width(&self) -> i32 {
             1
         }
 
-        fn height(&mut self) -> i32 {
+        fn height(&self) -> i32 {
             1
         }
 
@@ -776,11 +776,11 @@ fn video_frame_buffer_as_i420_and_as_nv12_return_none_for_native() {
     struct NativeBufferHandler;
 
     impl VideoFrameBufferHandler for NativeBufferHandler {
-        fn width(&mut self) -> i32 {
+        fn width(&self) -> i32 {
             2
         }
 
-        fn height(&mut self) -> i32 {
+        fn height(&self) -> i32 {
             2
         }
 
