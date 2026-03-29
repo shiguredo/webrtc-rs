@@ -362,6 +362,27 @@ impl I420Buffer {
         unsafe { slice::from_raw_parts_mut(ptr, len) }
     }
 
+    /// Y/U/V 平面を同時に可変参照する。
+    pub fn planes_mut(&mut self) -> (&mut [u8], &mut [u8], &mut [u8]) {
+        let raw = self.raw();
+        let height = self.height() as usize;
+        let chroma_height = self.chroma_height() as usize;
+        let ptr_y = unsafe { ffi::webrtc_I420Buffer_MutableDataY(raw.as_ptr()) };
+        let ptr_u = unsafe { ffi::webrtc_I420Buffer_MutableDataU(raw.as_ptr()) };
+        let ptr_v = unsafe { ffi::webrtc_I420Buffer_MutableDataV(raw.as_ptr()) };
+        let stride_y = unsafe { ffi::webrtc_I420Buffer_StrideY(raw.as_ptr()) } as usize;
+        let stride_u = unsafe { ffi::webrtc_I420Buffer_StrideU(raw.as_ptr()) } as usize;
+        let stride_v = unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) } as usize;
+
+        unsafe {
+            (
+                slice::from_raw_parts_mut(ptr_y, stride_y * height),
+                slice::from_raw_parts_mut(ptr_u, stride_u * chroma_height),
+                slice::from_raw_parts_mut(ptr_v, stride_v * chroma_height),
+            )
+        }
+    }
+
     /// U 平面を参照する。
     pub fn u_data(&self) -> &[u8] {
         let raw = self.raw();
@@ -523,6 +544,24 @@ impl NV12Buffer {
         let stride = unsafe { ffi::webrtc_NV12Buffer_StrideUV(raw.as_ptr()) } as usize;
         let h = self.chroma_height() as usize;
         unsafe { slice::from_raw_parts_mut(ptr, stride * h) }
+    }
+
+    /// Y/UV 平面を同時に可変参照する。
+    pub fn planes_mut(&mut self) -> (&mut [u8], &mut [u8]) {
+        let raw = self.raw();
+        let height = self.height() as usize;
+        let chroma_height = self.chroma_height() as usize;
+        let ptr_y = unsafe { ffi::webrtc_NV12Buffer_MutableDataY(raw.as_ptr()) };
+        let ptr_uv = unsafe { ffi::webrtc_NV12Buffer_MutableDataUV(raw.as_ptr()) };
+        let stride_y = unsafe { ffi::webrtc_NV12Buffer_StrideY(raw.as_ptr()) } as usize;
+        let stride_uv = unsafe { ffi::webrtc_NV12Buffer_StrideUV(raw.as_ptr()) } as usize;
+
+        unsafe {
+            (
+                slice::from_raw_parts_mut(ptr_y, stride_y * height),
+                slice::from_raw_parts_mut(ptr_uv, stride_uv * chroma_height),
+            )
+        }
     }
 
     pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_NV12Buffer_refcounted {

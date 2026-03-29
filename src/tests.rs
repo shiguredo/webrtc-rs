@@ -1031,6 +1031,134 @@ fn i420_to_nv12_round_trip() {
 }
 
 #[test]
+fn i420_buffer_planes_mut_to_nv12_round_trip() {
+    let width = 5;
+    let height = 3;
+    let mut src = I420Buffer::new(width, height);
+    let src_stride_y = src.stride_y();
+    let src_stride_u = src.stride_u();
+    let src_stride_v = src.stride_v();
+    let chroma_width = src.chroma_width();
+    let chroma_height = src.chroma_height();
+
+    {
+        let (src_y, src_u, src_v) = src.planes_mut();
+        for row in 0..height as usize {
+            let begin = row * src_stride_y as usize;
+            let end = begin + width as usize;
+            for (col, v) in src_y[begin..end].iter_mut().enumerate() {
+                *v = (row as u8).wrapping_mul(17).wrapping_add(col as u8);
+            }
+        }
+        for row in 0..chroma_height as usize {
+            let begin = row * src_stride_u as usize;
+            let end = begin + chroma_width as usize;
+            for (col, v) in src_u[begin..end].iter_mut().enumerate() {
+                *v = 0x40u8
+                    .wrapping_add((row as u8).wrapping_mul(7))
+                    .wrapping_add(col as u8);
+            }
+        }
+        for row in 0..chroma_height as usize {
+            let begin = row * src_stride_v as usize;
+            let end = begin + chroma_width as usize;
+            for (col, v) in src_v[begin..end].iter_mut().enumerate() {
+                *v = 0x80u8
+                    .wrapping_add((row as u8).wrapping_mul(11))
+                    .wrapping_add(col as u8);
+            }
+        }
+    }
+
+    let mut nv12 = NV12Buffer::new(width, height);
+    let dst_stride_y = nv12.stride_y();
+    let dst_stride_uv = nv12.stride_uv();
+    {
+        let (dst_y, dst_uv) = nv12.planes_mut();
+        assert!(i420_to_nv12(
+            src.y_data(),
+            src_stride_y,
+            src.u_data(),
+            src_stride_u,
+            src.v_data(),
+            src_stride_v,
+            dst_y,
+            dst_stride_y,
+            dst_uv,
+            dst_stride_uv,
+            width,
+            height,
+        ));
+    }
+
+    let mut restored = I420Buffer::new(width, height);
+    let restored_stride_y = restored.stride_y();
+    let restored_stride_u = restored.stride_u();
+    let restored_stride_v = restored.stride_v();
+    {
+        let (restored_y, restored_u, restored_v) = restored.planes_mut();
+        assert!(nv12_to_i420(
+            nv12.y_data(),
+            nv12.stride_y(),
+            nv12.uv_data(),
+            nv12.stride_uv(),
+            restored_y,
+            restored_stride_y,
+            restored_u,
+            restored_stride_u,
+            restored_v,
+            restored_stride_v,
+            width,
+            height,
+        ));
+    }
+
+    let assert_plane_eq = |lhs: &[u8],
+                           lhs_stride: i32,
+                           rhs: &[u8],
+                           rhs_stride: i32,
+                           row_bytes: i32,
+                           rows: i32| {
+        let lhs_stride = lhs_stride as usize;
+        let rhs_stride = rhs_stride as usize;
+        let row_bytes = row_bytes as usize;
+        let rows = rows as usize;
+        for row in 0..rows {
+            let lhs_begin = row * lhs_stride;
+            let lhs_end = lhs_begin + row_bytes;
+            let rhs_begin = row * rhs_stride;
+            let rhs_end = rhs_begin + row_bytes;
+            assert_eq!(lhs[lhs_begin..lhs_end], rhs[rhs_begin..rhs_end]);
+        }
+    };
+
+    assert_plane_eq(
+        src.y_data(),
+        src_stride_y,
+        restored.y_data(),
+        restored_stride_y,
+        width,
+        height,
+    );
+    assert_plane_eq(
+        src.u_data(),
+        src_stride_u,
+        restored.u_data(),
+        restored_stride_u,
+        chroma_width,
+        chroma_height,
+    );
+    assert_plane_eq(
+        src.v_data(),
+        src_stride_v,
+        restored.v_data(),
+        restored_stride_v,
+        chroma_width,
+        chroma_height,
+    );
+}
+
+#[test]
 fn logging_functions_are_callable() {
     // severity は 0 にしておく。実際のログ内容は検証しない。
     log::log_to_debug(log::Severity::Info);

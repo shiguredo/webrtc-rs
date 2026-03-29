@@ -39,6 +39,7 @@
   - `NV12Buffer` を追加し、`y_data` / `uv_data` の参照と `crop_and_scale_from` を利用できるようにする
   - `NV12Buffer` から `VideoFrameBuffer` への変換と `kind == Nv12` の取り扱いを追加する
   - `I420Buffer` / `NV12Buffer` の C API と Rust API から、4:2:0 の chroma 解像度を切り上げ半分で取得できるようにする
+  - `I420Buffer::planes_mut` と `NV12Buffer::planes_mut` を追加し、複数プレーンを同時に可変借用できるようにする
   - `u_data` / `v_data` / `uv_data` の平面長計算を `chroma_height` 利用へ統一する
   - @melpon
 - [ADD] `VideoFrame` の複製 API を追加する
