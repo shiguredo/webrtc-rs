@@ -33,6 +33,10 @@
 - [CHANGE] `I420Buffer` の convenience API を削除する
   - `I420Buffer::fill_y` と `I420Buffer::fill_uv` を削除し、平面書き込みを `y_data_mut` / `u_data_mut` / `v_data_mut` に統一する
   - @melpon
+- [CHANGE] `i420_to_nv12` / `nv12_to_i420` の入出力型を `NV12Buffer` ベースに変更する
+  - `i420_to_nv12` の戻り値を `Option<NV12Buffer>` に変更し、NV12 平面の手動分割を不要にする
+  - `nv12_to_i420` の引数を `&NV12Buffer` に変更し、NV12 平面ポインタと stride の手動指定を不要にする
+  - @melpon
 
 ## 0.146.2
 

@@ -652,10 +652,7 @@ fn i420_to_nv12_round_trip() {
     }
 
     let nv12 = i420_to_nv12(&src).expect("i420_to_nv12 の変換に失敗しました");
-    let y_size = (width * height) as usize;
-    let (y, uv) = nv12.split_at(y_size);
-    let restored = nv12_to_i420(y, width, uv, width, width, height)
-        .expect("nv12_to_i420 の逆変換に失敗しました");
+    let restored = nv12_to_i420(&nv12).expect("nv12_to_i420 の逆変換に失敗しました");
 
     assert_eq!(src.y_data(), restored.y_data());
     assert_eq!(src.u_data(), restored.u_data());

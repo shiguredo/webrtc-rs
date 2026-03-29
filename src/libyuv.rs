@@ -1,4 +1,4 @@
-use crate::{I420Buffer, ffi};
+use crate::{I420Buffer, NV12Buffer, ffi};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LibyuvFourcc {
@@ -52,19 +52,18 @@ pub fn convert_from_i420(src: &I420Buffer, fourcc: LibyuvFourcc) -> Option<Vec<u
 
 /// `libyuv::I420ToNV12` を呼び出して、I420 を NV12 へ変換する。
 /// 変換に失敗した場合は `None` を返す。
-pub fn i420_to_nv12(src: &I420Buffer) -> Option<Vec<u8>> {
+pub fn i420_to_nv12(src: &I420Buffer) -> Option<NV12Buffer> {
     let width = src.width();
     let height = src.height();
     if width <= 0 || height <= 0 {
         return None;
     }
 
-    let width = width as usize;
-    let height = height as usize;
-    let y_size = width.checked_mul(height)?;
-    let uv_size = width.checked_mul(height.div_ceil(2))?;
-    let mut dst = vec![0u8; y_size.checked_add(uv_size)?];
-    let (dst_y, dst_uv) = dst.split_at_mut(y_size);
+    let mut dst = NV12Buffer::new(width, height);
+    let dst_stride_y = dst.stride_y();
+    let dst_stride_uv = dst.stride_uv();
+    let dst_y = dst.y_data_mut().as_mut_ptr();
+    let dst_uv = dst.uv_data_mut().as_mut_ptr();
 
     let ret = unsafe {
         ffi::libyuv_I420ToNV12(
@@ -74,12 +73,12 @@ pub fn i420_to_nv12(src: &I420Buffer) -> Option<Vec<u8>> {
             src.stride_u(),
             src.v_data().as_ptr(),
             src.stride_v(),
-            dst_y.as_mut_ptr(),
-            width as i32,
-            dst_uv.as_mut_ptr(),
-            width as i32,
-            width as i32,
-            height as i32,
+            dst_y,
+            dst_stride_y,
+            dst_uv,
+            dst_stride_uv,
+            width,
+            height,
         )
     };
     if ret != 0 {
@@ -96,18 +95,25 @@ pub fn abgr_to_i420(src_abgr: &[u8], width: i32, height: i32) -> Option<I420Buff
     if src_abgr.len() < needed {
         return None;
     }
-    let buf = I420Buffer::new(width, height);
-    let raw = buf.raw().as_ptr();
+
+    let mut buf = I420Buffer::new(width, height);
+    let dst_stride_y = buf.stride_y();
+    let dst_stride_u = buf.stride_u();
+    let dst_stride_v = buf.stride_v();
+    let dst_y = buf.y_data_mut().as_mut_ptr();
+    let dst_u = buf.u_data_mut().as_mut_ptr();
+    let dst_v = buf.v_data_mut().as_mut_ptr();
+
     let ret = unsafe {
         ffi::libyuv_ABGRToI420(
             src_abgr.as_ptr(),
             stride as i32,
-            ffi::webrtc_I420Buffer_MutableDataY(raw),
-            ffi::webrtc_I420Buffer_StrideY(raw),
-            ffi::webrtc_I420Buffer_MutableDataU(raw),
-            ffi::webrtc_I420Buffer_StrideU(raw),
-            ffi::webrtc_I420Buffer_MutableDataV(raw),
-            ffi::webrtc_I420Buffer_StrideV(raw),
+            dst_y,
+            dst_stride_y,
+            dst_u,
+            dst_stride_u,
+            dst_v,
+            dst_stride_v,
             width,
             height,
         )
@@ -120,31 +126,33 @@ pub fn abgr_to_i420(src_abgr: &[u8], width: i32, height: i32) -> Option<I420Buff
 
 /// `libyuv::NV12ToI420` を呼び出して、NV12 から I420 へ変換する。
 /// 変換に失敗した場合は `None` を返す。
-pub fn nv12_to_i420(
-    src_y: &[u8],
-    src_stride_y: i32,
-    src_uv: &[u8],
-    src_stride_uv: i32,
-    width: i32,
-    height: i32,
-) -> Option<I420Buffer> {
+pub fn nv12_to_i420(src: &NV12Buffer) -> Option<I420Buffer> {
+    let width = src.width();
+    let height = src.height();
     if width <= 0 || height <= 0 {
         return None;
     }
-    let buf = I420Buffer::new(width, height);
-    let raw = buf.raw().as_ptr();
+
+    let mut buf = I420Buffer::new(width, height);
+    let dst_stride_y = buf.stride_y();
+    let dst_stride_u = buf.stride_u();
+    let dst_stride_v = buf.stride_v();
+    let dst_y = buf.y_data_mut().as_mut_ptr();
+    let dst_u = buf.u_data_mut().as_mut_ptr();
+    let dst_v = buf.v_data_mut().as_mut_ptr();
+
     let ret = unsafe {
         ffi::libyuv_NV12ToI420(
-            src_y.as_ptr(),
-            src_stride_y,
-            src_uv.as_ptr(),
-            src_stride_uv,
-            ffi::webrtc_I420Buffer_MutableDataY(raw),
-            ffi::webrtc_I420Buffer_StrideY(raw),
-            ffi::webrtc_I420Buffer_MutableDataU(raw),
-            ffi::webrtc_I420Buffer_StrideU(raw),
-            ffi::webrtc_I420Buffer_MutableDataV(raw),
-            ffi::webrtc_I420Buffer_StrideV(raw),
+            src.y_data().as_ptr(),
+            src.stride_y(),
+            src.uv_data().as_ptr(),
+            src.stride_uv(),
+            dst_y,
+            dst_stride_y,
+            dst_u,
+            dst_stride_u,
+            dst_v,
+            dst_stride_v,
             width,
             height,
         )
@@ -166,18 +174,25 @@ pub fn yuy2_to_i420(
     if width <= 0 || height <= 0 {
         return None;
     }
-    let buf = I420Buffer::new(width, height);
-    let raw = buf.raw().as_ptr();
+
+    let mut buf = I420Buffer::new(width, height);
+    let dst_stride_y = buf.stride_y();
+    let dst_stride_u = buf.stride_u();
+    let dst_stride_v = buf.stride_v();
+    let dst_y = buf.y_data_mut().as_mut_ptr();
+    let dst_u = buf.u_data_mut().as_mut_ptr();
+    let dst_v = buf.v_data_mut().as_mut_ptr();
+
     let ret = unsafe {
         ffi::libyuv_YUY2ToI420(
             src_yuy2.as_ptr(),
             src_stride,
-            ffi::webrtc_I420Buffer_MutableDataY(raw),
-            ffi::webrtc_I420Buffer_StrideY(raw),
-            ffi::webrtc_I420Buffer_MutableDataU(raw),
-            ffi::webrtc_I420Buffer_StrideU(raw),
-            ffi::webrtc_I420Buffer_MutableDataV(raw),
-            ffi::webrtc_I420Buffer_StrideV(raw),
+            dst_y,
+            dst_stride_y,
+            dst_u,
+            dst_stride_u,
+            dst_v,
+            dst_stride_v,
             width,
             height,
         )
