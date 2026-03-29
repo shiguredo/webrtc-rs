@@ -1113,24 +1113,20 @@ fn i420_buffer_planes_mut_to_nv12_round_trip() {
         ));
     }
 
-    let assert_plane_eq = |lhs: &[u8],
-                           lhs_stride: i32,
-                           rhs: &[u8],
-                           rhs_stride: i32,
-                           row_bytes: i32,
-                           rows: i32| {
-        let lhs_stride = lhs_stride as usize;
-        let rhs_stride = rhs_stride as usize;
-        let row_bytes = row_bytes as usize;
-        let rows = rows as usize;
-        for row in 0..rows {
-            let lhs_begin = row * lhs_stride;
-            let lhs_end = lhs_begin + row_bytes;
-            let rhs_begin = row * rhs_stride;
-            let rhs_end = rhs_begin + row_bytes;
-            assert_eq!(lhs[lhs_begin..lhs_end], rhs[rhs_begin..rhs_end]);
-        }
-    };
+    let assert_plane_eq =
+        |lhs: &[u8], lhs_stride: i32, rhs: &[u8], rhs_stride: i32, row_bytes: i32, rows: i32| {
+            let lhs_stride = lhs_stride as usize;
+            let rhs_stride = rhs_stride as usize;
+            let row_bytes = row_bytes as usize;
+            let rows = rows as usize;
+            for row in 0..rows {
+                let lhs_begin = row * lhs_stride;
+                let lhs_end = lhs_begin + row_bytes;
+                let rhs_begin = row * rhs_stride;
+                let rhs_end = rhs_begin + row_bytes;
+                assert_eq!(lhs[lhs_begin..lhs_end], rhs[rhs_begin..rhs_end]);
+            }
+        };
 
     assert_plane_eq(
         src.y_data(),
