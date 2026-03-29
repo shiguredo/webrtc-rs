@@ -40,12 +40,12 @@ WEBRTC_EXPORT int webrtc_I420Buffer_height(
 WEBRTC_EXPORT int webrtc_I420Buffer_chroma_width(
     const struct webrtc_I420Buffer* self) {
   auto buf = reinterpret_cast<const webrtc::I420Buffer*>(self);
-  return (buf->width() + 1) / 2;
+  return buf->ChromaWidth();
 }
 WEBRTC_EXPORT int webrtc_I420Buffer_chroma_height(
     const struct webrtc_I420Buffer* self) {
   auto buf = reinterpret_cast<const webrtc::I420Buffer*>(self);
-  return (buf->height() + 1) / 2;
+  return buf->ChromaHeight();
 }
 WEBRTC_EXPORT uint8_t* webrtc_I420Buffer_MutableDataY(
     struct webrtc_I420Buffer* self) {

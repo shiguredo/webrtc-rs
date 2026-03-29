@@ -40,12 +40,12 @@ WEBRTC_EXPORT int webrtc_NV12Buffer_height(
 WEBRTC_EXPORT int webrtc_NV12Buffer_chroma_width(
     const struct webrtc_NV12Buffer* self) {
   auto buf = reinterpret_cast<const webrtc::NV12Buffer*>(self);
-  return (buf->width() + 1) / 2;
+  return buf->ChromaWidth();
 }
 WEBRTC_EXPORT int webrtc_NV12Buffer_chroma_height(
     const struct webrtc_NV12Buffer* self) {
   auto buf = reinterpret_cast<const webrtc::NV12Buffer*>(self);
-  return (buf->height() + 1) / 2;
+  return buf->ChromaHeight();
 }
 WEBRTC_EXPORT uint8_t* webrtc_NV12Buffer_MutableDataY(
     struct webrtc_NV12Buffer* self) {
