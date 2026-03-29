@@ -320,9 +320,22 @@ fn tick_once(
         }
     }
 
-    if let Some((y_plane, u_plane, v_plane)) = abgr_to_i420(
+    let chroma_width = (width.saturating_add(1)) / 2;
+    let chroma_height = (height.saturating_add(1)) / 2;
+    let mut y_plane = vec![0u8; (width.max(0) as usize).saturating_mul(height.max(0) as usize)];
+    let mut u_plane =
+        vec![0u8; (chroma_width.max(0) as usize).saturating_mul(chroma_height.max(0) as usize)];
+    let mut v_plane =
+        vec![0u8; (chroma_width.max(0) as usize).saturating_mul(chroma_height.max(0) as usize)];
+    if abgr_to_i420(
         u32_slice_as_u8_slice(image),
         width.saturating_mul(4),
+        &mut y_plane,
+        width,
+        &mut u_plane,
+        chroma_width,
+        &mut v_plane,
+        chroma_width,
         width,
         height,
     ) {

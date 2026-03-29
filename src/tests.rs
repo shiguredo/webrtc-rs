@@ -932,7 +932,21 @@ fn abgr_to_i420_conversion() {
     for _ in 0..4 {
         src.extend_from_slice(&pixel);
     }
-    let (y_plane, u_plane, v_plane) = abgr_to_i420(&src, 2 * 4, 2, 2).expect("abgr_to_i420 failed");
+    let mut y_plane = vec![0u8; 2 * 2];
+    let mut u_plane = vec![0u8; 1];
+    let mut v_plane = vec![0u8; 1];
+    assert!(abgr_to_i420(
+        &src,
+        2 * 4,
+        &mut y_plane,
+        2,
+        &mut u_plane,
+        1,
+        &mut v_plane,
+        1,
+        2,
+        2,
+    ));
     // 単色なので Y/U/V は全て同一値になるはず。
     assert!(y_plane.iter().all(|&v| v == y_plane[0]));
     assert!(u_plane.iter().all(|&v| v == u_plane[0]));
@@ -944,18 +958,20 @@ fn convert_from_i420_argb_conversion() {
     let y_plane = vec![0x30; 4];
     let u_plane = vec![0x80; 1];
     let v_plane = vec![0x80; 1];
-    let dst = convert_from_i420(
+    let mut dst = vec![0u8; 2 * 2 * 4];
+    assert!(convert_from_i420(
         &y_plane,
         2,
         &u_plane,
         1,
         &v_plane,
         1,
+        &mut dst,
+        2 * 4,
         2,
         2,
         LibyuvFourcc::Argb,
-    )
-    .expect("convert_from_i420(Argb) failed");
+    ));
     assert_eq!(dst.len(), 2 * 2 * 4);
 }
 
@@ -975,19 +991,39 @@ fn i420_to_nv12_round_trip() {
     for (i, p) in src_v.iter_mut().enumerate() {
         *p = 0x80u8.wrapping_add(i as u8);
     }
-    let (nv12_y, nv12_uv) = i420_to_nv12(
+    let mut nv12_y = vec![0u8; (width * height) as usize];
+    let mut nv12_uv = vec![0u8; (width * (height / 2)) as usize];
+    assert!(i420_to_nv12(
         &src_y,
         width,
         &src_u,
         width / 2,
         &src_v,
         width / 2,
+        &mut nv12_y,
+        width,
+        &mut nv12_uv,
+        width,
         width,
         height,
-    )
-    .expect("i420_to_nv12 failed");
-    let (restored_y, restored_u, restored_v) =
-        nv12_to_i420(&nv12_y, width, &nv12_uv, width, width, height).expect("nv12_to_i420 failed");
+    ));
+    let mut restored_y = vec![0u8; src_y.len()];
+    let mut restored_u = vec![0u8; src_u.len()];
+    let mut restored_v = vec![0u8; src_v.len()];
+    assert!(nv12_to_i420(
+        &nv12_y,
+        width,
+        &nv12_uv,
+        width,
+        &mut restored_y,
+        width,
+        &mut restored_u,
+        width / 2,
+        &mut restored_v,
+        width / 2,
+        width,
+        height,
+    ));
 
     assert_eq!(src_y, restored_y);
     assert_eq!(src_u, restored_u);

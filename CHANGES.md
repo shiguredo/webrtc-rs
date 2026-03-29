@@ -31,8 +31,9 @@
   - `VideoFrame` / `VideoFrameRef` に `id` / `ntp_time_ms` / `presentation_timestamp` / `reference_time` / `rotation` / `color_space` / `update_rect` / `is_repeat_frame` getter を追加する
   - @melpon
 - [CHANGE] `libyuv` 変換 API を平面スライス中心に変更する
-  - `convert_from_i420` / `i420_to_nv12` / `nv12_to_i420` の入力を平面スライスと stride / width / height 引数に変更する
-  - `abgr_to_i420` / `nv12_to_i420` / `yuy2_to_i420` / `i420_to_nv12` の戻り値を平面 `Vec<u8>` のタプルに変更する
+  - `convert_from_i420` / `i420_to_nv12` / `abgr_to_i420` / `nv12_to_i420` / `yuy2_to_i420` の出力を `&mut [u8]` と `dst_stride_*` 引数で受ける形式に変更する
+  - `convert_from_i420` / `i420_to_nv12` / `abgr_to_i420` / `nv12_to_i420` / `yuy2_to_i420` の戻り値を `bool` に変更する
+  - 各変換 API の引数順を libyuv の C API と 1 対 1 になるように統一する
   - @melpon
 - [ADD] `NV12Buffer` と関連バッファ API を追加する
   - `NV12Buffer` を追加し、`y_data` / `uv_data` の参照と `crop_and_scale_from` を利用できるようにする
