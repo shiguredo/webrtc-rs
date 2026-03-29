@@ -17,6 +17,9 @@
   - `VideoFrame::from_i420` を削除し、`VideoFrame::from_buffer` を追加する
   - `VideoFrame::buffer` / `VideoFrameRef::buffer` の戻り値を `VideoFrameBuffer` に変更する
   - @melpon
+- [CHANGE] `I420Buffer` の convenience API を削除する
+  - `I420Buffer::fill_y` と `I420Buffer::fill_uv` を削除し、平面書き込みを `y_data_mut` / `u_data_mut` / `v_data_mut` に統一する
+  - @melpon
 
 ## 0.146.2
 

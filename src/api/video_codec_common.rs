@@ -325,26 +325,6 @@ impl I420Buffer {
         unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) }
     }
 
-    /// Y 平面を単一値で塗りつぶす。
-    pub fn fill_y(&mut self, value: u8) {
-        let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataY(self.raw().as_ptr()) };
-        let stride = unsafe { ffi::webrtc_I420Buffer_StrideY(self.raw().as_ptr()) } as usize;
-        let len = stride * self.height() as usize;
-        unsafe { slice::from_raw_parts_mut(ptr, len) }.fill(value);
-    }
-
-    /// U/V 平面を単一値で塗りつぶす。
-    pub fn fill_uv(&mut self, u: u8, v: u8) {
-        let raw = self.raw();
-        let stride_u = unsafe { ffi::webrtc_I420Buffer_StrideU(raw.as_ptr()) } as usize;
-        let stride_v = unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) } as usize;
-        let h = (self.height() as usize).div_ceil(2);
-        let ptr_u = unsafe { ffi::webrtc_I420Buffer_MutableDataU(raw.as_ptr()) };
-        let ptr_v = unsafe { ffi::webrtc_I420Buffer_MutableDataV(raw.as_ptr()) };
-        unsafe { slice::from_raw_parts_mut(ptr_u, stride_u * h) }.fill(u);
-        unsafe { slice::from_raw_parts_mut(ptr_v, stride_v * h) }.fill(v);
-    }
-
     /// 別の I420Buffer からスケールして埋める。
     pub fn scale_from(&mut self, src: &I420Buffer) {
         let raw = self.raw();

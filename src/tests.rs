@@ -208,8 +208,9 @@ fn scalability_mode_round_trip() {
 #[test]
 fn i420_buffer_and_video_frame() {
     let mut buf = I420Buffer::new(4, 4);
-    buf.fill_y(0x10);
-    buf.fill_uv(0x80, 0x90);
+    buf.y_data_mut().fill(0x10);
+    buf.u_data_mut().fill(0x80);
+    buf.v_data_mut().fill(0x90);
 
     let frame_buffer = buf.cast_to_video_frame_buffer();
     let frame = VideoFrame::from_buffer(&frame_buffer, 12345, 0);
@@ -256,8 +257,9 @@ fn video_frame_buffer_handler_native_roundtrip() {
 
         fn to_i420(&mut self) -> Option<I420Buffer> {
             let mut buffer = I420Buffer::new(2, 2);
-            buffer.fill_y(0x12);
-            buffer.fill_uv(0x34, 0x56);
+            buffer.y_data_mut().fill(0x12);
+            buffer.u_data_mut().fill(0x34);
+            buffer.v_data_mut().fill(0x56);
             Some(buffer)
         }
     }
@@ -305,8 +307,9 @@ fn video_frame_buffer_handler_custom_type_roundtrip() {
 
         fn to_i420(&mut self) -> Option<I420Buffer> {
             let mut buffer = I420Buffer::new(2, 2);
-            buffer.fill_y(0x77);
-            buffer.fill_uv(0x88, 0x99);
+            buffer.y_data_mut().fill(0x77);
+            buffer.u_data_mut().fill(0x88);
+            buffer.v_data_mut().fill(0x99);
             Some(buffer)
         }
     }
@@ -368,8 +371,9 @@ fn abgr_to_i420_conversion() {
 #[test]
 fn convert_from_i420_argb_conversion() {
     let mut src = I420Buffer::new(2, 2);
-    src.fill_y(0x30);
-    src.fill_uv(0x80, 0x80);
+    src.y_data_mut().fill(0x30);
+    src.u_data_mut().fill(0x80);
+    src.v_data_mut().fill(0x80);
 
     let dst = convert_from_i420(&src, LibyuvFourcc::Argb)
         .expect("convert_from_i420(Argb) の変換に失敗しました");
