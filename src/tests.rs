@@ -3,6 +3,7 @@ use std::ptr::NonNull;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
+    Mutex,
 };
 use std::time::Duration;
 
@@ -351,6 +352,124 @@ fn video_frame_buffer_handler_to_i420_none() {
     let frame = VideoFrame::from_buffer(&buffer, 100, 0);
     let mut frame_buffer = frame.buffer();
     assert!(frame_buffer.to_i420().is_none());
+}
+
+#[test]
+fn video_frame_buffer_crop_and_scale_from_i420_buffer() {
+    let mut src = I420Buffer::new(4, 4);
+    src.y_data_mut().fill(0x10);
+    src.u_data_mut().fill(0x20);
+    src.v_data_mut().fill(0x30);
+
+    let mut frame_buffer = src.cast_to_video_frame_buffer();
+    let scaled = frame_buffer
+        .scale(2, 2)
+        .expect("VideoFrameBuffer::scale の変換に失敗しました");
+    assert_eq!(scaled.width(), 2);
+    assert_eq!(scaled.height(), 2);
+
+    let mut frame_buffer = src.cast_to_video_frame_buffer();
+    let cropped_scaled = frame_buffer
+        .crop_and_scale(1, 1, 2, 2, 3, 3)
+        .expect("VideoFrameBuffer::crop_and_scale の変換に失敗しました");
+    assert_eq!(cropped_scaled.width(), 3);
+    assert_eq!(cropped_scaled.height(), 3);
+}
+
+#[test]
+fn video_frame_buffer_handler_crop_and_scale_callback() {
+    struct CropAndScaleBufferHandler {
+        called: Arc<AtomicBool>,
+        args: Arc<Mutex<Option<(i32, i32, i32, i32, i32, i32)>>>,
+    }
+
+    impl VideoFrameBufferHandler for CropAndScaleBufferHandler {
+        fn width(&mut self) -> i32 {
+            8
+        }
+
+        fn height(&mut self) -> i32 {
+            8
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            Some(I420Buffer::new(8, 8))
+        }
+
+        fn crop_and_scale(
+            &mut self,
+            offset_x: i32,
+            offset_y: i32,
+            crop_width: i32,
+            crop_height: i32,
+            scaled_width: i32,
+            scaled_height: i32,
+        ) -> Option<VideoFrameBuffer> {
+            self.called.store(true, Ordering::SeqCst);
+            *self.args.lock().expect("args のロックに失敗しました") = Some((
+                offset_x,
+                offset_y,
+                crop_width,
+                crop_height,
+                scaled_width,
+                scaled_height,
+            ));
+            Some(
+                I420Buffer::new(scaled_width, scaled_height)
+                    .cast_to_video_frame_buffer(),
+            )
+        }
+    }
+
+    let called = Arc::new(AtomicBool::new(false));
+    let args = Arc::new(Mutex::new(None));
+    let handler = CropAndScaleBufferHandler {
+        called: Arc::clone(&called),
+        args: Arc::clone(&args),
+    };
+    let mut buffer = VideoFrameBuffer::new_with_handler(Box::new(handler));
+
+    let scaled = buffer
+        .crop_and_scale(1, 2, 3, 4, 5, 6)
+        .expect("VideoFrameBufferHandler::crop_and_scale の実行に失敗しました");
+
+    assert!(called.load(Ordering::SeqCst));
+    assert_eq!(
+        *args.lock().expect("args のロックに失敗しました"),
+        Some((1, 2, 3, 4, 5, 6))
+    );
+    assert_eq!(scaled.width(), 5);
+    assert_eq!(scaled.height(), 6);
+}
+
+#[test]
+fn video_frame_buffer_handler_crop_and_scale_fallback() {
+    struct NoCropAndScaleBufferHandler;
+
+    impl VideoFrameBufferHandler for NoCropAndScaleBufferHandler {
+        fn width(&mut self) -> i32 {
+            4
+        }
+
+        fn height(&mut self) -> i32 {
+            4
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            let mut buffer = I420Buffer::new(4, 4);
+            buffer.y_data_mut().fill(0x55);
+            buffer.u_data_mut().fill(0x66);
+            buffer.v_data_mut().fill(0x77);
+            Some(buffer)
+        }
+    }
+
+    let mut buffer = VideoFrameBuffer::new_with_handler(Box::new(NoCropAndScaleBufferHandler));
+    let scaled = buffer
+        .scale(2, 2)
+        .expect("VideoFrameBuffer::scale のフォールバックに失敗しました");
+    assert_eq!(scaled.width(), 2);
+    assert_eq!(scaled.height(), 2);
 }
 
 #[test]

@@ -14,6 +14,7 @@
 - [CHANGE] `VideoFrame` の生成 API を `VideoFrameBuffer` ベースに変更する
   - `VideoFrameBuffer` / `VideoFrameBufferHandler` を追加し、Rust 実装の native バッファを `kNative` として扱えるようにする
   - `VideoFrameBufferKind` と `VideoFrameBuffer::kind` / `VideoFrameBufferHandler::kind` を追加し、バッファ種別を Rust 側で扱えるようにする
+  - `VideoFrameBuffer::crop_and_scale` / `VideoFrameBuffer::scale` と `VideoFrameBufferHandler::crop_and_scale` を追加し、Rust 側で `CropAndScale` / `Scale` を利用できるようにする
   - `VideoFrame::from_i420` を削除し、`VideoFrame::from_buffer` を追加する
   - `VideoFrame::buffer` / `VideoFrameRef::buffer` の戻り値を `VideoFrameBuffer` に変更する
   - @melpon

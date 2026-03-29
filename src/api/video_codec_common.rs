@@ -482,6 +482,19 @@ pub trait VideoFrameBufferHandler: Send {
     fn width(&mut self) -> i32;
     fn height(&mut self) -> i32;
     fn to_i420(&mut self) -> Option<I420Buffer>;
+    // None を返すとデフォルトの実装が呼ばれる。
+    // デフォルトの実装は to_i420() で I420Buffer を作成してからそれをクロップ＆スケールする。
+    fn crop_and_scale(
+        &mut self,
+        _offset_x: i32,
+        _offset_y: i32,
+        _crop_width: i32,
+        _crop_height: i32,
+        _scaled_width: i32,
+        _scaled_height: i32,
+    ) -> Option<VideoFrameBuffer> {
+        None
+    }
 }
 
 struct VideoFrameBufferHandlerState {
@@ -552,6 +565,40 @@ unsafe extern "C" fn video_frame_buffer_to_i420(
     }
 }
 
+unsafe extern "C" fn video_frame_buffer_crop_and_scale(
+    raw: *mut ffi::webrtc_VideoFrameBuffer,
+    offset_x: i32,
+    offset_y: i32,
+    crop_width: i32,
+    crop_height: i32,
+    scaled_width: i32,
+    scaled_height: i32,
+    user_data: *mut c_void,
+) -> *mut ffi::webrtc_VideoFrameBuffer_refcounted {
+    assert!(
+        !raw.is_null(),
+        "video_frame_buffer_crop_and_scale: raw is null"
+    );
+    assert!(
+        !user_data.is_null(),
+        "video_frame_buffer_crop_and_scale: user_data is null"
+    );
+    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
+    #[cfg(debug_assertions)]
+    assert_video_frame_buffer_handler_thread(state);
+    if let Some(buffer) = state.handler.crop_and_scale(
+        offset_x,
+        offset_y,
+        crop_width,
+        crop_height,
+        scaled_width,
+        scaled_height,
+    ) {
+        return buffer.into_raw_refcounted();
+    }
+    std::ptr::null_mut()
+}
+
 unsafe extern "C" fn video_frame_buffer_on_destroy(user_data: *mut c_void) {
     assert!(
         !user_data.is_null(),
@@ -578,6 +625,7 @@ impl VideoFrameBuffer {
             width: Some(video_frame_buffer_width),
             height: Some(video_frame_buffer_height),
             ToI420: Some(video_frame_buffer_to_i420),
+            CropAndScale: Some(video_frame_buffer_crop_and_scale),
             OnDestroy: Some(video_frame_buffer_on_destroy),
         };
         let raw_ref = match NonNull::new(unsafe {
@@ -612,12 +660,65 @@ impl VideoFrameBuffer {
         Some(I420Buffer::from_raw_ref(raw_ref))
     }
 
+    pub fn crop_and_scale(
+        &mut self,
+        offset_x: i32,
+        offset_y: i32,
+        crop_width: i32,
+        crop_height: i32,
+        scaled_width: i32,
+        scaled_height: i32,
+    ) -> Option<VideoFrameBuffer> {
+        let raw_ref = NonNull::new(unsafe {
+            ffi::webrtc_VideoFrameBuffer_CropAndScale(
+                self.raw().as_ptr(),
+                offset_x,
+                offset_y,
+                crop_width,
+                crop_height,
+                scaled_width,
+                scaled_height,
+            )
+        })
+        .or_else(|| {
+            NonNull::new(unsafe {
+                ffi::webrtc_VideoFrameBuffer_DefaultCropAndScale(
+                    self.raw().as_ptr(),
+                    offset_x,
+                    offset_y,
+                    crop_width,
+                    crop_height,
+                    scaled_width,
+                    scaled_height,
+                )
+            })
+        })?;
+        let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(raw_ref);
+        Some(VideoFrameBuffer { raw_ref })
+    }
+
+    pub fn scale(&mut self, scaled_width: i32, scaled_height: i32) -> Option<VideoFrameBuffer> {
+        self.crop_and_scale(
+            0,
+            0,
+            self.width(),
+            self.height(),
+            scaled_width,
+            scaled_height,
+        )
+    }
+
     pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_VideoFrameBuffer_refcounted {
         self.raw_ref.as_refcounted_ptr()
     }
 
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_VideoFrameBuffer> {
         self.raw_ref.raw()
+    }
+
+    fn into_raw_refcounted(self) -> *mut ffi::webrtc_VideoFrameBuffer_refcounted {
+        let this = std::mem::ManuallyDrop::new(self);
+        this.raw_ref.as_refcounted_ptr()
     }
 }
 
