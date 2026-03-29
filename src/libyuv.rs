@@ -28,6 +28,7 @@ fn plane_len(stride: i32, rows: i32) -> Option<usize> {
 
 /// `libyuv::ConvertFromI420` を呼び出して、I420 を指定フォーマットへ変換する。
 /// 変換に失敗した場合は `None` を返す。
+#[allow(clippy::too_many_arguments)]
 pub fn convert_from_i420(
     src_y: &[u8],
     src_stride_y: i32,
@@ -80,6 +81,7 @@ pub fn convert_from_i420(
 
 /// `libyuv::I420ToNV12` を呼び出して、I420 を NV12 へ変換する。
 /// 変換に失敗した場合は `None` を返す。
+#[allow(clippy::too_many_arguments)]
 pub fn i420_to_nv12(
     src_y: &[u8],
     src_stride_y: i32,
