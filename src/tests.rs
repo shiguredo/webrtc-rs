@@ -213,7 +213,10 @@ fn i420_buffer_and_video_frame() {
     buf.v_data_mut().fill(0x90);
 
     let frame_buffer = buf.cast_to_video_frame_buffer();
-    let frame = VideoFrame::from_buffer(&frame_buffer, 12345, 0);
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(12345)
+        .set_timestamp_rtp(0)
+        .build();
     assert_eq!(frame.width(), 4);
     assert_eq!(frame.height(), 4);
     assert_eq!(frame.timestamp_us(), 12345);
@@ -236,7 +239,10 @@ fn i420_buffer_mutable_planes_and_video_frame_rtp_timestamp() {
     assert!(buf.v_data().iter().all(|&v| v == 0x33));
 
     let frame_buffer = buf.cast_to_video_frame_buffer();
-    let frame = VideoFrame::from_buffer(&frame_buffer, 12345, 67890);
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(12345)
+        .set_timestamp_rtp(67890)
+        .build();
     assert_eq!(frame.timestamp_us(), 12345);
     assert_eq!(frame.rtp_timestamp(), 67890);
     assert_eq!(frame.as_ref().rtp_timestamp(), 67890);
@@ -250,7 +256,10 @@ fn video_frame_clone() {
     buf.v_data_mut().fill(0x66);
 
     let frame_buffer = buf.cast_to_video_frame_buffer();
-    let frame = VideoFrame::from_buffer(&frame_buffer, 11111, 22222);
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(11111)
+        .set_timestamp_rtp(22222)
+        .build();
     let cloned = frame.clone();
 
     assert_eq!(cloned.width(), frame.width());
@@ -274,7 +283,10 @@ fn video_frame_ref_to_owned() {
     buf.v_data_mut().fill(0x99);
 
     let frame_buffer = buf.cast_to_video_frame_buffer();
-    let frame = VideoFrame::from_buffer(&frame_buffer, 33333, 44444);
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(33333)
+        .set_timestamp_rtp(44444)
+        .build();
     let copied = frame.as_ref().to_owned();
 
     assert_eq!(copied.width(), frame.width());
@@ -288,6 +300,112 @@ fn video_frame_ref_to_owned() {
         .to_i420()
         .expect("to_owned した VideoFrame の buffer 変換に失敗しました");
     assert_eq!(copied_i420.y_data()[0], 0x77);
+}
+
+#[test]
+fn video_frame_update_rect_roundtrip() {
+    let mut rect = VideoFrameUpdateRect::new();
+    rect.set_offset_x(11);
+    rect.set_offset_y(22);
+    rect.set_width(33);
+    rect.set_height(44);
+
+    assert_eq!(rect.offset_x(), 11);
+    assert_eq!(rect.offset_y(), 22);
+    assert_eq!(rect.width(), 33);
+    assert_eq!(rect.height(), 44);
+}
+
+#[test]
+fn video_frame_builder_roundtrip_all_fields() {
+    let i420 = I420Buffer::new(4, 4);
+    let frame_buffer = i420.cast_to_video_frame_buffer();
+    let mut update_rect = VideoFrameUpdateRect::new();
+    update_rect.set_offset_x(1);
+    update_rect.set_offset_y(2);
+    update_rect.set_width(3);
+    update_rect.set_height(4);
+    let color_space = ColorSpace::new();
+    let color_space_string = color_space
+        .as_string()
+        .expect("ColorSpace::as_string に失敗しました");
+
+    let presentation_timestamp = Duration::from_micros(1_234_567);
+    let reference_time = Duration::from_micros(2_345_678);
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(765_432)
+        .set_timestamp_rtp(1122)
+        .set_id(5566)
+        .set_ntp_time_ms(7788)
+        .set_rotation(VideoRotation::R270)
+        .set_presentation_timestamp(Some(presentation_timestamp))
+        .set_reference_time(Some(reference_time))
+        .set_color_space(Some(&color_space))
+        .set_update_rect(Some(&update_rect))
+        .set_is_repeat_frame(true)
+        .build();
+
+    assert_eq!(frame.timestamp_us(), 765_432);
+    assert_eq!(frame.rtp_timestamp(), 1122);
+    assert_eq!(frame.id(), 5566);
+    assert_eq!(frame.ntp_time_ms(), 7788);
+    assert_eq!(frame.rotation(), VideoRotation::R270);
+    assert_eq!(frame.presentation_timestamp(), Some(presentation_timestamp));
+    assert_eq!(frame.reference_time(), Some(reference_time));
+    assert!(frame.has_update_rect());
+    assert!(frame.is_repeat_frame());
+    let frame_update_rect = frame.update_rect();
+    assert_eq!(frame_update_rect.offset_x(), 1);
+    assert_eq!(frame_update_rect.offset_y(), 2);
+    assert_eq!(frame_update_rect.width(), 3);
+    assert_eq!(frame_update_rect.height(), 4);
+    let frame_color_space = frame
+        .color_space()
+        .expect("ColorSpace が設定されていません");
+    assert_eq!(
+        frame_color_space
+            .as_string()
+            .expect("VideoFrame::color_space の as_string に失敗しました"),
+        color_space_string
+    );
+
+    let frame_ref = frame.as_ref();
+    assert_eq!(frame_ref.id(), 5566);
+    assert_eq!(frame_ref.ntp_time_ms(), 7788);
+    assert_eq!(frame_ref.rotation(), VideoRotation::R270);
+    assert_eq!(
+        frame_ref.presentation_timestamp(),
+        Some(presentation_timestamp)
+    );
+    assert_eq!(frame_ref.reference_time(), Some(reference_time));
+    assert!(frame_ref.has_update_rect());
+    assert!(frame_ref.is_repeat_frame());
+}
+
+#[test]
+fn video_frame_builder_none_update_rect() {
+    let i420 = I420Buffer::new(2, 2);
+    let frame_buffer = i420.cast_to_video_frame_buffer();
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(10)
+        .set_update_rect(None)
+        .build();
+
+    assert!(!frame.has_update_rect());
+    let update_rect = frame.update_rect();
+    assert_eq!(update_rect.offset_x(), 0);
+    assert_eq!(update_rect.offset_y(), 0);
+    assert_eq!(update_rect.width(), frame.width());
+    assert_eq!(update_rect.height(), frame.height());
+}
+
+#[test]
+#[should_panic(expected = "Duration microseconds overflowed i64")]
+fn video_frame_builder_overflow_duration_panics() {
+    let i420 = I420Buffer::new(2, 2);
+    let frame_buffer = i420.cast_to_video_frame_buffer();
+    let overflow = Duration::from_micros(i64::MAX as u64 + 1);
+    let _ = VideoFrame::builder(&frame_buffer).set_presentation_timestamp(Some(overflow));
 }
 
 #[test]
@@ -415,7 +533,10 @@ fn video_frame_buffer_handler_native_roundtrip() {
         .expect("VideoFrameBufferHandler の ToI420 が None になりました");
     assert_eq!(converted.y_data()[0], 0x12);
 
-    let frame = VideoFrame::from_buffer(&buffer, 12345, 67890);
+    let frame = VideoFrame::builder(&buffer)
+        .set_timestamp_us(12345)
+        .set_timestamp_rtp(67890)
+        .build();
     assert_eq!(frame.width(), 2);
     assert_eq!(frame.height(), 2);
     assert_eq!(frame.timestamp_us(), 12345);
@@ -458,7 +579,10 @@ fn video_frame_buffer_handler_custom_type_roundtrip() {
     let buffer = VideoFrameBuffer::new_with_handler(Box::new(I420TypeBufferHandler));
     assert_eq!(buffer.kind(), VideoFrameBufferKind::I420);
 
-    let frame = VideoFrame::from_buffer(&buffer, 222, 333);
+    let frame = VideoFrame::builder(&buffer)
+        .set_timestamp_us(222)
+        .set_timestamp_rtp(333)
+        .build();
     let mut frame_buffer = frame.buffer();
     assert_eq!(frame_buffer.kind(), VideoFrameBufferKind::I420);
 
@@ -489,7 +613,10 @@ fn video_frame_buffer_handler_to_i420_none() {
     let mut buffer = VideoFrameBuffer::new_with_handler(Box::new(NoI420BufferHandler));
     assert!(buffer.to_i420().is_none());
 
-    let frame = VideoFrame::from_buffer(&buffer, 100, 0);
+    let frame = VideoFrame::builder(&buffer)
+        .set_timestamp_us(100)
+        .set_timestamp_rtp(0)
+        .build();
     let mut frame_buffer = frame.buffer();
     assert!(frame_buffer.to_i420().is_none());
 }
@@ -693,7 +820,10 @@ fn video_frame_buffer_as_native_clone_and_frame_buffer() {
         .expect("clone からの as_native_ref が失敗しました");
     assert_eq!(cloned_handler.value, 5);
 
-    let frame = VideoFrame::from_buffer(&buffer, 10, 20);
+    let frame = VideoFrame::builder(&buffer)
+        .set_timestamp_us(10)
+        .set_timestamp_rtp(20)
+        .build();
     let frame_buffer = frame.buffer();
     // Safety: このテストでは同一実体への同時アクセスを行いません。
     let frame_handler = unsafe { frame_buffer.as_native_ref::<DowncastBufferHandler>() }
@@ -1066,7 +1196,10 @@ fn adapted_video_track_source() {
 
     let buf = I420Buffer::new(2, 2);
     let frame_buffer = buf.cast_to_video_frame_buffer();
-    let frame = VideoFrame::from_buffer(&frame_buffer, 2_000_000, 0);
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(2_000_000)
+        .set_timestamp_rtp(0)
+        .build();
     src.on_frame(&frame);
 }
 
@@ -1639,7 +1772,10 @@ fn video_track_and_transceiver_with_track() {
     // ついでにフレーム投入 API も呼んでおく。
     let buf = I420Buffer::new(2, 2);
     let frame_buffer = buf.cast_to_video_frame_buffer();
-    let frame = VideoFrame::from_buffer(&frame_buffer, 1_000_000, 0);
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(1_000_000)
+        .set_timestamp_rtp(0)
+        .build();
     source.on_frame(&frame);
 
     // PeerConnection を作成し、トラック付きで transceiver を追加する。
@@ -1774,7 +1910,10 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
 
     let buffer = I420Buffer::new(2, 2);
     let frame_buffer = buffer.cast_to_video_frame_buffer();
-    let frame = VideoFrame::from_buffer(&frame_buffer, 123, 0);
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(123)
+        .set_timestamp_rtp(0)
+        .build();
     let mut frame_types = VideoFrameTypeVector::new(0);
     frame_types.push(VideoFrameType::Key);
     frame_types.push(VideoFrameType::Delta);
@@ -2241,7 +2380,10 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
 
     let buffer = I420Buffer::new(2, 2);
     let frame_buffer = buffer.cast_to_video_frame_buffer();
-    let frame = VideoFrame::from_buffer(&frame_buffer, 123, 0);
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(123)
+        .set_timestamp_rtp(0)
+        .build();
     assert_eq!(
         encoder.encode(frame.as_ref(), None),
         VideoCodecStatus::Unknown(88)

@@ -262,18 +262,16 @@ fn tick_once(
             let mut scaled = I420Buffer::new(size.adapted_width, size.adapted_height);
             scaled.scale_from(&buffer);
             let scaled_buffer = scaled.cast_to_video_frame_buffer();
-            VideoFrame::from_buffer(
-                &scaled_buffer,
-                timestamp_aligner.translate(timestamp_us, time_millis() * 1000),
-                0,
-            )
+            VideoFrame::builder(&scaled_buffer)
+                .set_timestamp_us(timestamp_aligner.translate(timestamp_us, time_millis() * 1000))
+                .set_timestamp_rtp(0)
+                .build()
         } else {
             let frame_buffer = buffer.cast_to_video_frame_buffer();
-            VideoFrame::from_buffer(
-                &frame_buffer,
-                timestamp_aligner.translate(timestamp_us, time_millis() * 1000),
-                0,
-            )
+            VideoFrame::builder(&frame_buffer)
+                .set_timestamp_us(timestamp_aligner.translate(timestamp_us, time_millis() * 1000))
+                .set_timestamp_rtp(0)
+                .build()
         };
         source.on_frame(&frame);
     }

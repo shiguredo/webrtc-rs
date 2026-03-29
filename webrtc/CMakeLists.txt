@@ -364,11 +364,13 @@ add_library(webrtc_c
     src/webrtc_c/api/rtp_transceiver_direction.cc
     src/webrtc_c/api/rtp_transceiver_interface.cc
     src/webrtc_c/api/stats/rtc_stats_report.cc
+    src/webrtc_c/api/video/color_space.cc
     src/webrtc_c/api/video/encoded_image.cc
     src/webrtc_c/api/video/i420_buffer.cc
     src/webrtc_c/api/video/nv12_buffer.cc
     src/webrtc_c/api/video/video_frame.cc
     src/webrtc_c/api/video/video_frame_buffer.cc
+    src/webrtc_c/api/video/video_rotation.cc
     src/webrtc_c/api/video/video_sink_interface.cc
     src/webrtc_c/api/video/video_source_interface.cc
     src/webrtc_c/api/video_codecs/video_codec.cc
