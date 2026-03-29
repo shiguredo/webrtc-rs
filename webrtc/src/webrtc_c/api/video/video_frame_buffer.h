@@ -15,6 +15,7 @@ extern "C" {
 WEBRTC_DECLARE_REFCOUNTED(webrtc_VideoFrameBuffer);
 
 struct webrtc_I420Buffer_refcounted;
+struct webrtc_NV12Buffer_refcounted;
 
 struct webrtc_VideoFrameBuffer_cbs {
   int (*type)(void* user_data);
@@ -38,6 +39,14 @@ WEBRTC_EXPORT int webrtc_VideoFrameBuffer_width(
     const struct webrtc_VideoFrameBuffer* self);
 WEBRTC_EXPORT int webrtc_VideoFrameBuffer_height(
     const struct webrtc_VideoFrameBuffer* self);
+WEBRTC_EXPORT void* webrtc_VideoFrameBuffer_get_user_data(
+    struct webrtc_VideoFrameBuffer* self);
+WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted*
+webrtc_VideoFrameBuffer_cast_to_webrtc_I420Buffer(
+    struct webrtc_VideoFrameBuffer* self);
+WEBRTC_EXPORT struct webrtc_NV12Buffer_refcounted*
+webrtc_VideoFrameBuffer_cast_to_webrtc_NV12Buffer(
+    struct webrtc_VideoFrameBuffer* self);
 WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted* webrtc_VideoFrameBuffer_ToI420(
     struct webrtc_VideoFrameBuffer* self);
 WEBRTC_EXPORT struct webrtc_VideoFrameBuffer_refcounted*

@@ -610,6 +610,191 @@ fn video_frame_buffer_handler_crop_and_scale_fallback() {
 }
 
 #[test]
+fn video_frame_buffer_as_native_roundtrip() {
+    struct DowncastBufferHandler {
+        value: u8,
+    }
+
+    impl VideoFrameBufferHandler for DowncastBufferHandler {
+        fn width(&mut self) -> i32 {
+            2
+        }
+
+        fn height(&mut self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            let mut buffer = I420Buffer::new(2, 2);
+            buffer.y_data_mut().fill(self.value);
+            buffer.u_data_mut().fill(0x01);
+            buffer.v_data_mut().fill(0x02);
+            Some(buffer)
+        }
+    }
+
+    let mut buffer =
+        VideoFrameBuffer::new_with_handler(Box::new(DowncastBufferHandler { value: 7 }));
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let handler = unsafe { buffer.as_native_ref::<DowncastBufferHandler>() }
+        .expect("as_native_ref が失敗しました");
+    assert_eq!(handler.value, 7);
+
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let handler = unsafe { buffer.as_native_mut::<DowncastBufferHandler>() }
+        .expect("as_native_mut が失敗しました");
+    handler.value = 9;
+
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let handler = unsafe { buffer.as_native_ref::<DowncastBufferHandler>() }
+        .expect("as_native_ref が失敗しました");
+    assert_eq!(handler.value, 9);
+
+    let i420 = buffer
+        .to_i420()
+        .expect("VideoFrameBuffer の I420 変換に失敗しました");
+    assert_eq!(i420.y_data()[0], 9);
+}
+
+#[test]
+fn video_frame_buffer_as_native_clone_and_frame_buffer() {
+    struct DowncastBufferHandler {
+        value: u8,
+    }
+
+    impl VideoFrameBufferHandler for DowncastBufferHandler {
+        fn width(&mut self) -> i32 {
+            2
+        }
+
+        fn height(&mut self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            let mut buffer = I420Buffer::new(2, 2);
+            buffer.y_data_mut().fill(self.value);
+            buffer.u_data_mut().fill(0x11);
+            buffer.v_data_mut().fill(0x22);
+            Some(buffer)
+        }
+    }
+
+    let mut buffer =
+        VideoFrameBuffer::new_with_handler(Box::new(DowncastBufferHandler { value: 3 }));
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    unsafe { buffer.as_native_mut::<DowncastBufferHandler>() }
+        .expect("as_native_mut が失敗しました")
+        .value = 5;
+
+    let cloned = buffer.clone();
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let cloned_handler = unsafe { cloned.as_native_ref::<DowncastBufferHandler>() }
+        .expect("clone からの as_native_ref が失敗しました");
+    assert_eq!(cloned_handler.value, 5);
+
+    let frame = VideoFrame::from_buffer(&buffer, 10, 20);
+    let frame_buffer = frame.buffer();
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let frame_handler = unsafe { frame_buffer.as_native_ref::<DowncastBufferHandler>() }
+        .expect("VideoFrame::buffer からの as_native_ref が失敗しました");
+    assert_eq!(frame_handler.value, 5);
+}
+
+#[test]
+fn video_frame_buffer_as_native_returns_none_for_builtin_buffers() {
+    struct NativeBufferHandler;
+
+    impl VideoFrameBufferHandler for NativeBufferHandler {
+        fn width(&mut self) -> i32 {
+            1
+        }
+
+        fn height(&mut self) -> i32 {
+            1
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            Some(I420Buffer::new(1, 1))
+        }
+    }
+
+    let i420 = I420Buffer::new(2, 2);
+    let mut i420_frame_buffer = i420.cast_to_video_frame_buffer();
+    // Safety: 参照を取り出すだけで、同時アクセスは行いません。
+    assert!(unsafe {
+        i420_frame_buffer
+            .as_native_ref::<NativeBufferHandler>()
+            .is_none()
+    });
+    // Safety: 参照を取り出すだけで、同時アクセスは行いません。
+    assert!(unsafe {
+        i420_frame_buffer
+            .as_native_mut::<NativeBufferHandler>()
+            .is_none()
+    });
+
+    let nv12 = NV12Buffer::new(2, 2);
+    let mut nv12_frame_buffer = nv12.cast_to_video_frame_buffer();
+    // Safety: 参照を取り出すだけで、同時アクセスは行いません。
+    assert!(unsafe {
+        nv12_frame_buffer
+            .as_native_ref::<NativeBufferHandler>()
+            .is_none()
+    });
+    // Safety: 参照を取り出すだけで、同時アクセスは行いません。
+    assert!(unsafe {
+        nv12_frame_buffer
+            .as_native_mut::<NativeBufferHandler>()
+            .is_none()
+    });
+}
+
+#[test]
+fn video_frame_buffer_as_i420_and_as_nv12() {
+    let i420 = I420Buffer::new(2, 2);
+    let i420_frame_buffer = i420.cast_to_video_frame_buffer();
+    let i420_view = i420_frame_buffer
+        .as_i420()
+        .expect("as_i420 failed on I420 buffer");
+    assert_eq!(i420_view.width(), 2);
+    assert_eq!(i420_view.height(), 2);
+    assert!(i420_frame_buffer.as_nv12().is_none());
+
+    let nv12 = NV12Buffer::new(2, 2);
+    let nv12_frame_buffer = nv12.cast_to_video_frame_buffer();
+    let nv12_view = nv12_frame_buffer
+        .as_nv12()
+        .expect("as_nv12 failed on NV12 buffer");
+    assert_eq!(nv12_view.width(), 2);
+    assert_eq!(nv12_view.height(), 2);
+    assert!(nv12_frame_buffer.as_i420().is_none());
+}
+
+#[test]
+fn video_frame_buffer_as_i420_and_as_nv12_return_none_for_native() {
+    struct NativeBufferHandler;
+
+    impl VideoFrameBufferHandler for NativeBufferHandler {
+        fn width(&mut self) -> i32 {
+            2
+        }
+
+        fn height(&mut self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            Some(I420Buffer::new(2, 2))
+        }
+    }
+
+    let frame_buffer = VideoFrameBuffer::new_with_handler(Box::new(NativeBufferHandler));
+    assert!(frame_buffer.as_i420().is_none());
+    assert!(frame_buffer.as_nv12().is_none());
+}
+
+#[test]
 fn abgr_to_i420_conversion() {
     // 2x2 ピクセル、ABGR = 0xff804020 (B=0x20, G=0x40, R=0x80, A=0xff)
     let pixel = [0x20u8, 0x40, 0x80, 0xff];

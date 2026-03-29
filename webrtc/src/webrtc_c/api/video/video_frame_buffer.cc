@@ -8,6 +8,7 @@
 #include <api/make_ref_counted.h>
 #include <api/scoped_refptr.h>
 #include <api/video/i420_buffer.h>
+#include <api/video/nv12_buffer.h>
 #include <api/video/video_frame_buffer.h>
 
 #include "../../common.h"
@@ -100,6 +101,8 @@ class VideoFrameBufferImpl : public webrtc::VideoFrameBuffer {
     return buffer;
   }
 
+  void* user_data() const { return user_data_; }
+
  private:
   webrtc_VideoFrameBuffer_cbs cbs_{};
   void* user_data_ = nullptr;
@@ -126,6 +129,40 @@ WEBRTC_EXPORT int webrtc_VideoFrameBuffer_height(
     const struct webrtc_VideoFrameBuffer* self) {
   auto buffer = reinterpret_cast<const webrtc::VideoFrameBuffer*>(self);
   return buffer->height();
+}
+
+WEBRTC_EXPORT void* webrtc_VideoFrameBuffer_get_user_data(
+    struct webrtc_VideoFrameBuffer* self) {
+  auto buffer = reinterpret_cast<webrtc::VideoFrameBuffer*>(self);
+  auto impl = dynamic_cast<VideoFrameBufferImpl*>(buffer);
+  if (impl == nullptr) {
+    return nullptr;
+  }
+  return impl->user_data();
+}
+
+WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted*
+webrtc_VideoFrameBuffer_cast_to_webrtc_I420Buffer(
+    struct webrtc_VideoFrameBuffer* self) {
+  auto buffer = reinterpret_cast<webrtc::VideoFrameBuffer*>(self);
+  auto i420 = dynamic_cast<webrtc::I420Buffer*>(buffer);
+  if (i420 == nullptr) {
+    return nullptr;
+  }
+  webrtc::scoped_refptr<webrtc::I420Buffer> ref(i420);
+  return reinterpret_cast<struct webrtc_I420Buffer_refcounted*>(ref.release());
+}
+
+WEBRTC_EXPORT struct webrtc_NV12Buffer_refcounted*
+webrtc_VideoFrameBuffer_cast_to_webrtc_NV12Buffer(
+    struct webrtc_VideoFrameBuffer* self) {
+  auto buffer = reinterpret_cast<webrtc::VideoFrameBuffer*>(self);
+  auto nv12 = dynamic_cast<webrtc::NV12Buffer*>(buffer);
+  if (nv12 == nullptr) {
+    return nullptr;
+  }
+  webrtc::scoped_refptr<webrtc::NV12Buffer> ref(nv12);
+  return reinterpret_cast<struct webrtc_NV12Buffer_refcounted*>(ref.release());
 }
 
 WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted* webrtc_VideoFrameBuffer_ToI420(

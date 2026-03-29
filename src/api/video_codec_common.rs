@@ -2,6 +2,7 @@ use crate::ref_count::{
     EncodedImageBufferHandle, I420BufferHandle, NV12BufferHandle, VideoFrameBufferHandle,
 };
 use crate::{CxxString, CxxStringRef, Error, MapStringString, Result, ScopedRef, ffi};
+use std::any::Any;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -527,6 +528,11 @@ impl NV12Buffer {
         self.raw_ref.as_refcounted_ptr()
     }
 
+    fn from_raw_ref(raw_ref: NonNull<ffi::webrtc_NV12Buffer_refcounted>) -> Self {
+        let raw_ref = ScopedRef::<NV12BufferHandle>::from_raw(raw_ref);
+        Self { raw_ref }
+    }
+
     pub fn cast_to_video_frame_buffer(&self) -> VideoFrameBuffer {
         let raw_ref = NonNull::new(unsafe {
             ffi::webrtc_NV12Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer(
@@ -602,7 +608,23 @@ impl VideoFrameBufferKind {
     }
 }
 
-pub trait VideoFrameBufferHandler: Send {
+#[doc(hidden)]
+pub trait VideoFrameBufferHandlerAny {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+
+impl<T: Any> VideoFrameBufferHandlerAny for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+pub trait VideoFrameBufferHandler: Send + VideoFrameBufferHandlerAny {
     fn kind(&mut self) -> VideoFrameBufferKind {
         VideoFrameBufferKind::Native
     }
@@ -779,6 +801,44 @@ impl VideoFrameBuffer {
     pub fn kind(&self) -> VideoFrameBufferKind {
         let value = unsafe { ffi::webrtc_VideoFrameBuffer_type(self.raw().as_ptr()) };
         VideoFrameBufferKind::from_raw(value)
+    }
+
+    /// # Safety
+    /// 同一実体の `VideoFrameBuffer` へ同時アクセスしないこと。
+    /// 特に callback 側や別 clone から mutable にアクセスされないことを呼び出し側が保証する必要があります。
+    pub unsafe fn as_native_ref<T: VideoFrameBufferHandler + 'static>(&self) -> Option<&T> {
+        let user_data = unsafe { ffi::webrtc_VideoFrameBuffer_get_user_data(self.raw().as_ptr()) };
+        if user_data.is_null() {
+            return None;
+        }
+        let state = unsafe { &*(user_data as *const VideoFrameBufferHandlerState) };
+        state.handler.as_ref().as_any().downcast_ref::<T>()
+    }
+
+    /// # Safety
+    /// 同一実体の `VideoFrameBuffer` への参照が存在しないこと。
+    /// 特に callback 側や別 clone から同時に参照されないことを呼び出し側が保証する必要があります。
+    pub unsafe fn as_native_mut<T: VideoFrameBufferHandler + 'static>(&mut self) -> Option<&mut T> {
+        let user_data = unsafe { ffi::webrtc_VideoFrameBuffer_get_user_data(self.raw().as_ptr()) };
+        if user_data.is_null() {
+            return None;
+        }
+        let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
+        state.handler.as_mut().as_any_mut().downcast_mut::<T>()
+    }
+
+    pub fn as_i420(&self) -> Option<I420Buffer> {
+        let raw_ref = NonNull::new(unsafe {
+            ffi::webrtc_VideoFrameBuffer_cast_to_webrtc_I420Buffer(self.raw().as_ptr())
+        })?;
+        Some(I420Buffer::from_raw_ref(raw_ref))
+    }
+
+    pub fn as_nv12(&self) -> Option<NV12Buffer> {
+        let raw_ref = NonNull::new(unsafe {
+            ffi::webrtc_VideoFrameBuffer_cast_to_webrtc_NV12Buffer(self.raw().as_ptr())
+        })?;
+        Some(NV12Buffer::from_raw_ref(raw_ref))
     }
 
     pub fn to_i420(&mut self) -> Option<I420Buffer> {
