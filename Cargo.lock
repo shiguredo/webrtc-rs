@@ -550,7 +550,7 @@ checksum = "f501556feebae970519ffa4afc5edb078c8eb16da4a0a2fbe803d75c0e34a79b"
 
 [[package]]
 name = "shiguredo_webrtc"
-version = "0.146.2"
+version = "0.146.3-canary.0"
 dependencies = [
  "bindgen",
  "nojson",
