@@ -1,9 +1,8 @@
 use super::*;
 use std::ptr::NonNull;
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicBool, Ordering},
-    Mutex,
 };
 use std::time::Duration;
 
@@ -244,6 +243,67 @@ fn i420_buffer_mutable_planes_and_video_frame_rtp_timestamp() {
 }
 
 #[test]
+fn nv12_buffer_planes_kind_and_to_i420() {
+    let width = 4;
+    let height = 3;
+    let mut buf = NV12Buffer::new(width, height);
+
+    assert_eq!(buf.width(), width);
+    assert_eq!(buf.height(), height);
+    assert_eq!(buf.y_data().len(), (buf.stride_y() * height) as usize);
+    assert_eq!(
+        buf.uv_data().len(),
+        (buf.stride_uv() as usize) * (height as usize).div_ceil(2)
+    );
+
+    for (i, v) in buf.y_data_mut().iter_mut().enumerate() {
+        *v = (i as u8).wrapping_add(0x10);
+    }
+    for uv in buf.uv_data_mut().chunks_exact_mut(2) {
+        uv[0] = 0x44;
+        uv[1] = 0x88;
+    }
+
+    let mut frame_buffer = buf.cast_to_video_frame_buffer();
+    assert_eq!(frame_buffer.kind(), VideoFrameBufferKind::Nv12);
+
+    let i420 = frame_buffer
+        .to_i420()
+        .expect("VideoFrameBuffer から I420Buffer への変換に失敗しました");
+    assert_eq!(i420.y_data(), buf.y_data());
+    assert!(i420.u_data().iter().all(|&v| v == 0x44));
+    assert!(i420.v_data().iter().all(|&v| v == 0x88));
+}
+
+#[test]
+fn nv12_buffer_crop_and_scale_from() {
+    let mut src = NV12Buffer::new(4, 4);
+    src.y_data_mut().fill(0x11);
+    for uv in src.uv_data_mut().chunks_exact_mut(2) {
+        uv[0] = 0x22;
+        uv[1] = 0x66;
+    }
+
+    let mut dst = NV12Buffer::new(2, 2);
+    dst.crop_and_scale_from(&src, 0, 0, 4, 4);
+
+    assert!(dst.y_data().iter().all(|&v| v == 0x11));
+    for uv in dst.uv_data().chunks_exact(2) {
+        assert_eq!(uv[0], 0x22);
+        assert_eq!(uv[1], 0x66);
+    }
+
+    let mut frame_buffer = dst.cast_to_video_frame_buffer();
+    assert_eq!(frame_buffer.kind(), VideoFrameBufferKind::Nv12);
+    let i420 = frame_buffer
+        .to_i420()
+        .expect("VideoFrameBuffer から I420Buffer への変換に失敗しました");
+    assert!(i420.y_data().iter().all(|&v| v == 0x11));
+    assert!(i420.u_data().iter().all(|&v| v == 0x22));
+    assert!(i420.v_data().iter().all(|&v| v == 0x66));
+}
+
+#[test]
 fn video_frame_buffer_handler_native_roundtrip() {
     struct NativeBufferHandler;
 
@@ -414,10 +474,7 @@ fn video_frame_buffer_handler_crop_and_scale_callback() {
                 scaled_width,
                 scaled_height,
             ));
-            Some(
-                I420Buffer::new(scaled_width, scaled_height)
-                    .cast_to_video_frame_buffer(),
-            )
+            Some(I420Buffer::new(scaled_width, scaled_height).cast_to_video_frame_buffer())
         }
     }
 

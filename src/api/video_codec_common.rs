@@ -1,4 +1,6 @@
-use crate::ref_count::{EncodedImageBufferHandle, I420BufferHandle, VideoFrameBufferHandle};
+use crate::ref_count::{
+    EncodedImageBufferHandle, I420BufferHandle, NV12BufferHandle, VideoFrameBufferHandle,
+};
 use crate::{CxxString, CxxStringRef, Error, MapStringString, Result, ScopedRef, ffi};
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -412,6 +414,115 @@ impl I420Buffer {
     }
 
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_I420Buffer> {
+        self.raw_ref.raw()
+    }
+}
+
+/// webrtc::NV12Buffer のラッパー。
+pub struct NV12Buffer {
+    raw_ref: ScopedRef<NV12BufferHandle>,
+}
+
+impl NV12Buffer {
+    pub fn new(width: i32, height: i32) -> Self {
+        let raw = NonNull::new(unsafe { ffi::webrtc_NV12Buffer_Create(width, height) })
+            .expect("BUG: webrtc_NV12Buffer_Create returned null");
+        let raw_ref = ScopedRef::<NV12BufferHandle>::from_raw(raw);
+        Self { raw_ref }
+    }
+
+    pub fn width(&self) -> i32 {
+        unsafe { ffi::webrtc_NV12Buffer_width(self.raw().as_ptr()) }
+    }
+
+    pub fn height(&self) -> i32 {
+        unsafe { ffi::webrtc_NV12Buffer_height(self.raw().as_ptr()) }
+    }
+
+    pub fn stride_y(&self) -> i32 {
+        let raw = self.raw();
+        unsafe { ffi::webrtc_NV12Buffer_StrideY(raw.as_ptr()) }
+    }
+
+    pub fn stride_uv(&self) -> i32 {
+        let raw = self.raw();
+        unsafe { ffi::webrtc_NV12Buffer_StrideUV(raw.as_ptr()) }
+    }
+
+    pub fn crop_and_scale_from(
+        &mut self,
+        src: &NV12Buffer,
+        offset_x: i32,
+        offset_y: i32,
+        crop_width: i32,
+        crop_height: i32,
+    ) {
+        let raw = self.raw();
+        let src_raw = src.raw();
+        unsafe {
+            ffi::webrtc_NV12Buffer_CropAndScaleFrom(
+                raw.as_ptr(),
+                src_raw.as_ptr(),
+                offset_x,
+                offset_y,
+                crop_width,
+                crop_height,
+            )
+        };
+    }
+
+    /// Y 平面を参照する。
+    pub fn y_data(&self) -> &[u8] {
+        let raw = self.raw();
+        let ptr = unsafe { ffi::webrtc_NV12Buffer_MutableDataY(raw.as_ptr()) };
+        let stride = unsafe { ffi::webrtc_NV12Buffer_StrideY(raw.as_ptr()) } as usize;
+        let len = stride * self.height() as usize;
+        unsafe { slice::from_raw_parts(ptr, len) }
+    }
+
+    /// Y 平面を可変参照する。
+    pub fn y_data_mut(&mut self) -> &mut [u8] {
+        let raw = self.raw();
+        let ptr = unsafe { ffi::webrtc_NV12Buffer_MutableDataY(raw.as_ptr()) };
+        let stride = unsafe { ffi::webrtc_NV12Buffer_StrideY(raw.as_ptr()) } as usize;
+        let len = stride * self.height() as usize;
+        unsafe { slice::from_raw_parts_mut(ptr, len) }
+    }
+
+    /// UV 平面を参照する。
+    pub fn uv_data(&self) -> &[u8] {
+        let raw = self.raw();
+        let ptr = unsafe { ffi::webrtc_NV12Buffer_MutableDataUV(raw.as_ptr()) };
+        let stride = unsafe { ffi::webrtc_NV12Buffer_StrideUV(raw.as_ptr()) } as usize;
+        let h = (self.height() as usize).div_ceil(2);
+        unsafe { slice::from_raw_parts(ptr, stride * h) }
+    }
+
+    /// UV 平面を可変参照する。
+    pub fn uv_data_mut(&mut self) -> &mut [u8] {
+        let raw = self.raw();
+        let ptr = unsafe { ffi::webrtc_NV12Buffer_MutableDataUV(raw.as_ptr()) };
+        let stride = unsafe { ffi::webrtc_NV12Buffer_StrideUV(raw.as_ptr()) } as usize;
+        let h = (self.height() as usize).div_ceil(2);
+        unsafe { slice::from_raw_parts_mut(ptr, stride * h) }
+    }
+
+    pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_NV12Buffer_refcounted {
+        self.raw_ref.as_refcounted_ptr()
+    }
+
+    pub fn cast_to_video_frame_buffer(&self) -> VideoFrameBuffer {
+        let raw_ref = NonNull::new(unsafe {
+            ffi::webrtc_NV12Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer(
+                self.raw_ref.as_refcounted_ptr(),
+            )
+        })
+        .expect("BUG: webrtc_NV12Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer returned null");
+        let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(raw_ref);
+        VideoFrameBuffer { raw_ref }
+    }
+
+    pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_NV12Buffer> {
         self.raw_ref.raw()
     }
 }

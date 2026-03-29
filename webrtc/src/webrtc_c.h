@@ -24,6 +24,7 @@
 #include "webrtc_c/api/stats/rtc_stats_report.h"
 #include "webrtc_c/api/video/encoded_image.h"
 #include "webrtc_c/api/video/i420_buffer.h"
+#include "webrtc_c/api/video/nv12_buffer.h"
 #include "webrtc_c/api/video/video_frame.h"
 #include "webrtc_c/api/video/video_frame_buffer.h"
 #include "webrtc_c/api/video/video_sink_interface.h"
