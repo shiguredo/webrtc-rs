@@ -30,10 +30,9 @@
   - `ColorSpace` を追加し、`new` と `AsString` を Rust API から利用できるようにする
   - `VideoFrame` / `VideoFrameRef` に `id` / `ntp_time_ms` / `presentation_timestamp` / `reference_time` / `rotation` / `color_space` / `update_rect` / `is_repeat_frame` getter を追加する
   - @melpon
-- [CHANGE] `I420Buffer` / `NV12` 変換 API をバッファ中心に統一する
-  - `I420Buffer::fill_y` と `I420Buffer::fill_uv` を削除し、平面書き込みを `y_data_mut` / `u_data_mut` / `v_data_mut` に統一する
-  - `i420_to_nv12` の戻り値を `Option<NV12Buffer>` に変更し、NV12 平面の手動分割を不要にする
-  - `nv12_to_i420` の引数を `&NV12Buffer` に変更し、NV12 平面ポインタと stride の手動指定を不要にする
+- [CHANGE] `libyuv` 変換 API を平面スライス中心に変更する
+  - `convert_from_i420` / `i420_to_nv12` / `nv12_to_i420` の入力を平面スライスと stride / width / height 引数に変更する
+  - `abgr_to_i420` / `nv12_to_i420` / `yuy2_to_i420` / `i420_to_nv12` の戻り値を平面 `Vec<u8>` のタプルに変更する
   - @melpon
 - [ADD] `NV12Buffer` と関連バッファ API を追加する
   - `NV12Buffer` を追加し、`y_data` / `uv_data` の参照と `crop_and_scale_from` を利用できるようにする

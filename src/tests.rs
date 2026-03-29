@@ -932,22 +932,30 @@ fn abgr_to_i420_conversion() {
     for _ in 0..4 {
         src.extend_from_slice(&pixel);
     }
-    let buf = abgr_to_i420(&src, 2, 2).expect("abgr_to_i420 の変換に失敗しました");
+    let (y_plane, u_plane, v_plane) = abgr_to_i420(&src, 2 * 4, 2, 2).expect("abgr_to_i420 failed");
     // 単色なので Y/U/V は全て同一値になるはず。
-    assert!(buf.y_data().iter().all(|&v| v == buf.y_data()[0]));
-    assert!(buf.u_data().iter().all(|&v| v == buf.u_data()[0]));
-    assert!(buf.v_data().iter().all(|&v| v == buf.v_data()[0]));
+    assert!(y_plane.iter().all(|&v| v == y_plane[0]));
+    assert!(u_plane.iter().all(|&v| v == u_plane[0]));
+    assert!(v_plane.iter().all(|&v| v == v_plane[0]));
 }
 
 #[test]
 fn convert_from_i420_argb_conversion() {
-    let mut src = I420Buffer::new(2, 2);
-    src.y_data_mut().fill(0x30);
-    src.u_data_mut().fill(0x80);
-    src.v_data_mut().fill(0x80);
-
-    let dst = convert_from_i420(&src, LibyuvFourcc::Argb)
-        .expect("convert_from_i420(Argb) の変換に失敗しました");
+    let y_plane = vec![0x30; 4];
+    let u_plane = vec![0x80; 1];
+    let v_plane = vec![0x80; 1];
+    let dst = convert_from_i420(
+        &y_plane,
+        2,
+        &u_plane,
+        1,
+        &v_plane,
+        1,
+        2,
+        2,
+        LibyuvFourcc::Argb,
+    )
+    .expect("convert_from_i420(Argb) failed");
     assert_eq!(dst.len(), 2 * 2 * 4);
 }
 
@@ -955,23 +963,35 @@ fn convert_from_i420_argb_conversion() {
 fn i420_to_nv12_round_trip() {
     let width = 4;
     let height = 4;
-    let mut src = I420Buffer::new(width, height);
-    for (i, p) in src.y_data_mut().iter_mut().enumerate() {
+    let mut src_y = vec![0u8; (width * height) as usize];
+    let mut src_u = vec![0u8; ((width / 2) * (height / 2)) as usize];
+    let mut src_v = vec![0u8; ((width / 2) * (height / 2)) as usize];
+    for (i, p) in src_y.iter_mut().enumerate() {
         *p = (i as u8).wrapping_mul(3);
     }
-    for (i, p) in src.u_data_mut().iter_mut().enumerate() {
+    for (i, p) in src_u.iter_mut().enumerate() {
         *p = 0x40u8.wrapping_add(i as u8);
     }
-    for (i, p) in src.v_data_mut().iter_mut().enumerate() {
+    for (i, p) in src_v.iter_mut().enumerate() {
         *p = 0x80u8.wrapping_add(i as u8);
     }
+    let (nv12_y, nv12_uv) = i420_to_nv12(
+        &src_y,
+        width,
+        &src_u,
+        width / 2,
+        &src_v,
+        width / 2,
+        width,
+        height,
+    )
+    .expect("i420_to_nv12 failed");
+    let (restored_y, restored_u, restored_v) =
+        nv12_to_i420(&nv12_y, width, &nv12_uv, width, width, height).expect("nv12_to_i420 failed");
 
-    let nv12 = i420_to_nv12(&src).expect("i420_to_nv12 の変換に失敗しました");
-    let restored = nv12_to_i420(&nv12).expect("nv12_to_i420 の逆変換に失敗しました");
-
-    assert_eq!(src.y_data(), restored.y_data());
-    assert_eq!(src.u_data(), restored.u_data());
-    assert_eq!(src.v_data(), restored.v_data());
+    assert_eq!(src_y, restored_y);
+    assert_eq!(src_u, restored_u);
+    assert_eq!(src_v, restored_v);
 }
 
 #[test]

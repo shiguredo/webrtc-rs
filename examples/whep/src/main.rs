@@ -120,7 +120,17 @@ fn render_frame(frame: VideoFrameRef, width: i32, height: i32) {
     let mut scaled = I420Buffer::new(width, height);
     scaled.scale_from(&src);
 
-    let image = match convert_from_i420(&scaled, LibyuvFourcc::Argb) {
+    let image = match convert_from_i420(
+        scaled.y_data(),
+        scaled.stride_y(),
+        scaled.u_data(),
+        scaled.stride_u(),
+        scaled.v_data(),
+        scaled.stride_v(),
+        scaled.width(),
+        scaled.height(),
+        LibyuvFourcc::Argb,
+    ) {
         Some(image) => image,
         None => return,
     };
