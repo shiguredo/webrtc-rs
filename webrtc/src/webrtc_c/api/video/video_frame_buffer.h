@@ -22,14 +22,15 @@ struct webrtc_VideoFrameBuffer_cbs {
   int (*width)(void* user_data);
   int (*height)(void* user_data);
   struct webrtc_I420Buffer_refcounted* (*ToI420)(void* user_data);
-  struct webrtc_VideoFrameBuffer_refcounted* (*CropAndScale)(struct webrtc_VideoFrameBuffer* self,
-                                                             int offset_x,
-                                                             int offset_y,
-                                                             int crop_width,
-                                                             int crop_height,
-                                                             int scaled_width,
-                                                             int scaled_height,
-                                                             void* user_data);
+  struct webrtc_VideoFrameBuffer_refcounted* (*CropAndScale)(
+      struct webrtc_VideoFrameBuffer* self,
+      int offset_x,
+      int offset_y,
+      int crop_width,
+      int crop_height,
+      int scaled_width,
+      int scaled_height,
+      void* user_data);
   void (*OnDestroy)(void* user_data);
 };
 
@@ -47,16 +48,17 @@ webrtc_VideoFrameBuffer_cast_to_webrtc_I420Buffer(
 WEBRTC_EXPORT struct webrtc_NV12Buffer_refcounted*
 webrtc_VideoFrameBuffer_cast_to_webrtc_NV12Buffer(
     struct webrtc_VideoFrameBuffer* self);
-WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted* webrtc_VideoFrameBuffer_ToI420(
-    struct webrtc_VideoFrameBuffer* self);
+WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted*
+webrtc_VideoFrameBuffer_ToI420(struct webrtc_VideoFrameBuffer* self);
 WEBRTC_EXPORT struct webrtc_VideoFrameBuffer_refcounted*
-webrtc_VideoFrameBuffer_DefaultCropAndScale(struct webrtc_VideoFrameBuffer* self,
-                                            int offset_x,
-                                            int offset_y,
-                                            int crop_width,
-                                            int crop_height,
-                                            int scaled_width,
-                                            int scaled_height);
+webrtc_VideoFrameBuffer_DefaultCropAndScale(
+    struct webrtc_VideoFrameBuffer* self,
+    int offset_x,
+    int offset_y,
+    int crop_width,
+    int crop_height,
+    int scaled_width,
+    int scaled_height);
 WEBRTC_EXPORT struct webrtc_VideoFrameBuffer_refcounted*
 webrtc_VideoFrameBuffer_CropAndScale(struct webrtc_VideoFrameBuffer* self,
                                      int offset_x,

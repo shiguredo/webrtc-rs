@@ -6,7 +6,9 @@
 // WebRTC
 #include <api/video/color_space.h>
 
+#include "../../common.h"
 #include "../../common.impl.h"
+#include "../../std.h"
 
 extern "C" {
 

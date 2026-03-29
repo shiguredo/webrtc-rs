@@ -5,7 +5,6 @@
 #include "../../common.h"
 #include "color_space.h"
 #include "video_frame_buffer.h"
-#include "video_rotation.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -42,8 +41,8 @@ WEBRTC_EXPORT void webrtc_VideoFrame_UpdateRect_set_height(
 
 WEBRTC_DECLARE_UNIQUE(webrtc_VideoFrameBuilder);
 
-WEBRTC_EXPORT struct webrtc_VideoFrameBuilder_unique* webrtc_VideoFrameBuilder_new(
-    struct webrtc_VideoFrameBuffer_refcounted* buffer);
+WEBRTC_EXPORT struct webrtc_VideoFrameBuilder_unique*
+webrtc_VideoFrameBuilder_new(struct webrtc_VideoFrameBuffer_refcounted* buffer);
 WEBRTC_EXPORT struct webrtc_VideoFrame_unique* webrtc_VideoFrameBuilder_build(
     struct webrtc_VideoFrameBuilder* self);
 WEBRTC_EXPORT void webrtc_VideoFrameBuilder_set_timestamp_ms(
@@ -97,7 +96,8 @@ WEBRTC_EXPORT int64_t
 webrtc_VideoFrame_timestamp_us(const struct webrtc_VideoFrame* self);
 WEBRTC_EXPORT uint32_t
 webrtc_VideoFrame_timestamp_rtp(const struct webrtc_VideoFrame* self);
-WEBRTC_EXPORT uint16_t webrtc_VideoFrame_id(const struct webrtc_VideoFrame* self);
+WEBRTC_EXPORT uint16_t
+webrtc_VideoFrame_id(const struct webrtc_VideoFrame* self);
 WEBRTC_EXPORT int64_t
 webrtc_VideoFrame_ntp_time_ms(const struct webrtc_VideoFrame* self);
 WEBRTC_EXPORT void webrtc_VideoFrame_presentation_timestamp_us(
@@ -116,8 +116,8 @@ WEBRTC_EXPORT void webrtc_VideoFrame_color_space(
     struct webrtc_ColorSpace_unique** out_value);
 WEBRTC_EXPORT int webrtc_VideoFrame_has_update_rect(
     const struct webrtc_VideoFrame* self);
-WEBRTC_EXPORT struct webrtc_VideoFrame_UpdateRect_unique* webrtc_VideoFrame_update_rect(
-    const struct webrtc_VideoFrame* self);
+WEBRTC_EXPORT struct webrtc_VideoFrame_UpdateRect_unique*
+webrtc_VideoFrame_update_rect(const struct webrtc_VideoFrame* self);
 WEBRTC_EXPORT int webrtc_VideoFrame_is_repeat_frame(
     const struct webrtc_VideoFrame* self);
 WEBRTC_EXPORT struct webrtc_VideoFrameBuffer_refcounted*

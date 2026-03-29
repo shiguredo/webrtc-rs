@@ -7,6 +7,7 @@
 // WebRTC
 #include <api/scoped_refptr.h>
 #include <api/video/nv12_buffer.h>
+#include <api/video/video_frame_buffer.h>
 
 #include "../../common.h"
 #include "../../common.impl.h"

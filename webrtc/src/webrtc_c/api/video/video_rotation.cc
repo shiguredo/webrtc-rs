@@ -3,6 +3,8 @@
 // WebRTC
 #include <api/video/video_rotation.h>
 
+#include "../../common.h"
+
 extern "C" {
 
 WEBRTC_EXPORT const int webrtc_VideoRotation_0 =

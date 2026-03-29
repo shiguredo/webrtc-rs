@@ -165,8 +165,8 @@ webrtc_VideoFrameBuffer_cast_to_webrtc_NV12Buffer(
   return reinterpret_cast<struct webrtc_NV12Buffer_refcounted*>(ref.release());
 }
 
-WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted* webrtc_VideoFrameBuffer_ToI420(
-    struct webrtc_VideoFrameBuffer* self) {
+WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted*
+webrtc_VideoFrameBuffer_ToI420(struct webrtc_VideoFrameBuffer* self) {
   auto buffer = reinterpret_cast<webrtc::VideoFrameBuffer*>(self);
   auto i420 = buffer->ToI420();
   if (i420 == nullptr) {
@@ -176,17 +176,19 @@ WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted* webrtc_VideoFrameBuffer_ToI42
   if (copied == nullptr) {
     return nullptr;
   }
-  return reinterpret_cast<struct webrtc_I420Buffer_refcounted*>(copied.release());
+  return reinterpret_cast<struct webrtc_I420Buffer_refcounted*>(
+      copied.release());
 }
 
 WEBRTC_EXPORT struct webrtc_VideoFrameBuffer_refcounted*
-webrtc_VideoFrameBuffer_DefaultCropAndScale(struct webrtc_VideoFrameBuffer* self,
-                                            int offset_x,
-                                            int offset_y,
-                                            int crop_width,
-                                            int crop_height,
-                                            int scaled_width,
-                                            int scaled_height) {
+webrtc_VideoFrameBuffer_DefaultCropAndScale(
+    struct webrtc_VideoFrameBuffer* self,
+    int offset_x,
+    int offset_y,
+    int crop_width,
+    int crop_height,
+    int scaled_width,
+    int scaled_height) {
   auto buffer = reinterpret_cast<webrtc::VideoFrameBuffer*>(self);
   auto scaled = buffer->webrtc::VideoFrameBuffer::CropAndScale(
       offset_x, offset_y, crop_width, crop_height, scaled_width, scaled_height);
@@ -206,8 +208,8 @@ webrtc_VideoFrameBuffer_CropAndScale(struct webrtc_VideoFrameBuffer* self,
                                      int scaled_width,
                                      int scaled_height) {
   auto buffer = reinterpret_cast<webrtc::VideoFrameBuffer*>(self);
-  auto scaled = buffer->CropAndScale(offset_x, offset_y, crop_width, crop_height,
-                                     scaled_width, scaled_height);
+  auto scaled = buffer->CropAndScale(offset_x, offset_y, crop_width,
+                                     crop_height, scaled_width, scaled_height);
   if (scaled == nullptr) {
     return nullptr;
   }
@@ -215,10 +217,10 @@ webrtc_VideoFrameBuffer_CropAndScale(struct webrtc_VideoFrameBuffer* self,
       scaled.release());
 }
 
-WEBRTC_EXPORT struct webrtc_VideoFrameBuffer_refcounted* webrtc_VideoFrameBuffer_Scale(
-    struct webrtc_VideoFrameBuffer* self,
-    int scaled_width,
-    int scaled_height) {
+WEBRTC_EXPORT struct webrtc_VideoFrameBuffer_refcounted*
+webrtc_VideoFrameBuffer_Scale(struct webrtc_VideoFrameBuffer* self,
+                              int scaled_width,
+                              int scaled_height) {
   auto buffer = reinterpret_cast<webrtc::VideoFrameBuffer*>(self);
   auto scaled = buffer->Scale(scaled_width, scaled_height);
   if (scaled == nullptr) {

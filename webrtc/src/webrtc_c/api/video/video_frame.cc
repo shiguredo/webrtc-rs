@@ -8,12 +8,11 @@
 
 // WebRTC
 #include <api/scoped_refptr.h>
-#include <api/video/i420_buffer.h>
+#include <api/units/timestamp.h>
 #include <api/video/color_space.h>
 #include <api/video/video_frame.h>
 #include <api/video/video_frame_buffer.h>
 #include <api/video/video_rotation.h>
-#include <api/units/timestamp.h>
 
 #include "../../common.h"
 #include "../../common.impl.h"
@@ -27,7 +26,8 @@
 
 extern "C" {
 
-WEBRTC_DEFINE_UNIQUE(webrtc_VideoFrame_UpdateRect, webrtc::VideoFrame::UpdateRect);
+WEBRTC_DEFINE_UNIQUE(webrtc_VideoFrame_UpdateRect,
+                     webrtc::VideoFrame::UpdateRect);
 WEBRTC_DEFINE_UNIQUE(webrtc_VideoFrameBuilder, webrtc::VideoFrame::Builder);
 
 WEBRTC_EXPORT struct webrtc_VideoFrame_UpdateRect_unique*
@@ -85,7 +85,8 @@ WEBRTC_EXPORT void webrtc_VideoFrame_UpdateRect_set_height(
   update_rect->height = value;
 }
 
-WEBRTC_EXPORT struct webrtc_VideoFrameBuilder_unique* webrtc_VideoFrameBuilder_new(
+WEBRTC_EXPORT struct webrtc_VideoFrameBuilder_unique*
+webrtc_VideoFrameBuilder_new(
     struct webrtc_VideoFrameBuffer_refcounted* buffer) {
   if (buffer == nullptr) {
     return nullptr;
@@ -194,8 +195,8 @@ WEBRTC_EXPORT void webrtc_VideoFrameBuilder_set_update_rect(
     builder->set_update_rect(std::nullopt);
     return;
   }
-  auto value = reinterpret_cast<const webrtc::VideoFrame::UpdateRect*>(
-      update_rect);
+  auto value =
+      reinterpret_cast<const webrtc::VideoFrame::UpdateRect*>(update_rect);
   if (value == nullptr) {
     builder->set_update_rect(std::nullopt);
     return;
@@ -239,8 +240,8 @@ webrtc_VideoFrame_timestamp_rtp(const struct webrtc_VideoFrame* self) {
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
   return frame->rtp_timestamp();
 }
-WEBRTC_EXPORT uint16_t webrtc_VideoFrame_id(
-    const struct webrtc_VideoFrame* self) {
+WEBRTC_EXPORT uint16_t
+webrtc_VideoFrame_id(const struct webrtc_VideoFrame* self) {
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
   return frame->id();
 }
@@ -298,11 +299,11 @@ WEBRTC_EXPORT int webrtc_VideoFrame_has_update_rect(
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
   return frame->has_update_rect() ? 1 : 0;
 }
-WEBRTC_EXPORT struct webrtc_VideoFrame_UpdateRect_unique* webrtc_VideoFrame_update_rect(
-    const struct webrtc_VideoFrame* self) {
+WEBRTC_EXPORT struct webrtc_VideoFrame_UpdateRect_unique*
+webrtc_VideoFrame_update_rect(const struct webrtc_VideoFrame* self) {
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
-  auto update_rect = std::make_unique<webrtc::VideoFrame::UpdateRect>(
-      frame->update_rect());
+  auto update_rect =
+      std::make_unique<webrtc::VideoFrame::UpdateRect>(frame->update_rect());
   return reinterpret_cast<struct webrtc_VideoFrame_UpdateRect_unique*>(
       update_rect.release());
 }
