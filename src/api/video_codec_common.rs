@@ -8,6 +8,7 @@ use std::marker::PhantomData;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 use std::slice;
+use std::time::Duration;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ScalabilityMode {
@@ -917,23 +918,342 @@ impl Clone for VideoFrameBuffer {
     }
 }
 
+fn duration_to_timestamp_us(value: Duration) -> i64 {
+    i64::try_from(value.as_micros()).expect("Duration microseconds overflowed i64")
+}
+
+fn timestamp_us_to_duration(value: i64) -> Duration {
+    let micros = u64::try_from(value).expect("BUG: timestamp_us must be non-negative");
+    Duration::from_micros(micros)
+}
+
+pub struct ColorSpace {
+    raw_unique: NonNull<ffi::webrtc_ColorSpace_unique>,
+}
+
+impl Default for ColorSpace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ColorSpace {
+    pub fn new() -> Self {
+        let raw_unique = NonNull::new(unsafe { ffi::webrtc_ColorSpace_new() })
+            .expect("BUG: webrtc_ColorSpace_new returned null");
+        Self { raw_unique }
+    }
+
+    /// # Safety
+    /// `raw_unique` は有効な `webrtc_ColorSpace_unique` を指す必要があります。
+    unsafe fn from_raw_unique(raw_unique: NonNull<ffi::webrtc_ColorSpace_unique>) -> Self {
+        Self { raw_unique }
+    }
+
+    pub fn as_string(&self) -> Result<String> {
+        let raw = unsafe { ffi::webrtc_ColorSpace_AsString(self.raw().as_ptr()) };
+        let raw = NonNull::new(raw).expect("BUG: webrtc_ColorSpace_AsString returned null");
+        CxxString::from_unique(raw).to_string()
+    }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_ColorSpace {
+        self.raw().as_ptr()
+    }
+
+    pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_ColorSpace> {
+        let raw = unsafe { ffi::webrtc_ColorSpace_unique_get(self.raw_unique.as_ptr()) };
+        NonNull::new(raw).expect("BUG: webrtc_ColorSpace_unique_get returned null")
+    }
+}
+
+impl Drop for ColorSpace {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_ColorSpace_unique_delete(self.raw_unique.as_ptr()) };
+    }
+}
+
+unsafe impl Send for ColorSpace {}
+
+pub struct VideoFrameUpdateRect {
+    raw_unique: NonNull<ffi::webrtc_VideoFrame_UpdateRect_unique>,
+}
+
+impl Default for VideoFrameUpdateRect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl VideoFrameUpdateRect {
+    pub fn new() -> Self {
+        let raw_unique = NonNull::new(unsafe { ffi::webrtc_VideoFrame_UpdateRect_new() })
+            .expect("BUG: webrtc_VideoFrame_UpdateRect_new returned null");
+        Self { raw_unique }
+    }
+
+    /// # Safety
+    /// `raw_unique` は有効な `webrtc_VideoFrame_UpdateRect_unique` を指す必要があります。
+    unsafe fn from_raw_unique(
+        raw_unique: NonNull<ffi::webrtc_VideoFrame_UpdateRect_unique>,
+    ) -> Self {
+        Self { raw_unique }
+    }
+
+    pub fn offset_x(&self) -> i32 {
+        unsafe { ffi::webrtc_VideoFrame_UpdateRect_get_offset_x(self.raw().as_ptr()) }
+    }
+
+    pub fn set_offset_x(&mut self, value: i32) {
+        unsafe { ffi::webrtc_VideoFrame_UpdateRect_set_offset_x(self.raw().as_ptr(), value) };
+    }
+
+    pub fn offset_y(&self) -> i32 {
+        unsafe { ffi::webrtc_VideoFrame_UpdateRect_get_offset_y(self.raw().as_ptr()) }
+    }
+
+    pub fn set_offset_y(&mut self, value: i32) {
+        unsafe { ffi::webrtc_VideoFrame_UpdateRect_set_offset_y(self.raw().as_ptr(), value) };
+    }
+
+    pub fn width(&self) -> i32 {
+        unsafe { ffi::webrtc_VideoFrame_UpdateRect_get_width(self.raw().as_ptr()) }
+    }
+
+    pub fn set_width(&mut self, value: i32) {
+        unsafe { ffi::webrtc_VideoFrame_UpdateRect_set_width(self.raw().as_ptr(), value) };
+    }
+
+    pub fn height(&self) -> i32 {
+        unsafe { ffi::webrtc_VideoFrame_UpdateRect_get_height(self.raw().as_ptr()) }
+    }
+
+    pub fn set_height(&mut self, value: i32) {
+        unsafe { ffi::webrtc_VideoFrame_UpdateRect_set_height(self.raw().as_ptr(), value) };
+    }
+
+    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoFrame_UpdateRect {
+        self.raw().as_ptr()
+    }
+
+    fn raw(&self) -> NonNull<ffi::webrtc_VideoFrame_UpdateRect> {
+        let raw = unsafe { ffi::webrtc_VideoFrame_UpdateRect_unique_get(self.raw_unique.as_ptr()) };
+        NonNull::new(raw).expect("BUG: webrtc_VideoFrame_UpdateRect_unique_get returned null")
+    }
+}
+
+impl Drop for VideoFrameUpdateRect {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_VideoFrame_UpdateRect_unique_delete(self.raw_unique.as_ptr()) };
+    }
+}
+
+unsafe impl Send for VideoFrameUpdateRect {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VideoRotation {
+    R0,
+    R90,
+    R180,
+    R270,
+    Unknown(i32),
+}
+
+impl VideoRotation {
+    pub(crate) fn from_raw(value: i32) -> Self {
+        unsafe {
+            if value == ffi::webrtc_VideoRotation_0 {
+                Self::R0
+            } else if value == ffi::webrtc_VideoRotation_90 {
+                Self::R90
+            } else if value == ffi::webrtc_VideoRotation_180 {
+                Self::R180
+            } else if value == ffi::webrtc_VideoRotation_270 {
+                Self::R270
+            } else {
+                Self::Unknown(value)
+            }
+        }
+    }
+
+    pub(crate) fn to_raw(self) -> i32 {
+        unsafe {
+            match self {
+                Self::R0 => ffi::webrtc_VideoRotation_0,
+                Self::R90 => ffi::webrtc_VideoRotation_90,
+                Self::R180 => ffi::webrtc_VideoRotation_180,
+                Self::R270 => ffi::webrtc_VideoRotation_270,
+                Self::Unknown(v) => v,
+            }
+        }
+    }
+}
+
+pub struct VideoFrameBuilder {
+    raw_unique: NonNull<ffi::webrtc_VideoFrameBuilder_unique>,
+}
+
+impl VideoFrameBuilder {
+    fn new(buffer: &VideoFrameBuffer) -> Self {
+        let raw_unique =
+            NonNull::new(unsafe { ffi::webrtc_VideoFrameBuilder_new(buffer.as_refcounted_ptr()) })
+                .expect("BUG: webrtc_VideoFrameBuilder_new returned null");
+        Self { raw_unique }
+    }
+
+    fn raw(&self) -> NonNull<ffi::webrtc_VideoFrameBuilder> {
+        let raw = unsafe { ffi::webrtc_VideoFrameBuilder_unique_get(self.raw_unique.as_ptr()) };
+        NonNull::new(raw).expect("BUG: webrtc_VideoFrameBuilder_unique_get returned null")
+    }
+
+    pub fn set_timestamp_ms(&mut self, timestamp_ms: i64) -> &mut Self {
+        unsafe {
+            ffi::webrtc_VideoFrameBuilder_set_timestamp_ms(self.raw().as_ptr(), timestamp_ms)
+        };
+        self
+    }
+
+    pub fn set_timestamp_us(&mut self, timestamp_us: i64) -> &mut Self {
+        unsafe {
+            ffi::webrtc_VideoFrameBuilder_set_timestamp_us(self.raw().as_ptr(), timestamp_us)
+        };
+        self
+    }
+
+    pub fn set_presentation_timestamp(&mut self, value: Option<Duration>) -> &mut Self {
+        match value {
+            Some(value) => unsafe {
+                ffi::webrtc_VideoFrameBuilder_set_presentation_timestamp_us(
+                    self.raw().as_ptr(),
+                    1,
+                    duration_to_timestamp_us(value),
+                )
+            },
+            None => unsafe {
+                ffi::webrtc_VideoFrameBuilder_set_presentation_timestamp_us(
+                    self.raw().as_ptr(),
+                    0,
+                    0,
+                )
+            },
+        }
+        self
+    }
+
+    pub fn set_reference_time(&mut self, value: Option<Duration>) -> &mut Self {
+        match value {
+            Some(value) => unsafe {
+                ffi::webrtc_VideoFrameBuilder_set_reference_time_us(
+                    self.raw().as_ptr(),
+                    1,
+                    duration_to_timestamp_us(value),
+                )
+            },
+            None => unsafe {
+                ffi::webrtc_VideoFrameBuilder_set_reference_time_us(self.raw().as_ptr(), 0, 0)
+            },
+        }
+        self
+    }
+
+    pub fn set_rtp_timestamp(&mut self, value: u32) -> &mut Self {
+        unsafe { ffi::webrtc_VideoFrameBuilder_set_rtp_timestamp(self.raw().as_ptr(), value) };
+        self
+    }
+
+    pub fn set_timestamp_rtp(&mut self, value: u32) -> &mut Self {
+        unsafe { ffi::webrtc_VideoFrameBuilder_set_timestamp_rtp(self.raw().as_ptr(), value) };
+        self
+    }
+
+    pub fn set_ntp_time_ms(&mut self, value: i64) -> &mut Self {
+        unsafe { ffi::webrtc_VideoFrameBuilder_set_ntp_time_ms(self.raw().as_ptr(), value) };
+        self
+    }
+
+    pub fn set_rotation(&mut self, value: VideoRotation) -> &mut Self {
+        unsafe { ffi::webrtc_VideoFrameBuilder_set_rotation(self.raw().as_ptr(), value.to_raw()) };
+        self
+    }
+
+    pub fn set_color_space(&mut self, value: Option<&ColorSpace>) -> &mut Self {
+        match value {
+            Some(value) => unsafe {
+                ffi::webrtc_VideoFrameBuilder_set_color_space(
+                    self.raw().as_ptr(),
+                    1,
+                    value.as_ptr(),
+                )
+            },
+            None => unsafe {
+                ffi::webrtc_VideoFrameBuilder_set_color_space(
+                    self.raw().as_ptr(),
+                    0,
+                    std::ptr::null(),
+                )
+            },
+        }
+        self
+    }
+
+    pub fn set_id(&mut self, value: u16) -> &mut Self {
+        unsafe { ffi::webrtc_VideoFrameBuilder_set_id(self.raw().as_ptr(), value) };
+        self
+    }
+
+    pub fn set_update_rect(&mut self, value: Option<&VideoFrameUpdateRect>) -> &mut Self {
+        match value {
+            Some(value) => unsafe {
+                ffi::webrtc_VideoFrameBuilder_set_update_rect(
+                    self.raw().as_ptr(),
+                    1,
+                    value.as_ptr(),
+                )
+            },
+            None => unsafe {
+                ffi::webrtc_VideoFrameBuilder_set_update_rect(
+                    self.raw().as_ptr(),
+                    0,
+                    std::ptr::null(),
+                )
+            },
+        }
+        self
+    }
+
+    pub fn set_is_repeat_frame(&mut self, value: bool) -> &mut Self {
+        unsafe {
+            ffi::webrtc_VideoFrameBuilder_set_is_repeat_frame(
+                self.raw().as_ptr(),
+                if value { 1 } else { 0 },
+            )
+        };
+        self
+    }
+
+    pub fn build(&mut self) -> VideoFrame {
+        let raw_unique =
+            NonNull::new(unsafe { ffi::webrtc_VideoFrameBuilder_build(self.raw().as_ptr()) })
+                .expect("BUG: webrtc_VideoFrameBuilder_build returned null");
+        VideoFrame { raw_unique }
+    }
+}
+
+impl Drop for VideoFrameBuilder {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_VideoFrameBuilder_unique_delete(self.raw_unique.as_ptr()) };
+    }
+}
+
+unsafe impl Send for VideoFrameBuilder {}
+
 /// webrtc::VideoFrame のラッパー。
 pub struct VideoFrame {
     raw_unique: NonNull<ffi::webrtc_VideoFrame_unique>,
 }
 
 impl VideoFrame {
-    pub fn from_buffer(buffer: &VideoFrameBuffer, timestamp_us: i64, timestamp_rtp: u32) -> Self {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_VideoFrame_Create(
-                buffer.as_refcounted_ptr(),
-                ffi::webrtc_VideoRotation_0,
-                timestamp_us,
-                timestamp_rtp,
-            )
-        })
-        .expect("BUG: webrtc_VideoFrame_Create が null を返しました");
-        Self { raw_unique: raw }
+    pub fn builder(buffer: &VideoFrameBuffer) -> VideoFrameBuilder {
+        VideoFrameBuilder::new(buffer)
     }
 
     pub fn width(&self) -> i32 {
@@ -950,6 +1270,42 @@ impl VideoFrame {
 
     pub fn rtp_timestamp(&self) -> u32 {
         self.as_ref().rtp_timestamp()
+    }
+
+    pub fn id(&self) -> u16 {
+        self.as_ref().id()
+    }
+
+    pub fn ntp_time_ms(&self) -> i64 {
+        self.as_ref().ntp_time_ms()
+    }
+
+    pub fn rotation(&self) -> VideoRotation {
+        self.as_ref().rotation()
+    }
+
+    pub fn presentation_timestamp(&self) -> Option<Duration> {
+        self.as_ref().presentation_timestamp()
+    }
+
+    pub fn reference_time(&self) -> Option<Duration> {
+        self.as_ref().reference_time()
+    }
+
+    pub fn color_space(&self) -> Option<ColorSpace> {
+        self.as_ref().color_space()
+    }
+
+    pub fn has_update_rect(&self) -> bool {
+        self.as_ref().has_update_rect()
+    }
+
+    pub fn update_rect(&self) -> VideoFrameUpdateRect {
+        self.as_ref().update_rect()
+    }
+
+    pub fn is_repeat_frame(&self) -> bool {
+        self.as_ref().is_repeat_frame()
     }
 
     /// VideoFrameBuffer を取得する。
@@ -1016,6 +1372,78 @@ impl<'a> VideoFrameRef<'a> {
 
     pub fn rtp_timestamp(&self) -> u32 {
         unsafe { ffi::webrtc_VideoFrame_timestamp_rtp(self.raw.as_ptr()) }
+    }
+
+    pub fn id(&self) -> u16 {
+        unsafe { ffi::webrtc_VideoFrame_id(self.raw.as_ptr()) }
+    }
+
+    pub fn ntp_time_ms(&self) -> i64 {
+        unsafe { ffi::webrtc_VideoFrame_ntp_time_ms(self.raw.as_ptr()) }
+    }
+
+    pub fn rotation(&self) -> VideoRotation {
+        let value = unsafe { ffi::webrtc_VideoFrame_rotation(self.raw.as_ptr()) };
+        VideoRotation::from_raw(value)
+    }
+
+    pub fn presentation_timestamp(&self) -> Option<Duration> {
+        let mut has = 0;
+        let mut value = 0;
+        unsafe {
+            ffi::webrtc_VideoFrame_presentation_timestamp_us(
+                self.raw.as_ptr(),
+                &mut has,
+                &mut value,
+            );
+        }
+        if has == 0 {
+            None
+        } else {
+            Some(timestamp_us_to_duration(value))
+        }
+    }
+
+    pub fn reference_time(&self) -> Option<Duration> {
+        let mut has = 0;
+        let mut value = 0;
+        unsafe {
+            ffi::webrtc_VideoFrame_reference_time_us(self.raw.as_ptr(), &mut has, &mut value);
+        }
+        if has == 0 {
+            None
+        } else {
+            Some(timestamp_us_to_duration(value))
+        }
+    }
+
+    pub fn color_space(&self) -> Option<ColorSpace> {
+        let mut has = 0;
+        let mut raw_unique: *mut ffi::webrtc_ColorSpace_unique = std::ptr::null_mut();
+        unsafe {
+            ffi::webrtc_VideoFrame_color_space(self.raw.as_ptr(), &mut has, &mut raw_unique);
+        }
+        if has == 0 {
+            return None;
+        }
+        let raw_unique =
+            NonNull::new(raw_unique).expect("BUG: webrtc_VideoFrame_color_space returned null");
+        Some(unsafe { ColorSpace::from_raw_unique(raw_unique) })
+    }
+
+    pub fn has_update_rect(&self) -> bool {
+        unsafe { ffi::webrtc_VideoFrame_has_update_rect(self.raw.as_ptr()) != 0 }
+    }
+
+    pub fn update_rect(&self) -> VideoFrameUpdateRect {
+        let raw_unique =
+            NonNull::new(unsafe { ffi::webrtc_VideoFrame_update_rect(self.raw.as_ptr()) })
+                .expect("BUG: webrtc_VideoFrame_update_rect returned null");
+        unsafe { VideoFrameUpdateRect::from_raw_unique(raw_unique) }
+    }
+
+    pub fn is_repeat_frame(&self) -> bool {
+        unsafe { ffi::webrtc_VideoFrame_is_repeat_frame(self.raw.as_ptr()) != 0 }
     }
 
     pub fn buffer(&self) -> VideoFrameBuffer {
