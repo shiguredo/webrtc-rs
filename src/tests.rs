@@ -1,7 +1,7 @@
 use super::*;
 use std::ptr::NonNull;
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicBool, Ordering},
 };
 use std::time::Duration;
@@ -208,15 +208,20 @@ fn scalability_mode_round_trip() {
 #[test]
 fn i420_buffer_and_video_frame() {
     let mut buf = I420Buffer::new(4, 4);
-    buf.fill_y(0x10);
-    buf.fill_uv(0x80, 0x90);
+    buf.y_data_mut().fill(0x10);
+    buf.u_data_mut().fill(0x80);
+    buf.v_data_mut().fill(0x90);
 
-    let frame = VideoFrame::from_i420(&buf, 12345, 0);
+    let frame_buffer = buf.cast_to_video_frame_buffer();
+    let frame = VideoFrame::from_buffer(&frame_buffer, 12345, 0);
     assert_eq!(frame.width(), 4);
     assert_eq!(frame.height(), 4);
     assert_eq!(frame.timestamp_us(), 12345);
 
-    let copied = frame.buffer();
+    let mut copied = frame.buffer();
+    let copied = copied
+        .to_i420()
+        .expect("VideoFrameBuffer から I420Buffer への変換に失敗しました");
     assert_eq!(copied.y_data()[0], 0x10);
 }
 
@@ -230,10 +235,563 @@ fn i420_buffer_mutable_planes_and_video_frame_rtp_timestamp() {
     assert!(buf.u_data().iter().all(|&v| v == 0x22));
     assert!(buf.v_data().iter().all(|&v| v == 0x33));
 
-    let frame = VideoFrame::from_i420(&buf, 12345, 67890);
+    let frame_buffer = buf.cast_to_video_frame_buffer();
+    let frame = VideoFrame::from_buffer(&frame_buffer, 12345, 67890);
     assert_eq!(frame.timestamp_us(), 12345);
     assert_eq!(frame.rtp_timestamp(), 67890);
     assert_eq!(frame.as_ref().rtp_timestamp(), 67890);
+}
+
+#[test]
+fn video_frame_clone() {
+    let mut buf = I420Buffer::new(4, 4);
+    buf.y_data_mut().fill(0x44);
+    buf.u_data_mut().fill(0x55);
+    buf.v_data_mut().fill(0x66);
+
+    let frame_buffer = buf.cast_to_video_frame_buffer();
+    let frame = VideoFrame::from_buffer(&frame_buffer, 11111, 22222);
+    let cloned = frame.clone();
+
+    assert_eq!(cloned.width(), frame.width());
+    assert_eq!(cloned.height(), frame.height());
+    assert_eq!(cloned.timestamp_us(), frame.timestamp_us());
+    assert_eq!(cloned.rtp_timestamp(), frame.rtp_timestamp());
+    assert_ne!(cloned.as_ref().as_ptr(), frame.as_ref().as_ptr());
+
+    let mut copied = cloned.buffer();
+    let copied = copied
+        .to_i420()
+        .expect("clone した VideoFrame の buffer 変換に失敗しました");
+    assert_eq!(copied.y_data()[0], 0x44);
+}
+
+#[test]
+fn video_frame_ref_to_owned() {
+    let mut buf = I420Buffer::new(4, 4);
+    buf.y_data_mut().fill(0x77);
+    buf.u_data_mut().fill(0x88);
+    buf.v_data_mut().fill(0x99);
+
+    let frame_buffer = buf.cast_to_video_frame_buffer();
+    let frame = VideoFrame::from_buffer(&frame_buffer, 33333, 44444);
+    let copied = frame.as_ref().to_owned();
+
+    assert_eq!(copied.width(), frame.width());
+    assert_eq!(copied.height(), frame.height());
+    assert_eq!(copied.timestamp_us(), frame.timestamp_us());
+    assert_eq!(copied.rtp_timestamp(), frame.rtp_timestamp());
+    assert_ne!(copied.as_ref().as_ptr(), frame.as_ref().as_ptr());
+
+    let mut copied_buffer = copied.buffer();
+    let copied_i420 = copied_buffer
+        .to_i420()
+        .expect("to_owned した VideoFrame の buffer 変換に失敗しました");
+    assert_eq!(copied_i420.y_data()[0], 0x77);
+}
+
+#[test]
+fn i420_buffer_chroma_dimensions_for_odd_size() {
+    let width = 5;
+    let height = 3;
+    let buf = I420Buffer::new(width, height);
+
+    assert_eq!(buf.chroma_width(), 3);
+    assert_eq!(buf.chroma_height(), 2);
+    assert_eq!(
+        buf.u_data().len(),
+        (buf.stride_u() as usize) * (buf.chroma_height() as usize)
+    );
+    assert_eq!(
+        buf.v_data().len(),
+        (buf.stride_v() as usize) * (buf.chroma_height() as usize)
+    );
+}
+
+#[test]
+fn nv12_buffer_planes_kind_and_to_i420() {
+    let width = 4;
+    let height = 3;
+    let mut buf = NV12Buffer::new(width, height);
+
+    assert_eq!(buf.width(), width);
+    assert_eq!(buf.height(), height);
+    assert_eq!(buf.y_data().len(), (buf.stride_y() * height) as usize);
+    assert_eq!(
+        buf.uv_data().len(),
+        (buf.stride_uv() as usize) * (height as usize).div_ceil(2)
+    );
+
+    for (i, v) in buf.y_data_mut().iter_mut().enumerate() {
+        *v = (i as u8).wrapping_add(0x10);
+    }
+    for uv in buf.uv_data_mut().chunks_exact_mut(2) {
+        uv[0] = 0x44;
+        uv[1] = 0x88;
+    }
+
+    let mut frame_buffer = buf.cast_to_video_frame_buffer();
+    assert_eq!(frame_buffer.kind(), VideoFrameBufferKind::Nv12);
+
+    let i420 = frame_buffer
+        .to_i420()
+        .expect("VideoFrameBuffer から I420Buffer への変換に失敗しました");
+    assert_eq!(i420.y_data(), buf.y_data());
+    assert!(i420.u_data().iter().all(|&v| v == 0x44));
+    assert!(i420.v_data().iter().all(|&v| v == 0x88));
+}
+
+#[test]
+fn nv12_buffer_chroma_dimensions_for_odd_size() {
+    let width = 5;
+    let height = 3;
+    let buf = NV12Buffer::new(width, height);
+
+    assert_eq!(buf.chroma_width(), 3);
+    assert_eq!(buf.chroma_height(), 2);
+    assert_eq!(
+        buf.uv_data().len(),
+        (buf.stride_uv() as usize) * (buf.chroma_height() as usize)
+    );
+}
+
+#[test]
+fn nv12_buffer_crop_and_scale_from() {
+    let mut src = NV12Buffer::new(4, 4);
+    src.y_data_mut().fill(0x11);
+    for uv in src.uv_data_mut().chunks_exact_mut(2) {
+        uv[0] = 0x22;
+        uv[1] = 0x66;
+    }
+
+    let mut dst = NV12Buffer::new(2, 2);
+    dst.crop_and_scale_from(&src, 0, 0, 4, 4);
+
+    assert!(dst.y_data().iter().all(|&v| v == 0x11));
+    for uv in dst.uv_data().chunks_exact(2) {
+        assert_eq!(uv[0], 0x22);
+        assert_eq!(uv[1], 0x66);
+    }
+
+    let mut frame_buffer = dst.cast_to_video_frame_buffer();
+    assert_eq!(frame_buffer.kind(), VideoFrameBufferKind::Nv12);
+    let i420 = frame_buffer
+        .to_i420()
+        .expect("VideoFrameBuffer から I420Buffer への変換に失敗しました");
+    assert!(i420.y_data().iter().all(|&v| v == 0x11));
+    assert!(i420.u_data().iter().all(|&v| v == 0x22));
+    assert!(i420.v_data().iter().all(|&v| v == 0x66));
+}
+
+#[test]
+fn video_frame_buffer_handler_native_roundtrip() {
+    struct NativeBufferHandler;
+
+    impl VideoFrameBufferHandler for NativeBufferHandler {
+        fn width(&self) -> i32 {
+            2
+        }
+
+        fn height(&self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            let mut buffer = I420Buffer::new(2, 2);
+            buffer.y_data_mut().fill(0x12);
+            buffer.u_data_mut().fill(0x34);
+            buffer.v_data_mut().fill(0x56);
+            Some(buffer)
+        }
+    }
+
+    let mut buffer = VideoFrameBuffer::new_with_handler(Box::new(NativeBufferHandler));
+    assert_eq!(buffer.kind(), VideoFrameBufferKind::Native);
+    assert_eq!(buffer.width(), 2);
+    assert_eq!(buffer.height(), 2);
+
+    let converted = buffer
+        .to_i420()
+        .expect("VideoFrameBufferHandler の ToI420 が None になりました");
+    assert_eq!(converted.y_data()[0], 0x12);
+
+    let frame = VideoFrame::from_buffer(&buffer, 12345, 67890);
+    assert_eq!(frame.width(), 2);
+    assert_eq!(frame.height(), 2);
+    assert_eq!(frame.timestamp_us(), 12345);
+    assert_eq!(frame.rtp_timestamp(), 67890);
+
+    let mut frame_buffer = frame.buffer();
+    assert_eq!(frame_buffer.kind(), VideoFrameBufferKind::Native);
+    let frame_i420 = frame_buffer
+        .to_i420()
+        .expect("VideoFrame の VideoFrameBuffer から I420 変換に失敗しました");
+    assert_eq!(frame_i420.y_data()[0], 0x12);
+}
+
+#[test]
+fn video_frame_buffer_handler_custom_type_roundtrip() {
+    struct I420TypeBufferHandler;
+
+    impl VideoFrameBufferHandler for I420TypeBufferHandler {
+        fn kind(&self) -> VideoFrameBufferKind {
+            VideoFrameBufferKind::I420
+        }
+
+        fn width(&self) -> i32 {
+            2
+        }
+
+        fn height(&self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            let mut buffer = I420Buffer::new(2, 2);
+            buffer.y_data_mut().fill(0x77);
+            buffer.u_data_mut().fill(0x88);
+            buffer.v_data_mut().fill(0x99);
+            Some(buffer)
+        }
+    }
+
+    let buffer = VideoFrameBuffer::new_with_handler(Box::new(I420TypeBufferHandler));
+    assert_eq!(buffer.kind(), VideoFrameBufferKind::I420);
+
+    let frame = VideoFrame::from_buffer(&buffer, 222, 333);
+    let mut frame_buffer = frame.buffer();
+    assert_eq!(frame_buffer.kind(), VideoFrameBufferKind::I420);
+
+    let converted = frame_buffer
+        .to_i420()
+        .expect("VideoFrameBuffer の I420 変換に失敗しました");
+    assert_eq!(converted.y_data()[0], 0x77);
+}
+
+#[test]
+fn video_frame_buffer_handler_to_i420_none() {
+    struct NoI420BufferHandler;
+
+    impl VideoFrameBufferHandler for NoI420BufferHandler {
+        fn width(&self) -> i32 {
+            2
+        }
+
+        fn height(&self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            None
+        }
+    }
+
+    let mut buffer = VideoFrameBuffer::new_with_handler(Box::new(NoI420BufferHandler));
+    assert!(buffer.to_i420().is_none());
+
+    let frame = VideoFrame::from_buffer(&buffer, 100, 0);
+    let mut frame_buffer = frame.buffer();
+    assert!(frame_buffer.to_i420().is_none());
+}
+
+#[test]
+fn video_frame_buffer_crop_and_scale_from_i420_buffer() {
+    let mut src = I420Buffer::new(4, 4);
+    src.y_data_mut().fill(0x10);
+    src.u_data_mut().fill(0x20);
+    src.v_data_mut().fill(0x30);
+
+    let mut frame_buffer = src.cast_to_video_frame_buffer();
+    let scaled = frame_buffer
+        .scale(2, 2)
+        .expect("VideoFrameBuffer::scale の変換に失敗しました");
+    assert_eq!(scaled.width(), 2);
+    assert_eq!(scaled.height(), 2);
+
+    let mut frame_buffer = src.cast_to_video_frame_buffer();
+    let cropped_scaled = frame_buffer
+        .crop_and_scale(1, 1, 2, 2, 3, 3)
+        .expect("VideoFrameBuffer::crop_and_scale の変換に失敗しました");
+    assert_eq!(cropped_scaled.width(), 3);
+    assert_eq!(cropped_scaled.height(), 3);
+}
+
+#[test]
+fn video_frame_buffer_handler_crop_and_scale_callback() {
+    struct CropAndScaleBufferHandler {
+        called: Arc<AtomicBool>,
+        args: Arc<Mutex<Option<(i32, i32, i32, i32, i32, i32)>>>,
+    }
+
+    impl VideoFrameBufferHandler for CropAndScaleBufferHandler {
+        fn width(&self) -> i32 {
+            8
+        }
+
+        fn height(&self) -> i32 {
+            8
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            Some(I420Buffer::new(8, 8))
+        }
+
+        fn crop_and_scale(
+            &mut self,
+            offset_x: i32,
+            offset_y: i32,
+            crop_width: i32,
+            crop_height: i32,
+            scaled_width: i32,
+            scaled_height: i32,
+        ) -> Option<VideoFrameBuffer> {
+            self.called.store(true, Ordering::SeqCst);
+            *self.args.lock().expect("args のロックに失敗しました") = Some((
+                offset_x,
+                offset_y,
+                crop_width,
+                crop_height,
+                scaled_width,
+                scaled_height,
+            ));
+            Some(I420Buffer::new(scaled_width, scaled_height).cast_to_video_frame_buffer())
+        }
+    }
+
+    let called = Arc::new(AtomicBool::new(false));
+    let args = Arc::new(Mutex::new(None));
+    let handler = CropAndScaleBufferHandler {
+        called: Arc::clone(&called),
+        args: Arc::clone(&args),
+    };
+    let mut buffer = VideoFrameBuffer::new_with_handler(Box::new(handler));
+
+    let scaled = buffer
+        .crop_and_scale(1, 2, 3, 4, 5, 6)
+        .expect("VideoFrameBufferHandler::crop_and_scale の実行に失敗しました");
+
+    assert!(called.load(Ordering::SeqCst));
+    assert_eq!(
+        *args.lock().expect("args のロックに失敗しました"),
+        Some((1, 2, 3, 4, 5, 6))
+    );
+    assert_eq!(scaled.width(), 5);
+    assert_eq!(scaled.height(), 6);
+}
+
+#[test]
+fn video_frame_buffer_handler_crop_and_scale_fallback() {
+    struct NoCropAndScaleBufferHandler;
+
+    impl VideoFrameBufferHandler for NoCropAndScaleBufferHandler {
+        fn width(&self) -> i32 {
+            4
+        }
+
+        fn height(&self) -> i32 {
+            4
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            let mut buffer = I420Buffer::new(4, 4);
+            buffer.y_data_mut().fill(0x55);
+            buffer.u_data_mut().fill(0x66);
+            buffer.v_data_mut().fill(0x77);
+            Some(buffer)
+        }
+    }
+
+    let mut buffer = VideoFrameBuffer::new_with_handler(Box::new(NoCropAndScaleBufferHandler));
+    let scaled = buffer
+        .scale(2, 2)
+        .expect("VideoFrameBuffer::scale のフォールバックに失敗しました");
+    assert_eq!(scaled.width(), 2);
+    assert_eq!(scaled.height(), 2);
+}
+
+#[test]
+fn video_frame_buffer_as_native_roundtrip() {
+    struct DowncastBufferHandler {
+        value: u8,
+    }
+
+    impl VideoFrameBufferHandler for DowncastBufferHandler {
+        fn width(&self) -> i32 {
+            2
+        }
+
+        fn height(&self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            let mut buffer = I420Buffer::new(2, 2);
+            buffer.y_data_mut().fill(self.value);
+            buffer.u_data_mut().fill(0x01);
+            buffer.v_data_mut().fill(0x02);
+            Some(buffer)
+        }
+    }
+
+    let mut buffer =
+        VideoFrameBuffer::new_with_handler(Box::new(DowncastBufferHandler { value: 7 }));
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let handler = unsafe { buffer.as_native_ref::<DowncastBufferHandler>() }
+        .expect("as_native_ref が失敗しました");
+    assert_eq!(handler.value, 7);
+
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let handler = unsafe { buffer.as_native_mut::<DowncastBufferHandler>() }
+        .expect("as_native_mut が失敗しました");
+    handler.value = 9;
+
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let handler = unsafe { buffer.as_native_ref::<DowncastBufferHandler>() }
+        .expect("as_native_ref が失敗しました");
+    assert_eq!(handler.value, 9);
+
+    let i420 = buffer
+        .to_i420()
+        .expect("VideoFrameBuffer の I420 変換に失敗しました");
+    assert_eq!(i420.y_data()[0], 9);
+}
+
+#[test]
+fn video_frame_buffer_as_native_clone_and_frame_buffer() {
+    struct DowncastBufferHandler {
+        value: u8,
+    }
+
+    impl VideoFrameBufferHandler for DowncastBufferHandler {
+        fn width(&self) -> i32 {
+            2
+        }
+
+        fn height(&self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            let mut buffer = I420Buffer::new(2, 2);
+            buffer.y_data_mut().fill(self.value);
+            buffer.u_data_mut().fill(0x11);
+            buffer.v_data_mut().fill(0x22);
+            Some(buffer)
+        }
+    }
+
+    let mut buffer =
+        VideoFrameBuffer::new_with_handler(Box::new(DowncastBufferHandler { value: 3 }));
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    unsafe { buffer.as_native_mut::<DowncastBufferHandler>() }
+        .expect("as_native_mut が失敗しました")
+        .value = 5;
+
+    let cloned = buffer.clone();
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let cloned_handler = unsafe { cloned.as_native_ref::<DowncastBufferHandler>() }
+        .expect("clone からの as_native_ref が失敗しました");
+    assert_eq!(cloned_handler.value, 5);
+
+    let frame = VideoFrame::from_buffer(&buffer, 10, 20);
+    let frame_buffer = frame.buffer();
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let frame_handler = unsafe { frame_buffer.as_native_ref::<DowncastBufferHandler>() }
+        .expect("VideoFrame::buffer からの as_native_ref が失敗しました");
+    assert_eq!(frame_handler.value, 5);
+}
+
+#[test]
+fn video_frame_buffer_as_native_returns_none_for_builtin_buffers() {
+    struct NativeBufferHandler;
+
+    impl VideoFrameBufferHandler for NativeBufferHandler {
+        fn width(&self) -> i32 {
+            1
+        }
+
+        fn height(&self) -> i32 {
+            1
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            Some(I420Buffer::new(1, 1))
+        }
+    }
+
+    let i420 = I420Buffer::new(2, 2);
+    let mut i420_frame_buffer = i420.cast_to_video_frame_buffer();
+    // Safety: 参照を取り出すだけで、同時アクセスは行いません。
+    assert!(unsafe {
+        i420_frame_buffer
+            .as_native_ref::<NativeBufferHandler>()
+            .is_none()
+    });
+    // Safety: 参照を取り出すだけで、同時アクセスは行いません。
+    assert!(unsafe {
+        i420_frame_buffer
+            .as_native_mut::<NativeBufferHandler>()
+            .is_none()
+    });
+
+    let nv12 = NV12Buffer::new(2, 2);
+    let mut nv12_frame_buffer = nv12.cast_to_video_frame_buffer();
+    // Safety: 参照を取り出すだけで、同時アクセスは行いません。
+    assert!(unsafe {
+        nv12_frame_buffer
+            .as_native_ref::<NativeBufferHandler>()
+            .is_none()
+    });
+    // Safety: 参照を取り出すだけで、同時アクセスは行いません。
+    assert!(unsafe {
+        nv12_frame_buffer
+            .as_native_mut::<NativeBufferHandler>()
+            .is_none()
+    });
+}
+
+#[test]
+fn video_frame_buffer_as_i420_and_as_nv12() {
+    let i420 = I420Buffer::new(2, 2);
+    let i420_frame_buffer = i420.cast_to_video_frame_buffer();
+    let i420_view = i420_frame_buffer
+        .as_i420()
+        .expect("as_i420 failed on I420 buffer");
+    assert_eq!(i420_view.width(), 2);
+    assert_eq!(i420_view.height(), 2);
+    assert!(i420_frame_buffer.as_nv12().is_none());
+
+    let nv12 = NV12Buffer::new(2, 2);
+    let nv12_frame_buffer = nv12.cast_to_video_frame_buffer();
+    let nv12_view = nv12_frame_buffer
+        .as_nv12()
+        .expect("as_nv12 failed on NV12 buffer");
+    assert_eq!(nv12_view.width(), 2);
+    assert_eq!(nv12_view.height(), 2);
+    assert!(nv12_frame_buffer.as_i420().is_none());
+}
+
+#[test]
+fn video_frame_buffer_as_i420_and_as_nv12_return_none_for_native() {
+    struct NativeBufferHandler;
+
+    impl VideoFrameBufferHandler for NativeBufferHandler {
+        fn width(&self) -> i32 {
+            2
+        }
+
+        fn height(&self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            Some(I420Buffer::new(2, 2))
+        }
+    }
+
+    let frame_buffer = VideoFrameBuffer::new_with_handler(Box::new(NativeBufferHandler));
+    assert!(frame_buffer.as_i420().is_none());
+    assert!(frame_buffer.as_nv12().is_none());
 }
 
 #[test]
@@ -254,8 +812,9 @@ fn abgr_to_i420_conversion() {
 #[test]
 fn convert_from_i420_argb_conversion() {
     let mut src = I420Buffer::new(2, 2);
-    src.fill_y(0x30);
-    src.fill_uv(0x80, 0x80);
+    src.y_data_mut().fill(0x30);
+    src.u_data_mut().fill(0x80);
+    src.v_data_mut().fill(0x80);
 
     let dst = convert_from_i420(&src, LibyuvFourcc::Argb)
         .expect("convert_from_i420(Argb) の変換に失敗しました");
@@ -278,10 +837,7 @@ fn i420_to_nv12_round_trip() {
     }
 
     let nv12 = i420_to_nv12(&src).expect("i420_to_nv12 の変換に失敗しました");
-    let y_size = (width * height) as usize;
-    let (y, uv) = nv12.split_at(y_size);
-    let restored = nv12_to_i420(y, width, uv, width, width, height)
-        .expect("nv12_to_i420 の逆変換に失敗しました");
+    let restored = nv12_to_i420(&nv12).expect("nv12_to_i420 の逆変換に失敗しました");
 
     assert_eq!(src.y_data(), restored.y_data());
     assert_eq!(src.u_data(), restored.u_data());
@@ -509,7 +1065,8 @@ fn adapted_video_track_source() {
     assert!(adapted.size.adapted_height >= 0);
 
     let buf = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buf, 2_000_000, 0);
+    let frame_buffer = buf.cast_to_video_frame_buffer();
+    let frame = VideoFrame::from_buffer(&frame_buffer, 2_000_000, 0);
     src.on_frame(&frame);
 }
 
@@ -1081,7 +1638,8 @@ fn video_track_and_transceiver_with_track() {
         .expect("VideoTrack の生成に失敗しました");
     // ついでにフレーム投入 API も呼んでおく。
     let buf = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buf, 1_000_000, 0);
+    let frame_buffer = buf.cast_to_video_frame_buffer();
+    let frame = VideoFrame::from_buffer(&frame_buffer, 1_000_000, 0);
     source.on_frame(&frame);
 
     // PeerConnection を作成し、トラック付きで transceiver を追加する。
@@ -1215,7 +1773,8 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
         .expect("custom encoder の作成に失敗しました");
 
     let buffer = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buffer, 123, 0);
+    let frame_buffer = buffer.cast_to_video_frame_buffer();
+    let frame = VideoFrame::from_buffer(&frame_buffer, 123, 0);
     let mut frame_types = VideoFrameTypeVector::new(0);
     frame_types.push(VideoFrameType::Key);
     frame_types.push(VideoFrameType::Delta);
@@ -1285,8 +1844,8 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
             {
                 let mut preferred = info.preferred_pixel_formats();
                 preferred.clear();
-                preferred.push(VideoFrameBufferType::I420);
-                preferred.push(VideoFrameBufferType::Nv12);
+                preferred.push(VideoFrameBufferKind::I420);
+                preferred.push(VideoFrameBufferKind::Nv12);
             }
 
             info.set_is_qp_trusted(Some(true));
@@ -1361,10 +1920,10 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
 
     let mut preferred = info.preferred_pixel_formats();
     assert_eq!(preferred.len(), 2);
-    assert_eq!(preferred.get(0), Some(VideoFrameBufferType::I420));
-    assert_eq!(preferred.get(1), Some(VideoFrameBufferType::Nv12));
-    assert!(preferred.set(1, VideoFrameBufferType::I420A));
-    assert_eq!(preferred.get(1), Some(VideoFrameBufferType::I420A));
+    assert_eq!(preferred.get(0), Some(VideoFrameBufferKind::I420));
+    assert_eq!(preferred.get(1), Some(VideoFrameBufferKind::Nv12));
+    assert!(preferred.set(1, VideoFrameBufferKind::I420A));
+    assert_eq!(preferred.get(1), Some(VideoFrameBufferKind::I420A));
 
     assert_eq!(info.is_qp_trusted(), Some(true));
     assert_eq!(info.min_qp(), Some(9));
@@ -1681,7 +2240,8 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     );
 
     let buffer = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buffer, 123, 0);
+    let frame_buffer = buffer.cast_to_video_frame_buffer();
+    let frame = VideoFrame::from_buffer(&frame_buffer, 123, 0);
     assert_eq!(
         encoder.encode(frame.as_ref(), None),
         VideoCodecStatus::Unknown(88)

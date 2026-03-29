@@ -17,6 +17,10 @@
 
 extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_I420Buffer, webrtc::I420Buffer);
+WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_I420Buffer,
+                              webrtc_VideoFrameBuffer,
+                              webrtc::I420Buffer,
+                              webrtc::VideoFrameBuffer);
 WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted* webrtc_I420Buffer_Create(
     int width,
     int height) {
@@ -32,6 +36,16 @@ WEBRTC_EXPORT int webrtc_I420Buffer_height(
     const struct webrtc_I420Buffer* self) {
   auto buf = reinterpret_cast<const webrtc::I420Buffer*>(self);
   return buf->height();
+}
+WEBRTC_EXPORT int webrtc_I420Buffer_chroma_width(
+    const struct webrtc_I420Buffer* self) {
+  auto buf = reinterpret_cast<const webrtc::I420Buffer*>(self);
+  return buf->ChromaWidth();
+}
+WEBRTC_EXPORT int webrtc_I420Buffer_chroma_height(
+    const struct webrtc_I420Buffer* self) {
+  auto buf = reinterpret_cast<const webrtc::I420Buffer*>(self);
+  return buf->ChromaHeight();
 }
 WEBRTC_EXPORT uint8_t* webrtc_I420Buffer_MutableDataY(
     struct webrtc_I420Buffer* self) {

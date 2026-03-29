@@ -11,6 +11,31 @@
 
 ## develop
 
+- [ADD] `NV12Buffer` と関連バッファ API を追加する
+  - `NV12Buffer` を追加し、`y_data` / `uv_data` の参照と `crop_and_scale_from` を利用できるようにする
+  - `NV12Buffer` から `VideoFrameBuffer` への変換と `kind == Nv12` の取り扱いを追加する
+  - `I420Buffer` / `NV12Buffer` の C API と Rust API から、4:2:0 の chroma 解像度を切り上げ半分で取得できるようにする
+  - `u_data` / `v_data` / `uv_data` の平面長計算を `chroma_height` 利用へ統一する
+  - @melpon
+- [ADD] `VideoFrame` の複製 API を追加する
+  - C API `webrtc_VideoFrame_copy` を追加する
+  - Rust 側で `VideoFrame: Clone` と `VideoFrameRef::to_owned` を追加する
+  - @melpon
+- [CHANGE] `VideoFrame` の生成 API を `VideoFrameBuffer` ベースに変更する
+  - `VideoFrameBuffer` / `VideoFrameBufferHandler` を追加し、Rust 実装の native バッファを `kNative` として扱えるようにする
+  - `VideoFrameBufferKind` と `VideoFrameBuffer::kind` / `VideoFrameBufferHandler::kind` を追加し、バッファ種別を Rust 側で扱えるようにする
+  - `VideoFrameBuffer::crop_and_scale` / `VideoFrameBuffer::scale` と `VideoFrameBufferHandler::crop_and_scale` を追加し、Rust 側で `CropAndScale` / `Scale` を利用できるようにする
+  - C API `webrtc_VideoFrameBuffer_get_user_data` と `webrtc_VideoFrameBuffer_cast_to_webrtc_I420Buffer` / `webrtc_VideoFrameBuffer_cast_to_webrtc_NV12Buffer` を追加する
+  - Rust 側で `VideoFrameBuffer::as_native_ref` / `VideoFrameBuffer::as_native_mut` / `VideoFrameBuffer::as_i420` / `VideoFrameBuffer::as_nv12` を追加する
+  - `VideoFrame::from_i420` を削除し、`VideoFrame::from_buffer` を追加する
+  - `VideoFrame::buffer` / `VideoFrameRef::buffer` の戻り値を `VideoFrameBuffer` に変更する
+  - @melpon
+- [CHANGE] `I420Buffer` / `NV12` 変換 API をバッファ中心に統一する
+  - `I420Buffer::fill_y` と `I420Buffer::fill_uv` を削除し、平面書き込みを `y_data_mut` / `u_data_mut` / `v_data_mut` に統一する
+  - `i420_to_nv12` の戻り値を `Option<NV12Buffer>` に変更し、NV12 平面の手動分割を不要にする
+  - `nv12_to_i420` の引数を `&NV12Buffer` に変更し、NV12 平面ポインタと stride の手動指定を不要にする
+  - @melpon
+
 ## 0.146.2
 
 **リリース日**: 2026-03-27

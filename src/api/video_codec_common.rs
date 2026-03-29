@@ -1,7 +1,11 @@
-use crate::ref_count::{EncodedImageBufferHandle, I420BufferHandle};
+use crate::ref_count::{
+    EncodedImageBufferHandle, I420BufferHandle, NV12BufferHandle, VideoFrameBufferHandle,
+};
 use crate::{CxxString, CxxStringRef, Error, MapStringString, Result, ScopedRef, ffi};
+use std::any::Any;
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::os::raw::c_void;
 use std::ptr::NonNull;
 use std::slice;
 
@@ -309,6 +313,14 @@ impl I420Buffer {
         unsafe { ffi::webrtc_I420Buffer_height(self.raw().as_ptr()) }
     }
 
+    pub fn chroma_width(&self) -> i32 {
+        unsafe { ffi::webrtc_I420Buffer_chroma_width(self.raw().as_ptr()) }
+    }
+
+    pub fn chroma_height(&self) -> i32 {
+        unsafe { ffi::webrtc_I420Buffer_chroma_height(self.raw().as_ptr()) }
+    }
+
     pub fn stride_y(&self) -> i32 {
         let raw = self.raw();
         unsafe { ffi::webrtc_I420Buffer_StrideY(raw.as_ptr()) }
@@ -322,26 +334,6 @@ impl I420Buffer {
     pub fn stride_v(&self) -> i32 {
         let raw = self.raw();
         unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) }
-    }
-
-    /// Y 平面を単一値で塗りつぶす。
-    pub fn fill_y(&mut self, value: u8) {
-        let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataY(self.raw().as_ptr()) };
-        let stride = unsafe { ffi::webrtc_I420Buffer_StrideY(self.raw().as_ptr()) } as usize;
-        let len = stride * self.height() as usize;
-        unsafe { slice::from_raw_parts_mut(ptr, len) }.fill(value);
-    }
-
-    /// U/V 平面を単一値で塗りつぶす。
-    pub fn fill_uv(&mut self, u: u8, v: u8) {
-        let raw = self.raw();
-        let stride_u = unsafe { ffi::webrtc_I420Buffer_StrideU(raw.as_ptr()) } as usize;
-        let stride_v = unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) } as usize;
-        let h = (self.height() as usize).div_ceil(2);
-        let ptr_u = unsafe { ffi::webrtc_I420Buffer_MutableDataU(raw.as_ptr()) };
-        let ptr_v = unsafe { ffi::webrtc_I420Buffer_MutableDataV(raw.as_ptr()) };
-        unsafe { slice::from_raw_parts_mut(ptr_u, stride_u * h) }.fill(u);
-        unsafe { slice::from_raw_parts_mut(ptr_v, stride_v * h) }.fill(v);
     }
 
     /// 別の I420Buffer からスケールして埋める。
@@ -374,7 +366,7 @@ impl I420Buffer {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataU(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_I420Buffer_StrideU(raw.as_ptr()) } as usize;
-        let h = (self.height() as usize).div_ceil(2);
+        let h = self.chroma_height() as usize;
         unsafe { slice::from_raw_parts(ptr, stride * h) }
     }
 
@@ -383,7 +375,7 @@ impl I420Buffer {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataU(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_I420Buffer_StrideU(raw.as_ptr()) } as usize;
-        let h = (self.height() as usize).div_ceil(2);
+        let h = self.chroma_height() as usize;
         unsafe { slice::from_raw_parts_mut(ptr, stride * h) }
     }
 
@@ -392,7 +384,7 @@ impl I420Buffer {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataV(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) } as usize;
-        let h = (self.height() as usize).div_ceil(2);
+        let h = self.chroma_height() as usize;
         unsafe { slice::from_raw_parts(ptr, stride * h) }
     }
 
@@ -401,7 +393,7 @@ impl I420Buffer {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataV(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) } as usize;
-        let h = (self.height() as usize).div_ceil(2);
+        let h = self.chroma_height() as usize;
         unsafe { slice::from_raw_parts_mut(ptr, stride * h) }
     }
 
@@ -409,8 +401,519 @@ impl I420Buffer {
         self.raw_ref.as_refcounted_ptr()
     }
 
+    fn from_raw_ref(raw_ref: NonNull<ffi::webrtc_I420Buffer_refcounted>) -> Self {
+        let raw_ref = ScopedRef::<I420BufferHandle>::from_raw(raw_ref);
+        Self { raw_ref }
+    }
+
+    fn into_raw_refcounted(self) -> *mut ffi::webrtc_I420Buffer_refcounted {
+        let this = std::mem::ManuallyDrop::new(self);
+        this.raw_ref.as_refcounted_ptr()
+    }
+
+    pub fn cast_to_video_frame_buffer(&self) -> VideoFrameBuffer {
+        let raw_ref = NonNull::new(unsafe {
+            ffi::webrtc_I420Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer(
+                self.raw_ref.as_refcounted_ptr(),
+            )
+        })
+        .expect("BUG: webrtc_I420Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer returned null");
+        let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(raw_ref);
+        VideoFrameBuffer { raw_ref }
+    }
+
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_I420Buffer> {
         self.raw_ref.raw()
+    }
+}
+
+/// webrtc::NV12Buffer のラッパー。
+pub struct NV12Buffer {
+    raw_ref: ScopedRef<NV12BufferHandle>,
+}
+
+impl NV12Buffer {
+    pub fn new(width: i32, height: i32) -> Self {
+        let raw = NonNull::new(unsafe { ffi::webrtc_NV12Buffer_Create(width, height) })
+            .expect("BUG: webrtc_NV12Buffer_Create returned null");
+        let raw_ref = ScopedRef::<NV12BufferHandle>::from_raw(raw);
+        Self { raw_ref }
+    }
+
+    pub fn width(&self) -> i32 {
+        unsafe { ffi::webrtc_NV12Buffer_width(self.raw().as_ptr()) }
+    }
+
+    pub fn height(&self) -> i32 {
+        unsafe { ffi::webrtc_NV12Buffer_height(self.raw().as_ptr()) }
+    }
+
+    pub fn chroma_width(&self) -> i32 {
+        unsafe { ffi::webrtc_NV12Buffer_chroma_width(self.raw().as_ptr()) }
+    }
+
+    pub fn chroma_height(&self) -> i32 {
+        unsafe { ffi::webrtc_NV12Buffer_chroma_height(self.raw().as_ptr()) }
+    }
+
+    pub fn stride_y(&self) -> i32 {
+        let raw = self.raw();
+        unsafe { ffi::webrtc_NV12Buffer_StrideY(raw.as_ptr()) }
+    }
+
+    pub fn stride_uv(&self) -> i32 {
+        let raw = self.raw();
+        unsafe { ffi::webrtc_NV12Buffer_StrideUV(raw.as_ptr()) }
+    }
+
+    pub fn crop_and_scale_from(
+        &mut self,
+        src: &NV12Buffer,
+        offset_x: i32,
+        offset_y: i32,
+        crop_width: i32,
+        crop_height: i32,
+    ) {
+        let raw = self.raw();
+        let src_raw = src.raw();
+        unsafe {
+            ffi::webrtc_NV12Buffer_CropAndScaleFrom(
+                raw.as_ptr(),
+                src_raw.as_ptr(),
+                offset_x,
+                offset_y,
+                crop_width,
+                crop_height,
+            )
+        };
+    }
+
+    /// Y 平面を参照する。
+    pub fn y_data(&self) -> &[u8] {
+        let raw = self.raw();
+        let ptr = unsafe { ffi::webrtc_NV12Buffer_MutableDataY(raw.as_ptr()) };
+        let stride = unsafe { ffi::webrtc_NV12Buffer_StrideY(raw.as_ptr()) } as usize;
+        let len = stride * self.height() as usize;
+        unsafe { slice::from_raw_parts(ptr, len) }
+    }
+
+    /// Y 平面を可変参照する。
+    pub fn y_data_mut(&mut self) -> &mut [u8] {
+        let raw = self.raw();
+        let ptr = unsafe { ffi::webrtc_NV12Buffer_MutableDataY(raw.as_ptr()) };
+        let stride = unsafe { ffi::webrtc_NV12Buffer_StrideY(raw.as_ptr()) } as usize;
+        let len = stride * self.height() as usize;
+        unsafe { slice::from_raw_parts_mut(ptr, len) }
+    }
+
+    /// UV 平面を参照する。
+    pub fn uv_data(&self) -> &[u8] {
+        let raw = self.raw();
+        let ptr = unsafe { ffi::webrtc_NV12Buffer_MutableDataUV(raw.as_ptr()) };
+        let stride = unsafe { ffi::webrtc_NV12Buffer_StrideUV(raw.as_ptr()) } as usize;
+        let h = self.chroma_height() as usize;
+        unsafe { slice::from_raw_parts(ptr, stride * h) }
+    }
+
+    /// UV 平面を可変参照する。
+    pub fn uv_data_mut(&mut self) -> &mut [u8] {
+        let raw = self.raw();
+        let ptr = unsafe { ffi::webrtc_NV12Buffer_MutableDataUV(raw.as_ptr()) };
+        let stride = unsafe { ffi::webrtc_NV12Buffer_StrideUV(raw.as_ptr()) } as usize;
+        let h = self.chroma_height() as usize;
+        unsafe { slice::from_raw_parts_mut(ptr, stride * h) }
+    }
+
+    pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_NV12Buffer_refcounted {
+        self.raw_ref.as_refcounted_ptr()
+    }
+
+    fn from_raw_ref(raw_ref: NonNull<ffi::webrtc_NV12Buffer_refcounted>) -> Self {
+        let raw_ref = ScopedRef::<NV12BufferHandle>::from_raw(raw_ref);
+        Self { raw_ref }
+    }
+
+    pub fn cast_to_video_frame_buffer(&self) -> VideoFrameBuffer {
+        let raw_ref = NonNull::new(unsafe {
+            ffi::webrtc_NV12Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer(
+                self.raw_ref.as_refcounted_ptr(),
+            )
+        })
+        .expect("BUG: webrtc_NV12Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer returned null");
+        let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(raw_ref);
+        VideoFrameBuffer { raw_ref }
+    }
+
+    pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_NV12Buffer> {
+        self.raw_ref.raw()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VideoFrameBufferKind {
+    Native,
+    I420,
+    I420A,
+    I422,
+    I444,
+    I010,
+    I210,
+    I410,
+    Nv12,
+    Unknown(i32),
+}
+
+impl VideoFrameBufferKind {
+    pub(crate) fn from_raw(value: i32) -> Self {
+        unsafe {
+            if value == ffi::webrtc_VideoFrameBuffer_Type_kNative {
+                Self::Native
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI420 {
+                Self::I420
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI420A {
+                Self::I420A
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI422 {
+                Self::I422
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI444 {
+                Self::I444
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI010 {
+                Self::I010
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI210 {
+                Self::I210
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI410 {
+                Self::I410
+            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kNV12 {
+                Self::Nv12
+            } else {
+                Self::Unknown(value)
+            }
+        }
+    }
+
+    pub(crate) fn to_raw(self) -> i32 {
+        unsafe {
+            match self {
+                Self::Native => ffi::webrtc_VideoFrameBuffer_Type_kNative,
+                Self::I420 => ffi::webrtc_VideoFrameBuffer_Type_kI420,
+                Self::I420A => ffi::webrtc_VideoFrameBuffer_Type_kI420A,
+                Self::I422 => ffi::webrtc_VideoFrameBuffer_Type_kI422,
+                Self::I444 => ffi::webrtc_VideoFrameBuffer_Type_kI444,
+                Self::I010 => ffi::webrtc_VideoFrameBuffer_Type_kI010,
+                Self::I210 => ffi::webrtc_VideoFrameBuffer_Type_kI210,
+                Self::I410 => ffi::webrtc_VideoFrameBuffer_Type_kI410,
+                Self::Nv12 => ffi::webrtc_VideoFrameBuffer_Type_kNV12,
+                Self::Unknown(v) => v,
+            }
+        }
+    }
+}
+
+#[doc(hidden)]
+pub trait VideoFrameBufferHandlerAny {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+
+impl<T: Any> VideoFrameBufferHandlerAny for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+pub trait VideoFrameBufferHandler: Send + VideoFrameBufferHandlerAny {
+    fn kind(&self) -> VideoFrameBufferKind {
+        VideoFrameBufferKind::Native
+    }
+    fn width(&self) -> i32;
+    fn height(&self) -> i32;
+    fn to_i420(&mut self) -> Option<I420Buffer>;
+    // None を返すとデフォルトの実装が呼ばれる。
+    // デフォルトの実装は to_i420() で I420Buffer を作成してからそれをクロップ＆スケールする。
+    fn crop_and_scale(
+        &mut self,
+        _offset_x: i32,
+        _offset_y: i32,
+        _crop_width: i32,
+        _crop_height: i32,
+        _scaled_width: i32,
+        _scaled_height: i32,
+    ) -> Option<VideoFrameBuffer> {
+        None
+    }
+}
+
+struct VideoFrameBufferHandlerState {
+    handler: Box<dyn VideoFrameBufferHandler>,
+    #[cfg(debug_assertions)]
+    callback_thread: Option<std::thread::ThreadId>,
+}
+
+#[cfg(debug_assertions)]
+fn assert_video_frame_buffer_handler_thread(state: &mut VideoFrameBufferHandlerState) {
+    let current = std::thread::current().id();
+    if let Some(thread) = state.callback_thread {
+        assert_eq!(
+            thread, current,
+            "video_frame_buffer callback called from multiple threads",
+        );
+    } else {
+        state.callback_thread = Some(current);
+    }
+}
+
+unsafe extern "C" fn video_frame_buffer_type(user_data: *mut c_void) -> i32 {
+    assert!(
+        !user_data.is_null(),
+        "video_frame_buffer_type: user_data is null"
+    );
+    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
+    #[cfg(debug_assertions)]
+    assert_video_frame_buffer_handler_thread(state);
+    state.handler.kind().to_raw()
+}
+
+unsafe extern "C" fn video_frame_buffer_width(user_data: *mut c_void) -> i32 {
+    assert!(
+        !user_data.is_null(),
+        "video_frame_buffer_width: user_data is null"
+    );
+    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
+    #[cfg(debug_assertions)]
+    assert_video_frame_buffer_handler_thread(state);
+    state.handler.width()
+}
+
+unsafe extern "C" fn video_frame_buffer_height(user_data: *mut c_void) -> i32 {
+    assert!(
+        !user_data.is_null(),
+        "video_frame_buffer_height: user_data is null"
+    );
+    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
+    #[cfg(debug_assertions)]
+    assert_video_frame_buffer_handler_thread(state);
+    state.handler.height()
+}
+
+unsafe extern "C" fn video_frame_buffer_to_i420(
+    user_data: *mut c_void,
+) -> *mut ffi::webrtc_I420Buffer_refcounted {
+    assert!(
+        !user_data.is_null(),
+        "video_frame_buffer_to_i420: user_data is null"
+    );
+    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
+    #[cfg(debug_assertions)]
+    assert_video_frame_buffer_handler_thread(state);
+    match state.handler.to_i420() {
+        Some(buffer) => buffer.into_raw_refcounted(),
+        None => std::ptr::null_mut(),
+    }
+}
+
+unsafe extern "C" fn video_frame_buffer_crop_and_scale(
+    raw: *mut ffi::webrtc_VideoFrameBuffer,
+    offset_x: i32,
+    offset_y: i32,
+    crop_width: i32,
+    crop_height: i32,
+    scaled_width: i32,
+    scaled_height: i32,
+    user_data: *mut c_void,
+) -> *mut ffi::webrtc_VideoFrameBuffer_refcounted {
+    assert!(
+        !raw.is_null(),
+        "video_frame_buffer_crop_and_scale: raw is null"
+    );
+    assert!(
+        !user_data.is_null(),
+        "video_frame_buffer_crop_and_scale: user_data is null"
+    );
+    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
+    #[cfg(debug_assertions)]
+    assert_video_frame_buffer_handler_thread(state);
+    if let Some(buffer) = state.handler.crop_and_scale(
+        offset_x,
+        offset_y,
+        crop_width,
+        crop_height,
+        scaled_width,
+        scaled_height,
+    ) {
+        return buffer.into_raw_refcounted();
+    }
+    std::ptr::null_mut()
+}
+
+unsafe extern "C" fn video_frame_buffer_on_destroy(user_data: *mut c_void) {
+    assert!(
+        !user_data.is_null(),
+        "video_frame_buffer_on_destroy: user_data is null"
+    );
+    let _ = unsafe { Box::from_raw(user_data as *mut VideoFrameBufferHandlerState) };
+}
+
+/// webrtc::VideoFrameBuffer のラッパー。
+pub struct VideoFrameBuffer {
+    raw_ref: ScopedRef<VideoFrameBufferHandle>,
+}
+
+impl VideoFrameBuffer {
+    pub fn new_with_handler(handler: Box<dyn VideoFrameBufferHandler>) -> Self {
+        let state = Box::new(VideoFrameBufferHandlerState {
+            handler,
+            #[cfg(debug_assertions)]
+            callback_thread: None,
+        });
+        let user_data = Box::into_raw(state) as *mut c_void;
+        let cbs = ffi::webrtc_VideoFrameBuffer_cbs {
+            type_: Some(video_frame_buffer_type),
+            width: Some(video_frame_buffer_width),
+            height: Some(video_frame_buffer_height),
+            ToI420: Some(video_frame_buffer_to_i420),
+            CropAndScale: Some(video_frame_buffer_crop_and_scale),
+            OnDestroy: Some(video_frame_buffer_on_destroy),
+        };
+        let raw_ref = match NonNull::new(unsafe {
+            ffi::webrtc_VideoFrameBuffer_make_ref_counted(&cbs, user_data)
+        }) {
+            Some(raw_ref) => raw_ref,
+            None => {
+                let _ = unsafe { Box::from_raw(user_data as *mut VideoFrameBufferHandlerState) };
+                panic!("BUG: webrtc_VideoFrameBuffer_make_ref_counted returned null");
+            }
+        };
+        let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(raw_ref);
+        Self { raw_ref }
+    }
+
+    pub fn width(&self) -> i32 {
+        unsafe { ffi::webrtc_VideoFrameBuffer_width(self.raw().as_ptr()) }
+    }
+
+    pub fn height(&self) -> i32 {
+        unsafe { ffi::webrtc_VideoFrameBuffer_height(self.raw().as_ptr()) }
+    }
+
+    pub fn kind(&self) -> VideoFrameBufferKind {
+        let value = unsafe { ffi::webrtc_VideoFrameBuffer_type(self.raw().as_ptr()) };
+        VideoFrameBufferKind::from_raw(value)
+    }
+
+    /// # Safety
+    /// 同一実体の `VideoFrameBuffer` へ同時アクセスしないこと。
+    /// 特に callback 側や別 clone から mutable にアクセスされないことを呼び出し側が保証する必要があります。
+    pub unsafe fn as_native_ref<T: VideoFrameBufferHandler + 'static>(&self) -> Option<&T> {
+        let user_data = unsafe { ffi::webrtc_VideoFrameBuffer_get_user_data(self.raw().as_ptr()) };
+        if user_data.is_null() {
+            return None;
+        }
+        let state = unsafe { &*(user_data as *const VideoFrameBufferHandlerState) };
+        state.handler.as_ref().as_any().downcast_ref::<T>()
+    }
+
+    /// # Safety
+    /// 同一実体の `VideoFrameBuffer` への参照が存在しないこと。
+    /// 特に callback 側や別 clone から同時に参照されないことを呼び出し側が保証する必要があります。
+    pub unsafe fn as_native_mut<T: VideoFrameBufferHandler + 'static>(&mut self) -> Option<&mut T> {
+        let user_data = unsafe { ffi::webrtc_VideoFrameBuffer_get_user_data(self.raw().as_ptr()) };
+        if user_data.is_null() {
+            return None;
+        }
+        let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
+        state.handler.as_mut().as_any_mut().downcast_mut::<T>()
+    }
+
+    pub fn as_i420(&self) -> Option<I420Buffer> {
+        let raw_ref = NonNull::new(unsafe {
+            ffi::webrtc_VideoFrameBuffer_cast_to_webrtc_I420Buffer(self.raw().as_ptr())
+        })?;
+        Some(I420Buffer::from_raw_ref(raw_ref))
+    }
+
+    pub fn as_nv12(&self) -> Option<NV12Buffer> {
+        let raw_ref = NonNull::new(unsafe {
+            ffi::webrtc_VideoFrameBuffer_cast_to_webrtc_NV12Buffer(self.raw().as_ptr())
+        })?;
+        Some(NV12Buffer::from_raw_ref(raw_ref))
+    }
+
+    pub fn to_i420(&mut self) -> Option<I420Buffer> {
+        let raw_ref =
+            NonNull::new(unsafe { ffi::webrtc_VideoFrameBuffer_ToI420(self.raw().as_ptr()) })?;
+        Some(I420Buffer::from_raw_ref(raw_ref))
+    }
+
+    pub fn crop_and_scale(
+        &mut self,
+        offset_x: i32,
+        offset_y: i32,
+        crop_width: i32,
+        crop_height: i32,
+        scaled_width: i32,
+        scaled_height: i32,
+    ) -> Option<VideoFrameBuffer> {
+        let raw_ref = NonNull::new(unsafe {
+            ffi::webrtc_VideoFrameBuffer_CropAndScale(
+                self.raw().as_ptr(),
+                offset_x,
+                offset_y,
+                crop_width,
+                crop_height,
+                scaled_width,
+                scaled_height,
+            )
+        })
+        .or_else(|| {
+            NonNull::new(unsafe {
+                ffi::webrtc_VideoFrameBuffer_DefaultCropAndScale(
+                    self.raw().as_ptr(),
+                    offset_x,
+                    offset_y,
+                    crop_width,
+                    crop_height,
+                    scaled_width,
+                    scaled_height,
+                )
+            })
+        })?;
+        let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(raw_ref);
+        Some(VideoFrameBuffer { raw_ref })
+    }
+
+    pub fn scale(&mut self, scaled_width: i32, scaled_height: i32) -> Option<VideoFrameBuffer> {
+        self.crop_and_scale(
+            0,
+            0,
+            self.width(),
+            self.height(),
+            scaled_width,
+            scaled_height,
+        )
+    }
+
+    pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_VideoFrameBuffer_refcounted {
+        self.raw_ref.as_refcounted_ptr()
+    }
+
+    pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_VideoFrameBuffer> {
+        self.raw_ref.raw()
+    }
+
+    fn into_raw_refcounted(self) -> *mut ffi::webrtc_VideoFrameBuffer_refcounted {
+        let this = std::mem::ManuallyDrop::new(self);
+        this.raw_ref.as_refcounted_ptr()
+    }
+}
+
+impl Clone for VideoFrameBuffer {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
     }
 }
 
@@ -420,7 +923,7 @@ pub struct VideoFrame {
 }
 
 impl VideoFrame {
-    pub fn from_i420(buffer: &I420Buffer, timestamp_us: i64, timestamp_rtp: u32) -> Self {
+    pub fn from_buffer(buffer: &VideoFrameBuffer, timestamp_us: i64, timestamp_rtp: u32) -> Self {
         let raw = NonNull::new(unsafe {
             ffi::webrtc_VideoFrame_Create(
                 buffer.as_refcounted_ptr(),
@@ -449,8 +952,8 @@ impl VideoFrame {
         self.as_ref().rtp_timestamp()
     }
 
-    /// I420Buffer を取得する。
-    pub fn buffer(&self) -> I420Buffer {
+    /// VideoFrameBuffer を取得する。
+    pub fn buffer(&self) -> VideoFrameBuffer {
         self.as_ref().buffer()
     }
 
@@ -462,6 +965,16 @@ impl VideoFrame {
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_VideoFrame> {
         let raw = unsafe { ffi::webrtc_VideoFrame_unique_get(self.raw_unique.as_ptr()) };
         NonNull::new(raw).expect("BUG: webrtc_VideoFrame_unique_get が null を返しました")
+    }
+}
+
+impl Clone for VideoFrame {
+    fn clone(&self) -> Self {
+        let raw = unsafe { ffi::webrtc_VideoFrame_copy(self.raw().as_ptr()) };
+        Self {
+            raw_unique: NonNull::new(raw)
+                .expect("BUG: webrtc_VideoFrame_copy が null を返しました"),
+        }
     }
 }
 
@@ -505,12 +1018,20 @@ impl<'a> VideoFrameRef<'a> {
         unsafe { ffi::webrtc_VideoFrame_timestamp_rtp(self.raw.as_ptr()) }
     }
 
-    pub fn buffer(&self) -> I420Buffer {
+    pub fn buffer(&self) -> VideoFrameBuffer {
         let buf =
             NonNull::new(unsafe { ffi::webrtc_VideoFrame_video_frame_buffer(self.raw.as_ptr()) })
                 .expect("BUG: webrtc_VideoFrame_video_frame_buffer が null を返しました");
-        let raw_ref = ScopedRef::<I420BufferHandle>::from_raw(buf);
-        I420Buffer { raw_ref }
+        let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(buf);
+        VideoFrameBuffer { raw_ref }
+    }
+
+    pub fn to_owned(&self) -> VideoFrame {
+        let raw = unsafe { ffi::webrtc_VideoFrame_copy(self.raw.as_ptr()) };
+        VideoFrame {
+            raw_unique: NonNull::new(raw)
+                .expect("BUG: webrtc_VideoFrame_copy が null を返しました"),
+        }
     }
 
     pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoFrame {
