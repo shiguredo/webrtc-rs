@@ -46,6 +46,10 @@
   - C API `webrtc_VideoFrame_copy` を追加する
   - Rust 側で `VideoFrame: Clone` と `VideoFrameRef::to_owned` を追加する
   - @melpon
+- [UPDATE] prebuilt アーカイブに C ヘッダーと Android 用 `webrtc.jar` を同梱する
+  - `webrtc/src` 配下の `*.h` を `include/` 配下に同梱する
+  - Android のアーカイブには `jar/webrtc.jar` も同梱する
+  - @melpon
 
 ## 0.146.2
 
