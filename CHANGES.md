@@ -48,6 +48,12 @@
   - C API `webrtc_VideoFrame_copy` を追加する
   - Rust 側で `VideoFrame: Clone` と `VideoFrameRef::to_owned` を追加する
   - @melpon
+- [ADD] Apple 向け ObjC ビデオファクトリの API を追加する
+  - C API `webrtc_objc_RTCDefaultVideoEncoderFactory_new` / `webrtc_objc_RTCVideoEncoderFactory_release` / `webrtc_ObjCToNativeVideoEncoderFactory` を追加する
+  - C API `webrtc_objc_RTCDefaultVideoDecoderFactory_new` / `webrtc_objc_RTCVideoDecoderFactory_release` / `webrtc_ObjCToNativeVideoDecoderFactory` を追加する
+  - Rust API `VideoEncoderFactory::from_objc_default` / `VideoDecoderFactory::from_objc_default` を追加する
+  - macOS / iOS で Objective-C++ 実装を有効化し、非 Apple では `nullptr` / no-op のスタブを返すようにする
+  - @melpon
 - [UPDATE] prebuilt アーカイブに C ヘッダーと Android 用 `webrtc.jar` を同梱する
   - `webrtc/src` 配下の `*.h` を `include/` 配下に同梱する
   - Android のアーカイブには `jar/webrtc.jar` も同梱する

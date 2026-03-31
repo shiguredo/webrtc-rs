@@ -2105,6 +2105,19 @@ impl VideoEncoderFactory {
         Self { raw_unique: raw }
     }
 
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    pub fn from_objc_default() -> Option<Self> {
+        let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoEncoderFactory_new() };
+        if objc_factory.is_null() {
+            return None;
+        }
+
+        let raw_unique = unsafe { ffi::webrtc_ObjCToNativeVideoEncoderFactory(objc_factory) };
+        unsafe { ffi::webrtc_objc_RTCVideoEncoderFactory_release(objc_factory) };
+        let raw_unique = NonNull::new(raw_unique)?;
+        Some(Self { raw_unique })
+    }
+
     pub fn new_with_handler(handler: Box<dyn VideoEncoderFactoryHandler>) -> Self {
         let state = Box::new(VideoEncoderFactoryHandlerState { handler });
         let user_data = Box::into_raw(state) as *mut c_void;

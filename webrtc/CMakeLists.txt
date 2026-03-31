@@ -339,6 +339,13 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
+set(WEBRTC_OBJC_SOURCES
+  src/webrtc_c/sdk/objc/components/video_codec/RTCDefaultVideoDecoderFactory.mm
+  src/webrtc_c/sdk/objc/components/video_codec/RTCDefaultVideoEncoderFactory.mm
+  src/webrtc_c/sdk/objc/native/api/video_decoder_factory.mm
+  src/webrtc_c/sdk/objc/native/api/video_encoder_factory.mm
+)
+
 add_library(webrtc_c
   STATIC
     src/webrtc_c/api/audio/audio_device.cc
@@ -391,6 +398,7 @@ add_library(webrtc_c
     src/webrtc_c/rtc_base/thread.cc
     src/webrtc_c/rtc_base/time_utils.cc
     src/webrtc_c/rtc_base/timestamp_aligner.cc
+    ${WEBRTC_OBJC_SOURCES}
     src/webrtc_c/std.cc
 )
 # CMake 4.x で C++20 モジュールスキャンが自動有効になるが、
@@ -437,6 +445,12 @@ if(WEBRTC_USE_WEBRTC_LIBCXX)
         "$<$<COMPILE_LANGUAGE:OBJCXX>:-isystem${LIBCXX_INCLUDE_DIR}>"
     )
   endforeach()
+endif()
+
+# これらのファイルは iOS, macOS 以外の環境ではビルドエラーを回避するための
+# ダミー実装なので C++ としてコンパイルする
+if(NOT WEBRTC_C_TARGET STREQUAL "macos_arm64" AND NOT WEBRTC_C_TARGET STREQUAL "ios_arm64")
+  set_source_files_properties(${WEBRTC_OBJC_SOURCES} PROPERTIES LANGUAGE CXX)
 endif()
 
 # 指定したライブラリを自身の静的ライブラリにバンドルする

@@ -50,5 +50,9 @@
 #include "webrtc_c/rtc_base/thread.h"
 #include "webrtc_c/rtc_base/time_utils.h"
 #include "webrtc_c/rtc_base/timestamp_aligner.h"
+#include "webrtc_c/sdk/objc/components/video_codec/RTCDefaultVideoDecoderFactory.h"
+#include "webrtc_c/sdk/objc/components/video_codec/RTCDefaultVideoEncoderFactory.h"
+#include "webrtc_c/sdk/objc/native/api/video_decoder_factory.h"
+#include "webrtc_c/sdk/objc/native/api/video_encoder_factory.h"
 #include "webrtc_c/std.h"
 // IWYU pragma: end_exports
