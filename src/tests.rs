@@ -2315,6 +2315,138 @@ fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
     );
 }
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[test]
+fn objc_video_encoder_factory_bridge_works() {
+    let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoEncoderFactory_new() };
+    assert!(
+        !objc_factory.is_null(),
+        "webrtc_objc_RTCDefaultVideoEncoderFactory_new returned null"
+    );
+
+    let native_unique = unsafe { ffi::webrtc_ObjCToNativeVideoEncoderFactory(objc_factory) };
+    assert!(
+        !native_unique.is_null(),
+        "webrtc_ObjCToNativeVideoEncoderFactory returned null"
+    );
+
+    let native = unsafe { ffi::webrtc_VideoEncoderFactory_unique_get(native_unique) };
+    assert!(
+        !native.is_null(),
+        "webrtc_VideoEncoderFactory_unique_get returned null"
+    );
+
+    let formats = unsafe { ffi::webrtc_VideoEncoderFactory_GetSupportedFormats(native) };
+    assert!(
+        !formats.is_null(),
+        "webrtc_VideoEncoderFactory_GetSupportedFormats returned null"
+    );
+    let size = unsafe { ffi::webrtc_SdpVideoFormat_vector_size(formats) };
+    assert!(size >= 0, "invalid format size: {size}");
+
+    unsafe {
+        ffi::webrtc_SdpVideoFormat_vector_delete(formats);
+        ffi::webrtc_VideoEncoderFactory_unique_delete(native_unique);
+        ffi::webrtc_objc_RTCVideoEncoderFactory_release(objc_factory);
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[test]
+fn objc_video_decoder_factory_bridge_works() {
+    let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoDecoderFactory_new() };
+    assert!(
+        !objc_factory.is_null(),
+        "webrtc_objc_RTCDefaultVideoDecoderFactory_new returned null"
+    );
+
+    let native_unique = unsafe { ffi::webrtc_ObjCToNativeVideoDecoderFactory(objc_factory) };
+    assert!(
+        !native_unique.is_null(),
+        "webrtc_ObjCToNativeVideoDecoderFactory returned null"
+    );
+
+    let native = unsafe { ffi::webrtc_VideoDecoderFactory_unique_get(native_unique) };
+    assert!(
+        !native.is_null(),
+        "webrtc_VideoDecoderFactory_unique_get returned null"
+    );
+
+    let formats = unsafe { ffi::webrtc_VideoDecoderFactory_GetSupportedFormats(native) };
+    assert!(
+        !formats.is_null(),
+        "webrtc_VideoDecoderFactory_GetSupportedFormats returned null"
+    );
+    let size = unsafe { ffi::webrtc_SdpVideoFormat_vector_size(formats) };
+    assert!(size >= 0, "invalid format size: {size}");
+
+    unsafe {
+        ffi::webrtc_SdpVideoFormat_vector_delete(formats);
+        ffi::webrtc_VideoDecoderFactory_unique_delete(native_unique);
+        ffi::webrtc_objc_RTCVideoDecoderFactory_release(objc_factory);
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[test]
+fn video_encoder_factory_from_objc_default_works() {
+    let factory = VideoEncoderFactory::from_objc_default()
+        .expect("VideoEncoderFactory::from_objc_default が None を返しました");
+    let _formats = factory.get_supported_formats();
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[test]
+fn video_decoder_factory_from_objc_default_works() {
+    let factory = VideoDecoderFactory::from_objc_default()
+        .expect("VideoDecoderFactory::from_objc_default が None を返しました");
+    let _formats = factory.get_supported_formats();
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+#[test]
+fn objc_video_factory_functions_return_null_on_non_apple() {
+    let enc_objc = unsafe { ffi::webrtc_objc_RTCDefaultVideoEncoderFactory_new() };
+    assert!(
+        enc_objc.is_null(),
+        "encoder objc factory should be null on non-Apple platforms"
+    );
+    let enc_native = unsafe {
+        ffi::webrtc_ObjCToNativeVideoEncoderFactory(std::ptr::null_mut::<
+            ffi::webrtc_objc_RTCVideoEncoderFactory,
+        >())
+    };
+    assert!(
+        enc_native.is_null(),
+        "encoder native factory should be null on non-Apple platforms"
+    );
+    unsafe {
+        ffi::webrtc_objc_RTCVideoEncoderFactory_release(std::ptr::null_mut::<
+            ffi::webrtc_objc_RTCVideoEncoderFactory,
+        >())
+    };
+
+    let dec_objc = unsafe { ffi::webrtc_objc_RTCDefaultVideoDecoderFactory_new() };
+    assert!(
+        dec_objc.is_null(),
+        "decoder objc factory should be null on non-Apple platforms"
+    );
+    let dec_native = unsafe {
+        ffi::webrtc_ObjCToNativeVideoDecoderFactory(std::ptr::null_mut::<
+            ffi::webrtc_objc_RTCVideoDecoderFactory,
+        >())
+    };
+    assert!(
+        dec_native.is_null(),
+        "decoder native factory should be null on non-Apple platforms"
+    );
+    unsafe {
+        ffi::webrtc_objc_RTCVideoDecoderFactory_release(std::ptr::null_mut::<
+            ffi::webrtc_objc_RTCVideoDecoderFactory,
+        >())
+    };
+}
+
 #[test]
 fn video_decoder_factory_get_supported_formats_returns_owned_formats() {
     struct TestVideoDecoderFactoryHandler;

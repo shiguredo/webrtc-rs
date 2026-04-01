@@ -8,6 +8,7 @@ extern "C" {
 #endif
 
 WEBRTC_EXPORT void webrtc_InitClassLoader(JNIEnv* env);
+WEBRTC_EXPORT jclass webrtc_GetClass(JNIEnv* env, const char* name);
 
 #if defined(__cplusplus)
 }

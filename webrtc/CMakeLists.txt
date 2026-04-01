@@ -339,6 +339,13 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
+set(WEBRTC_OBJC_SOURCES
+  src/webrtc_c/sdk/objc/components/video_codec/RTCDefaultVideoDecoderFactory.mm
+  src/webrtc_c/sdk/objc/components/video_codec/RTCDefaultVideoEncoderFactory.mm
+  src/webrtc_c/sdk/objc/native/api/video_decoder_factory.mm
+  src/webrtc_c/sdk/objc/native/api/video_encoder_factory.mm
+)
+
 add_library(webrtc_c
   STATIC
     src/webrtc_c/api/audio/audio_device.cc
@@ -391,6 +398,7 @@ add_library(webrtc_c
     src/webrtc_c/rtc_base/thread.cc
     src/webrtc_c/rtc_base/time_utils.cc
     src/webrtc_c/rtc_base/timestamp_aligner.cc
+    ${WEBRTC_OBJC_SOURCES}
     src/webrtc_c/std.cc
 )
 # CMake 4.x で C++20 モジュールスキャンが自動有効になるが、
@@ -413,6 +421,8 @@ foreach(target IN LISTS WEBRTC_CPP_TARGETS)
       ${WEBRTC_INCLUDE_DIR}/third_party/boringssl/src/include
       ${WEBRTC_INCLUDE_DIR}/third_party/libyuv/include
       ${WEBRTC_INCLUDE_DIR}/third_party/zlib
+      ${WEBRTC_INCLUDE_DIR}/sdk/objc
+      ${WEBRTC_INCLUDE_DIR}/sdk/objc/base
   )
 endforeach()
 
@@ -439,6 +449,12 @@ if(WEBRTC_USE_WEBRTC_LIBCXX)
   endforeach()
 endif()
 
+# これらのファイルは iOS, macOS 以外の環境ではビルドエラーを回避するための
+# ダミー実装なので C++ としてコンパイルする
+if(NOT WEBRTC_C_TARGET STREQUAL "macos_arm64" AND NOT WEBRTC_C_TARGET STREQUAL "ios_arm64")
+  set_source_files_properties(${WEBRTC_OBJC_SOURCES} PROPERTIES LANGUAGE CXX)
+endif()
+
 # 指定したライブラリを自身の静的ライブラリにバンドルする
 function(bundle_static_library target static_libs bundled_target)
   file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bundled)
@@ -453,10 +469,17 @@ function(bundle_static_library target static_libs bundled_target)
       VERBATIM
       COMMENT "Bundling libs: ${static_libs} to $<TARGET_FILE:${target}>")
   elseif (APPLE)
+    set(APPLE_BUNDLE_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/bundle_apple_static_library.sh")
     add_custom_command(
-      COMMAND libtool -static -o ${bundled_tgt_full_name} "$<TARGET_FILE:${target}>" ${static_libs}
+      COMMAND /bin/sh ${APPLE_BUNDLE_SCRIPT}
+        ${bundled_tgt_full_name}
+        "$<TARGET_FILE:${target}>"
+        ${CMAKE_AR}
+        ${WEBRTC_C_TARGET}
+        --
+        ${static_libs}
       OUTPUT ${bundled_tgt_full_name}
-      DEPENDS $<TARGET_FILE:${target}> ${static_libs}
+      DEPENDS $<TARGET_FILE:${target}> ${static_libs} ${APPLE_BUNDLE_SCRIPT}
       VERBATIM
       COMMENT "Bundling libs: ${static_libs} to $<TARGET_FILE:${target}>")
   else ()
@@ -479,7 +502,7 @@ function(bundle_static_library target static_libs bundled_target)
       COMMENT "Bundling libs: ${static_libs} to $<TARGET_FILE:${target}>")
   endif()
 
-  add_custom_target(${bundled_target}_bundling ALL DEPENDS ${bundled_tgt_full_name})
+  add_custom_target(${bundled_target}_bundling DEPENDS ${bundled_tgt_full_name})
   add_dependencies(${bundled_target}_bundling ${target})
 
   add_library(${bundled_target} STATIC IMPORTED)
@@ -543,7 +566,6 @@ elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
 
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
     target_compile_options(${target} PRIVATE -fconstant-string-class=NSConstantString)
-    target_link_options(${target} PRIVATE -ObjC)
     target_compile_definitions(${target}
       PRIVATE
         WEBRTC_POSIX
@@ -562,24 +584,24 @@ elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
     target_link_libraries(${target}
       PRIVATE
-        #"-framework Foundation"
         "-framework AVFoundation"
-        #"-framework CoreServices"
-        #"-framework CoreFoundation"
-        #"-framework AudioUnit"
+        "-framework AppKit"
         "-framework AudioToolbox"
         "-framework CoreAudio"
-        "-framework QuartzCore"
-        #"-framework CoreGraphics"
         "-framework CoreMedia"
-        #"-framework CoreVideo"
-        "-framework VideoToolbox"
-        "-framework AppKit"
+        "-framework IOSurface"
         "-framework Metal"
         "-framework MetalKit"
         "-framework OpenGL"
-        "-framework IOSurface"
+        "-framework QuartzCore"
         "-framework ScreenCaptureKit"
+        "-framework VideoToolbox"
+        #"-framework AudioUnit"
+        #"-framework CoreFoundation"
+        #"-framework CoreGraphics"
+        #"-framework CoreServices"
+        #"-framework CoreVideo"
+        #"-framework Foundation"
     )
   endforeach()
 
@@ -693,6 +715,7 @@ elseif (WEBRTC_C_TARGET STREQUAL "android_arm64")
       src/webrtc_c/jni_export.cc
       src/webrtc_c/sdk/android/src/jni/jvm.cc
       src/webrtc_c/sdk/android/native_api/audio_device_module/audio_device_android.cc
+      src/webrtc_c/sdk/android/native_api/codecs/wrapper.cc
       src/webrtc_c/sdk/android/native_api/jni/class_loader.cc
   )
 
@@ -777,7 +800,6 @@ if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
   endforeach()
 elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
   foreach(target IN LISTS WEBRTC_C_TARGETS)
-    target_link_options(${target} PRIVATE -ObjC)
     target_link_libraries(${target}
       PRIVATE
         "-framework AVFoundation"
