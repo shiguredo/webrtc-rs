@@ -578,24 +578,24 @@ elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
     target_link_libraries(${target}
       PRIVATE
-        #"-framework Foundation"
         "-framework AVFoundation"
-        #"-framework CoreServices"
-        #"-framework CoreFoundation"
-        #"-framework AudioUnit"
+        "-framework AppKit"
         "-framework AudioToolbox"
         "-framework CoreAudio"
-        "-framework QuartzCore"
-        #"-framework CoreGraphics"
         "-framework CoreMedia"
-        #"-framework CoreVideo"
-        "-framework VideoToolbox"
-        "-framework AppKit"
+        "-framework IOSurface"
         "-framework Metal"
         "-framework MetalKit"
         "-framework OpenGL"
-        "-framework IOSurface"
+        "-framework QuartzCore"
         "-framework ScreenCaptureKit"
+        "-framework VideoToolbox"
+        #"-framework AudioUnit"
+        #"-framework CoreFoundation"
+        #"-framework CoreGraphics"
+        #"-framework CoreServices"
+        #"-framework CoreVideo"
+        #"-framework Foundation"
     )
   endforeach()
 
