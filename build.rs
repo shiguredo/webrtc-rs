@@ -116,6 +116,10 @@ fn main() {
         "cargo:rerun-if-changed={}",
         webrtc_dir.join("CMakeLists.txt").display()
     );
+    println!(
+        "cargo:rerun-if-changed={}",
+        webrtc_dir.join("scripts").display()
+    );
 
     let target_platform = get_target_platform();
     let out_dir = get_out_dir();
@@ -1430,7 +1434,6 @@ fn emit_link_directives(lib_path: &Path) {
             }
         }
         "macos" => {
-            println!("cargo:rustc-link-arg=-ObjC");
             println!("cargo:rustc-link-lib=c++");
             for framework in [
                 "AVFoundation",
@@ -1464,7 +1467,6 @@ fn emit_link_directives(lib_path: &Path) {
             }
         }
         "ios" => {
-            println!("cargo:rustc-link-arg=-ObjC");
             println!("cargo:rustc-link-lib=c++");
             for framework in [
                 "Foundation",

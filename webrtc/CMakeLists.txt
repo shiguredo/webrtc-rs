@@ -469,10 +469,17 @@ function(bundle_static_library target static_libs bundled_target)
       VERBATIM
       COMMENT "Bundling libs: ${static_libs} to $<TARGET_FILE:${target}>")
   elseif (APPLE)
+    set(APPLE_BUNDLE_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/bundle_apple_static_library.sh")
     add_custom_command(
-      COMMAND libtool -static -o ${bundled_tgt_full_name} "$<TARGET_FILE:${target}>" ${static_libs}
+      COMMAND /bin/sh ${APPLE_BUNDLE_SCRIPT}
+        ${bundled_tgt_full_name}
+        "$<TARGET_FILE:${target}>"
+        ${CMAKE_AR}
+        ${WEBRTC_C_TARGET}
+        --
+        ${static_libs}
       OUTPUT ${bundled_tgt_full_name}
-      DEPENDS $<TARGET_FILE:${target}> ${static_libs}
+      DEPENDS $<TARGET_FILE:${target}> ${static_libs} ${APPLE_BUNDLE_SCRIPT}
       VERBATIM
       COMMENT "Bundling libs: ${static_libs} to $<TARGET_FILE:${target}>")
   else ()
@@ -495,7 +502,7 @@ function(bundle_static_library target static_libs bundled_target)
       COMMENT "Bundling libs: ${static_libs} to $<TARGET_FILE:${target}>")
   endif()
 
-  add_custom_target(${bundled_target}_bundling ALL DEPENDS ${bundled_tgt_full_name})
+  add_custom_target(${bundled_target}_bundling DEPENDS ${bundled_tgt_full_name})
   add_dependencies(${bundled_target}_bundling ${target})
 
   add_library(${bundled_target} STATIC IMPORTED)
@@ -559,7 +566,6 @@ elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
 
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
     target_compile_options(${target} PRIVATE -fconstant-string-class=NSConstantString)
-    target_link_options(${target} PRIVATE -ObjC)
     target_compile_definitions(${target}
       PRIVATE
         WEBRTC_POSIX
@@ -794,7 +800,6 @@ if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
   endforeach()
 elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
   foreach(target IN LISTS WEBRTC_C_TARGETS)
-    target_link_options(${target} PRIVATE -ObjC)
     target_link_libraries(${target}
       PRIVATE
         "-framework AVFoundation"

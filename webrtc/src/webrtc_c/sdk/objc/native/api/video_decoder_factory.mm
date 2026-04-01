@@ -26,7 +26,6 @@ id<RTC_OBJC_TYPE(RTCVideoDecoderFactory)> ToRTCVideoDecoderFactory(
 }  // namespace
 
 extern "C" {
-
 WEBRTC_EXPORT struct webrtc_VideoDecoderFactory_unique*
 webrtc_ObjCToNativeVideoDecoderFactory(
     struct webrtc_objc_RTCVideoDecoderFactory* objc_video_decoder_factory) {

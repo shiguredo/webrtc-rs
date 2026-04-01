@@ -62,6 +62,8 @@
   - `webrtc/src` 配下の `*.h` を `include/` 配下に同梱する
   - Android のアーカイブには `jar/webrtc.jar` も同梱する
   - @melpon
+- [FIX] Apple 向け static library バンドル時に Objective-C カテゴリ実装メンバーを集約して、利用者へ `-ObjC` フラグを要求しないようにする
+  - @melpon
 
 ## 0.146.2
 
