@@ -1324,6 +1324,15 @@ fn generate_bindings(header: &Path, include_dir: &Path) {
         let include = sysroot.join("usr").join("include");
         let target_include = include.join(target);
         builder = builder
+            .header(
+                header
+                    .parent()
+                    .unwrap()
+                    .join("webrtc_c")
+                    .join("android.h")
+                    .to_str()
+                    .unwrap(),
+            )
             .clang_arg(format!("--target={target}"))
             .clang_arg(format!("--sysroot={}", sysroot.display()))
             .clang_arg(format!("-isystem{}", include.display()));

@@ -421,6 +421,8 @@ foreach(target IN LISTS WEBRTC_CPP_TARGETS)
       ${WEBRTC_INCLUDE_DIR}/third_party/boringssl/src/include
       ${WEBRTC_INCLUDE_DIR}/third_party/libyuv/include
       ${WEBRTC_INCLUDE_DIR}/third_party/zlib
+      ${WEBRTC_INCLUDE_DIR}/sdk/objc
+      ${WEBRTC_INCLUDE_DIR}/sdk/objc/base
   )
 endforeach()
 
