@@ -1430,23 +1430,21 @@ fn emit_link_directives(lib_path: &Path) {
             }
         }
         "macos" => {
+            println!("cargo:rustc-link-arg=-ObjC");
             println!("cargo:rustc-link-lib=c++");
             for framework in [
-                "Foundation",
                 "AVFoundation",
-                "CoreAudio",
-                "AudioToolbox",
-                "CoreMedia",
-                "CoreVideo",
-                "CoreGraphics",
-                "CoreFoundation",
-                "VideoToolbox",
-                "Security",
-                "Metal",
-                "IOSurface",
-                "QuartzCore",
-                "Cocoa",
                 "AppKit",
+                "AudioToolbox",
+                "CoreAudio",
+                "CoreMedia",
+                "IOSurface",
+                "Metal",
+                "MetalKit",
+                "OpenGL",
+                "QuartzCore",
+                "ScreenCaptureKit",
+                "VideoToolbox",
             ] {
                 println!("cargo:rustc-link-lib=framework={framework}");
             }
@@ -1466,6 +1464,7 @@ fn emit_link_directives(lib_path: &Path) {
             }
         }
         "ios" => {
+            println!("cargo:rustc-link-arg=-ObjC");
             println!("cargo:rustc-link-lib=c++");
             for framework in [
                 "Foundation",
