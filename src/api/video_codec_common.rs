@@ -198,6 +198,12 @@ impl SdpVideoFormat {
         unsafe { ffi::webrtc_SdpVideoFormat_is_equal(self.raw().as_ptr(), other.raw.as_ptr()) != 0 }
     }
 
+    pub fn is_same_codec(&self, other: SdpVideoFormatRef<'_>) -> bool {
+        unsafe {
+            ffi::webrtc_SdpVideoFormat_IsSameCodec(self.raw().as_ptr(), other.raw.as_ptr()) != 0
+        }
+    }
+
     pub fn scalability_modes(&self) -> Vec<ScalabilityMode> {
         self.as_ref().scalability_modes()
     }
@@ -291,6 +297,31 @@ impl Drop for SdpVideoFormat {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_SdpVideoFormat_unique_delete(self.raw_unique.as_ptr()) };
     }
+}
+
+pub fn fuzzy_match_sdp_video_format(
+    supported_formats: &[SdpVideoFormat],
+    format: SdpVideoFormatRef<'_>,
+) -> Option<SdpVideoFormat> {
+    let raw_formats = unsafe { ffi::webrtc_SdpVideoFormat_vector_new() };
+    let raw_formats =
+        NonNull::new(raw_formats).expect("BUG: webrtc_SdpVideoFormat_vector_new returned null");
+
+    for supported_format in supported_formats {
+        unsafe {
+            ffi::webrtc_SdpVideoFormat_vector_push_back(
+                raw_formats.as_ptr(),
+                supported_format.raw().as_ptr(),
+            )
+        };
+    }
+
+    let matched =
+        unsafe { ffi::webrtc_FuzzyMatchSdpVideoFormat(raw_formats.as_ptr(), format.as_ptr()) };
+
+    unsafe { ffi::webrtc_SdpVideoFormat_vector_delete(raw_formats.as_ptr()) };
+
+    NonNull::new(matched).map(|raw_unique| SdpVideoFormat { raw_unique })
 }
 
 /// webrtc::I420Buffer のラッパー。
