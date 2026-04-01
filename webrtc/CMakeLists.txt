@@ -707,6 +707,7 @@ elseif (WEBRTC_C_TARGET STREQUAL "android_arm64")
       src/webrtc_c/jni_export.cc
       src/webrtc_c/sdk/android/src/jni/jvm.cc
       src/webrtc_c/sdk/android/native_api/audio_device_module/audio_device_android.cc
+      src/webrtc_c/sdk/android/native_api/codecs/wrapper.cc
       src/webrtc_c/sdk/android/native_api/jni/class_loader.cc
   )
 

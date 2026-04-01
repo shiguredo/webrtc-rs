@@ -54,6 +54,10 @@
   - Rust API `VideoEncoderFactory::from_objc_default` / `VideoDecoderFactory::from_objc_default` を追加する
   - macOS / iOS で Objective-C++ 実装を有効化し、非 Apple では `nullptr` / no-op のスタブを返すようにする
   - @melpon
+- [ADD] Android 向けビデオファクトリの API を追加する
+  - C API `jni_JNIEnv_GetMethodID` / `jni_JNIEnv_NewObjectA` / `webrtc_GetClass` / `webrtc_JavaToNativeVideoEncoderFactory` / `webrtc_JavaToNativeVideoDecoderFactory` を追加する
+  - Rust API `VideoEncoderFactory::from_android_default` / `VideoDecoderFactory::from_android_default` を追加する
+  - @melpon
 - [UPDATE] prebuilt アーカイブに C ヘッダーと Android 用 `webrtc.jar` を同梱する
   - `webrtc/src` 配下の `*.h` を `include/` 配下に同梱する
   - Android のアーカイブには `jar/webrtc.jar` も同梱する

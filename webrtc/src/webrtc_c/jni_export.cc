@@ -22,6 +22,20 @@ WEBRTC_EXPORT jint jni_JNIEnv_GetJavaVM(JNIEnv* env, JavaVM** out_vm) {
   return env->GetJavaVM(out_vm);
 }
 
+WEBRTC_EXPORT jmethodID jni_JNIEnv_GetMethodID(JNIEnv* env,
+                                               jclass clazz,
+                                               const char* name,
+                                               const char* sig) {
+  return env->GetMethodID(clazz, name, sig);
+}
+
+WEBRTC_EXPORT jobject jni_JNIEnv_NewObjectA(JNIEnv* env,
+                                            jclass clazz,
+                                            jmethodID method_id,
+                                            const jvalue* args) {
+  return env->NewObjectA(clazz, method_id, args);
+}
+
 WEBRTC_EXPORT jobject jni_JNIEnv_NewGlobalRef(JNIEnv* env, jobject obj) {
   return env->NewGlobalRef(obj);
 }
