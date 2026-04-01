@@ -196,6 +196,137 @@ fn sdp_video_format_new_has_empty_scalability_modes() {
 }
 
 #[test]
+fn fuzzy_match_sdp_video_format_prefers_more_parameter_matches() {
+    let supported_formats = vec![
+        SdpVideoFormat::new_with_parameters(
+            "H264",
+            &std::collections::HashMap::from([
+                (String::from("profile-level-id"), String::from("42e01f")),
+                (String::from("packetization-mode"), String::from("1")),
+            ]),
+            &[],
+        ),
+        SdpVideoFormat::new_with_parameters(
+            "H264",
+            &std::collections::HashMap::from([
+                (String::from("profile-level-id"), String::from("42e01f")),
+                (String::from("packetization-mode"), String::from("0")),
+            ]),
+            &[],
+        ),
+    ];
+    let requested = SdpVideoFormat::new_with_parameters(
+        "H264",
+        &std::collections::HashMap::from([
+            (String::from("profile-level-id"), String::from("42e01f")),
+            (String::from("packetization-mode"), String::from("1")),
+            (String::from("x-google-start-bitrate"), String::from("500")),
+        ]),
+        &[],
+    );
+
+    let mut matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
+        .expect("fuzzy_match_sdp_video_format should return a matched format");
+    let params = matched
+        .parameters_mut()
+        .iter()
+        .collect::<std::collections::HashMap<String, String>>();
+
+    assert_eq!(
+        params.get("packetization-mode").map(String::as_str),
+        Some("1")
+    );
+}
+
+#[test]
+fn fuzzy_match_sdp_video_format_keeps_first_candidate_on_tie() {
+    let supported_formats = vec![
+        SdpVideoFormat::new_with_parameters(
+            "H264",
+            &std::collections::HashMap::from([(
+                String::from("x-google-start-bitrate"),
+                String::from("300"),
+            )]),
+            &[],
+        ),
+        SdpVideoFormat::new_with_parameters(
+            "H264",
+            &std::collections::HashMap::from([(
+                String::from("x-google-start-bitrate"),
+                String::from("500"),
+            )]),
+            &[],
+        ),
+    ];
+    let requested = SdpVideoFormat::new("H264");
+
+    let mut matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
+        .expect("fuzzy_match_sdp_video_format should return a matched format");
+    let params = matched
+        .parameters_mut()
+        .iter()
+        .collect::<std::collections::HashMap<String, String>>();
+
+    assert_eq!(
+        params.get("x-google-start-bitrate").map(String::as_str),
+        Some("300")
+    );
+}
+
+#[test]
+fn fuzzy_match_sdp_video_format_returns_none_for_different_codec_name() {
+    let supported_formats = vec![SdpVideoFormat::new("VP8")];
+    let requested = SdpVideoFormat::new("H264");
+
+    assert!(fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref()).is_none());
+}
+
+#[test]
+fn sdp_video_format_is_same_codec_follows_codec_specific_rules() {
+    let h264_upper = SdpVideoFormat::new("H264");
+    let h264_lower = SdpVideoFormat::new("h264");
+    assert!(h264_upper.is_same_codec(h264_lower.as_ref()));
+
+    let h264_packetization_mode_1 = SdpVideoFormat::new_with_parameters(
+        "H264",
+        &std::collections::HashMap::from([(String::from("packetization-mode"), String::from("1"))]),
+        &[],
+    );
+    assert!(!h264_upper.is_same_codec(h264_packetization_mode_1.as_ref()));
+
+    let h264_profile_a = SdpVideoFormat::new_with_parameters(
+        "H264",
+        &std::collections::HashMap::from([(
+            String::from("profile-level-id"),
+            String::from("42e01f"),
+        )]),
+        &[],
+    );
+    let h264_profile_b = SdpVideoFormat::new_with_parameters(
+        "H264",
+        &std::collections::HashMap::from([(
+            String::from("profile-level-id"),
+            String::from("640c34"),
+        )]),
+        &[],
+    );
+    assert!(!h264_profile_a.is_same_codec(h264_profile_b.as_ref()));
+
+    let vp9_profile_0 = SdpVideoFormat::new_with_parameters(
+        "VP9",
+        &std::collections::HashMap::from([(String::from("profile-id"), String::from("0"))]),
+        &[],
+    );
+    let vp9_profile_2 = SdpVideoFormat::new_with_parameters(
+        "VP9",
+        &std::collections::HashMap::from([(String::from("profile-id"), String::from("2"))]),
+        &[],
+    );
+    assert!(!vp9_profile_0.is_same_codec(vp9_profile_2.as_ref()));
+    assert!(vp9_profile_0.is_same_codec(vp9_profile_0.clone().as_ref()));
+}
+
+#[test]
 fn scalability_mode_round_trip() {
     let mode = ScalabilityMode::L2T2;
     assert_eq!(

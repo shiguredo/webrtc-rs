@@ -58,6 +58,10 @@
   - C API `jni_JNIEnv_GetMethodID` / `jni_JNIEnv_NewObjectA` / `webrtc_GetClass` / `webrtc_JavaToNativeVideoEncoderFactory` / `webrtc_JavaToNativeVideoDecoderFactory` を追加する
   - Rust API `VideoEncoderFactory::from_android_default` / `VideoDecoderFactory::from_android_default` を追加する
   - @melpon
+- [ADD] `SdpVideoFormat` の codec 判定と fuzzy match API を追加する
+  - C API `webrtc_FuzzyMatchSdpVideoFormat` / `webrtc_SdpVideoFormat_IsSameCodec` を追加する
+  - Rust API `fuzzy_match_sdp_video_format` / `SdpVideoFormat::is_same_codec` を追加する
+  - @melpon
 - [UPDATE] prebuilt アーカイブに C ヘッダーと Android 用 `webrtc.jar` を同梱する
   - `webrtc/src` 配下の `*.h` を `include/` 配下に同梱する
   - Android のアーカイブには `jar/webrtc.jar` も同梱する
