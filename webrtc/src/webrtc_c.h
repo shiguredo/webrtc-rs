@@ -10,6 +10,7 @@
 #include "webrtc_c/api/media_stream_interface.h"
 #include "webrtc_c/api/media_types.h"
 #include "webrtc_c/api/peer_connection_interface.h"
+#include "webrtc_c/api/priority.h"
 #include "webrtc_c/api/ref_count.h"
 #include "webrtc_c/api/rtc_error.h"
 #include "webrtc_c/api/rtc_event_log.h"

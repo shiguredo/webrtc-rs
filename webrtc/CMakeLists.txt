@@ -359,6 +359,7 @@ add_library(webrtc_c
     src/webrtc_c/api/environment.cc
     src/webrtc_c/api/media_types.cc
     src/webrtc_c/api/media_stream_interface.cc
+    src/webrtc_c/api/priority.cc
     src/webrtc_c/api/peer_connection_interface.cc
     src/webrtc_c/api/ref_count.cc
     src/webrtc_c/api/rtc_error.cc
