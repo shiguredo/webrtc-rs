@@ -35,7 +35,7 @@
   - `convert_from_i420` / `i420_to_nv12` / `abgr_to_i420` / `nv12_to_i420` / `yuy2_to_i420` の戻り値を `bool` に変更する
   - 各変換 API の引数順を libyuv の C API と 1 対 1 になるように統一する
   - @melpon
-- [UPDATE] libwebrtc m146 (m146.7680.5.0) に上げる
+- [UPDATE] libwebrtc m146 (m146.7680.6.0) に上げる
   - @voluntas
 - [ADD] `NV12Buffer` と関連バッファ API を追加する
   - `NV12Buffer` を追加し、`y_data` / `uv_data` の参照と `crop_and_scale_from` を利用できるようにする
