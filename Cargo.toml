@@ -1,6 +1,6 @@
 [package]
 name = "shiguredo_webrtc"
-version = "0.146.3-canary.4"
+version = "0.146.3"
 edition = "2024"
 rust-version = "1.88"
 authors = ["Shiguredo Inc."]
@@ -38,7 +38,7 @@ android-ndk-version = "27.2.12479018"
 
 [build-dependencies]
 bindgen = "0.72"
-shiguredo_cmake = "4.3.0"
+shiguredo_cmake = "4.3"
 shiguredo_toml = "2026.1"
 nojson = "0.3"
 
