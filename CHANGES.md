@@ -9,8 +9,11 @@
 - FIX
   - バグ修正
 
+
 ## develop
 
+- [UPDATE] libwebrtc m147 (m147.7727.8.0) に上げる
+  - @voluntas
 
 ## 0.146.3
 
