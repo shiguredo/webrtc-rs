@@ -337,6 +337,21 @@ impl I420Buffer {
         Self { raw_ref }
     }
 
+    pub fn new_with_strides(
+        width: i32,
+        height: i32,
+        stride_y: i32,
+        stride_u: i32,
+        stride_v: i32,
+    ) -> Self {
+        let raw = NonNull::new(unsafe {
+            ffi::webrtc_I420Buffer_CreateWithStrides(width, height, stride_y, stride_u, stride_v)
+        })
+        .expect("BUG: webrtc_I420Buffer_CreateWithStrides returned null");
+        let raw_ref = ScopedRef::<I420BufferHandle>::from_raw(raw);
+        Self { raw_ref }
+    }
+
     pub fn width(&self) -> i32 {
         unsafe { ffi::webrtc_I420Buffer_width(self.raw().as_ptr()) }
     }
@@ -391,6 +406,56 @@ impl I420Buffer {
         let stride = unsafe { ffi::webrtc_I420Buffer_StrideY(raw.as_ptr()) } as usize;
         let len = stride * self.height() as usize;
         unsafe { slice::from_raw_parts_mut(ptr, len) }
+    }
+
+    /// 連続したメモリとして Y/U/V 全体を参照する。
+    pub fn data(&self) -> &[u8] {
+        let raw = self.raw();
+        let height = self.height() as usize;
+        let chroma_height = self.chroma_height() as usize;
+        let ptr_y = unsafe { ffi::webrtc_I420Buffer_MutableDataY(raw.as_ptr()) };
+        let ptr_u = unsafe { ffi::webrtc_I420Buffer_MutableDataU(raw.as_ptr()) };
+        let ptr_v = unsafe { ffi::webrtc_I420Buffer_MutableDataV(raw.as_ptr()) };
+        let stride_y = unsafe { ffi::webrtc_I420Buffer_StrideY(raw.as_ptr()) } as usize;
+        let stride_u = unsafe { ffi::webrtc_I420Buffer_StrideU(raw.as_ptr()) } as usize;
+        let stride_v = unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) } as usize;
+        let len_y = stride_y * height;
+        let len_u = stride_u * chroma_height;
+        let len_v = stride_v * chroma_height;
+
+        debug_assert_eq!(ptr_y.wrapping_add(len_y), ptr_u);
+        debug_assert_eq!(ptr_u.wrapping_add(len_u), ptr_v);
+
+        let total_len = len_y
+            .checked_add(len_u)
+            .and_then(|v| v.checked_add(len_v))
+            .expect("I420Buffer data length overflow");
+        unsafe { slice::from_raw_parts(ptr_y, total_len) }
+    }
+
+    /// 連続したメモリとして Y/U/V 全体を可変参照する。
+    pub fn data_mut(&mut self) -> &mut [u8] {
+        let raw = self.raw();
+        let height = self.height() as usize;
+        let chroma_height = self.chroma_height() as usize;
+        let ptr_y = unsafe { ffi::webrtc_I420Buffer_MutableDataY(raw.as_ptr()) };
+        let ptr_u = unsafe { ffi::webrtc_I420Buffer_MutableDataU(raw.as_ptr()) };
+        let ptr_v = unsafe { ffi::webrtc_I420Buffer_MutableDataV(raw.as_ptr()) };
+        let stride_y = unsafe { ffi::webrtc_I420Buffer_StrideY(raw.as_ptr()) } as usize;
+        let stride_u = unsafe { ffi::webrtc_I420Buffer_StrideU(raw.as_ptr()) } as usize;
+        let stride_v = unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) } as usize;
+        let len_y = stride_y * height;
+        let len_u = stride_u * chroma_height;
+        let len_v = stride_v * chroma_height;
+
+        debug_assert_eq!(ptr_y.wrapping_add(len_y), ptr_u);
+        debug_assert_eq!(ptr_u.wrapping_add(len_u), ptr_v);
+
+        let total_len = len_y
+            .checked_add(len_u)
+            .and_then(|v| v.checked_add(len_v))
+            .expect("I420Buffer data length overflow");
+        unsafe { slice::from_raw_parts_mut(ptr_y, total_len) }
     }
 
     /// Y/U/V 平面を同時に可変参照する。
@@ -493,6 +558,15 @@ impl NV12Buffer {
         Self { raw_ref }
     }
 
+    pub fn new_with_strides(width: i32, height: i32, stride_y: i32, stride_uv: i32) -> Self {
+        let raw = NonNull::new(unsafe {
+            ffi::webrtc_NV12Buffer_CreateWithStrides(width, height, stride_y, stride_uv)
+        })
+        .expect("BUG: webrtc_NV12Buffer_CreateWithStrides returned null");
+        let raw_ref = ScopedRef::<NV12BufferHandle>::from_raw(raw);
+        Self { raw_ref }
+    }
+
     pub fn width(&self) -> i32 {
         unsafe { ffi::webrtc_NV12Buffer_width(self.raw().as_ptr()) }
     }
@@ -557,6 +631,46 @@ impl NV12Buffer {
         let stride = unsafe { ffi::webrtc_NV12Buffer_StrideY(raw.as_ptr()) } as usize;
         let len = stride * self.height() as usize;
         unsafe { slice::from_raw_parts_mut(ptr, len) }
+    }
+
+    /// 連続したメモリとして Y/UV 全体を参照する。
+    pub fn data(&self) -> &[u8] {
+        let raw = self.raw();
+        let height = self.height() as usize;
+        let chroma_height = self.chroma_height() as usize;
+        let ptr_y = unsafe { ffi::webrtc_NV12Buffer_MutableDataY(raw.as_ptr()) };
+        let ptr_uv = unsafe { ffi::webrtc_NV12Buffer_MutableDataUV(raw.as_ptr()) };
+        let stride_y = unsafe { ffi::webrtc_NV12Buffer_StrideY(raw.as_ptr()) } as usize;
+        let stride_uv = unsafe { ffi::webrtc_NV12Buffer_StrideUV(raw.as_ptr()) } as usize;
+        let len_y = stride_y * height;
+        let len_uv = stride_uv * chroma_height;
+
+        debug_assert_eq!(ptr_y.wrapping_add(len_y), ptr_uv);
+
+        let total_len = len_y
+            .checked_add(len_uv)
+            .expect("NV12Buffer data length overflow");
+        unsafe { slice::from_raw_parts(ptr_y, total_len) }
+    }
+
+    /// 連続したメモリとして Y/UV 全体を可変参照する。
+    pub fn data_mut(&mut self) -> &mut [u8] {
+        let raw = self.raw();
+        let height = self.height() as usize;
+        let chroma_height = self.chroma_height() as usize;
+        let ptr_y = unsafe { ffi::webrtc_NV12Buffer_MutableDataY(raw.as_ptr()) };
+        let ptr_uv = unsafe { ffi::webrtc_NV12Buffer_MutableDataUV(raw.as_ptr()) };
+        let stride_y = unsafe { ffi::webrtc_NV12Buffer_StrideY(raw.as_ptr()) } as usize;
+        let stride_uv = unsafe { ffi::webrtc_NV12Buffer_StrideUV(raw.as_ptr()) } as usize;
+        let len_y = stride_y * height;
+        let len_uv = stride_uv * chroma_height;
+
+        debug_assert_eq!(ptr_y.wrapping_add(len_y), ptr_uv);
+
+        let total_len = len_y
+            .checked_add(len_uv)
+            .expect("NV12Buffer data length overflow");
+        unsafe { slice::from_raw_parts_mut(ptr_y, total_len) }
     }
 
     /// UV 平面を参照する。

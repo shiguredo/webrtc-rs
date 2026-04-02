@@ -21,7 +21,8 @@ pub use cxxstd::{
 };
 pub use error::{Error, Result};
 pub use libyuv::{
-    LibyuvFourcc, abgr_to_i420, convert_from_i420, i420_to_nv12, nv12_to_i420, yuy2_to_i420,
+    LibyuvFourcc, abgr_to_i420, convert_from_i420, i420_copy, i420_to_nv12, nv12_copy,
+    nv12_to_i420, yuy2_to_i420,
 };
 pub use ref_count::{RefCountedHandle, ScopedRef};
 pub use rtc_base::{

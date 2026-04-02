@@ -18,6 +18,12 @@ struct webrtc_VideoFrameBuffer_refcounted;
 WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted* webrtc_I420Buffer_Create(
     int width,
     int height);
+WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted*
+webrtc_I420Buffer_CreateWithStrides(int width,
+                                    int height,
+                                    int stride_y,
+                                    int stride_u,
+                                    int stride_v);
 WEBRTC_EXPORT int webrtc_I420Buffer_width(const struct webrtc_I420Buffer* self);
 WEBRTC_EXPORT int webrtc_I420Buffer_height(
     const struct webrtc_I420Buffer* self);
