@@ -9,9 +9,14 @@
 - FIX
   - バグ修正
 
-## develop
+
+## feature/libwebrtc-m147
 
 - [UPDATE] libwebrtc m147 (m147.7727.8.0) に上げる
+  - @voluntas
+
+## develop
+
 - [CHANGE] `VideoFrame` の生成 API を `VideoFrameBuffer` ベースに変更する
   - `VideoFrameBuffer` / `VideoFrameBufferHandler` を追加し、Rust 実装の native バッファを `kNative` として扱えるようにする
   - `VideoFrameBufferKind` と `VideoFrameBuffer::kind` / `VideoFrameBufferHandler::kind` を追加し、バッファ種別を Rust 側で扱えるようにする
