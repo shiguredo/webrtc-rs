@@ -1,8 +1,9 @@
 #pragma once
 
-#include <vector>
+#include <vector>  // IWYU pragma: keep
 
-#include <api/scoped_refptr.h>
+// WebRTC
+#include <api/scoped_refptr.h>  // IWYU pragma: keep
 
 #include "common.h"
 

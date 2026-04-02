@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <memory>
 #include <string>
-#include <vector>
+#include <vector>  // IWYU pragma: keep
 
 // WebRTC
 #include <api/media_stream_interface.h>
