@@ -558,6 +558,65 @@ fn i420_buffer_chroma_dimensions_for_odd_size() {
 }
 
 #[test]
+fn i420_buffer_new_with_strides_preserves_stride_and_plane_lengths() {
+    let width = 5;
+    let height = 3;
+    let stride_y = 8;
+    let stride_u = 4;
+    let stride_v = 6;
+    let buf = I420Buffer::new_with_strides(width, height, stride_y, stride_u, stride_v);
+
+    assert_eq!(buf.width(), width);
+    assert_eq!(buf.height(), height);
+    assert_eq!(buf.stride_y(), stride_y);
+    assert_eq!(buf.stride_u(), stride_u);
+    assert_eq!(buf.stride_v(), stride_v);
+    assert_eq!(buf.y_data().len(), (stride_y * height) as usize);
+    assert_eq!(
+        buf.u_data().len(),
+        (stride_u * buf.chroma_height()) as usize
+    );
+    assert_eq!(
+        buf.v_data().len(),
+        (stride_v * buf.chroma_height()) as usize
+    );
+}
+
+#[test]
+fn i420_buffer_data_and_data_mut_use_contiguous_memory_with_padding() {
+    let width = 5;
+    let height = 3;
+    let stride_y = 8;
+    let stride_u = 4;
+    let stride_v = 6;
+    let chroma_height = (height as usize).div_ceil(2);
+    let len_y = (stride_y as usize) * (height as usize);
+    let len_u = (stride_u as usize) * chroma_height;
+    let len_v = (stride_v as usize) * chroma_height;
+    let total_len = len_y + len_u + len_v;
+    let mut buf = I420Buffer::new_with_strides(width, height, stride_y, stride_u, stride_v);
+
+    let base = buf.data().as_ptr() as usize;
+    assert_eq!(buf.data().len(), total_len);
+    assert_eq!(buf.y_data().as_ptr() as usize, base);
+    assert_eq!(buf.u_data().as_ptr() as usize - base, len_y);
+    assert_eq!(buf.v_data().as_ptr() as usize - base, len_y + len_u);
+
+    {
+        let data = buf.data_mut();
+        data[0] = 0x11;
+        data[len_y] = 0x22;
+        data[len_y + len_u] = 0x33;
+        data[total_len - 1] = 0x44;
+    }
+
+    assert_eq!(buf.y_data()[0], 0x11);
+    assert_eq!(buf.u_data()[0], 0x22);
+    assert_eq!(buf.v_data()[0], 0x33);
+    assert_eq!(buf.v_data()[len_v - 1], 0x44);
+}
+
+#[test]
 fn nv12_buffer_planes_kind_and_to_i420() {
     let width = 4;
     let height = 3;
@@ -602,6 +661,54 @@ fn nv12_buffer_chroma_dimensions_for_odd_size() {
         buf.uv_data().len(),
         (buf.stride_uv() as usize) * (buf.chroma_height() as usize)
     );
+}
+
+#[test]
+fn nv12_buffer_new_with_strides_preserves_stride_and_plane_lengths() {
+    let width = 5;
+    let height = 3;
+    let stride_y = 8;
+    let stride_uv = 8;
+    let buf = NV12Buffer::new_with_strides(width, height, stride_y, stride_uv);
+
+    assert_eq!(buf.width(), width);
+    assert_eq!(buf.height(), height);
+    assert_eq!(buf.stride_y(), stride_y);
+    assert_eq!(buf.stride_uv(), stride_uv);
+    assert_eq!(buf.y_data().len(), (stride_y * height) as usize);
+    assert_eq!(
+        buf.uv_data().len(),
+        (stride_uv * buf.chroma_height()) as usize
+    );
+}
+
+#[test]
+fn nv12_buffer_data_and_data_mut_use_contiguous_memory_with_padding() {
+    let width = 5;
+    let height = 3;
+    let stride_y = 8;
+    let stride_uv = 8;
+    let chroma_height = (height as usize).div_ceil(2);
+    let len_y = (stride_y as usize) * (height as usize);
+    let len_uv = (stride_uv as usize) * chroma_height;
+    let total_len = len_y + len_uv;
+    let mut buf = NV12Buffer::new_with_strides(width, height, stride_y, stride_uv);
+
+    let base = buf.data().as_ptr() as usize;
+    assert_eq!(buf.data().len(), total_len);
+    assert_eq!(buf.y_data().as_ptr() as usize, base);
+    assert_eq!(buf.uv_data().as_ptr() as usize - base, len_y);
+
+    {
+        let data = buf.data_mut();
+        data[0] = 0x11;
+        data[len_y] = 0x22;
+        data[total_len - 1] = 0x33;
+    }
+
+    assert_eq!(buf.y_data()[0], 0x11);
+    assert_eq!(buf.uv_data()[0], 0x22);
+    assert_eq!(buf.uv_data()[len_uv - 1], 0x33);
 }
 
 #[test]
