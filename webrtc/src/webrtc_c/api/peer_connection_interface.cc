@@ -1193,6 +1193,23 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateVideoTrack(
     *out_track = nullptr;
   }
 }
+WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream(
+    struct webrtc_PeerConnectionFactoryInterface* self,
+    const char* stream_id,
+    size_t stream_id_len,
+    struct webrtc_MediaStreamInterface_refcounted** out_stream) {
+  auto factory =
+      reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
+  auto stream_id_str = std::string(stream_id, stream_id_len);
+  auto stream = factory->CreateLocalMediaStream(stream_id_str);
+  if (stream) {
+    *out_stream =
+        reinterpret_cast<struct webrtc_MediaStreamInterface_refcounted*>(
+            stream.release());
+  } else {
+    *out_stream = nullptr;
+  }
+}
 WEBRTC_EXPORT struct webrtc_RtpCapabilities*
 webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities(
     struct webrtc_PeerConnectionFactoryInterface* self,

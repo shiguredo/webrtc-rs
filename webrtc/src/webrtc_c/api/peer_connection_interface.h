@@ -408,6 +408,11 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateVideoTrack(
     const char* track_id,
     size_t track_id_len,
     struct webrtc_VideoTrackInterface_refcounted** out_track);
+WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream(
+    struct webrtc_PeerConnectionFactoryInterface* self,
+    const char* stream_id,
+    size_t stream_id_len,
+    struct webrtc_MediaStreamInterface_refcounted** out_stream);
 
 WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateAudioSource(
     struct webrtc_PeerConnectionFactoryInterface* self,

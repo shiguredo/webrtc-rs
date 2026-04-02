@@ -3,6 +3,8 @@
 // WebRTC
 #include <api/priority.h>
 
+#include "../common.h"
+
 extern "C" {
 WEBRTC_EXPORT extern const int webrtc_Priority_kVeryLow =
     static_cast<int>(webrtc::Priority::kVeryLow);

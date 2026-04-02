@@ -10,12 +10,14 @@
   - バグ修正
 
 
-## feature/libwebrtc-m147
+## develop
 
 - [UPDATE] libwebrtc m147 (m147.7727.8.0) に上げる
   - @voluntas
 
-## develop
+## 0.146.3
+
+**リリース日**: 2026-04-02
 
 - [CHANGE] `VideoFrame` の生成 API を `VideoFrameBuffer` ベースに変更する
   - `VideoFrameBuffer` / `VideoFrameBufferHandler` を追加し、Rust 実装の native バッファを `kNative` として扱えるようにする
@@ -41,7 +43,7 @@
   - `convert_from_i420` / `i420_to_nv12` / `abgr_to_i420` / `nv12_to_i420` / `yuy2_to_i420` の戻り値を `bool` に変更する
   - 各変換 API の引数順を libyuv の C API と 1 対 1 になるように統一する
   - @melpon
-- [UPDATE] libwebrtc m146 (m146.7680.5.0) に上げる
+- [UPDATE] libwebrtc m146 (m146.7680.6.0) に上げる
   - @voluntas
 - [ADD] `NV12Buffer` と関連バッファ API を追加する
   - `NV12Buffer` を追加し、`y_data` / `uv_data` の参照と `crop_and_scale_from` を利用できるようにする
@@ -72,6 +74,11 @@
   - C API に `webrtc_RtpEncodingParameters_*`（上記 4 フィールド用）と `webrtc_Priority_*` / `webrtc_kDefaultBitratePriority` を追加する
   - Rust API に `Priority` / `default_bitrate_priority` と上記フィールドの getter / setter を追加する
   - @voluntas, @melpon
+- [ADD] `MediaStreamInterface` と `CreateLocalMediaStream` の C API / Rust API を追加する
+  - C API `webrtc_MediaStreamInterface_*` と `webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream` を追加する
+  - Rust API `MediaStream` と `PeerConnectionFactory::create_local_media_stream` を追加する
+  - `MediaStream` の `audio_tracks` / `video_tracks` / `find_*` / `add_*` / `remove_*` を追加する
+  - @melpon
 - [UPDATE] prebuilt アーカイブに C ヘッダーと Android 用 `webrtc.jar` を同梱する
   - `webrtc/src` 配下の `*.h` を `include/` 配下に同梱する
   - Android のアーカイブには `jar/webrtc.jar` も同梱する

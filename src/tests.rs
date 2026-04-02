@@ -2997,3 +2997,149 @@ fn custom_video_decoder_get_decoder_info_name_experiment() {
         assert!(!info.is_hardware_accelerated());
     }
 }
+
+#[test]
+fn create_local_media_stream_returns_requested_id() {
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc);
+    deps_factory.set_audio_decoder_factory(&dec);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    let stream = factory
+        .create_local_media_stream("stream-0")
+        .expect("CreateLocalMediaStream が失敗しました");
+    assert_eq!(
+        stream.id().expect("MediaStream id の取得に失敗しました"),
+        "stream-0"
+    );
+
+    drop(stream);
+    drop(factory);
+    drop(deps_factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
+fn media_stream_track_round_trip() {
+    let dec_audio = AudioDecoderFactory::builtin();
+    let enc_audio = AudioEncoderFactory::builtin();
+    let enc_video = VideoEncoderFactory::builtin();
+    let dec_video = VideoDecoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc_audio);
+    deps_factory.set_audio_decoder_factory(&dec_audio);
+    deps_factory.set_video_encoder_factory(enc_video);
+    deps_factory.set_video_decoder_factory(dec_video);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    let stream = factory
+        .create_local_media_stream("stream-1")
+        .expect("CreateLocalMediaStream が失敗しました");
+    let audio_source = factory
+        .create_audio_source()
+        .expect("AudioSource の生成に失敗しました");
+    let audio_track = factory
+        .create_audio_track(&audio_source, "audio-track-0")
+        .expect("AudioTrack の生成に失敗しました");
+    let video_source = AdaptedVideoTrackSource::new();
+    let vts = video_source.cast_to_video_track_source();
+    let video_track = factory
+        .create_video_track(&vts, "video-track-0")
+        .expect("VideoTrack の生成に失敗しました");
+
+    assert!(stream.audio_tracks().is_empty());
+    assert!(stream.video_tracks().is_empty());
+    assert!(stream.add_audio_track(&audio_track));
+    assert!(stream.add_video_track(&video_track));
+
+    let audio_tracks = stream.audio_tracks();
+    let video_tracks = stream.video_tracks();
+    assert_eq!(audio_tracks.len(), 1);
+    assert_eq!(video_tracks.len(), 1);
+
+    let found_audio = stream
+        .find_audio_track("audio-track-0")
+        .expect("FindAudioTrack が None を返しました");
+    let found_video = stream
+        .find_video_track("video-track-0")
+        .expect("FindVideoTrack が None を返しました");
+    assert_eq!(
+        found_audio
+            .cast_to_media_stream_track()
+            .id()
+            .expect("audio track id の取得に失敗しました"),
+        "audio-track-0"
+    );
+    assert_eq!(
+        found_video
+            .cast_to_media_stream_track()
+            .id()
+            .expect("video track id の取得に失敗しました"),
+        "video-track-0"
+    );
+    assert!(stream.find_audio_track("audio-track-unknown").is_none());
+    assert!(stream.find_video_track("video-track-unknown").is_none());
+
+    assert!(stream.remove_audio_track(&audio_track));
+    assert!(stream.remove_video_track(&video_track));
+    assert!(stream.find_audio_track("audio-track-0").is_none());
+    assert!(stream.find_video_track("video-track-0").is_none());
+
+    drop(found_video);
+    drop(found_audio);
+    drop(video_tracks);
+    drop(audio_tracks);
+    drop(video_track);
+    drop(vts);
+    drop(video_source);
+    drop(audio_track);
+    drop(audio_source);
+    drop(stream);
+    drop(factory);
+    drop(deps_factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
