@@ -39,10 +39,10 @@ WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_MediaStreamTrackInterface,
                               webrtc_VideoTrackInterface,
                               webrtc::MediaStreamTrackInterface,
                               webrtc::VideoTrackInterface);
-WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_VideoTrackInterface,
-                              webrtc_MediaStreamTrackInterface,
-                              webrtc::VideoTrackInterface,
-                              webrtc::MediaStreamTrackInterface);
+WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_MediaStreamTrackInterface,
+                              webrtc_AudioTrackInterface,
+                              webrtc::MediaStreamTrackInterface,
+                              webrtc::AudioTrackInterface);
 
 WEBRTC_EXPORT struct std_string_unique* webrtc_MediaStreamTrackInterface_kind(
     struct webrtc_MediaStreamTrackInterface* self) {
@@ -79,6 +79,11 @@ WEBRTC_EXPORT int8_t webrtc_MediaStreamTrackInterface_set_enabled(
 extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_VideoTrackInterface,
                          webrtc::VideoTrackInterface);
+
+WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_VideoTrackInterface,
+                              webrtc_MediaStreamTrackInterface,
+                              webrtc::VideoTrackInterface,
+                              webrtc::MediaStreamTrackInterface);
 
 WEBRTC_EXPORT void webrtc_VideoTrackInterface_AddOrUpdateSink(
     struct webrtc_VideoTrackInterface* self,
@@ -171,6 +176,11 @@ extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_AudioTrackInterface,
                          webrtc::AudioTrackInterface);
 
+WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_AudioTrackInterface,
+                              webrtc_MediaStreamTrackInterface,
+                              webrtc::AudioTrackInterface,
+                              webrtc::MediaStreamTrackInterface);
+
 WEBRTC_EXPORT void webrtc_AudioTrackInterface_AddSink(
     struct webrtc_AudioTrackInterface* self,
     struct webrtc_AudioTrackSinkInterface* sink) {
@@ -186,14 +196,6 @@ WEBRTC_EXPORT void webrtc_AudioTrackInterface_RemoveSink(
   auto sink_impl = reinterpret_cast<webrtc::AudioTrackSinkInterface*>(sink);
   track->RemoveSink(sink_impl);
 }
-WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_AudioTrackInterface,
-                              webrtc_MediaStreamTrackInterface,
-                              webrtc::AudioTrackInterface,
-                              webrtc::MediaStreamTrackInterface);
-WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_MediaStreamTrackInterface,
-                              webrtc_AudioTrackInterface,
-                              webrtc::MediaStreamTrackInterface,
-                              webrtc::AudioTrackInterface);
 
 // -------------------------
 // std::vector<scoped_refptr<webrtc::AudioTrackInterface>>
