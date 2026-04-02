@@ -1,14 +1,14 @@
 use crate::ref_count::{
     AudioTrackHandle, AudioTrackSourceHandle, ConnectionContextHandle, DataChannelHandle,
-    DtlsTransportHandle, PeerConnectionFactoryHandle, PeerConnectionHandle, RtpReceiverHandle,
-    RtpSenderHandle, RtpTransceiverHandle, SetLocalDescriptionObserverHandle,
+    DtlsTransportHandle, MediaStreamHandle, PeerConnectionFactoryHandle, PeerConnectionHandle,
+    RtpReceiverHandle, RtpSenderHandle, RtpTransceiverHandle, SetLocalDescriptionObserverHandle,
     SetRemoteDescriptionObserverHandle, VideoTrackHandle,
 };
 use crate::{
     AudioDecoderFactory, AudioDeviceModule, AudioEncoderFactory, AudioProcessingBuilder,
     AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit, DtlsTransport, Error,
-    IceCandidate, IceCandidateRef, MediaStreamTrack, MediaType, RTCStatsReport, Result, RtcError,
-    RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender, RtpTransceiver,
+    IceCandidate, IceCandidateRef, MediaStream, MediaStreamTrack, MediaType, RTCStatsReport,
+    Result, RtcError, RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender, RtpTransceiver,
     RtpTransceiverInit, SSLCertificateVerifier, SSLIdentity, ScopedRef, SessionDescription,
     StringVector, Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack, VideoTrackSource,
     ffi,
@@ -331,6 +331,23 @@ impl PeerConnectionFactory {
         ))?;
         let raw_ref = ScopedRef::<AudioTrackHandle>::from_raw(out);
         Ok(AudioTrack::from_scoped_ref(raw_ref))
+    }
+
+    pub fn create_local_media_stream(&self, stream_id: &str) -> Result<MediaStream> {
+        let mut out = std::ptr::null_mut();
+        unsafe {
+            ffi::webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream(
+                self.raw_ref.as_ptr(),
+                stream_id.as_ptr() as *const _,
+                stream_id.len(),
+                &mut out,
+            );
+        }
+        let out = NonNull::new(out).ok_or(Error::NullPointer(
+            "webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream returned null",
+        ))?;
+        let raw_ref = ScopedRef::<MediaStreamHandle>::from_raw(out);
+        Ok(MediaStream::from_scoped_ref(raw_ref))
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionFactoryInterface {

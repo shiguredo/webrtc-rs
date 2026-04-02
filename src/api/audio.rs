@@ -81,6 +81,10 @@ impl AudioTrack {
         Self { raw_ref }
     }
 
+    pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_AudioTrackInterface_refcounted {
+        self.raw_ref.as_refcounted_ptr()
+    }
+
     /// AudioTrack を MediaStreamTrack にキャストする。
     pub fn cast_to_media_stream_track(&self) -> MediaStreamTrack {
         let raw = unsafe {

@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 // Abseil
 #include <absl/container/inlined_vector.h>
@@ -183,6 +184,17 @@ webrtc_SdpVideoFormat_copy_scalability_modes(struct webrtc_SdpVideoFormat* self,
   return copied;
 }
 
+WEBRTC_EXPORT int webrtc_SdpVideoFormat_IsSameCodec(
+    struct webrtc_SdpVideoFormat* self,
+    struct webrtc_SdpVideoFormat* other) {
+  auto format = reinterpret_cast<webrtc::SdpVideoFormat*>(self);
+  auto rhs = reinterpret_cast<webrtc::SdpVideoFormat*>(other);
+  if (format == nullptr || rhs == nullptr) {
+    return 0;
+  }
+  return format->IsSameCodec(*rhs);
+}
+
 WEBRTC_EXPORT int webrtc_SdpVideoFormat_is_equal(
     struct webrtc_SdpVideoFormat* lhs,
     struct webrtc_SdpVideoFormat* rhs) {
@@ -192,5 +204,24 @@ WEBRTC_EXPORT int webrtc_SdpVideoFormat_is_equal(
     return 0;
   }
   return *a == *b;
+}
+
+WEBRTC_EXPORT struct webrtc_SdpVideoFormat_unique*
+webrtc_FuzzyMatchSdpVideoFormat(
+    struct webrtc_SdpVideoFormat_vector* supported_formats,
+    struct webrtc_SdpVideoFormat* format) {
+  auto formats =
+      reinterpret_cast<std::vector<webrtc::SdpVideoFormat>*>(supported_formats);
+  auto input = reinterpret_cast<webrtc::SdpVideoFormat*>(format);
+  if (formats == nullptr || input == nullptr) {
+    return nullptr;
+  }
+  auto matched = webrtc::FuzzyMatchSdpVideoFormat(*formats, *input);
+  if (!matched.has_value()) {
+    return nullptr;
+  }
+  auto result = std::make_unique<webrtc::SdpVideoFormat>(*matched);
+  return reinterpret_cast<struct webrtc_SdpVideoFormat_unique*>(
+      result.release());
 }
 }

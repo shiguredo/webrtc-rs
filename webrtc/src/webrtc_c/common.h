@@ -94,6 +94,32 @@
       struct WEBRTC_CONCAT(type, _vector) * self, struct type * value);
 
 // -------------------------
+// std::vector<webrtc::scoped_refptr<T>>
+// -------------------------
+
+#define WEBRTC_DECLARE_REFCOUNTED_VECTOR(type)                               \
+  struct type;                                                               \
+  struct WEBRTC_CONCAT(type, _refcounted);                                   \
+  struct WEBRTC_CONCAT(type, _refcounted_vector);                            \
+  WEBRTC_EXPORT struct WEBRTC_CONCAT(type, _refcounted_vector) *             \
+      WEBRTC_CONCAT(type, _refcounted_vector_new)(int size);                 \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _refcounted_vector_delete)(         \
+      struct WEBRTC_CONCAT(type, _refcounted_vector) * self);                \
+  WEBRTC_EXPORT struct WEBRTC_CONCAT(type, _refcounted) *                    \
+      WEBRTC_CONCAT(type, _refcounted_vector_get)(                           \
+          struct WEBRTC_CONCAT(type, _refcounted_vector) * self, int index); \
+  WEBRTC_EXPORT int WEBRTC_CONCAT(type, _refcounted_vector_size)(            \
+      struct WEBRTC_CONCAT(type, _refcounted_vector) * self);                \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _refcounted_vector_resize)(         \
+      struct WEBRTC_CONCAT(type, _refcounted_vector) * self, int size);      \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _refcounted_vector_set)(            \
+      struct WEBRTC_CONCAT(type, _refcounted_vector) * self, int index,      \
+      struct WEBRTC_CONCAT(type, _refcounted) * value);                      \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _refcounted_vector_push_back)(      \
+      struct WEBRTC_CONCAT(type, _refcounted_vector) * self,                 \
+      struct WEBRTC_CONCAT(type, _refcounted) * value);
+
+// -------------------------
 // absl::InlinedVector<T, N>
 // -------------------------
 

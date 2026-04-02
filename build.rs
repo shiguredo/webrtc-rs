@@ -116,6 +116,10 @@ fn main() {
         "cargo:rerun-if-changed={}",
         webrtc_dir.join("CMakeLists.txt").display()
     );
+    println!(
+        "cargo:rerun-if-changed={}",
+        webrtc_dir.join("scripts").display()
+    );
 
     let target_platform = get_target_platform();
     let out_dir = get_out_dir();
@@ -1324,6 +1328,15 @@ fn generate_bindings(header: &Path, include_dir: &Path) {
         let include = sysroot.join("usr").join("include");
         let target_include = include.join(target);
         builder = builder
+            .header(
+                header
+                    .parent()
+                    .unwrap()
+                    .join("webrtc_c")
+                    .join("android.h")
+                    .to_str()
+                    .unwrap(),
+            )
             .clang_arg(format!("--target={target}"))
             .clang_arg(format!("--sysroot={}", sysroot.display()))
             .clang_arg(format!("-isystem{}", include.display()));
@@ -1423,21 +1436,18 @@ fn emit_link_directives(lib_path: &Path) {
         "macos" => {
             println!("cargo:rustc-link-lib=c++");
             for framework in [
-                "Foundation",
                 "AVFoundation",
-                "CoreAudio",
-                "AudioToolbox",
-                "CoreMedia",
-                "CoreVideo",
-                "CoreGraphics",
-                "CoreFoundation",
-                "VideoToolbox",
-                "Security",
-                "Metal",
-                "IOSurface",
-                "QuartzCore",
-                "Cocoa",
                 "AppKit",
+                "AudioToolbox",
+                "CoreAudio",
+                "CoreMedia",
+                "IOSurface",
+                "Metal",
+                "MetalKit",
+                "OpenGL",
+                "QuartzCore",
+                "ScreenCaptureKit",
+                "VideoToolbox",
             ] {
                 println!("cargo:rustc-link-lib=framework={framework}");
             }

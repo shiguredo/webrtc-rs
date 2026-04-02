@@ -1,4 +1,4 @@
-use crate::{I420Buffer, ffi};
+use crate::ffi;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LibyuvFourcc {
@@ -15,175 +15,268 @@ impl LibyuvFourcc {
     }
 }
 
-/// `libyuv::ConvertFromI420` を呼び出して、I420 を指定フォーマットへ変換する。
-/// 変換に失敗した場合は `None` を返す。
-pub fn convert_from_i420(src: &I420Buffer, fourcc: LibyuvFourcc) -> Option<Vec<u8>> {
-    let width = src.width();
-    let height = src.height();
-    if width <= 0 || height <= 0 {
+fn chroma_dimension(value: i32) -> Option<i32> {
+    value.checked_add(1).map(|v| v / 2)
+}
+
+fn i420_chroma_size(width: i32, height: i32) -> Option<(i32, i32)> {
+    Some((chroma_dimension(width)?, chroma_dimension(height)?))
+}
+
+fn required_plane_len(stride: i32, rows: i32, row_bytes: i32) -> Option<usize> {
+    if stride <= 0 || rows <= 0 || row_bytes <= 0 {
         return None;
     }
-    let stride = width.checked_mul(4)?;
-    let size = (stride as usize).checked_mul(height as usize)?;
-    let mut dst = vec![0u8; size];
-    let y = src.y_data();
-    let u = src.u_data();
-    let v = src.v_data();
-    let ret = unsafe {
+
+    let stride = stride as usize;
+    let rows = rows as usize;
+    let row_bytes = row_bytes as usize;
+    let last_row_offset = stride.checked_mul(rows.checked_sub(1)?)?;
+    last_row_offset.checked_add(row_bytes)
+}
+
+fn has_required_len(len: usize, stride: i32, rows: i32, row_bytes: i32) -> bool {
+    required_plane_len(stride, rows, row_bytes).is_some_and(|need| len >= need)
+}
+
+/// `libyuv::ConvertFromI420` を呼び出して、I420 を指定フォーマットへ変換する。
+/// 変換に失敗した場合は `false` を返す。
+#[allow(clippy::too_many_arguments)]
+pub fn convert_from_i420(
+    src_y: &[u8],
+    src_stride_y: i32,
+    src_u: &[u8],
+    src_stride_u: i32,
+    src_v: &[u8],
+    src_stride_v: i32,
+    dst_argb: &mut [u8],
+    dst_stride_argb: i32,
+    width: i32,
+    height: i32,
+    fourcc: LibyuvFourcc,
+) -> bool {
+    let Some((chroma_width, chroma_height)) = i420_chroma_size(width, height) else {
+        return false;
+    };
+    let Some(dst_row_bytes_argb) = width.checked_mul(4) else {
+        return false;
+    };
+
+    if !has_required_len(src_y.len(), src_stride_y, height, width)
+        || !has_required_len(src_u.len(), src_stride_u, chroma_height, chroma_width)
+        || !has_required_len(src_v.len(), src_stride_v, chroma_height, chroma_width)
+        || !has_required_len(dst_argb.len(), dst_stride_argb, height, dst_row_bytes_argb)
+    {
+        return false;
+    }
+
+    unsafe {
         ffi::libyuv_ConvertFromI420(
-            y.as_ptr(),
-            src.stride_y(),
-            u.as_ptr(),
-            src.stride_u(),
-            v.as_ptr(),
-            src.stride_v(),
-            dst.as_mut_ptr(),
-            stride,
+            src_y.as_ptr(),
+            src_stride_y,
+            src_u.as_ptr(),
+            src_stride_u,
+            src_v.as_ptr(),
+            src_stride_v,
+            dst_argb.as_mut_ptr(),
+            dst_stride_argb,
             width,
             height,
             fourcc.as_raw(),
-        )
-    };
-    if ret != 0 {
-        return None;
+        ) == 0
     }
-    Some(dst)
 }
 
 /// `libyuv::I420ToNV12` を呼び出して、I420 を NV12 へ変換する。
-/// 変換に失敗した場合は `None` を返す。
-pub fn i420_to_nv12(src: &I420Buffer) -> Option<Vec<u8>> {
-    let width = src.width();
-    let height = src.height();
-    if width <= 0 || height <= 0 {
-        return None;
-    }
-
-    let width = width as usize;
-    let height = height as usize;
-    let y_size = width.checked_mul(height)?;
-    let uv_size = width.checked_mul(height.div_ceil(2))?;
-    let mut dst = vec![0u8; y_size.checked_add(uv_size)?];
-    let (dst_y, dst_uv) = dst.split_at_mut(y_size);
-
-    let ret = unsafe {
-        ffi::libyuv_I420ToNV12(
-            src.y_data().as_ptr(),
-            src.stride_y(),
-            src.u_data().as_ptr(),
-            src.stride_u(),
-            src.v_data().as_ptr(),
-            src.stride_v(),
-            dst_y.as_mut_ptr(),
-            width as i32,
-            dst_uv.as_mut_ptr(),
-            width as i32,
-            width as i32,
-            height as i32,
-        )
+/// 変換に失敗した場合は `false` を返す。
+#[allow(clippy::too_many_arguments)]
+pub fn i420_to_nv12(
+    src_y: &[u8],
+    src_stride_y: i32,
+    src_u: &[u8],
+    src_stride_u: i32,
+    src_v: &[u8],
+    src_stride_v: i32,
+    dst_y: &mut [u8],
+    dst_stride_y: i32,
+    dst_uv: &mut [u8],
+    dst_stride_uv: i32,
+    width: i32,
+    height: i32,
+) -> bool {
+    let Some((chroma_width, chroma_height)) = i420_chroma_size(width, height) else {
+        return false;
     };
-    if ret != 0 {
-        return None;
+    let Some(dst_uv_row_bytes) = chroma_width.checked_mul(2) else {
+        return false;
+    };
+
+    if !has_required_len(src_y.len(), src_stride_y, height, width)
+        || !has_required_len(src_u.len(), src_stride_u, chroma_height, chroma_width)
+        || !has_required_len(src_v.len(), src_stride_v, chroma_height, chroma_width)
+        || !has_required_len(dst_y.len(), dst_stride_y, height, width)
+        || !has_required_len(dst_uv.len(), dst_stride_uv, chroma_height, dst_uv_row_bytes)
+    {
+        return false;
     }
-    Some(dst)
+
+    unsafe {
+        ffi::libyuv_I420ToNV12(
+            src_y.as_ptr(),
+            src_stride_y,
+            src_u.as_ptr(),
+            src_stride_u,
+            src_v.as_ptr(),
+            src_stride_v,
+            dst_y.as_mut_ptr(),
+            dst_stride_y,
+            dst_uv.as_mut_ptr(),
+            dst_stride_uv,
+            width,
+            height,
+        ) == 0
+    }
 }
 
 /// `libyuv::ABGRToI420` を呼び出して、ABGR から I420 へ変換する。
-/// 変換に失敗した場合は `None` を返す。
-pub fn abgr_to_i420(src_abgr: &[u8], width: i32, height: i32) -> Option<I420Buffer> {
-    let stride = (width as usize).checked_mul(4)?;
-    let needed = stride.checked_mul(height as usize)?;
-    if src_abgr.len() < needed {
-        return None;
+/// 変換に失敗した場合は `false` を返す。
+#[allow(clippy::too_many_arguments)]
+pub fn abgr_to_i420(
+    src_abgr: &[u8],
+    src_stride_abgr: i32,
+    dst_y: &mut [u8],
+    dst_stride_y: i32,
+    dst_u: &mut [u8],
+    dst_stride_u: i32,
+    dst_v: &mut [u8],
+    dst_stride_v: i32,
+    width: i32,
+    height: i32,
+) -> bool {
+    let Some((chroma_width, chroma_height)) = i420_chroma_size(width, height) else {
+        return false;
+    };
+    let Some(src_abgr_row_bytes) = width.checked_mul(4) else {
+        return false;
+    };
+
+    if !has_required_len(src_abgr.len(), src_stride_abgr, height, src_abgr_row_bytes)
+        || !has_required_len(dst_y.len(), dst_stride_y, height, width)
+        || !has_required_len(dst_u.len(), dst_stride_u, chroma_height, chroma_width)
+        || !has_required_len(dst_v.len(), dst_stride_v, chroma_height, chroma_width)
+    {
+        return false;
     }
-    let buf = I420Buffer::new(width, height);
-    let raw = buf.raw().as_ptr();
-    let ret = unsafe {
+
+    unsafe {
         ffi::libyuv_ABGRToI420(
             src_abgr.as_ptr(),
-            stride as i32,
-            ffi::webrtc_I420Buffer_MutableDataY(raw),
-            ffi::webrtc_I420Buffer_StrideY(raw),
-            ffi::webrtc_I420Buffer_MutableDataU(raw),
-            ffi::webrtc_I420Buffer_StrideU(raw),
-            ffi::webrtc_I420Buffer_MutableDataV(raw),
-            ffi::webrtc_I420Buffer_StrideV(raw),
+            src_stride_abgr,
+            dst_y.as_mut_ptr(),
+            dst_stride_y,
+            dst_u.as_mut_ptr(),
+            dst_stride_u,
+            dst_v.as_mut_ptr(),
+            dst_stride_v,
             width,
             height,
-        )
-    };
-    if ret != 0 {
-        return None;
+        ) == 0
     }
-    Some(buf)
 }
 
 /// `libyuv::NV12ToI420` を呼び出して、NV12 から I420 へ変換する。
-/// 変換に失敗した場合は `None` を返す。
+/// 変換に失敗した場合は `false` を返す。
+#[allow(clippy::too_many_arguments)]
 pub fn nv12_to_i420(
     src_y: &[u8],
     src_stride_y: i32,
     src_uv: &[u8],
     src_stride_uv: i32,
+    dst_y: &mut [u8],
+    dst_stride_y: i32,
+    dst_u: &mut [u8],
+    dst_stride_u: i32,
+    dst_v: &mut [u8],
+    dst_stride_v: i32,
     width: i32,
     height: i32,
-) -> Option<I420Buffer> {
-    if width <= 0 || height <= 0 {
-        return None;
+) -> bool {
+    let Some((chroma_width, chroma_height)) = i420_chroma_size(width, height) else {
+        return false;
+    };
+    let Some(src_uv_row_bytes) = chroma_width.checked_mul(2) else {
+        return false;
+    };
+
+    if !has_required_len(src_y.len(), src_stride_y, height, width)
+        || !has_required_len(src_uv.len(), src_stride_uv, chroma_height, src_uv_row_bytes)
+        || !has_required_len(dst_y.len(), dst_stride_y, height, width)
+        || !has_required_len(dst_u.len(), dst_stride_u, chroma_height, chroma_width)
+        || !has_required_len(dst_v.len(), dst_stride_v, chroma_height, chroma_width)
+    {
+        return false;
     }
-    let buf = I420Buffer::new(width, height);
-    let raw = buf.raw().as_ptr();
-    let ret = unsafe {
+
+    unsafe {
         ffi::libyuv_NV12ToI420(
             src_y.as_ptr(),
             src_stride_y,
             src_uv.as_ptr(),
             src_stride_uv,
-            ffi::webrtc_I420Buffer_MutableDataY(raw),
-            ffi::webrtc_I420Buffer_StrideY(raw),
-            ffi::webrtc_I420Buffer_MutableDataU(raw),
-            ffi::webrtc_I420Buffer_StrideU(raw),
-            ffi::webrtc_I420Buffer_MutableDataV(raw),
-            ffi::webrtc_I420Buffer_StrideV(raw),
+            dst_y.as_mut_ptr(),
+            dst_stride_y,
+            dst_u.as_mut_ptr(),
+            dst_stride_u,
+            dst_v.as_mut_ptr(),
+            dst_stride_v,
             width,
             height,
-        )
-    };
-    if ret != 0 {
-        return None;
+        ) == 0
     }
-    Some(buf)
 }
 
 /// `libyuv::YUY2ToI420` を呼び出して、YUY2 から I420 へ変換する。
-/// 変換に失敗した場合は `None` を返す。
+/// 変換に失敗した場合は `false` を返す。
+#[allow(clippy::too_many_arguments)]
 pub fn yuy2_to_i420(
     src_yuy2: &[u8],
-    src_stride: i32,
+    src_stride_yuy2: i32,
+    dst_y: &mut [u8],
+    dst_stride_y: i32,
+    dst_u: &mut [u8],
+    dst_stride_u: i32,
+    dst_v: &mut [u8],
+    dst_stride_v: i32,
     width: i32,
     height: i32,
-) -> Option<I420Buffer> {
-    if width <= 0 || height <= 0 {
-        return None;
+) -> bool {
+    let Some((chroma_width, chroma_height)) = i420_chroma_size(width, height) else {
+        return false;
+    };
+    let Some(src_yuy2_row_bytes) = width.checked_mul(2) else {
+        return false;
+    };
+
+    if !has_required_len(src_yuy2.len(), src_stride_yuy2, height, src_yuy2_row_bytes)
+        || !has_required_len(dst_y.len(), dst_stride_y, height, width)
+        || !has_required_len(dst_u.len(), dst_stride_u, chroma_height, chroma_width)
+        || !has_required_len(dst_v.len(), dst_stride_v, chroma_height, chroma_width)
+    {
+        return false;
     }
-    let buf = I420Buffer::new(width, height);
-    let raw = buf.raw().as_ptr();
-    let ret = unsafe {
+
+    unsafe {
         ffi::libyuv_YUY2ToI420(
             src_yuy2.as_ptr(),
-            src_stride,
-            ffi::webrtc_I420Buffer_MutableDataY(raw),
-            ffi::webrtc_I420Buffer_StrideY(raw),
-            ffi::webrtc_I420Buffer_MutableDataU(raw),
-            ffi::webrtc_I420Buffer_StrideU(raw),
-            ffi::webrtc_I420Buffer_MutableDataV(raw),
-            ffi::webrtc_I420Buffer_StrideV(raw),
+            src_stride_yuy2,
+            dst_y.as_mut_ptr(),
+            dst_stride_y,
+            dst_u.as_mut_ptr(),
+            dst_stride_u,
+            dst_v.as_mut_ptr(),
+            dst_stride_v,
             width,
             height,
-        )
-    };
-    if ret != 0 {
-        return None;
+        ) == 0
     }
-    Some(buf)
 }

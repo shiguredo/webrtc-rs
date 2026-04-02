@@ -591,6 +591,38 @@ impl RtpEncodingParameters {
         self.as_ref().set_codec(codec);
     }
 
+    pub fn bitrate_priority(&self) -> f64 {
+        self.as_ref().bitrate_priority()
+    }
+
+    pub fn set_bitrate_priority(&mut self, value: f64) {
+        self.as_ref().set_bitrate_priority(value);
+    }
+
+    pub fn network_priority(&self) -> Priority {
+        self.as_ref().network_priority()
+    }
+
+    pub fn set_network_priority(&mut self, value: Priority) {
+        self.as_ref().set_network_priority(value);
+    }
+
+    pub fn request_key_frame(&self) -> bool {
+        self.as_ref().request_key_frame()
+    }
+
+    pub fn set_request_key_frame(&mut self, value: bool) {
+        self.as_ref().set_request_key_frame(value);
+    }
+
+    pub fn num_temporal_layers(&self) -> Option<i32> {
+        self.as_ref().num_temporal_layers()
+    }
+
+    pub fn set_num_temporal_layers(&mut self, value: Option<i32>) {
+        self.as_ref().set_num_temporal_layers(value);
+    }
+
     pub fn as_ptr(&self) -> *mut ffi::webrtc_RtpEncodingParameters {
         self.raw.as_ptr()
     }
@@ -896,6 +928,72 @@ impl<'a> RtpEncodingParametersRef<'a> {
             },
         }
     }
+
+    pub fn bitrate_priority(&self) -> f64 {
+        unsafe { ffi::webrtc_RtpEncodingParameters_get_bitrate_priority(self.raw.as_ptr()) }
+    }
+
+    pub fn set_bitrate_priority(&mut self, value: f64) {
+        unsafe {
+            ffi::webrtc_RtpEncodingParameters_set_bitrate_priority(self.raw.as_ptr(), value);
+        }
+    }
+
+    pub fn network_priority(&self) -> Priority {
+        let v =
+            unsafe { ffi::webrtc_RtpEncodingParameters_get_network_priority(self.raw.as_ptr()) };
+        Priority::from_int(v)
+    }
+
+    pub fn set_network_priority(&mut self, value: Priority) {
+        unsafe {
+            ffi::webrtc_RtpEncodingParameters_set_network_priority(
+                self.raw.as_ptr(),
+                value.to_int(),
+            );
+        }
+    }
+
+    pub fn request_key_frame(&self) -> bool {
+        unsafe { ffi::webrtc_RtpEncodingParameters_get_request_key_frame(self.raw.as_ptr()) != 0 }
+    }
+
+    pub fn set_request_key_frame(&mut self, value: bool) {
+        unsafe {
+            ffi::webrtc_RtpEncodingParameters_set_request_key_frame(
+                self.raw.as_ptr(),
+                if value { 1 } else { 0 },
+            );
+        }
+    }
+
+    pub fn num_temporal_layers(&self) -> Option<i32> {
+        let mut has = 0;
+        let mut value = 0;
+        unsafe {
+            ffi::webrtc_RtpEncodingParameters_get_num_temporal_layers(
+                self.raw.as_ptr(),
+                &mut has,
+                &mut value,
+            );
+        }
+        if has == 0 { None } else { Some(value) }
+    }
+
+    pub fn set_num_temporal_layers(&mut self, value: Option<i32>) {
+        match value {
+            Some(v) => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_num_temporal_layers(self.raw.as_ptr(), 1, &v);
+            },
+            None => unsafe {
+                ffi::webrtc_RtpEncodingParameters_set_num_temporal_layers(
+                    self.raw.as_ptr(),
+                    0,
+                    std::ptr::null(),
+                );
+            },
+        }
+    }
 }
 
 /// std::vector<RtpEncodingParameters> の所有ラッパー。
@@ -982,6 +1080,43 @@ impl Drop for RtpEncodingParametersVector {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_RtpEncodingParameters_vector_delete(self.raw.as_ptr()) };
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Priority {
+    VeryLow,
+    Low,
+    Medium,
+    High,
+    Unknown(i32),
+}
+
+impl Priority {
+    pub fn to_int(self) -> i32 {
+        match self {
+            Priority::VeryLow => unsafe { ffi::webrtc_Priority_kVeryLow },
+            Priority::Low => unsafe { ffi::webrtc_Priority_kLow },
+            Priority::Medium => unsafe { ffi::webrtc_Priority_kMedium },
+            Priority::High => unsafe { ffi::webrtc_Priority_kHigh },
+            Priority::Unknown(v) => v,
+        }
+    }
+
+    pub fn from_int(v: i32) -> Self {
+        match v {
+            x if x == unsafe { ffi::webrtc_Priority_kVeryLow } => Priority::VeryLow,
+            x if x == unsafe { ffi::webrtc_Priority_kLow } => Priority::Low,
+            x if x == unsafe { ffi::webrtc_Priority_kMedium } => Priority::Medium,
+            x if x == unsafe { ffi::webrtc_Priority_kHigh } => Priority::High,
+            _ => Priority::Unknown(v),
+        }
+    }
+}
+
+unsafe impl Send for Priority {}
+
+pub fn default_bitrate_priority() -> f64 {
+    unsafe { ffi::webrtc_kDefaultBitratePriority }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

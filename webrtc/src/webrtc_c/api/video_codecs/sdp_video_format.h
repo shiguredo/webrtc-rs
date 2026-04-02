@@ -74,9 +74,17 @@ WEBRTC_EXPORT size_t
 webrtc_SdpVideoFormat_copy_scalability_modes(struct webrtc_SdpVideoFormat* self,
                                              int* out_modes,
                                              size_t out_modes_len);
+WEBRTC_EXPORT int webrtc_SdpVideoFormat_IsSameCodec(
+    struct webrtc_SdpVideoFormat* self,
+    struct webrtc_SdpVideoFormat* other);
 WEBRTC_EXPORT int webrtc_SdpVideoFormat_is_equal(
     struct webrtc_SdpVideoFormat* lhs,
     struct webrtc_SdpVideoFormat* rhs);
+
+WEBRTC_EXPORT struct webrtc_SdpVideoFormat_unique*
+webrtc_FuzzyMatchSdpVideoFormat(
+    struct webrtc_SdpVideoFormat_vector* supported_formats,
+    struct webrtc_SdpVideoFormat* format);
 
 #if defined(__cplusplus)
 }

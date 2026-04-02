@@ -1,7 +1,7 @@
 use super::*;
 use std::ptr::NonNull;
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicBool, Ordering},
 };
 use std::time::Duration;
@@ -196,6 +196,137 @@ fn sdp_video_format_new_has_empty_scalability_modes() {
 }
 
 #[test]
+fn fuzzy_match_sdp_video_format_prefers_more_parameter_matches() {
+    let supported_formats = vec![
+        SdpVideoFormat::new_with_parameters(
+            "H264",
+            &std::collections::HashMap::from([
+                (String::from("profile-level-id"), String::from("42e01f")),
+                (String::from("packetization-mode"), String::from("1")),
+            ]),
+            &[],
+        ),
+        SdpVideoFormat::new_with_parameters(
+            "H264",
+            &std::collections::HashMap::from([
+                (String::from("profile-level-id"), String::from("42e01f")),
+                (String::from("packetization-mode"), String::from("0")),
+            ]),
+            &[],
+        ),
+    ];
+    let requested = SdpVideoFormat::new_with_parameters(
+        "H264",
+        &std::collections::HashMap::from([
+            (String::from("profile-level-id"), String::from("42e01f")),
+            (String::from("packetization-mode"), String::from("1")),
+            (String::from("x-google-start-bitrate"), String::from("500")),
+        ]),
+        &[],
+    );
+
+    let mut matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
+        .expect("fuzzy_match_sdp_video_format should return a matched format");
+    let params = matched
+        .parameters_mut()
+        .iter()
+        .collect::<std::collections::HashMap<String, String>>();
+
+    assert_eq!(
+        params.get("packetization-mode").map(String::as_str),
+        Some("1")
+    );
+}
+
+#[test]
+fn fuzzy_match_sdp_video_format_keeps_first_candidate_on_tie() {
+    let supported_formats = vec![
+        SdpVideoFormat::new_with_parameters(
+            "H264",
+            &std::collections::HashMap::from([(
+                String::from("x-google-start-bitrate"),
+                String::from("300"),
+            )]),
+            &[],
+        ),
+        SdpVideoFormat::new_with_parameters(
+            "H264",
+            &std::collections::HashMap::from([(
+                String::from("x-google-start-bitrate"),
+                String::from("500"),
+            )]),
+            &[],
+        ),
+    ];
+    let requested = SdpVideoFormat::new("H264");
+
+    let mut matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
+        .expect("fuzzy_match_sdp_video_format should return a matched format");
+    let params = matched
+        .parameters_mut()
+        .iter()
+        .collect::<std::collections::HashMap<String, String>>();
+
+    assert_eq!(
+        params.get("x-google-start-bitrate").map(String::as_str),
+        Some("300")
+    );
+}
+
+#[test]
+fn fuzzy_match_sdp_video_format_returns_none_for_different_codec_name() {
+    let supported_formats = vec![SdpVideoFormat::new("VP8")];
+    let requested = SdpVideoFormat::new("H264");
+
+    assert!(fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref()).is_none());
+}
+
+#[test]
+fn sdp_video_format_is_same_codec_follows_codec_specific_rules() {
+    let h264_upper = SdpVideoFormat::new("H264");
+    let h264_lower = SdpVideoFormat::new("h264");
+    assert!(h264_upper.is_same_codec(h264_lower.as_ref()));
+
+    let h264_packetization_mode_1 = SdpVideoFormat::new_with_parameters(
+        "H264",
+        &std::collections::HashMap::from([(String::from("packetization-mode"), String::from("1"))]),
+        &[],
+    );
+    assert!(!h264_upper.is_same_codec(h264_packetization_mode_1.as_ref()));
+
+    let h264_profile_a = SdpVideoFormat::new_with_parameters(
+        "H264",
+        &std::collections::HashMap::from([(
+            String::from("profile-level-id"),
+            String::from("42e01f"),
+        )]),
+        &[],
+    );
+    let h264_profile_b = SdpVideoFormat::new_with_parameters(
+        "H264",
+        &std::collections::HashMap::from([(
+            String::from("profile-level-id"),
+            String::from("640c34"),
+        )]),
+        &[],
+    );
+    assert!(!h264_profile_a.is_same_codec(h264_profile_b.as_ref()));
+
+    let vp9_profile_0 = SdpVideoFormat::new_with_parameters(
+        "VP9",
+        &std::collections::HashMap::from([(String::from("profile-id"), String::from("0"))]),
+        &[],
+    );
+    let vp9_profile_2 = SdpVideoFormat::new_with_parameters(
+        "VP9",
+        &std::collections::HashMap::from([(String::from("profile-id"), String::from("2"))]),
+        &[],
+    );
+    assert!(!vp9_profile_0.is_same_codec(vp9_profile_2.as_ref()));
+    assert!(vp9_profile_0.is_same_codec(vp9_profile_0.clone().as_ref()));
+}
+
+#[test]
 fn scalability_mode_round_trip() {
     let mode = ScalabilityMode::L2T2;
     assert_eq!(
@@ -208,15 +339,23 @@ fn scalability_mode_round_trip() {
 #[test]
 fn i420_buffer_and_video_frame() {
     let mut buf = I420Buffer::new(4, 4);
-    buf.fill_y(0x10);
-    buf.fill_uv(0x80, 0x90);
+    buf.y_data_mut().fill(0x10);
+    buf.u_data_mut().fill(0x80);
+    buf.v_data_mut().fill(0x90);
 
-    let frame = VideoFrame::from_i420(&buf, 12345, 0);
+    let frame_buffer = buf.cast_to_video_frame_buffer();
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(12345)
+        .set_timestamp_rtp(0)
+        .build();
     assert_eq!(frame.width(), 4);
     assert_eq!(frame.height(), 4);
     assert_eq!(frame.timestamp_us(), 12345);
 
-    let copied = frame.buffer();
+    let mut copied = frame.buffer();
+    let copied = copied
+        .to_i420()
+        .expect("VideoFrameBuffer から I420Buffer への変換に失敗しました");
     assert_eq!(copied.y_data()[0], 0x10);
 }
 
@@ -230,10 +369,690 @@ fn i420_buffer_mutable_planes_and_video_frame_rtp_timestamp() {
     assert!(buf.u_data().iter().all(|&v| v == 0x22));
     assert!(buf.v_data().iter().all(|&v| v == 0x33));
 
-    let frame = VideoFrame::from_i420(&buf, 12345, 67890);
+    let frame_buffer = buf.cast_to_video_frame_buffer();
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(12345)
+        .set_timestamp_rtp(67890)
+        .build();
     assert_eq!(frame.timestamp_us(), 12345);
     assert_eq!(frame.rtp_timestamp(), 67890);
     assert_eq!(frame.as_ref().rtp_timestamp(), 67890);
+}
+
+#[test]
+fn video_frame_clone() {
+    let mut buf = I420Buffer::new(4, 4);
+    buf.y_data_mut().fill(0x44);
+    buf.u_data_mut().fill(0x55);
+    buf.v_data_mut().fill(0x66);
+
+    let frame_buffer = buf.cast_to_video_frame_buffer();
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(11111)
+        .set_timestamp_rtp(22222)
+        .build();
+    let cloned = frame.clone();
+
+    assert_eq!(cloned.width(), frame.width());
+    assert_eq!(cloned.height(), frame.height());
+    assert_eq!(cloned.timestamp_us(), frame.timestamp_us());
+    assert_eq!(cloned.rtp_timestamp(), frame.rtp_timestamp());
+    assert_ne!(cloned.as_ref().as_ptr(), frame.as_ref().as_ptr());
+
+    let mut copied = cloned.buffer();
+    let copied = copied
+        .to_i420()
+        .expect("clone した VideoFrame の buffer 変換に失敗しました");
+    assert_eq!(copied.y_data()[0], 0x44);
+}
+
+#[test]
+fn video_frame_ref_to_owned() {
+    let mut buf = I420Buffer::new(4, 4);
+    buf.y_data_mut().fill(0x77);
+    buf.u_data_mut().fill(0x88);
+    buf.v_data_mut().fill(0x99);
+
+    let frame_buffer = buf.cast_to_video_frame_buffer();
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(33333)
+        .set_timestamp_rtp(44444)
+        .build();
+    let copied = frame.as_ref().to_owned();
+
+    assert_eq!(copied.width(), frame.width());
+    assert_eq!(copied.height(), frame.height());
+    assert_eq!(copied.timestamp_us(), frame.timestamp_us());
+    assert_eq!(copied.rtp_timestamp(), frame.rtp_timestamp());
+    assert_ne!(copied.as_ref().as_ptr(), frame.as_ref().as_ptr());
+
+    let mut copied_buffer = copied.buffer();
+    let copied_i420 = copied_buffer
+        .to_i420()
+        .expect("to_owned した VideoFrame の buffer 変換に失敗しました");
+    assert_eq!(copied_i420.y_data()[0], 0x77);
+}
+
+#[test]
+fn video_frame_update_rect_roundtrip() {
+    let mut rect = VideoFrameUpdateRect::new();
+    rect.set_offset_x(11);
+    rect.set_offset_y(22);
+    rect.set_width(33);
+    rect.set_height(44);
+
+    assert_eq!(rect.offset_x(), 11);
+    assert_eq!(rect.offset_y(), 22);
+    assert_eq!(rect.width(), 33);
+    assert_eq!(rect.height(), 44);
+}
+
+#[test]
+fn video_frame_builder_roundtrip_all_fields() {
+    let i420 = I420Buffer::new(4, 4);
+    let frame_buffer = i420.cast_to_video_frame_buffer();
+    let mut update_rect = VideoFrameUpdateRect::new();
+    update_rect.set_offset_x(1);
+    update_rect.set_offset_y(2);
+    update_rect.set_width(3);
+    update_rect.set_height(4);
+    let color_space = ColorSpace::new();
+    let color_space_string = color_space
+        .as_string()
+        .expect("ColorSpace::as_string に失敗しました");
+
+    let presentation_timestamp = Duration::from_micros(1_234_567);
+    let reference_time = Duration::from_micros(2_345_678);
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(765_432)
+        .set_timestamp_rtp(1122)
+        .set_id(5566)
+        .set_ntp_time_ms(7788)
+        .set_rotation(VideoRotation::R270)
+        .set_presentation_timestamp(Some(presentation_timestamp))
+        .set_reference_time(Some(reference_time))
+        .set_color_space(Some(&color_space))
+        .set_update_rect(Some(&update_rect))
+        .set_is_repeat_frame(true)
+        .build();
+
+    assert_eq!(frame.timestamp_us(), 765_432);
+    assert_eq!(frame.rtp_timestamp(), 1122);
+    assert_eq!(frame.id(), 5566);
+    assert_eq!(frame.ntp_time_ms(), 7788);
+    assert_eq!(frame.rotation(), VideoRotation::R270);
+    assert_eq!(frame.presentation_timestamp(), Some(presentation_timestamp));
+    assert_eq!(frame.reference_time(), Some(reference_time));
+    assert!(frame.has_update_rect());
+    assert!(frame.is_repeat_frame());
+    let frame_update_rect = frame.update_rect();
+    assert_eq!(frame_update_rect.offset_x(), 1);
+    assert_eq!(frame_update_rect.offset_y(), 2);
+    assert_eq!(frame_update_rect.width(), 3);
+    assert_eq!(frame_update_rect.height(), 4);
+    let frame_color_space = frame
+        .color_space()
+        .expect("ColorSpace が設定されていません");
+    assert_eq!(
+        frame_color_space
+            .as_string()
+            .expect("VideoFrame::color_space の as_string に失敗しました"),
+        color_space_string
+    );
+
+    let frame_ref = frame.as_ref();
+    assert_eq!(frame_ref.id(), 5566);
+    assert_eq!(frame_ref.ntp_time_ms(), 7788);
+    assert_eq!(frame_ref.rotation(), VideoRotation::R270);
+    assert_eq!(
+        frame_ref.presentation_timestamp(),
+        Some(presentation_timestamp)
+    );
+    assert_eq!(frame_ref.reference_time(), Some(reference_time));
+    assert!(frame_ref.has_update_rect());
+    assert!(frame_ref.is_repeat_frame());
+}
+
+#[test]
+fn video_frame_builder_none_update_rect() {
+    let i420 = I420Buffer::new(2, 2);
+    let frame_buffer = i420.cast_to_video_frame_buffer();
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(10)
+        .set_update_rect(None)
+        .build();
+
+    assert!(!frame.has_update_rect());
+    let update_rect = frame.update_rect();
+    assert_eq!(update_rect.offset_x(), 0);
+    assert_eq!(update_rect.offset_y(), 0);
+    assert_eq!(update_rect.width(), frame.width());
+    assert_eq!(update_rect.height(), frame.height());
+}
+
+#[test]
+#[should_panic(expected = "Duration microseconds overflowed i64")]
+fn video_frame_builder_overflow_duration_panics() {
+    let i420 = I420Buffer::new(2, 2);
+    let frame_buffer = i420.cast_to_video_frame_buffer();
+    let overflow = Duration::from_micros(i64::MAX as u64 + 1);
+    let _ = VideoFrame::builder(&frame_buffer).set_presentation_timestamp(Some(overflow));
+}
+
+#[test]
+fn i420_buffer_chroma_dimensions_for_odd_size() {
+    let width = 5;
+    let height = 3;
+    let buf = I420Buffer::new(width, height);
+
+    assert_eq!(buf.chroma_width(), 3);
+    assert_eq!(buf.chroma_height(), 2);
+    assert_eq!(
+        buf.u_data().len(),
+        (buf.stride_u() as usize) * (buf.chroma_height() as usize)
+    );
+    assert_eq!(
+        buf.v_data().len(),
+        (buf.stride_v() as usize) * (buf.chroma_height() as usize)
+    );
+}
+
+#[test]
+fn nv12_buffer_planes_kind_and_to_i420() {
+    let width = 4;
+    let height = 3;
+    let mut buf = NV12Buffer::new(width, height);
+
+    assert_eq!(buf.width(), width);
+    assert_eq!(buf.height(), height);
+    assert_eq!(buf.y_data().len(), (buf.stride_y() * height) as usize);
+    assert_eq!(
+        buf.uv_data().len(),
+        (buf.stride_uv() as usize) * (height as usize).div_ceil(2)
+    );
+
+    for (i, v) in buf.y_data_mut().iter_mut().enumerate() {
+        *v = (i as u8).wrapping_add(0x10);
+    }
+    for uv in buf.uv_data_mut().chunks_exact_mut(2) {
+        uv[0] = 0x44;
+        uv[1] = 0x88;
+    }
+
+    let mut frame_buffer = buf.cast_to_video_frame_buffer();
+    assert_eq!(frame_buffer.kind(), VideoFrameBufferKind::Nv12);
+
+    let i420 = frame_buffer
+        .to_i420()
+        .expect("VideoFrameBuffer から I420Buffer への変換に失敗しました");
+    assert_eq!(i420.y_data(), buf.y_data());
+    assert!(i420.u_data().iter().all(|&v| v == 0x44));
+    assert!(i420.v_data().iter().all(|&v| v == 0x88));
+}
+
+#[test]
+fn nv12_buffer_chroma_dimensions_for_odd_size() {
+    let width = 5;
+    let height = 3;
+    let buf = NV12Buffer::new(width, height);
+
+    assert_eq!(buf.chroma_width(), 3);
+    assert_eq!(buf.chroma_height(), 2);
+    assert_eq!(
+        buf.uv_data().len(),
+        (buf.stride_uv() as usize) * (buf.chroma_height() as usize)
+    );
+}
+
+#[test]
+fn nv12_buffer_crop_and_scale_from() {
+    let mut src = NV12Buffer::new(4, 4);
+    src.y_data_mut().fill(0x11);
+    for uv in src.uv_data_mut().chunks_exact_mut(2) {
+        uv[0] = 0x22;
+        uv[1] = 0x66;
+    }
+
+    let mut dst = NV12Buffer::new(2, 2);
+    dst.crop_and_scale_from(&src, 0, 0, 4, 4);
+
+    assert!(dst.y_data().iter().all(|&v| v == 0x11));
+    for uv in dst.uv_data().chunks_exact(2) {
+        assert_eq!(uv[0], 0x22);
+        assert_eq!(uv[1], 0x66);
+    }
+
+    let mut frame_buffer = dst.cast_to_video_frame_buffer();
+    assert_eq!(frame_buffer.kind(), VideoFrameBufferKind::Nv12);
+    let i420 = frame_buffer
+        .to_i420()
+        .expect("VideoFrameBuffer から I420Buffer への変換に失敗しました");
+    assert!(i420.y_data().iter().all(|&v| v == 0x11));
+    assert!(i420.u_data().iter().all(|&v| v == 0x22));
+    assert!(i420.v_data().iter().all(|&v| v == 0x66));
+}
+
+#[test]
+fn video_frame_buffer_handler_native_roundtrip() {
+    struct NativeBufferHandler;
+
+    impl VideoFrameBufferHandler for NativeBufferHandler {
+        fn width(&self) -> i32 {
+            2
+        }
+
+        fn height(&self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            let mut buffer = I420Buffer::new(2, 2);
+            buffer.y_data_mut().fill(0x12);
+            buffer.u_data_mut().fill(0x34);
+            buffer.v_data_mut().fill(0x56);
+            Some(buffer)
+        }
+    }
+
+    let mut buffer = VideoFrameBuffer::new_with_handler(Box::new(NativeBufferHandler));
+    assert_eq!(buffer.kind(), VideoFrameBufferKind::Native);
+    assert_eq!(buffer.width(), 2);
+    assert_eq!(buffer.height(), 2);
+
+    let converted = buffer
+        .to_i420()
+        .expect("VideoFrameBufferHandler の ToI420 が None になりました");
+    assert_eq!(converted.y_data()[0], 0x12);
+
+    let frame = VideoFrame::builder(&buffer)
+        .set_timestamp_us(12345)
+        .set_timestamp_rtp(67890)
+        .build();
+    assert_eq!(frame.width(), 2);
+    assert_eq!(frame.height(), 2);
+    assert_eq!(frame.timestamp_us(), 12345);
+    assert_eq!(frame.rtp_timestamp(), 67890);
+
+    let mut frame_buffer = frame.buffer();
+    assert_eq!(frame_buffer.kind(), VideoFrameBufferKind::Native);
+    let frame_i420 = frame_buffer
+        .to_i420()
+        .expect("VideoFrame の VideoFrameBuffer から I420 変換に失敗しました");
+    assert_eq!(frame_i420.y_data()[0], 0x12);
+}
+
+#[test]
+fn video_frame_buffer_handler_custom_type_roundtrip() {
+    struct I420TypeBufferHandler;
+
+    impl VideoFrameBufferHandler for I420TypeBufferHandler {
+        fn kind(&self) -> VideoFrameBufferKind {
+            VideoFrameBufferKind::I420
+        }
+
+        fn width(&self) -> i32 {
+            2
+        }
+
+        fn height(&self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            let mut buffer = I420Buffer::new(2, 2);
+            buffer.y_data_mut().fill(0x77);
+            buffer.u_data_mut().fill(0x88);
+            buffer.v_data_mut().fill(0x99);
+            Some(buffer)
+        }
+    }
+
+    let buffer = VideoFrameBuffer::new_with_handler(Box::new(I420TypeBufferHandler));
+    assert_eq!(buffer.kind(), VideoFrameBufferKind::I420);
+
+    let frame = VideoFrame::builder(&buffer)
+        .set_timestamp_us(222)
+        .set_timestamp_rtp(333)
+        .build();
+    let mut frame_buffer = frame.buffer();
+    assert_eq!(frame_buffer.kind(), VideoFrameBufferKind::I420);
+
+    let converted = frame_buffer
+        .to_i420()
+        .expect("VideoFrameBuffer の I420 変換に失敗しました");
+    assert_eq!(converted.y_data()[0], 0x77);
+}
+
+#[test]
+fn video_frame_buffer_handler_to_i420_none() {
+    struct NoI420BufferHandler;
+
+    impl VideoFrameBufferHandler for NoI420BufferHandler {
+        fn width(&self) -> i32 {
+            2
+        }
+
+        fn height(&self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            None
+        }
+    }
+
+    let mut buffer = VideoFrameBuffer::new_with_handler(Box::new(NoI420BufferHandler));
+    assert!(buffer.to_i420().is_none());
+
+    let frame = VideoFrame::builder(&buffer)
+        .set_timestamp_us(100)
+        .set_timestamp_rtp(0)
+        .build();
+    let mut frame_buffer = frame.buffer();
+    assert!(frame_buffer.to_i420().is_none());
+}
+
+#[test]
+fn video_frame_buffer_crop_and_scale_from_i420_buffer() {
+    let mut src = I420Buffer::new(4, 4);
+    src.y_data_mut().fill(0x10);
+    src.u_data_mut().fill(0x20);
+    src.v_data_mut().fill(0x30);
+
+    let mut frame_buffer = src.cast_to_video_frame_buffer();
+    let scaled = frame_buffer
+        .scale(2, 2)
+        .expect("VideoFrameBuffer::scale の変換に失敗しました");
+    assert_eq!(scaled.width(), 2);
+    assert_eq!(scaled.height(), 2);
+
+    let mut frame_buffer = src.cast_to_video_frame_buffer();
+    let cropped_scaled = frame_buffer
+        .crop_and_scale(1, 1, 2, 2, 3, 3)
+        .expect("VideoFrameBuffer::crop_and_scale の変換に失敗しました");
+    assert_eq!(cropped_scaled.width(), 3);
+    assert_eq!(cropped_scaled.height(), 3);
+}
+
+#[test]
+fn video_frame_buffer_handler_crop_and_scale_callback() {
+    struct CropAndScaleBufferHandler {
+        called: Arc<AtomicBool>,
+        args: Arc<Mutex<Option<(i32, i32, i32, i32, i32, i32)>>>,
+    }
+
+    impl VideoFrameBufferHandler for CropAndScaleBufferHandler {
+        fn width(&self) -> i32 {
+            8
+        }
+
+        fn height(&self) -> i32 {
+            8
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            Some(I420Buffer::new(8, 8))
+        }
+
+        fn crop_and_scale(
+            &mut self,
+            offset_x: i32,
+            offset_y: i32,
+            crop_width: i32,
+            crop_height: i32,
+            scaled_width: i32,
+            scaled_height: i32,
+        ) -> Option<VideoFrameBuffer> {
+            self.called.store(true, Ordering::SeqCst);
+            *self.args.lock().expect("args のロックに失敗しました") = Some((
+                offset_x,
+                offset_y,
+                crop_width,
+                crop_height,
+                scaled_width,
+                scaled_height,
+            ));
+            Some(I420Buffer::new(scaled_width, scaled_height).cast_to_video_frame_buffer())
+        }
+    }
+
+    let called = Arc::new(AtomicBool::new(false));
+    let args = Arc::new(Mutex::new(None));
+    let handler = CropAndScaleBufferHandler {
+        called: Arc::clone(&called),
+        args: Arc::clone(&args),
+    };
+    let mut buffer = VideoFrameBuffer::new_with_handler(Box::new(handler));
+
+    let scaled = buffer
+        .crop_and_scale(1, 2, 3, 4, 5, 6)
+        .expect("VideoFrameBufferHandler::crop_and_scale の実行に失敗しました");
+
+    assert!(called.load(Ordering::SeqCst));
+    assert_eq!(
+        *args.lock().expect("args のロックに失敗しました"),
+        Some((1, 2, 3, 4, 5, 6))
+    );
+    assert_eq!(scaled.width(), 5);
+    assert_eq!(scaled.height(), 6);
+}
+
+#[test]
+fn video_frame_buffer_handler_crop_and_scale_fallback() {
+    struct NoCropAndScaleBufferHandler;
+
+    impl VideoFrameBufferHandler for NoCropAndScaleBufferHandler {
+        fn width(&self) -> i32 {
+            4
+        }
+
+        fn height(&self) -> i32 {
+            4
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            let mut buffer = I420Buffer::new(4, 4);
+            buffer.y_data_mut().fill(0x55);
+            buffer.u_data_mut().fill(0x66);
+            buffer.v_data_mut().fill(0x77);
+            Some(buffer)
+        }
+    }
+
+    let mut buffer = VideoFrameBuffer::new_with_handler(Box::new(NoCropAndScaleBufferHandler));
+    let scaled = buffer
+        .scale(2, 2)
+        .expect("VideoFrameBuffer::scale のフォールバックに失敗しました");
+    assert_eq!(scaled.width(), 2);
+    assert_eq!(scaled.height(), 2);
+}
+
+#[test]
+fn video_frame_buffer_as_native_roundtrip() {
+    struct DowncastBufferHandler {
+        value: u8,
+    }
+
+    impl VideoFrameBufferHandler for DowncastBufferHandler {
+        fn width(&self) -> i32 {
+            2
+        }
+
+        fn height(&self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            let mut buffer = I420Buffer::new(2, 2);
+            buffer.y_data_mut().fill(self.value);
+            buffer.u_data_mut().fill(0x01);
+            buffer.v_data_mut().fill(0x02);
+            Some(buffer)
+        }
+    }
+
+    let mut buffer =
+        VideoFrameBuffer::new_with_handler(Box::new(DowncastBufferHandler { value: 7 }));
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let handler = unsafe { buffer.as_native_ref::<DowncastBufferHandler>() }
+        .expect("as_native_ref が失敗しました");
+    assert_eq!(handler.value, 7);
+
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let handler = unsafe { buffer.as_native_mut::<DowncastBufferHandler>() }
+        .expect("as_native_mut が失敗しました");
+    handler.value = 9;
+
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let handler = unsafe { buffer.as_native_ref::<DowncastBufferHandler>() }
+        .expect("as_native_ref が失敗しました");
+    assert_eq!(handler.value, 9);
+
+    let i420 = buffer
+        .to_i420()
+        .expect("VideoFrameBuffer の I420 変換に失敗しました");
+    assert_eq!(i420.y_data()[0], 9);
+}
+
+#[test]
+fn video_frame_buffer_as_native_clone_and_frame_buffer() {
+    struct DowncastBufferHandler {
+        value: u8,
+    }
+
+    impl VideoFrameBufferHandler for DowncastBufferHandler {
+        fn width(&self) -> i32 {
+            2
+        }
+
+        fn height(&self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            let mut buffer = I420Buffer::new(2, 2);
+            buffer.y_data_mut().fill(self.value);
+            buffer.u_data_mut().fill(0x11);
+            buffer.v_data_mut().fill(0x22);
+            Some(buffer)
+        }
+    }
+
+    let mut buffer =
+        VideoFrameBuffer::new_with_handler(Box::new(DowncastBufferHandler { value: 3 }));
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    unsafe { buffer.as_native_mut::<DowncastBufferHandler>() }
+        .expect("as_native_mut が失敗しました")
+        .value = 5;
+
+    let cloned = buffer.clone();
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let cloned_handler = unsafe { cloned.as_native_ref::<DowncastBufferHandler>() }
+        .expect("clone からの as_native_ref が失敗しました");
+    assert_eq!(cloned_handler.value, 5);
+
+    let frame = VideoFrame::builder(&buffer)
+        .set_timestamp_us(10)
+        .set_timestamp_rtp(20)
+        .build();
+    let frame_buffer = frame.buffer();
+    // Safety: このテストでは同一実体への同時アクセスを行いません。
+    let frame_handler = unsafe { frame_buffer.as_native_ref::<DowncastBufferHandler>() }
+        .expect("VideoFrame::buffer からの as_native_ref が失敗しました");
+    assert_eq!(frame_handler.value, 5);
+}
+
+#[test]
+fn video_frame_buffer_as_native_returns_none_for_builtin_buffers() {
+    struct NativeBufferHandler;
+
+    impl VideoFrameBufferHandler for NativeBufferHandler {
+        fn width(&self) -> i32 {
+            1
+        }
+
+        fn height(&self) -> i32 {
+            1
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            Some(I420Buffer::new(1, 1))
+        }
+    }
+
+    let i420 = I420Buffer::new(2, 2);
+    let mut i420_frame_buffer = i420.cast_to_video_frame_buffer();
+    // Safety: 参照を取り出すだけで、同時アクセスは行いません。
+    assert!(unsafe {
+        i420_frame_buffer
+            .as_native_ref::<NativeBufferHandler>()
+            .is_none()
+    });
+    // Safety: 参照を取り出すだけで、同時アクセスは行いません。
+    assert!(unsafe {
+        i420_frame_buffer
+            .as_native_mut::<NativeBufferHandler>()
+            .is_none()
+    });
+
+    let nv12 = NV12Buffer::new(2, 2);
+    let mut nv12_frame_buffer = nv12.cast_to_video_frame_buffer();
+    // Safety: 参照を取り出すだけで、同時アクセスは行いません。
+    assert!(unsafe {
+        nv12_frame_buffer
+            .as_native_ref::<NativeBufferHandler>()
+            .is_none()
+    });
+    // Safety: 参照を取り出すだけで、同時アクセスは行いません。
+    assert!(unsafe {
+        nv12_frame_buffer
+            .as_native_mut::<NativeBufferHandler>()
+            .is_none()
+    });
+}
+
+#[test]
+fn video_frame_buffer_as_i420_and_as_nv12() {
+    let i420 = I420Buffer::new(2, 2);
+    let i420_frame_buffer = i420.cast_to_video_frame_buffer();
+    let i420_view = i420_frame_buffer
+        .as_i420()
+        .expect("as_i420 failed on I420 buffer");
+    assert_eq!(i420_view.width(), 2);
+    assert_eq!(i420_view.height(), 2);
+    assert!(i420_frame_buffer.as_nv12().is_none());
+
+    let nv12 = NV12Buffer::new(2, 2);
+    let nv12_frame_buffer = nv12.cast_to_video_frame_buffer();
+    let nv12_view = nv12_frame_buffer
+        .as_nv12()
+        .expect("as_nv12 failed on NV12 buffer");
+    assert_eq!(nv12_view.width(), 2);
+    assert_eq!(nv12_view.height(), 2);
+    assert!(nv12_frame_buffer.as_i420().is_none());
+}
+
+#[test]
+fn video_frame_buffer_as_i420_and_as_nv12_return_none_for_native() {
+    struct NativeBufferHandler;
+
+    impl VideoFrameBufferHandler for NativeBufferHandler {
+        fn width(&self) -> i32 {
+            2
+        }
+
+        fn height(&self) -> i32 {
+            2
+        }
+
+        fn to_i420(&mut self) -> Option<I420Buffer> {
+            Some(I420Buffer::new(2, 2))
+        }
+    }
+
+    let frame_buffer = VideoFrameBuffer::new_with_handler(Box::new(NativeBufferHandler));
+    assert!(frame_buffer.as_i420().is_none());
+    assert!(frame_buffer.as_nv12().is_none());
 }
 
 #[test]
@@ -244,21 +1063,46 @@ fn abgr_to_i420_conversion() {
     for _ in 0..4 {
         src.extend_from_slice(&pixel);
     }
-    let buf = abgr_to_i420(&src, 2, 2).expect("abgr_to_i420 の変換に失敗しました");
+    let mut y_plane = vec![0u8; 2 * 2];
+    let mut u_plane = vec![0u8; 1];
+    let mut v_plane = vec![0u8; 1];
+    assert!(abgr_to_i420(
+        &src,
+        2 * 4,
+        &mut y_plane,
+        2,
+        &mut u_plane,
+        1,
+        &mut v_plane,
+        1,
+        2,
+        2,
+    ));
     // 単色なので Y/U/V は全て同一値になるはず。
-    assert!(buf.y_data().iter().all(|&v| v == buf.y_data()[0]));
-    assert!(buf.u_data().iter().all(|&v| v == buf.u_data()[0]));
-    assert!(buf.v_data().iter().all(|&v| v == buf.v_data()[0]));
+    assert!(y_plane.iter().all(|&v| v == y_plane[0]));
+    assert!(u_plane.iter().all(|&v| v == u_plane[0]));
+    assert!(v_plane.iter().all(|&v| v == v_plane[0]));
 }
 
 #[test]
 fn convert_from_i420_argb_conversion() {
-    let mut src = I420Buffer::new(2, 2);
-    src.fill_y(0x30);
-    src.fill_uv(0x80, 0x80);
-
-    let dst = convert_from_i420(&src, LibyuvFourcc::Argb)
-        .expect("convert_from_i420(Argb) の変換に失敗しました");
+    let y_plane = vec![0x30; 4];
+    let u_plane = vec![0x80; 1];
+    let v_plane = vec![0x80; 1];
+    let mut dst = vec![0u8; 2 * 2 * 4];
+    assert!(convert_from_i420(
+        &y_plane,
+        2,
+        &u_plane,
+        1,
+        &v_plane,
+        1,
+        &mut dst,
+        2 * 4,
+        2,
+        2,
+        LibyuvFourcc::Argb,
+    ));
     assert_eq!(dst.len(), 2 * 2 * 4);
 }
 
@@ -266,26 +1110,179 @@ fn convert_from_i420_argb_conversion() {
 fn i420_to_nv12_round_trip() {
     let width = 4;
     let height = 4;
-    let mut src = I420Buffer::new(width, height);
-    for (i, p) in src.y_data_mut().iter_mut().enumerate() {
+    let mut src_y = vec![0u8; (width * height) as usize];
+    let mut src_u = vec![0u8; ((width / 2) * (height / 2)) as usize];
+    let mut src_v = vec![0u8; ((width / 2) * (height / 2)) as usize];
+    for (i, p) in src_y.iter_mut().enumerate() {
         *p = (i as u8).wrapping_mul(3);
     }
-    for (i, p) in src.u_data_mut().iter_mut().enumerate() {
+    for (i, p) in src_u.iter_mut().enumerate() {
         *p = 0x40u8.wrapping_add(i as u8);
     }
-    for (i, p) in src.v_data_mut().iter_mut().enumerate() {
+    for (i, p) in src_v.iter_mut().enumerate() {
         *p = 0x80u8.wrapping_add(i as u8);
     }
+    let mut nv12_y = vec![0u8; (width * height) as usize];
+    let mut nv12_uv = vec![0u8; (width * (height / 2)) as usize];
+    assert!(i420_to_nv12(
+        &src_y,
+        width,
+        &src_u,
+        width / 2,
+        &src_v,
+        width / 2,
+        &mut nv12_y,
+        width,
+        &mut nv12_uv,
+        width,
+        width,
+        height,
+    ));
+    let mut restored_y = vec![0u8; src_y.len()];
+    let mut restored_u = vec![0u8; src_u.len()];
+    let mut restored_v = vec![0u8; src_v.len()];
+    assert!(nv12_to_i420(
+        &nv12_y,
+        width,
+        &nv12_uv,
+        width,
+        &mut restored_y,
+        width,
+        &mut restored_u,
+        width / 2,
+        &mut restored_v,
+        width / 2,
+        width,
+        height,
+    ));
 
-    let nv12 = i420_to_nv12(&src).expect("i420_to_nv12 の変換に失敗しました");
-    let y_size = (width * height) as usize;
-    let (y, uv) = nv12.split_at(y_size);
-    let restored = nv12_to_i420(y, width, uv, width, width, height)
-        .expect("nv12_to_i420 の逆変換に失敗しました");
+    assert_eq!(src_y, restored_y);
+    assert_eq!(src_u, restored_u);
+    assert_eq!(src_v, restored_v);
+}
 
-    assert_eq!(src.y_data(), restored.y_data());
-    assert_eq!(src.u_data(), restored.u_data());
-    assert_eq!(src.v_data(), restored.v_data());
+#[test]
+fn i420_buffer_planes_mut_to_nv12_round_trip() {
+    let width = 5;
+    let height = 3;
+    let mut src = I420Buffer::new(width, height);
+    let src_stride_y = src.stride_y();
+    let src_stride_u = src.stride_u();
+    let src_stride_v = src.stride_v();
+    let chroma_width = src.chroma_width();
+    let chroma_height = src.chroma_height();
+
+    {
+        let (src_y, src_u, src_v) = src.planes_mut();
+        for row in 0..height as usize {
+            let begin = row * src_stride_y as usize;
+            let end = begin + width as usize;
+            for (col, v) in src_y[begin..end].iter_mut().enumerate() {
+                *v = (row as u8).wrapping_mul(17).wrapping_add(col as u8);
+            }
+        }
+        for row in 0..chroma_height as usize {
+            let begin = row * src_stride_u as usize;
+            let end = begin + chroma_width as usize;
+            for (col, v) in src_u[begin..end].iter_mut().enumerate() {
+                *v = 0x40u8
+                    .wrapping_add((row as u8).wrapping_mul(7))
+                    .wrapping_add(col as u8);
+            }
+        }
+        for row in 0..chroma_height as usize {
+            let begin = row * src_stride_v as usize;
+            let end = begin + chroma_width as usize;
+            for (col, v) in src_v[begin..end].iter_mut().enumerate() {
+                *v = 0x80u8
+                    .wrapping_add((row as u8).wrapping_mul(11))
+                    .wrapping_add(col as u8);
+            }
+        }
+    }
+
+    let mut nv12 = NV12Buffer::new(width, height);
+    let dst_stride_y = nv12.stride_y();
+    let dst_stride_uv = nv12.stride_uv();
+    {
+        let (dst_y, dst_uv) = nv12.planes_mut();
+        assert!(i420_to_nv12(
+            src.y_data(),
+            src_stride_y,
+            src.u_data(),
+            src_stride_u,
+            src.v_data(),
+            src_stride_v,
+            dst_y,
+            dst_stride_y,
+            dst_uv,
+            dst_stride_uv,
+            width,
+            height,
+        ));
+    }
+
+    let mut restored = I420Buffer::new(width, height);
+    let restored_stride_y = restored.stride_y();
+    let restored_stride_u = restored.stride_u();
+    let restored_stride_v = restored.stride_v();
+    {
+        let (restored_y, restored_u, restored_v) = restored.planes_mut();
+        assert!(nv12_to_i420(
+            nv12.y_data(),
+            nv12.stride_y(),
+            nv12.uv_data(),
+            nv12.stride_uv(),
+            restored_y,
+            restored_stride_y,
+            restored_u,
+            restored_stride_u,
+            restored_v,
+            restored_stride_v,
+            width,
+            height,
+        ));
+    }
+
+    let assert_plane_eq =
+        |lhs: &[u8], lhs_stride: i32, rhs: &[u8], rhs_stride: i32, row_bytes: i32, rows: i32| {
+            let lhs_stride = lhs_stride as usize;
+            let rhs_stride = rhs_stride as usize;
+            let row_bytes = row_bytes as usize;
+            let rows = rows as usize;
+            for row in 0..rows {
+                let lhs_begin = row * lhs_stride;
+                let lhs_end = lhs_begin + row_bytes;
+                let rhs_begin = row * rhs_stride;
+                let rhs_end = rhs_begin + row_bytes;
+                assert_eq!(lhs[lhs_begin..lhs_end], rhs[rhs_begin..rhs_end]);
+            }
+        };
+
+    assert_plane_eq(
+        src.y_data(),
+        src_stride_y,
+        restored.y_data(),
+        restored_stride_y,
+        width,
+        height,
+    );
+    assert_plane_eq(
+        src.u_data(),
+        src_stride_u,
+        restored.u_data(),
+        restored_stride_u,
+        chroma_width,
+        chroma_height,
+    );
+    assert_plane_eq(
+        src.v_data(),
+        src_stride_v,
+        restored.v_data(),
+        restored_stride_v,
+        chroma_width,
+        chroma_height,
+    );
 }
 
 #[test]
@@ -509,7 +1506,11 @@ fn adapted_video_track_source() {
     assert!(adapted.size.adapted_height >= 0);
 
     let buf = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buf, 2_000_000, 0);
+    let frame_buffer = buf.cast_to_video_frame_buffer();
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(2_000_000)
+        .set_timestamp_rtp(0)
+        .build();
     src.on_frame(&frame);
 }
 
@@ -716,6 +1717,26 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     enc.set_adaptive_ptime(true);
     enc.set_scalability_mode(Some("L1T3"));
     enc.set_codec(Some(&codec));
+    assert_eq!(enc.bitrate_priority(), default_bitrate_priority());
+    assert_eq!(enc.network_priority(), Priority::Low);
+    enc.set_bitrate_priority(4.0);
+    enc.set_network_priority(Priority::VeryLow);
+    enc.set_request_key_frame(true);
+    enc.set_num_temporal_layers(Some(2));
+    assert_eq!(enc.bitrate_priority(), 4.0);
+    assert_eq!(enc.network_priority(), Priority::VeryLow);
+    assert!(enc.request_key_frame());
+    assert_eq!(enc.num_temporal_layers(), Some(2));
+    enc.set_request_key_frame(false);
+    enc.set_num_temporal_layers(None);
+    assert!(!enc.request_key_frame());
+    assert!(enc.num_temporal_layers().is_none());
+    let mid = Priority::Medium;
+    assert_eq!(Priority::from_int(mid.to_int()), mid);
+    let unknown = 123456;
+    assert_eq!(Priority::from_int(unknown), Priority::Unknown(unknown));
+    enc.set_network_priority(Priority::Unknown(unknown));
+    assert_eq!(enc.network_priority(), Priority::Unknown(unknown));
     assert_eq!(enc.rid().expect("rid の取得に失敗しました"), "f");
     assert_eq!(enc.ssrc(), Some(1234));
     assert_eq!(enc.max_bitrate_bps(), Some(1_500_000));
@@ -1081,7 +2102,11 @@ fn video_track_and_transceiver_with_track() {
         .expect("VideoTrack の生成に失敗しました");
     // ついでにフレーム投入 API も呼んでおく。
     let buf = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buf, 1_000_000, 0);
+    let frame_buffer = buf.cast_to_video_frame_buffer();
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(1_000_000)
+        .set_timestamp_rtp(0)
+        .build();
     source.on_frame(&frame);
 
     // PeerConnection を作成し、トラック付きで transceiver を追加する。
@@ -1215,7 +2240,11 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
         .expect("custom encoder の作成に失敗しました");
 
     let buffer = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buffer, 123, 0);
+    let frame_buffer = buffer.cast_to_video_frame_buffer();
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(123)
+        .set_timestamp_rtp(0)
+        .build();
     let mut frame_types = VideoFrameTypeVector::new(0);
     frame_types.push(VideoFrameType::Key);
     frame_types.push(VideoFrameType::Delta);
@@ -1285,8 +2314,8 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
             {
                 let mut preferred = info.preferred_pixel_formats();
                 preferred.clear();
-                preferred.push(VideoFrameBufferType::I420);
-                preferred.push(VideoFrameBufferType::Nv12);
+                preferred.push(VideoFrameBufferKind::I420);
+                preferred.push(VideoFrameBufferKind::Nv12);
             }
 
             info.set_is_qp_trusted(Some(true));
@@ -1361,10 +2390,10 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
 
     let mut preferred = info.preferred_pixel_formats();
     assert_eq!(preferred.len(), 2);
-    assert_eq!(preferred.get(0), Some(VideoFrameBufferType::I420));
-    assert_eq!(preferred.get(1), Some(VideoFrameBufferType::Nv12));
-    assert!(preferred.set(1, VideoFrameBufferType::I420A));
-    assert_eq!(preferred.get(1), Some(VideoFrameBufferType::I420A));
+    assert_eq!(preferred.get(0), Some(VideoFrameBufferKind::I420));
+    assert_eq!(preferred.get(1), Some(VideoFrameBufferKind::Nv12));
+    assert!(preferred.set(1, VideoFrameBufferKind::I420A));
+    assert_eq!(preferred.get(1), Some(VideoFrameBufferKind::I420A));
 
     assert_eq!(info.is_qp_trusted(), Some(true));
     assert_eq!(info.min_qp(), Some(9));
@@ -1435,6 +2464,138 @@ fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
         params.get("profile-level-id").map(String::as_str),
         Some("42e01f")
     );
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[test]
+fn objc_video_encoder_factory_bridge_works() {
+    let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoEncoderFactory_new() };
+    assert!(
+        !objc_factory.is_null(),
+        "webrtc_objc_RTCDefaultVideoEncoderFactory_new returned null"
+    );
+
+    let native_unique = unsafe { ffi::webrtc_ObjCToNativeVideoEncoderFactory(objc_factory) };
+    assert!(
+        !native_unique.is_null(),
+        "webrtc_ObjCToNativeVideoEncoderFactory returned null"
+    );
+
+    let native = unsafe { ffi::webrtc_VideoEncoderFactory_unique_get(native_unique) };
+    assert!(
+        !native.is_null(),
+        "webrtc_VideoEncoderFactory_unique_get returned null"
+    );
+
+    let formats = unsafe { ffi::webrtc_VideoEncoderFactory_GetSupportedFormats(native) };
+    assert!(
+        !formats.is_null(),
+        "webrtc_VideoEncoderFactory_GetSupportedFormats returned null"
+    );
+    let size = unsafe { ffi::webrtc_SdpVideoFormat_vector_size(formats) };
+    assert!(size >= 0, "invalid format size: {size}");
+
+    unsafe {
+        ffi::webrtc_SdpVideoFormat_vector_delete(formats);
+        ffi::webrtc_VideoEncoderFactory_unique_delete(native_unique);
+        ffi::webrtc_objc_RTCVideoEncoderFactory_release(objc_factory);
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[test]
+fn objc_video_decoder_factory_bridge_works() {
+    let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoDecoderFactory_new() };
+    assert!(
+        !objc_factory.is_null(),
+        "webrtc_objc_RTCDefaultVideoDecoderFactory_new returned null"
+    );
+
+    let native_unique = unsafe { ffi::webrtc_ObjCToNativeVideoDecoderFactory(objc_factory) };
+    assert!(
+        !native_unique.is_null(),
+        "webrtc_ObjCToNativeVideoDecoderFactory returned null"
+    );
+
+    let native = unsafe { ffi::webrtc_VideoDecoderFactory_unique_get(native_unique) };
+    assert!(
+        !native.is_null(),
+        "webrtc_VideoDecoderFactory_unique_get returned null"
+    );
+
+    let formats = unsafe { ffi::webrtc_VideoDecoderFactory_GetSupportedFormats(native) };
+    assert!(
+        !formats.is_null(),
+        "webrtc_VideoDecoderFactory_GetSupportedFormats returned null"
+    );
+    let size = unsafe { ffi::webrtc_SdpVideoFormat_vector_size(formats) };
+    assert!(size >= 0, "invalid format size: {size}");
+
+    unsafe {
+        ffi::webrtc_SdpVideoFormat_vector_delete(formats);
+        ffi::webrtc_VideoDecoderFactory_unique_delete(native_unique);
+        ffi::webrtc_objc_RTCVideoDecoderFactory_release(objc_factory);
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[test]
+fn video_encoder_factory_from_objc_default_works() {
+    let factory = VideoEncoderFactory::from_objc_default()
+        .expect("VideoEncoderFactory::from_objc_default が None を返しました");
+    let _formats = factory.get_supported_formats();
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[test]
+fn video_decoder_factory_from_objc_default_works() {
+    let factory = VideoDecoderFactory::from_objc_default()
+        .expect("VideoDecoderFactory::from_objc_default が None を返しました");
+    let _formats = factory.get_supported_formats();
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+#[test]
+fn objc_video_factory_functions_return_null_on_non_apple() {
+    let enc_objc = unsafe { ffi::webrtc_objc_RTCDefaultVideoEncoderFactory_new() };
+    assert!(
+        enc_objc.is_null(),
+        "encoder objc factory should be null on non-Apple platforms"
+    );
+    let enc_native = unsafe {
+        ffi::webrtc_ObjCToNativeVideoEncoderFactory(std::ptr::null_mut::<
+            ffi::webrtc_objc_RTCVideoEncoderFactory,
+        >())
+    };
+    assert!(
+        enc_native.is_null(),
+        "encoder native factory should be null on non-Apple platforms"
+    );
+    unsafe {
+        ffi::webrtc_objc_RTCVideoEncoderFactory_release(std::ptr::null_mut::<
+            ffi::webrtc_objc_RTCVideoEncoderFactory,
+        >())
+    };
+
+    let dec_objc = unsafe { ffi::webrtc_objc_RTCDefaultVideoDecoderFactory_new() };
+    assert!(
+        dec_objc.is_null(),
+        "decoder objc factory should be null on non-Apple platforms"
+    );
+    let dec_native = unsafe {
+        ffi::webrtc_ObjCToNativeVideoDecoderFactory(std::ptr::null_mut::<
+            ffi::webrtc_objc_RTCVideoDecoderFactory,
+        >())
+    };
+    assert!(
+        dec_native.is_null(),
+        "decoder native factory should be null on non-Apple platforms"
+    );
+    unsafe {
+        ffi::webrtc_objc_RTCVideoDecoderFactory_release(std::ptr::null_mut::<
+            ffi::webrtc_objc_RTCVideoDecoderFactory,
+        >())
+    };
 }
 
 #[test]
@@ -1681,7 +2842,11 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     );
 
     let buffer = I420Buffer::new(2, 2);
-    let frame = VideoFrame::from_i420(&buffer, 123, 0);
+    let frame_buffer = buffer.cast_to_video_frame_buffer();
+    let frame = VideoFrame::builder(&frame_buffer)
+        .set_timestamp_us(123)
+        .set_timestamp_rtp(0)
+        .build();
     assert_eq!(
         encoder.encode(frame.as_ref(), None),
         VideoCodecStatus::Unknown(88)
@@ -1831,4 +2996,150 @@ fn custom_video_decoder_get_decoder_info_name_experiment() {
         );
         assert!(!info.is_hardware_accelerated());
     }
+}
+
+#[test]
+fn create_local_media_stream_returns_requested_id() {
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc);
+    deps_factory.set_audio_decoder_factory(&dec);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    let stream = factory
+        .create_local_media_stream("stream-0")
+        .expect("CreateLocalMediaStream が失敗しました");
+    assert_eq!(
+        stream.id().expect("MediaStream id の取得に失敗しました"),
+        "stream-0"
+    );
+
+    drop(stream);
+    drop(factory);
+    drop(deps_factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
+fn media_stream_track_round_trip() {
+    let dec_audio = AudioDecoderFactory::builtin();
+    let enc_audio = AudioEncoderFactory::builtin();
+    let enc_video = VideoEncoderFactory::builtin();
+    let dec_video = VideoDecoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc_audio);
+    deps_factory.set_audio_decoder_factory(&dec_audio);
+    deps_factory.set_video_encoder_factory(enc_video);
+    deps_factory.set_video_decoder_factory(dec_video);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    let stream = factory
+        .create_local_media_stream("stream-1")
+        .expect("CreateLocalMediaStream が失敗しました");
+    let audio_source = factory
+        .create_audio_source()
+        .expect("AudioSource の生成に失敗しました");
+    let audio_track = factory
+        .create_audio_track(&audio_source, "audio-track-0")
+        .expect("AudioTrack の生成に失敗しました");
+    let video_source = AdaptedVideoTrackSource::new();
+    let vts = video_source.cast_to_video_track_source();
+    let video_track = factory
+        .create_video_track(&vts, "video-track-0")
+        .expect("VideoTrack の生成に失敗しました");
+
+    assert!(stream.audio_tracks().is_empty());
+    assert!(stream.video_tracks().is_empty());
+    assert!(stream.add_audio_track(&audio_track));
+    assert!(stream.add_video_track(&video_track));
+
+    let audio_tracks = stream.audio_tracks();
+    let video_tracks = stream.video_tracks();
+    assert_eq!(audio_tracks.len(), 1);
+    assert_eq!(video_tracks.len(), 1);
+
+    let found_audio = stream
+        .find_audio_track("audio-track-0")
+        .expect("FindAudioTrack が None を返しました");
+    let found_video = stream
+        .find_video_track("video-track-0")
+        .expect("FindVideoTrack が None を返しました");
+    assert_eq!(
+        found_audio
+            .cast_to_media_stream_track()
+            .id()
+            .expect("audio track id の取得に失敗しました"),
+        "audio-track-0"
+    );
+    assert_eq!(
+        found_video
+            .cast_to_media_stream_track()
+            .id()
+            .expect("video track id の取得に失敗しました"),
+        "video-track-0"
+    );
+    assert!(stream.find_audio_track("audio-track-unknown").is_none());
+    assert!(stream.find_video_track("video-track-unknown").is_none());
+
+    assert!(stream.remove_audio_track(&audio_track));
+    assert!(stream.remove_video_track(&video_track));
+    assert!(stream.find_audio_track("audio-track-0").is_none());
+    assert!(stream.find_video_track("video-track-0").is_none());
+
+    drop(found_video);
+    drop(found_audio);
+    drop(video_tracks);
+    drop(audio_tracks);
+    drop(video_track);
+    drop(vts);
+    drop(video_source);
+    drop(audio_track);
+    drop(audio_source);
+    drop(stream);
+    drop(factory);
+    drop(deps_factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    worker.stop();
+    signaling.stop();
 }
