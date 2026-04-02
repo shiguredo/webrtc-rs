@@ -64,8 +64,8 @@
   - @melpon
 - [ADD] `RtpEncodingParameters` に `bitrate_priority` / `network_priority` / `request_key_frame` / `num_temporal_layers` を追加する
   - C API に `webrtc_RtpEncodingParameters_*`（上記 4 フィールド用）と `webrtc_Priority_*` / `webrtc_kDefaultBitratePriority` を追加する
-  - Rust API に `NetworkPriority` / `default_bitrate_priority` と上記フィールドの getter / setter を追加する
-  - @voluntas
+  - Rust API に `Priority` / `default_bitrate_priority` と上記フィールドの getter / setter を追加する
+  - @voluntas, @melpon
 - [UPDATE] prebuilt アーカイブに C ヘッダーと Android 用 `webrtc.jar` を同梱する
   - `webrtc/src` 配下の `*.h` を `include/` 配下に同梱する
   - Android のアーカイブには `jar/webrtc.jar` も同梱する
