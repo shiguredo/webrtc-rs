@@ -62,6 +62,10 @@
   - C API `webrtc_FuzzyMatchSdpVideoFormat` / `webrtc_SdpVideoFormat_IsSameCodec` を追加する
   - Rust API `fuzzy_match_sdp_video_format` / `SdpVideoFormat::is_same_codec` を追加する
   - @melpon
+- [ADD] `RtpEncodingParameters` に `bitrate_priority` / `network_priority` / `request_key_frame` / `num_temporal_layers` を追加する
+  - C API に `webrtc_RtpEncodingParameters_*`（上記 4 フィールド用）と `webrtc_Priority_*` / `webrtc_kDefaultBitratePriority` を追加する
+  - Rust API に `NetworkPriority` / `default_bitrate_priority` と上記フィールドの getter / setter を追加する
+  - @voluntas
 - [UPDATE] prebuilt アーカイブに C ヘッダーと Android 用 `webrtc.jar` を同梱する
   - `webrtc/src` 配下の `*.h` を `include/` 配下に同梱する
   - Android のアーカイブには `jar/webrtc.jar` も同梱する

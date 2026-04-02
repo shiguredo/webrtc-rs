@@ -177,9 +177,49 @@ WEBRTC_EXPORT void webrtc_RtpEncodingParameters_set_codec(
     int has,
     const struct webrtc_RtpCodec* value);
 
+WEBRTC_EXPORT void webrtc_RtpEncodingParameters_get_bitrate_priority(
+    struct webrtc_RtpEncodingParameters* self,
+    double* out_value);
+WEBRTC_EXPORT void webrtc_RtpEncodingParameters_set_bitrate_priority(
+    struct webrtc_RtpEncodingParameters* self,
+    double value);
+
+WEBRTC_EXPORT void webrtc_RtpEncodingParameters_get_network_priority(
+    struct webrtc_RtpEncodingParameters* self,
+    int* out_value);
+WEBRTC_EXPORT void webrtc_RtpEncodingParameters_set_network_priority(
+    struct webrtc_RtpEncodingParameters* self,
+    int value);
+
+WEBRTC_EXPORT int webrtc_RtpEncodingParameters_get_request_key_frame(
+    struct webrtc_RtpEncodingParameters* self);
+WEBRTC_EXPORT void webrtc_RtpEncodingParameters_set_request_key_frame(
+    struct webrtc_RtpEncodingParameters* self,
+    int request_key_frame);
+
+WEBRTC_EXPORT void webrtc_RtpEncodingParameters_get_num_temporal_layers(
+    struct webrtc_RtpEncodingParameters* self,
+    int* out_has,
+    int* out_value);
+WEBRTC_EXPORT void webrtc_RtpEncodingParameters_set_num_temporal_layers(
+    struct webrtc_RtpEncodingParameters* self,
+    int has,
+    const int* value);
+
 WEBRTC_EXPORT struct webrtc_RtpEncodingParameters_vector*
 webrtc_RtpEncodingParameters_vector_clone(
     struct webrtc_RtpEncodingParameters_vector* src);
+
+// -------------------------
+// webrtc::Priority
+// -------------------------
+
+WEBRTC_EXPORT extern const int webrtc_Priority_kVeryLow;
+WEBRTC_EXPORT extern const int webrtc_Priority_kLow;
+WEBRTC_EXPORT extern const int webrtc_Priority_kMedium;
+WEBRTC_EXPORT extern const int webrtc_Priority_kHigh;
+
+WEBRTC_EXPORT extern const double webrtc_kDefaultBitratePriority;
 
 // -------------------------
 // webrtc::DegradationPreference
