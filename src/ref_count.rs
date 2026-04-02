@@ -281,6 +281,22 @@ impl RefCountedHandle for MediaStreamTrackHandle {
     }
 }
 
+pub(crate) struct MediaStreamHandle;
+impl RefCountedHandle for MediaStreamHandle {
+    type Refcounted = ffi::webrtc_MediaStreamInterface_refcounted;
+    type Raw = ffi::webrtc_MediaStreamInterface;
+
+    unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
+        unsafe { ffi::webrtc_MediaStreamInterface_refcounted_get(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *mut Self::Raw) {
+        unsafe { ffi::webrtc_MediaStreamInterface_AddRef(raw) };
+    }
+    unsafe fn release(raw: *mut Self::Raw) {
+        unsafe { ffi::webrtc_MediaStreamInterface_Release(raw) };
+    }
+}
+
 pub(crate) struct RtpReceiverHandle;
 impl RefCountedHandle for RtpReceiverHandle {
     type Refcounted = ffi::webrtc_RtpReceiverInterface_refcounted;
