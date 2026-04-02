@@ -4,9 +4,11 @@
 #include <stdint.h>
 #include <memory>
 #include <string>
+#include <vector>
 
 // WebRTC
 #include <api/media_stream_interface.h>
+#include <api/scoped_refptr.h>
 #include <api/video/video_frame.h>
 #include <api/video/video_sink_interface.h>
 #include <api/video/video_source_interface.h>
@@ -192,4 +194,111 @@ WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_MediaStreamTrackInterface,
                               webrtc_AudioTrackInterface,
                               webrtc::MediaStreamTrackInterface,
                               webrtc::AudioTrackInterface);
+
+// -------------------------
+// std::vector<scoped_refptr<webrtc::AudioTrackInterface>>
+// -------------------------
+
+WEBRTC_DEFINE_REFCOUNTED_VECTOR(webrtc_AudioTrackInterface,
+                                webrtc::AudioTrackInterface);
+
+// -------------------------
+// std::vector<scoped_refptr<webrtc::VideoTrackInterface>>
+// -------------------------
+
+WEBRTC_DEFINE_REFCOUNTED_VECTOR(webrtc_VideoTrackInterface,
+                                webrtc::VideoTrackInterface);
+
+// -------------------------
+// webrtc::MediaStreamInterface
+// -------------------------
+
+WEBRTC_DEFINE_REFCOUNTED(webrtc_MediaStreamInterface,
+                         webrtc::MediaStreamInterface);
+WEBRTC_EXPORT struct std_string_unique* webrtc_MediaStreamInterface_id(
+    struct webrtc_MediaStreamInterface* self) {
+  auto stream = reinterpret_cast<webrtc::MediaStreamInterface*>(self);
+  auto id = std::make_unique<std::string>(stream->id());
+  return reinterpret_cast<struct std_string_unique*>(id.release());
+}
+
+WEBRTC_EXPORT struct webrtc_AudioTrackInterface_refcounted_vector*
+webrtc_MediaStreamInterface_GetAudioTracks(
+    struct webrtc_MediaStreamInterface* self) {
+  auto stream = reinterpret_cast<webrtc::MediaStreamInterface*>(self);
+  auto tracks = new webrtc::AudioTrackVector(stream->GetAudioTracks());
+  return reinterpret_cast<struct webrtc_AudioTrackInterface_refcounted_vector*>(
+      tracks);
+}
+
+WEBRTC_EXPORT struct webrtc_VideoTrackInterface_refcounted_vector*
+webrtc_MediaStreamInterface_GetVideoTracks(
+    struct webrtc_MediaStreamInterface* self) {
+  auto stream = reinterpret_cast<webrtc::MediaStreamInterface*>(self);
+  auto tracks = new webrtc::VideoTrackVector(stream->GetVideoTracks());
+  return reinterpret_cast<struct webrtc_VideoTrackInterface_refcounted_vector*>(
+      tracks);
+}
+
+WEBRTC_EXPORT struct webrtc_AudioTrackInterface_refcounted*
+webrtc_MediaStreamInterface_FindAudioTrack(
+    struct webrtc_MediaStreamInterface* self,
+    const char* track_id,
+    size_t track_id_len) {
+  auto stream = reinterpret_cast<webrtc::MediaStreamInterface*>(self);
+  auto track = stream->FindAudioTrack(std::string(track_id, track_id_len));
+  return reinterpret_cast<struct webrtc_AudioTrackInterface_refcounted*>(
+      track.release());
+}
+
+WEBRTC_EXPORT struct webrtc_VideoTrackInterface_refcounted*
+webrtc_MediaStreamInterface_FindVideoTrack(
+    struct webrtc_MediaStreamInterface* self,
+    const char* track_id,
+    size_t track_id_len) {
+  auto stream = reinterpret_cast<webrtc::MediaStreamInterface*>(self);
+  auto track = stream->FindVideoTrack(std::string(track_id, track_id_len));
+  return reinterpret_cast<struct webrtc_VideoTrackInterface_refcounted*>(
+      track.release());
+}
+
+WEBRTC_EXPORT int8_t webrtc_MediaStreamInterface_AddTrackWithAudioTrack(
+    struct webrtc_MediaStreamInterface* self,
+    struct webrtc_AudioTrackInterface_refcounted* track) {
+  auto stream = reinterpret_cast<webrtc::MediaStreamInterface*>(self);
+  auto raw_track = webrtc_AudioTrackInterface_refcounted_get(track);
+  auto audio_track = reinterpret_cast<webrtc::AudioTrackInterface*>(raw_track);
+  webrtc::scoped_refptr<webrtc::AudioTrackInterface> track_ref(audio_track);
+  return stream->AddTrack(track_ref) ? 1 : 0;
+}
+
+WEBRTC_EXPORT int8_t webrtc_MediaStreamInterface_AddTrackWithVideoTrack(
+    struct webrtc_MediaStreamInterface* self,
+    struct webrtc_VideoTrackInterface_refcounted* track) {
+  auto stream = reinterpret_cast<webrtc::MediaStreamInterface*>(self);
+  auto raw_track = webrtc_VideoTrackInterface_refcounted_get(track);
+  auto video_track = reinterpret_cast<webrtc::VideoTrackInterface*>(raw_track);
+  webrtc::scoped_refptr<webrtc::VideoTrackInterface> track_ref(video_track);
+  return stream->AddTrack(track_ref) ? 1 : 0;
+}
+
+WEBRTC_EXPORT int8_t webrtc_MediaStreamInterface_RemoveTrackWithAudioTrack(
+    struct webrtc_MediaStreamInterface* self,
+    struct webrtc_AudioTrackInterface_refcounted* track) {
+  auto stream = reinterpret_cast<webrtc::MediaStreamInterface*>(self);
+  auto raw_track = webrtc_AudioTrackInterface_refcounted_get(track);
+  auto audio_track = reinterpret_cast<webrtc::AudioTrackInterface*>(raw_track);
+  webrtc::scoped_refptr<webrtc::AudioTrackInterface> track_ref(audio_track);
+  return stream->RemoveTrack(track_ref) ? 1 : 0;
+}
+
+WEBRTC_EXPORT int8_t webrtc_MediaStreamInterface_RemoveTrackWithVideoTrack(
+    struct webrtc_MediaStreamInterface* self,
+    struct webrtc_VideoTrackInterface_refcounted* track) {
+  auto stream = reinterpret_cast<webrtc::MediaStreamInterface*>(self);
+  auto raw_track = webrtc_VideoTrackInterface_refcounted_get(track);
+  auto video_track = reinterpret_cast<webrtc::VideoTrackInterface*>(raw_track);
+  webrtc::scoped_refptr<webrtc::VideoTrackInterface> track_ref(video_track);
+  return stream->RemoveTrack(track_ref) ? 1 : 0;
+}
 }

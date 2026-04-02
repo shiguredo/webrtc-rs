@@ -66,6 +66,11 @@
   - C API に `webrtc_RtpEncodingParameters_*`（上記 4 フィールド用）と `webrtc_Priority_*` / `webrtc_kDefaultBitratePriority` を追加する
   - Rust API に `Priority` / `default_bitrate_priority` と上記フィールドの getter / setter を追加する
   - @voluntas, @melpon
+- [ADD] `MediaStreamInterface` と `CreateLocalMediaStream` の C API / Rust API を追加する
+  - C API `webrtc_MediaStreamInterface_*` と `webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream` を追加する
+  - Rust API `MediaStream` と `PeerConnectionFactory::create_local_media_stream` を追加する
+  - `MediaStream` の `audio_tracks` / `video_tracks` / `find_*` / `add_*` / `remove_*` を追加する
+  - @melpon
 - [UPDATE] prebuilt アーカイブに C ヘッダーと Android 用 `webrtc.jar` を同梱する
   - `webrtc/src` 配下の `*.h` を `include/` 配下に同梱する
   - Android のアーカイブには `jar/webrtc.jar` も同梱する

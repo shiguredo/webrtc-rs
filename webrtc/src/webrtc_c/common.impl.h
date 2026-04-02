@@ -1,5 +1,9 @@
 #pragma once
 
+#include <vector>
+
+#include <api/scoped_refptr.h>
+
 #include "common.h"
 
 #define WEBRTC_DEFINE_CAST(type, cast_to, cpptype, cpp_cast_to)             \
@@ -137,6 +141,65 @@
     auto vec = reinterpret_cast<std::vector<cpptype>*>(self);             \
     auto cpp = reinterpret_cast<cpptype*>(value);                         \
     vec->push_back(*cpp);                                                 \
+  }
+
+// -------------------------
+// std::vector<webrtc::scoped_refptr<T>>
+// -------------------------
+
+#define WEBRTC_DEFINE_REFCOUNTED_VECTOR(type, cpptype)                        \
+  WEBRTC_EXPORT struct WEBRTC_CONCAT(type, _refcounted_vector) *              \
+      WEBRTC_CONCAT(type, _refcounted_vector_new)(int size) {                 \
+    auto vec = new std::vector<webrtc::scoped_refptr<cpptype>>(size);         \
+    return reinterpret_cast<struct WEBRTC_CONCAT(type, _refcounted_vector)*>( \
+        vec);                                                                 \
+  }                                                                           \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _refcounted_vector_delete)(          \
+      struct WEBRTC_CONCAT(type, _refcounted_vector) * self) {                \
+    auto vec =                                                                \
+        reinterpret_cast<std::vector<webrtc::scoped_refptr<cpptype>>*>(self); \
+    delete vec;                                                               \
+  }                                                                           \
+  WEBRTC_EXPORT struct WEBRTC_CONCAT(type, _refcounted) *                     \
+      WEBRTC_CONCAT(type, _refcounted_vector_get)(                            \
+          struct WEBRTC_CONCAT(type, _refcounted_vector) * self, int index) { \
+    auto vec =                                                                \
+        reinterpret_cast<std::vector<webrtc::scoped_refptr<cpptype>>*>(self); \
+    webrtc::scoped_refptr<cpptype> ref((*vec)[index]);                        \
+    return reinterpret_cast<struct WEBRTC_CONCAT(type, _refcounted)*>(        \
+        ref.release());                                                       \
+  }                                                                           \
+  WEBRTC_EXPORT int WEBRTC_CONCAT(type, _refcounted_vector_size)(             \
+      struct WEBRTC_CONCAT(type, _refcounted_vector) * self) {                \
+    auto vec =                                                                \
+        reinterpret_cast<std::vector<webrtc::scoped_refptr<cpptype>>*>(self); \
+    return static_cast<int>(vec->size());                                     \
+  }                                                                           \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _refcounted_vector_resize)(          \
+      struct WEBRTC_CONCAT(type, _refcounted_vector) * self, int size) {      \
+    auto vec =                                                                \
+        reinterpret_cast<std::vector<webrtc::scoped_refptr<cpptype>>*>(self); \
+    vec->resize(size);                                                        \
+  }                                                                           \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _refcounted_vector_set)(             \
+      struct WEBRTC_CONCAT(type, _refcounted_vector) * self, int index,       \
+      struct WEBRTC_CONCAT(type, _refcounted) * value) {                      \
+    auto vec =                                                                \
+        reinterpret_cast<std::vector<webrtc::scoped_refptr<cpptype>>*>(self); \
+    auto raw = WEBRTC_CONCAT(type, _refcounted_get)(value);                   \
+    auto cpp = reinterpret_cast<cpptype*>(raw);                               \
+    webrtc::scoped_refptr<cpptype> ref(cpp);                                  \
+    (*vec)[index] = ref;                                                      \
+  }                                                                           \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _refcounted_vector_push_back)(       \
+      struct WEBRTC_CONCAT(type, _refcounted_vector) * self,                  \
+      struct WEBRTC_CONCAT(type, _refcounted) * value) {                      \
+    auto vec =                                                                \
+        reinterpret_cast<std::vector<webrtc::scoped_refptr<cpptype>>*>(self); \
+    auto raw = WEBRTC_CONCAT(type, _refcounted_get)(value);                   \
+    auto cpp = reinterpret_cast<cpptype*>(raw);                               \
+    webrtc::scoped_refptr<cpptype> ref(cpp);                                  \
+    vec->push_back(ref);                                                      \
   }
 
 // -------------------------
