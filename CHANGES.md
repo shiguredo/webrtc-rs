@@ -16,6 +16,9 @@
   - C API `webrtc_I420Buffer_CreateWithStrides` / `webrtc_NV12Buffer_CreateWithStrides` を追加し、Rust API `new_with_strides` を利用できるようにする
   - Rust API `data` / `data_mut` を追加し、YUV プレーン全体を連続メモリとして扱えるようにする
   - @melpon
+- [ADD] libyuv の `i420_copy` / `nv12_copy` API を追加する
+  - C API `libyuv_I420Copy` / `libyuv_NV12Copy` を追加し、Rust API `i420_copy` / `nv12_copy` を利用できるようにする
+  - @melpon
 
 ## 0.147.0
 

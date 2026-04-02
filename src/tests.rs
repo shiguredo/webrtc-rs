@@ -1393,6 +1393,281 @@ fn i420_buffer_planes_mut_to_nv12_round_trip() {
 }
 
 #[test]
+fn i420_copy_with_odd_size_and_padding() {
+    let width = 5;
+    let height = 3;
+    let chroma_width = (width + 1) / 2;
+    let chroma_height = (height + 1) / 2;
+
+    let src_stride_y = 8;
+    let src_stride_u = 4;
+    let src_stride_v = 6;
+    let mut src_y = vec![0u8; (src_stride_y * height) as usize];
+    let mut src_u = vec![0u8; (src_stride_u * chroma_height) as usize];
+    let mut src_v = vec![0u8; (src_stride_v * chroma_height) as usize];
+
+    for row in 0..height as usize {
+        let row_begin = row * src_stride_y as usize;
+        let row_end = row_begin + width as usize;
+        for (col, px) in src_y[row_begin..row_end].iter_mut().enumerate() {
+            *px = (row as u8).wrapping_mul(13).wrapping_add(col as u8);
+        }
+    }
+    for row in 0..chroma_height as usize {
+        let row_begin = row * src_stride_u as usize;
+        let row_end = row_begin + chroma_width as usize;
+        for (col, px) in src_u[row_begin..row_end].iter_mut().enumerate() {
+            *px = 0x40u8
+                .wrapping_add((row as u8).wrapping_mul(7))
+                .wrapping_add(col as u8);
+        }
+    }
+    for row in 0..chroma_height as usize {
+        let row_begin = row * src_stride_v as usize;
+        let row_end = row_begin + chroma_width as usize;
+        for (col, px) in src_v[row_begin..row_end].iter_mut().enumerate() {
+            *px = 0x80u8
+                .wrapping_add((row as u8).wrapping_mul(11))
+                .wrapping_add(col as u8);
+        }
+    }
+
+    let dst_stride_y = 9;
+    let dst_stride_u = 5;
+    let dst_stride_v = 7;
+    let mut dst_y = vec![0u8; (dst_stride_y * height) as usize];
+    let mut dst_u = vec![0u8; (dst_stride_u * chroma_height) as usize];
+    let mut dst_v = vec![0u8; (dst_stride_v * chroma_height) as usize];
+    assert!(i420_copy(
+        &src_y,
+        src_stride_y,
+        &src_u,
+        src_stride_u,
+        &src_v,
+        src_stride_v,
+        &mut dst_y,
+        dst_stride_y,
+        &mut dst_u,
+        dst_stride_u,
+        &mut dst_v,
+        dst_stride_v,
+        width,
+        height,
+    ));
+
+    let assert_plane_eq =
+        |lhs: &[u8], lhs_stride: i32, rhs: &[u8], rhs_stride: i32, row_bytes: i32, rows: i32| {
+            let lhs_stride = lhs_stride as usize;
+            let rhs_stride = rhs_stride as usize;
+            let row_bytes = row_bytes as usize;
+            let rows = rows as usize;
+            for row in 0..rows {
+                let lhs_begin = row * lhs_stride;
+                let lhs_end = lhs_begin + row_bytes;
+                let rhs_begin = row * rhs_stride;
+                let rhs_end = rhs_begin + row_bytes;
+                assert_eq!(lhs[lhs_begin..lhs_end], rhs[rhs_begin..rhs_end]);
+            }
+        };
+
+    assert_plane_eq(&src_y, src_stride_y, &dst_y, dst_stride_y, width, height);
+    assert_plane_eq(
+        &src_u,
+        src_stride_u,
+        &dst_u,
+        dst_stride_u,
+        chroma_width,
+        chroma_height,
+    );
+    assert_plane_eq(
+        &src_v,
+        src_stride_v,
+        &dst_v,
+        dst_stride_v,
+        chroma_width,
+        chroma_height,
+    );
+}
+
+#[test]
+fn i420_copy_returns_false_when_source_plane_is_too_short() {
+    let width = 4;
+    let height = 4;
+    let src_y = vec![0u8; (width * height) as usize];
+    let src_u = vec![0u8; ((width / 2) * (height / 2) - 1) as usize];
+    let src_v = vec![0u8; ((width / 2) * (height / 2)) as usize];
+    let mut dst_y = vec![0u8; (width * height) as usize];
+    let mut dst_u = vec![0u8; ((width / 2) * (height / 2)) as usize];
+    let mut dst_v = vec![0u8; ((width / 2) * (height / 2)) as usize];
+
+    assert!(!i420_copy(
+        &src_y,
+        width,
+        &src_u,
+        width / 2,
+        &src_v,
+        width / 2,
+        &mut dst_y,
+        width,
+        &mut dst_u,
+        width / 2,
+        &mut dst_v,
+        width / 2,
+        width,
+        height,
+    ));
+}
+
+#[test]
+fn i420_copy_returns_false_when_destination_plane_is_too_short() {
+    let width = 4;
+    let height = 4;
+    let src_y = vec![0u8; (width * height) as usize];
+    let src_u = vec![0u8; ((width / 2) * (height / 2)) as usize];
+    let src_v = vec![0u8; ((width / 2) * (height / 2)) as usize];
+    let mut dst_y = vec![0u8; (width * height) as usize];
+    let mut dst_u = vec![0u8; ((width / 2) * (height / 2)) as usize];
+    let mut dst_v = vec![0u8; ((width / 2) * (height / 2) - 1) as usize];
+
+    assert!(!i420_copy(
+        &src_y,
+        width,
+        &src_u,
+        width / 2,
+        &src_v,
+        width / 2,
+        &mut dst_y,
+        width,
+        &mut dst_u,
+        width / 2,
+        &mut dst_v,
+        width / 2,
+        width,
+        height,
+    ));
+}
+
+#[test]
+fn nv12_copy_with_odd_size_and_padding() {
+    let width = 5;
+    let height = 3;
+    let chroma_width = (width + 1) / 2;
+    let chroma_height = (height + 1) / 2;
+    let uv_row_bytes = chroma_width * 2;
+
+    let src_stride_y = 8;
+    let src_stride_uv = 10;
+    let mut src_y = vec![0u8; (src_stride_y * height) as usize];
+    let mut src_uv = vec![0u8; (src_stride_uv * chroma_height) as usize];
+    for row in 0..height as usize {
+        let row_begin = row * src_stride_y as usize;
+        let row_end = row_begin + width as usize;
+        for (col, px) in src_y[row_begin..row_end].iter_mut().enumerate() {
+            *px = 0x20u8
+                .wrapping_add((row as u8).wrapping_mul(9))
+                .wrapping_add(col as u8);
+        }
+    }
+    for row in 0..chroma_height as usize {
+        let row_begin = row * src_stride_uv as usize;
+        let row_end = row_begin + uv_row_bytes as usize;
+        for (col, px) in src_uv[row_begin..row_end].iter_mut().enumerate() {
+            *px = 0x60u8
+                .wrapping_add((row as u8).wrapping_mul(5))
+                .wrapping_add(col as u8);
+        }
+    }
+
+    let dst_stride_y = 9;
+    let dst_stride_uv = 11;
+    let mut dst_y = vec![0u8; (dst_stride_y * height) as usize];
+    let mut dst_uv = vec![0u8; (dst_stride_uv * chroma_height) as usize];
+    assert!(nv12_copy(
+        &src_y,
+        src_stride_y,
+        &src_uv,
+        src_stride_uv,
+        &mut dst_y,
+        dst_stride_y,
+        &mut dst_uv,
+        dst_stride_uv,
+        width,
+        height,
+    ));
+
+    let assert_plane_eq =
+        |lhs: &[u8], lhs_stride: i32, rhs: &[u8], rhs_stride: i32, row_bytes: i32, rows: i32| {
+            let lhs_stride = lhs_stride as usize;
+            let rhs_stride = rhs_stride as usize;
+            let row_bytes = row_bytes as usize;
+            let rows = rows as usize;
+            for row in 0..rows {
+                let lhs_begin = row * lhs_stride;
+                let lhs_end = lhs_begin + row_bytes;
+                let rhs_begin = row * rhs_stride;
+                let rhs_end = rhs_begin + row_bytes;
+                assert_eq!(lhs[lhs_begin..lhs_end], rhs[rhs_begin..rhs_end]);
+            }
+        };
+
+    assert_plane_eq(&src_y, src_stride_y, &dst_y, dst_stride_y, width, height);
+    assert_plane_eq(
+        &src_uv,
+        src_stride_uv,
+        &dst_uv,
+        dst_stride_uv,
+        uv_row_bytes,
+        chroma_height,
+    );
+}
+
+#[test]
+fn nv12_copy_returns_false_when_source_plane_is_too_short() {
+    let width = 4;
+    let height = 4;
+    let src_y = vec![0u8; (width * height) as usize];
+    let src_uv = vec![0u8; (width * (height / 2) - 1) as usize];
+    let mut dst_y = vec![0u8; (width * height) as usize];
+    let mut dst_uv = vec![0u8; (width * (height / 2)) as usize];
+
+    assert!(!nv12_copy(
+        &src_y,
+        width,
+        &src_uv,
+        width,
+        &mut dst_y,
+        width,
+        &mut dst_uv,
+        width,
+        width,
+        height,
+    ));
+}
+
+#[test]
+fn nv12_copy_returns_false_when_destination_plane_is_too_short() {
+    let width = 4;
+    let height = 4;
+    let src_y = vec![0u8; (width * height) as usize];
+    let src_uv = vec![0u8; (width * (height / 2)) as usize];
+    let mut dst_y = vec![0u8; (width * height) as usize];
+    let mut dst_uv = vec![0u8; (width * (height / 2) - 1) as usize];
+
+    assert!(!nv12_copy(
+        &src_y,
+        width,
+        &src_uv,
+        width,
+        &mut dst_y,
+        width,
+        &mut dst_uv,
+        width,
+        width,
+        height,
+    ));
+}
+
+#[test]
 fn logging_functions_are_callable() {
     // severity は 0 にしておく。実際のログ内容は検証しない。
     log::log_to_debug(log::Severity::Info);

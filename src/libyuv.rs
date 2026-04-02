@@ -138,6 +138,105 @@ pub fn i420_to_nv12(
     }
 }
 
+/// `libyuv::I420Copy` を呼び出して、I420 を I420 へコピーする。
+/// コピーに失敗した場合は `false` を返す。
+#[allow(clippy::too_many_arguments)]
+pub fn i420_copy(
+    src_y: &[u8],
+    src_stride_y: i32,
+    src_u: &[u8],
+    src_stride_u: i32,
+    src_v: &[u8],
+    src_stride_v: i32,
+    dst_y: &mut [u8],
+    dst_stride_y: i32,
+    dst_u: &mut [u8],
+    dst_stride_u: i32,
+    dst_v: &mut [u8],
+    dst_stride_v: i32,
+    width: i32,
+    height: i32,
+) -> bool {
+    let Some((chroma_width, chroma_height)) = i420_chroma_size(width, height) else {
+        return false;
+    };
+
+    if !has_required_len(src_y.len(), src_stride_y, height, width)
+        || !has_required_len(src_u.len(), src_stride_u, chroma_height, chroma_width)
+        || !has_required_len(src_v.len(), src_stride_v, chroma_height, chroma_width)
+        || !has_required_len(dst_y.len(), dst_stride_y, height, width)
+        || !has_required_len(dst_u.len(), dst_stride_u, chroma_height, chroma_width)
+        || !has_required_len(dst_v.len(), dst_stride_v, chroma_height, chroma_width)
+    {
+        return false;
+    }
+
+    unsafe {
+        ffi::libyuv_I420Copy(
+            src_y.as_ptr(),
+            src_stride_y,
+            src_u.as_ptr(),
+            src_stride_u,
+            src_v.as_ptr(),
+            src_stride_v,
+            dst_y.as_mut_ptr(),
+            dst_stride_y,
+            dst_u.as_mut_ptr(),
+            dst_stride_u,
+            dst_v.as_mut_ptr(),
+            dst_stride_v,
+            width,
+            height,
+        ) == 0
+    }
+}
+
+/// `libyuv::NV12Copy` を呼び出して、NV12 を NV12 へコピーする。
+/// コピーに失敗した場合は `false` を返す。
+#[allow(clippy::too_many_arguments)]
+pub fn nv12_copy(
+    src_y: &[u8],
+    src_stride_y: i32,
+    src_uv: &[u8],
+    src_stride_uv: i32,
+    dst_y: &mut [u8],
+    dst_stride_y: i32,
+    dst_uv: &mut [u8],
+    dst_stride_uv: i32,
+    width: i32,
+    height: i32,
+) -> bool {
+    let Some((chroma_width, chroma_height)) = i420_chroma_size(width, height) else {
+        return false;
+    };
+    let Some(uv_row_bytes) = chroma_width.checked_mul(2) else {
+        return false;
+    };
+
+    if !has_required_len(src_y.len(), src_stride_y, height, width)
+        || !has_required_len(src_uv.len(), src_stride_uv, chroma_height, uv_row_bytes)
+        || !has_required_len(dst_y.len(), dst_stride_y, height, width)
+        || !has_required_len(dst_uv.len(), dst_stride_uv, chroma_height, uv_row_bytes)
+    {
+        return false;
+    }
+
+    unsafe {
+        ffi::libyuv_NV12Copy(
+            src_y.as_ptr(),
+            src_stride_y,
+            src_uv.as_ptr(),
+            src_stride_uv,
+            dst_y.as_mut_ptr(),
+            dst_stride_y,
+            dst_uv.as_mut_ptr(),
+            dst_stride_uv,
+            width,
+            height,
+        ) == 0
+    }
+}
+
 /// `libyuv::ABGRToI420` を呼び出して、ABGR から I420 へ変換する。
 /// 変換に失敗した場合は `false` を返す。
 #[allow(clippy::too_many_arguments)]
