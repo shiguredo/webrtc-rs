@@ -12,6 +12,73 @@
 ## develop
 
 - [UPDATE] libwebrtc m147 (m147.7727.8.0) に上げる
+- [CHANGE] `VideoFrame` の生成 API を `VideoFrameBuffer` ベースに変更する
+  - `VideoFrameBuffer` / `VideoFrameBufferHandler` を追加し、Rust 実装の native バッファを `kNative` として扱えるようにする
+  - `VideoFrameBufferKind` と `VideoFrameBuffer::kind` / `VideoFrameBufferHandler::kind` を追加し、バッファ種別を Rust 側で扱えるようにする
+  - `VideoFrameBuffer::crop_and_scale` / `VideoFrameBuffer::scale` と `VideoFrameBufferHandler::crop_and_scale` を追加し、Rust 側で `CropAndScale` / `Scale` を利用できるようにする
+  - C API `webrtc_VideoFrameBuffer_get_user_data` と `webrtc_VideoFrameBuffer_cast_to_webrtc_I420Buffer` / `webrtc_VideoFrameBuffer_cast_to_webrtc_NV12Buffer` を追加する
+  - Rust 側で `VideoFrameBuffer::as_native_ref` / `VideoFrameBuffer::as_native_mut` / `VideoFrameBuffer::as_i420` / `VideoFrameBuffer::as_nv12` を追加する
+  - `VideoFrame::from_i420` を削除し、`VideoFrame::from_buffer` を追加する
+  - `VideoFrame::buffer` / `VideoFrameRef::buffer` の戻り値を `VideoFrameBuffer` に変更する
+  - @melpon
+- [CHANGE] `VideoFrame` の生成 API を builder 必須に変更する
+  - `VideoFrame::from_buffer` を削除し、`VideoFrame::builder(&VideoFrameBuffer)` を追加する
+  - C API `webrtc_VideoFrame_Create` を削除し、`webrtc_VideoFrameBuilder_*` 経由の生成に統一する
+  - `VideoFrameBuilder` を追加し、`set_video_frame_buffer` を持たない C++ `VideoFrame::Builder` 準拠の setter を提供する
+  - `VideoFrameUpdateRect` を C API 経由の独立クラスとして追加し、builder / getter と連携できるようにする
+  - C API の `webrtc_VideoFrameBuilder` / `webrtc_VideoFrame_UpdateRect` の所有を `*_unique` ベースへ統一する
+  - `webrtc_VideoRotation_*` の C API 定義を `video_frame` から `video_rotation` へ分離する
+  - `ColorSpace` を追加し、`new` と `AsString` を Rust API から利用できるようにする
+  - `VideoFrame` / `VideoFrameRef` に `id` / `ntp_time_ms` / `presentation_timestamp` / `reference_time` / `rotation` / `color_space` / `update_rect` / `is_repeat_frame` getter を追加する
+  - @melpon
+- [CHANGE] `libyuv` 変換 API を平面スライス中心に変更する
+  - `convert_from_i420` / `i420_to_nv12` / `abgr_to_i420` / `nv12_to_i420` / `yuy2_to_i420` の出力を `&mut [u8]` と `dst_stride_*` 引数で受ける形式に変更する
+  - `convert_from_i420` / `i420_to_nv12` / `abgr_to_i420` / `nv12_to_i420` / `yuy2_to_i420` の戻り値を `bool` に変更する
+  - 各変換 API の引数順を libyuv の C API と 1 対 1 になるように統一する
+  - @melpon
+- [UPDATE] libwebrtc m146 (m146.7680.5.0) に上げる
+  - @voluntas
+- [ADD] `NV12Buffer` と関連バッファ API を追加する
+  - `NV12Buffer` を追加し、`y_data` / `uv_data` の参照と `crop_and_scale_from` を利用できるようにする
+  - `NV12Buffer` から `VideoFrameBuffer` への変換と `kind == Nv12` の取り扱いを追加する
+  - `I420Buffer` / `NV12Buffer` の C API と Rust API から、4:2:0 の chroma 解像度を切り上げ半分で取得できるようにする
+  - `I420Buffer::planes_mut` と `NV12Buffer::planes_mut` を追加し、複数プレーンを同時に可変借用できるようにする
+  - `u_data` / `v_data` / `uv_data` の平面長計算を `chroma_height` 利用へ統一する
+  - @melpon
+- [ADD] `VideoFrame` の複製 API を追加する
+  - C API `webrtc_VideoFrame_copy` を追加する
+  - Rust 側で `VideoFrame: Clone` と `VideoFrameRef::to_owned` を追加する
+  - @melpon
+- [ADD] Apple 向け ObjC ビデオファクトリの API を追加する
+  - C API `webrtc_objc_RTCDefaultVideoEncoderFactory_new` / `webrtc_objc_RTCVideoEncoderFactory_release` / `webrtc_ObjCToNativeVideoEncoderFactory` を追加する
+  - C API `webrtc_objc_RTCDefaultVideoDecoderFactory_new` / `webrtc_objc_RTCVideoDecoderFactory_release` / `webrtc_ObjCToNativeVideoDecoderFactory` を追加する
+  - Rust API `VideoEncoderFactory::from_objc_default` / `VideoDecoderFactory::from_objc_default` を追加する
+  - macOS / iOS で Objective-C++ 実装を有効化し、非 Apple では `nullptr` / no-op のスタブを返すようにする
+  - @melpon
+- [ADD] Android 向けビデオファクトリの API を追加する
+  - C API `jni_JNIEnv_GetMethodID` / `jni_JNIEnv_NewObjectA` / `webrtc_GetClass` / `webrtc_JavaToNativeVideoEncoderFactory` / `webrtc_JavaToNativeVideoDecoderFactory` を追加する
+  - Rust API `VideoEncoderFactory::from_android_default` / `VideoDecoderFactory::from_android_default` を追加する
+  - @melpon
+- [ADD] `SdpVideoFormat` の codec 判定と fuzzy match API を追加する
+  - C API `webrtc_FuzzyMatchSdpVideoFormat` / `webrtc_SdpVideoFormat_IsSameCodec` を追加する
+  - Rust API `fuzzy_match_sdp_video_format` / `SdpVideoFormat::is_same_codec` を追加する
+  - @melpon
+- [ADD] `RtpEncodingParameters` に `bitrate_priority` / `network_priority` / `request_key_frame` / `num_temporal_layers` を追加する
+  - C API に `webrtc_RtpEncodingParameters_*`（上記 4 フィールド用）と `webrtc_Priority_*` / `webrtc_kDefaultBitratePriority` を追加する
+  - Rust API に `Priority` / `default_bitrate_priority` と上記フィールドの getter / setter を追加する
+  - @voluntas, @melpon
+- [UPDATE] prebuilt アーカイブに C ヘッダーと Android 用 `webrtc.jar` を同梱する
+  - `webrtc/src` 配下の `*.h` を `include/` 配下に同梱する
+  - Android のアーカイブには `jar/webrtc.jar` も同梱する
+  - @melpon
+- [FIX] Apple 向け static library バンドル時に Objective-C カテゴリ実装メンバーを集約して、利用者へ `-ObjC` フラグを要求しないようにする
+  - @melpon
+
+## 0.146.2
+
+**リリース日**: 2026-03-27
+
+- [ADD] `PeerConnectionFactory::get_rtp_receiver_capabilities` を追加する
   - @voluntas
 - [UPDATE] iOS / Android 向け CMake プラットフォーム値を Cargo.toml から取得する
   - `CMAKE_OSX_DEPLOYMENT_TARGET` と `ANDROID_PLATFORM` の固定値を `package.metadata.build-config` に移動する
@@ -30,6 +97,12 @@
   - `QpThresholds` / `ScalingSettings` / `ResolutionBitrateLimits` / `Resolution` を追加する
   - `ToString` / `GetEncoderBitrateLimitsForResolution` を追加する
   - `fps_allocation` / `preferred_pixel_formats` / optional フィールド操作を追加する
+  - @melpon
+- [ADD] Android / iOS のネイティブ API 呼び出しを 1 対 1 の C API として追加する
+  - Android は `jvm` ラッパー (`webrtc_jni_*`) と `jni_export` ラッパー (`jni_*`) を分離し、`libwebrtc` の公開経路を維持する
+  - iOS は `objc.{h,mm}` で標準ライブラリの関数と定数の C API を追加する
+  - `webrtc_InitClassLoader` / `webrtc_CreateJavaAudioDeviceModule` を追加する
+  - `webrtc_objc_RTCAudioSession*` / `webrtc_objc_RTCAudioSessionConfiguration*` の C API を追加する
   - @melpon
 - [CHANGE] AudioDeviceModule の `AudioParameters` / `Stats` C API を C++ の opaque API に変更する
   - `webrtc_AudioParameters` / `webrtc_AudioDeviceModule_Stats` の公開 field を廃止する

@@ -24,12 +24,8 @@ hooks = [
   {
     id = "clang-format",
     name = "clang-format",
-    entry = "clang-format --dry-run --Werror",
+    entry = "python3 webrtc/run.py format --check",
     language = "system",
-    types_or = [
-      "c",
-      "c++"
-    ],
-    files = "^webrtc/src/"
+    pass_filenames = false
   }
 ]

@@ -7,7 +7,9 @@
 // libyuv
 #include <libyuv/convert.h>
 #include <libyuv/convert_from.h>
+#include <libyuv/rotate.h>
 #include <libyuv/video_common.h>
+
 #include "common.h"
 
 // -------------------------
@@ -15,6 +17,12 @@
 // -------------------------
 
 extern "C" {
+
+WEBRTC_EXPORT const uint32_t libyuv_FOURCC_ARGB =
+    static_cast<uint32_t>(libyuv::FOURCC_ARGB);
+WEBRTC_EXPORT const uint32_t libyuv_FOURCC_BGRA =
+    static_cast<uint32_t>(libyuv::FOURCC_BGRA);
+
 WEBRTC_EXPORT int libyuv_ABGRToI420(const uint8_t* src_abgr,
                                     int src_stride_abgr,
                                     uint8_t* dst_y,
@@ -29,11 +37,6 @@ WEBRTC_EXPORT int libyuv_ABGRToI420(const uint8_t* src_abgr,
                             dst_u, dst_stride_u, dst_v, dst_stride_v, width,
                             height);
 }
-WEBRTC_EXPORT const uint32_t libyuv_FOURCC_ARGB =
-    static_cast<uint32_t>(libyuv::FOURCC_ARGB);
-WEBRTC_EXPORT const uint32_t libyuv_FOURCC_BGRA =
-    static_cast<uint32_t>(libyuv::FOURCC_BGRA);
-
 WEBRTC_EXPORT int libyuv_ConvertFromI420(const uint8_t* src_y,
                                          int src_stride_y,
                                          const uint8_t* src_u,
@@ -97,5 +100,26 @@ WEBRTC_EXPORT int libyuv_YUY2ToI420(const uint8_t* src_yuy2,
   return libyuv::YUY2ToI420(src_yuy2, src_stride_yuy2, dst_y, dst_stride_y,
                             dst_u, dst_stride_u, dst_v, dst_stride_v, width,
                             height);
+}
+
+WEBRTC_EXPORT int libyuv_I420Rotate(const uint8_t* src_y,
+                                    int src_stride_y,
+                                    const uint8_t* src_u,
+                                    int src_stride_u,
+                                    const uint8_t* src_v,
+                                    int src_stride_v,
+                                    uint8_t* dst_y,
+                                    int dst_stride_y,
+                                    uint8_t* dst_u,
+                                    int dst_stride_u,
+                                    uint8_t* dst_v,
+                                    int dst_stride_v,
+                                    int width,
+                                    int height,
+                                    int mode) {
+  return libyuv::I420Rotate(src_y, src_stride_y, src_u, src_stride_u, src_v,
+                            src_stride_v, dst_y, dst_stride_y, dst_u,
+                            dst_stride_u, dst_v, dst_stride_v, width, height,
+                            (libyuv::RotationMode)mode);
 }
 }

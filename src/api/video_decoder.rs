@@ -493,6 +493,82 @@ impl VideoDecoderFactory {
         Self { raw_unique: raw }
     }
 
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    pub fn from_objc_default() -> Option<Self> {
+        let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoDecoderFactory_new() };
+        if objc_factory.is_null() {
+            return None;
+        }
+
+        let raw_unique = unsafe { ffi::webrtc_ObjCToNativeVideoDecoderFactory(objc_factory) };
+        unsafe { ffi::webrtc_objc_RTCVideoDecoderFactory_release(objc_factory) };
+        let raw_unique = NonNull::new(raw_unique)?;
+        Some(Self { raw_unique })
+    }
+
+    #[cfg(target_os = "android")]
+    pub fn from_android_default() -> Option<Self> {
+        let env = unsafe { ffi::webrtc_jni_AttachCurrentThreadIfNeeded() };
+        if env.is_null() {
+            return None;
+        }
+
+        let class = unsafe {
+            ffi::webrtc_GetClass(
+                env,
+                b"org/webrtc/DefaultVideoDecoderFactory\0".as_ptr().cast(),
+            )
+        };
+        if class.is_null() {
+            if unsafe { ffi::jni_JNIEnv_ExceptionCheck(env) != 0 } {
+                unsafe { ffi::jni_JNIEnv_ExceptionClear(env) };
+            }
+            return None;
+        }
+
+        let ctor = unsafe {
+            ffi::jni_JNIEnv_GetMethodID(
+                env,
+                class,
+                b"<init>\0".as_ptr().cast(),
+                b"(Lorg/webrtc/EglBase$Context;)V\0".as_ptr().cast(),
+            )
+        };
+        if ctor.is_null() {
+            unsafe { ffi::jni_JNIEnv_DeleteLocalRef(env, class) };
+            if unsafe { ffi::jni_JNIEnv_ExceptionCheck(env) != 0 } {
+                unsafe { ffi::jni_JNIEnv_ExceptionClear(env) };
+            }
+            return None;
+        }
+
+        let mut args: [ffi::jvalue; 1] = unsafe { std::mem::zeroed() };
+        args[0].l = std::ptr::null_mut();
+        let decoder_factory =
+            unsafe { ffi::jni_JNIEnv_NewObjectA(env, class, ctor, args.as_ptr()) };
+        if decoder_factory.is_null() {
+            unsafe { ffi::jni_JNIEnv_DeleteLocalRef(env, class) };
+            if unsafe { ffi::jni_JNIEnv_ExceptionCheck(env) != 0 } {
+                unsafe { ffi::jni_JNIEnv_ExceptionClear(env) };
+            }
+            return None;
+        }
+
+        let raw_unique =
+            unsafe { ffi::webrtc_JavaToNativeVideoDecoderFactory(env, decoder_factory) };
+        unsafe {
+            ffi::jni_JNIEnv_DeleteLocalRef(env, decoder_factory);
+            ffi::jni_JNIEnv_DeleteLocalRef(env, class);
+        }
+        if unsafe { ffi::jni_JNIEnv_ExceptionCheck(env) != 0 } {
+            unsafe { ffi::jni_JNIEnv_ExceptionClear(env) };
+            return None;
+        }
+
+        let raw_unique = NonNull::new(raw_unique)?;
+        Some(Self { raw_unique })
+    }
+
     pub fn new_with_handler(handler: Box<dyn VideoDecoderFactoryHandler>) -> Self {
         let state = Box::new(VideoDecoderFactoryHandlerState { handler });
         let user_data = Box::into_raw(state) as *mut c_void;

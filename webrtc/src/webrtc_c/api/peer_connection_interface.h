@@ -423,6 +423,10 @@ WEBRTC_EXPORT struct webrtc_RtpCapabilities*
 webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities(
     struct webrtc_PeerConnectionFactoryInterface* self,
     int media_type);
+WEBRTC_EXPORT struct webrtc_RtpCapabilities*
+webrtc_PeerConnectionFactoryInterface_GetRtpReceiverCapabilities(
+    struct webrtc_PeerConnectionFactoryInterface* self,
+    int media_type);
 
 struct webrtc_PeerConnectionFactoryInterface_Options;
 WEBRTC_EXPORT struct webrtc_PeerConnectionFactoryInterface_Options*

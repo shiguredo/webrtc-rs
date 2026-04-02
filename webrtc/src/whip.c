@@ -70,6 +70,27 @@ static int whip_RtpCodecCapability_is_same_format(
                                       whip_RtpCodecCapability_cast(rhs));
 }
 
+static struct webrtc_VideoFrame_unique* whip_VideoFrame_build(
+    struct webrtc_VideoFrameBuffer_refcounted* buffer,
+    int rotation,
+    int64_t timestamp_us,
+    uint32_t timestamp_rtp) {
+  struct webrtc_VideoFrameBuilder_unique* builder =
+      webrtc_VideoFrameBuilder_new(buffer);
+  if (builder == NULL) {
+    return NULL;
+  }
+  struct webrtc_VideoFrameBuilder* builder_raw =
+      webrtc_VideoFrameBuilder_unique_get(builder);
+  webrtc_VideoFrameBuilder_set_rotation(builder_raw, rotation);
+  webrtc_VideoFrameBuilder_set_timestamp_us(builder_raw, timestamp_us);
+  webrtc_VideoFrameBuilder_set_timestamp_rtp(builder_raw, timestamp_rtp);
+  struct webrtc_VideoFrame_unique* frame =
+      webrtc_VideoFrameBuilder_build(builder_raw);
+  webrtc_VideoFrameBuilder_unique_delete(builder);
+  return frame;
+}
+
 static void whip_OnSendRequestResponse(char* resp, void* user_data);
 
 struct PeerConnectionFactory {
@@ -343,8 +364,12 @@ void* _FakeVideoCapturer_CaptureThread(void* arg) {
     }
 
     int64_t timestamp_us = (now_ms - cap->start_time_ms) * 1000;
-    struct webrtc_VideoFrame_unique* frame = webrtc_VideoFrame_Create(
-        buffer, webrtc_VideoRotation_0, timestamp_us, 0);
+    struct webrtc_VideoFrameBuffer_refcounted* buffer_for_frame =
+        webrtc_I420Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer(buffer);
+    struct webrtc_VideoFrame_unique* frame = whip_VideoFrame_build(
+        buffer_for_frame, webrtc_VideoRotation_0, timestamp_us, 0);
+    webrtc_VideoFrameBuffer_Release(
+        webrtc_VideoFrameBuffer_refcounted_get(buffer_for_frame));
     webrtc_I420Buffer_Release(webrtc_I420Buffer_refcounted_get(buffer));
 
     int adapted_width;
@@ -369,21 +394,34 @@ void* _FakeVideoCapturer_CaptureThread(void* arg) {
             webrtc_VideoFrame_width(webrtc_VideoFrame_unique_get(frame)) ||
         adapted_height !=
             webrtc_VideoFrame_height(webrtc_VideoFrame_unique_get(frame))) {
-      struct webrtc_I420Buffer_refcounted* buf =
+      struct webrtc_VideoFrameBuffer_refcounted* frame_buf =
           webrtc_VideoFrame_video_frame_buffer(
               webrtc_VideoFrame_unique_get(frame));
+      struct webrtc_I420Buffer_refcounted* buf = webrtc_VideoFrameBuffer_ToI420(
+          webrtc_VideoFrameBuffer_refcounted_get(frame_buf));
+      webrtc_VideoFrameBuffer_Release(
+          webrtc_VideoFrameBuffer_refcounted_get(frame_buf));
+      if (buf == NULL) {
+        webrtc_VideoFrame_unique_delete(frame);
+        webrtc_Thread_SleepMs(1);
+        continue;
+      }
       struct webrtc_I420Buffer_refcounted* scaled =
           webrtc_I420Buffer_Create(adapted_width, adapted_height);
       webrtc_I420Buffer_ScaleFrom(webrtc_I420Buffer_refcounted_get(scaled),
                                   webrtc_I420Buffer_refcounted_get(buf));
       webrtc_I420Buffer_Release(webrtc_I420Buffer_refcounted_get(buf));
       webrtc_VideoFrame_unique_delete(frame);
-      frame = webrtc_VideoFrame_Create(
-          scaled, webrtc_VideoRotation_0,
+      struct webrtc_VideoFrameBuffer_refcounted* scaled_for_frame =
+          webrtc_I420Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer(scaled);
+      frame = whip_VideoFrame_build(
+          scaled_for_frame, webrtc_VideoRotation_0,
           webrtc_TimestampAligner_TranslateTimestamp(
               webrtc_TimestampAligner_unique_get(cap->timestamp_aligner),
               timestamp_us, webrtc_TimeMillis() * 1000),
           0);
+      webrtc_VideoFrameBuffer_Release(
+          webrtc_VideoFrameBuffer_refcounted_get(scaled_for_frame));
       webrtc_I420Buffer_Release(webrtc_I420Buffer_refcounted_get(scaled));
     } else {
       // 翻訳したタイムスタンプに差し替え
@@ -391,12 +429,26 @@ void* _FakeVideoCapturer_CaptureThread(void* arg) {
           webrtc_TimestampAligner_unique_get(cap->timestamp_aligner),
           timestamp_us, webrtc_TimeMillis() * 1000);
       // VideoFrame は再生成
-      struct webrtc_I420Buffer_refcounted* buf =
+      struct webrtc_VideoFrameBuffer_refcounted* frame_buf =
           webrtc_VideoFrame_video_frame_buffer(
               webrtc_VideoFrame_unique_get(frame));
+      struct webrtc_I420Buffer_refcounted* buf = webrtc_VideoFrameBuffer_ToI420(
+          webrtc_VideoFrameBuffer_refcounted_get(frame_buf));
+      webrtc_VideoFrameBuffer_Release(
+          webrtc_VideoFrameBuffer_refcounted_get(frame_buf));
+      if (buf == NULL) {
+        webrtc_VideoFrame_unique_delete(frame);
+        webrtc_Thread_SleepMs(1);
+        continue;
+      }
       webrtc_VideoFrame_unique_delete(frame);
+      struct webrtc_VideoFrameBuffer_refcounted* buf_for_frame =
+          webrtc_I420Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer(buf);
       frame =
-          webrtc_VideoFrame_Create(buf, webrtc_VideoRotation_0, translated, 0);
+          whip_VideoFrame_build(buf_for_frame, webrtc_VideoRotation_0,
+                                translated, 0);
+      webrtc_VideoFrameBuffer_Release(
+          webrtc_VideoFrameBuffer_refcounted_get(buf_for_frame));
       webrtc_I420Buffer_Release(webrtc_I420Buffer_refcounted_get(buf));
     }
 

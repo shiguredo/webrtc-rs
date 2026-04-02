@@ -82,9 +82,15 @@ jobs:
             exit 1
           fi
           echo "OUT_DIR: $OUT_DIR"
-          mkdir -p staging/lib
+          mkdir -p staging/lib staging/include
           cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
           cp "$OUT_DIR/bindings.rs" staging/
+          while IFS= read -r -d '' header; do
+            rel_path="${header#webrtc/src/}"
+            dest_path="staging/include/${rel_path}"
+            mkdir -p "$(dirname "$dest_path")"
+            cp "$header" "$dest_path"
+          done < <(find webrtc/src -type f -name '*.h' ! -name '*.impl.h' -print0)
           tar czf "libwebrtc_c-${{ matrix.target }}.tar.gz" -C staging .
       - name: Package prebuilt artifacts (Windows)
         if: runner.os == 'Windows'
@@ -99,9 +105,47 @@ jobs:
           }
           Write-Host "OUT_DIR: $($outDir.FullName)"
           New-Item -ItemType Directory -Force -Path "staging/lib" | Out-Null
+          New-Item -ItemType Directory -Force -Path "staging/include" | Out-Null
           Copy-Item "$($outDir.FullName)/lib/webrtc_c.lib" "staging/lib/"
           Copy-Item "$($outDir.FullName)/bindings.rs" "staging/"
+          $srcRoot = (Resolve-Path "webrtc/src").Path
+          Get-ChildItem -Path $srcRoot -Recurse -File -Filter "*.h" |
+            Where-Object { $_.Name -notlike "*.impl.h" } |
+            ForEach-Object {
+              $relativePath = $_.FullName.Substring($srcRoot.Length).TrimStart('\', '/')
+              $destPath = Join-Path "staging/include" $relativePath
+              $destDir = Split-Path -Parent $destPath
+              New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+              Copy-Item $_.FullName $destPath
+            }
           tar -czf "libwebrtc_c-${{ matrix.target }}.tar.gz" -C staging .
+      - name: Verify packaged files (non-Windows)
+        if: runner.os != 'Windows'
+        run: |
+          archive="libwebrtc_c-${{ matrix.target }}.tar.gz"
+          tar tzf "$archive" | grep -Eq '(^|\./)bindings\.rs$'
+          tar tzf "$archive" | grep -Eq '(^|\./)include/webrtc_c\.h$'
+          if tar tzf "$archive" | grep -Eq '(^|\./)include/.*\.impl\.h$'; then
+            echo "ERROR: include contains forbidden *.impl.h headers"
+            exit 1
+          fi
+      - name: Verify packaged files (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $archive = "libwebrtc_c-${{ matrix.target }}.tar.gz"
+          $entries = tar -tzf $archive
+          if (-not ($entries | Select-String -Pattern '(^|\./)bindings\.rs$')) {
+            Write-Error "ERROR: bindings.rs is missing in package"
+            exit 1
+          }
+          if (-not ($entries | Select-String -Pattern '(^|\./)include/webrtc_c\.h$')) {
+            Write-Error "ERROR: include/webrtc_c.h is missing in package"
+            exit 1
+          }
+          if ($entries | Select-String -Pattern '(^|\./)include/.*\.impl\.h$') {
+            Write-Error "ERROR: include contains forbidden *.impl.h headers"
+            exit 1
+          }
       - name: Generate SHA256 checksum (non-Windows)
         if: runner.os != 'Windows'
         run: shasum -a 256 "libwebrtc_c-${{ matrix.target }}.tar.gz" > "libwebrtc_c-${{ matrix.target }}.tar.gz.sha256"
@@ -177,10 +221,25 @@ jobs:
             exit 1
           fi
           echo "OUT_DIR: $OUT_DIR"
-          mkdir -p staging/lib
+          mkdir -p staging/lib staging/include
           cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
           cp "$OUT_DIR/bindings.rs" staging/
+          while IFS= read -r -d '' header; do
+            rel_path="${header#webrtc/src/}"
+            dest_path="staging/include/${rel_path}"
+            mkdir -p "$(dirname "$dest_path")"
+            cp "$header" "$dest_path"
+          done < <(find webrtc/src -type f -name '*.h' ! -name '*.impl.h' -print0)
           tar czf "libwebrtc_c-${{ matrix.target }}.tar.gz" -C staging .
+      - name: Verify packaged files
+        run: |
+          archive="libwebrtc_c-${{ matrix.target }}.tar.gz"
+          tar tzf "$archive" | grep -Eq '(^|\./)bindings\.rs$'
+          tar tzf "$archive" | grep -Eq '(^|\./)include/webrtc_c\.h$'
+          if tar tzf "$archive" | grep -Eq '(^|\./)include/.*\.impl\.h$'; then
+            echo "ERROR: include contains forbidden *.impl.h headers"
+            exit 1
+          fi
       - name: Generate SHA256 checksum
         run: shasum -a 256 "libwebrtc_c-${{ matrix.target }}.tar.gz" > "libwebrtc_c-${{ matrix.target }}.tar.gz.sha256"
       - name: Upload to GitHub Release
@@ -219,12 +278,32 @@ jobs:
             exit 1
           fi
           echo "OUT_DIR: $OUT_DIR"
-          mkdir -p staging/lib
+          mkdir -p staging/lib staging/include staging/jar
           cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
           cp "$OUT_DIR/bindings.rs" staging/
+          while IFS= read -r -d '' header; do
+            rel_path="${header#webrtc/src/}"
+            dest_path="staging/include/${rel_path}"
+            mkdir -p "$(dirname "$dest_path")"
+            cp "$header" "$dest_path"
+          done < <(find webrtc/src -type f -name '*.h' ! -name '*.impl.h' -print0)
+          WEBRTC_JAR=$(find "$OUT_DIR" -type f -name "webrtc.jar" | head -1)
+          if [ -z "$WEBRTC_JAR" ]; then
+            echo "ERROR: webrtc.jar is missing"
+            exit 1
+          fi
+          cp "$WEBRTC_JAR" staging/jar/webrtc.jar
           tar czf "libwebrtc_c-android_arm64.tar.gz" -C staging .
       - name: Verify packaged files
-        run: tar tzf "libwebrtc_c-android_arm64.tar.gz" | grep "^bindings.rs$"
+        run: |
+          archive="libwebrtc_c-android_arm64.tar.gz"
+          tar tzf "$archive" | grep -Eq '(^|\./)bindings\.rs$'
+          tar tzf "$archive" | grep -Eq '(^|\./)include/webrtc_c\.h$'
+          tar tzf "$archive" | grep -Eq '(^|\./)jar/webrtc\.jar$'
+          if tar tzf "$archive" | grep -Eq '(^|\./)include/.*\.impl\.h$'; then
+            echo "ERROR: include contains forbidden *.impl.h headers"
+            exit 1
+          fi
       - name: Generate SHA256 checksum
         run: shasum -a 256 "libwebrtc_c-android_arm64.tar.gz" > "libwebrtc_c-android_arm64.tar.gz.sha256"
       - name: Upload to GitHub Release
@@ -259,12 +338,25 @@ jobs:
             exit 1
           fi
           echo "OUT_DIR: $OUT_DIR"
-          mkdir -p staging/lib
+          mkdir -p staging/lib staging/include
           cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
           cp "$OUT_DIR/bindings.rs" staging/
+          while IFS= read -r -d '' header; do
+            rel_path="${header#webrtc/src/}"
+            dest_path="staging/include/${rel_path}"
+            mkdir -p "$(dirname "$dest_path")"
+            cp "$header" "$dest_path"
+          done < <(find webrtc/src -type f -name '*.h' ! -name '*.impl.h' -print0)
           tar czf "libwebrtc_c-ios_arm64.tar.gz" -C staging .
       - name: Verify packaged files
-        run: tar tzf "libwebrtc_c-ios_arm64.tar.gz" | grep "^bindings.rs$"
+        run: |
+          archive="libwebrtc_c-ios_arm64.tar.gz"
+          tar tzf "$archive" | grep -Eq '(^|\./)bindings\.rs$'
+          tar tzf "$archive" | grep -Eq '(^|\./)include/webrtc_c\.h$'
+          if tar tzf "$archive" | grep -Eq '(^|\./)include/.*\.impl\.h$'; then
+            echo "ERROR: include contains forbidden *.impl.h headers"
+            exit 1
+          fi
       - name: Generate SHA256 checksum
         run: shasum -a 256 "libwebrtc_c-ios_arm64.tar.gz" > "libwebrtc_c-ios_arm64.tar.gz.sha256"
       - name: Upload to GitHub Release

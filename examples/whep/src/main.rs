@@ -112,14 +112,35 @@ fn rgb_to_ansi256(r: u8, g: u8, b: u8) -> i32 {
 }
 
 fn render_frame(frame: VideoFrameRef, width: i32, height: i32) {
-    let src = frame.buffer();
+    let mut src = frame.buffer();
+    let src = match src.to_i420() {
+        Some(src) => src,
+        None => return,
+    };
     let mut scaled = I420Buffer::new(width, height);
     scaled.scale_from(&src);
 
-    let image = match convert_from_i420(&scaled, LibyuvFourcc::Argb) {
-        Some(image) => image,
-        None => return,
-    };
+    let mut image = vec![
+        0u8;
+        (scaled.width().max(0) as usize)
+            .saturating_mul(scaled.height().max(0) as usize)
+            .saturating_mul(4)
+    ];
+    if !convert_from_i420(
+        scaled.y_data(),
+        scaled.stride_y(),
+        scaled.u_data(),
+        scaled.stride_u(),
+        scaled.v_data(),
+        scaled.stride_v(),
+        &mut image,
+        scaled.width().saturating_mul(4),
+        scaled.width(),
+        scaled.height(),
+        LibyuvFourcc::Argb,
+    ) {
+        return;
+    }
     let width_u = width.max(0) as usize;
     let height_u = height.max(0) as usize;
     let capacity = width_u.saturating_mul(height_u).saturating_mul(20);

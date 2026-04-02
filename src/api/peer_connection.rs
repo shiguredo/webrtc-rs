@@ -254,7 +254,23 @@ impl PeerConnectionFactory {
                 self.as_ptr(),
                 media_type.to_int(),
             )
-        }).expect("BUG: webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities が null を返しました");
+        })
+        .expect(
+            "BUG: webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities が null を返しました",
+        );
+        RtpCapabilities::from_raw(raw)
+    }
+
+    pub fn get_rtp_receiver_capabilities(&self, media_type: MediaType) -> RtpCapabilities {
+        let raw = NonNull::new(unsafe {
+            ffi::webrtc_PeerConnectionFactoryInterface_GetRtpReceiverCapabilities(
+                self.as_ptr(),
+                media_type.to_int(),
+            )
+        })
+        .expect(
+            "BUG: webrtc_PeerConnectionFactoryInterface_GetRtpReceiverCapabilities が null を返しました",
+        );
         RtpCapabilities::from_raw(raw)
     }
 

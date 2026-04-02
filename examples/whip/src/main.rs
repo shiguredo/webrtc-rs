@@ -32,6 +32,73 @@ fn u32_slice_as_u8_slice(data: &[u32]) -> &[u8] {
     unsafe { std::slice::from_raw_parts(ptr, len) }
 }
 
+fn copy_plane(
+    dst: &mut [u8],
+    dst_stride: i32,
+    src: &[u8],
+    src_stride: i32,
+    row_bytes: i32,
+    rows: i32,
+) -> Option<()> {
+    if dst_stride < row_bytes || src_stride < row_bytes || row_bytes <= 0 || rows <= 0 {
+        return None;
+    }
+    let dst_stride = dst_stride as usize;
+    let src_stride = src_stride as usize;
+    let row_bytes = row_bytes as usize;
+    let rows = rows as usize;
+    for row in 0..rows {
+        let dst_begin = row.checked_mul(dst_stride)?;
+        let src_begin = row.checked_mul(src_stride)?;
+        let dst_end = dst_begin.checked_add(row_bytes)?;
+        let src_end = src_begin.checked_add(row_bytes)?;
+        let dst_row = dst.get_mut(dst_begin..dst_end)?;
+        let src_row = src.get(src_begin..src_end)?;
+        dst_row.copy_from_slice(src_row);
+    }
+    Some(())
+}
+
+fn i420_planes_to_buffer(
+    y_plane: &[u8],
+    u_plane: &[u8],
+    v_plane: &[u8],
+    width: i32,
+    height: i32,
+) -> Option<I420Buffer> {
+    let chroma_width = width.checked_add(1)?.checked_div(2)?;
+    let chroma_height = height.checked_add(1)?.checked_div(2)?;
+    let mut dst = I420Buffer::new(width, height);
+    let dst_stride_y = dst.stride_y();
+    let dst_stride_u = dst.stride_u();
+    let dst_stride_v = dst.stride_v();
+    copy_plane(
+        dst.y_data_mut(),
+        dst_stride_y,
+        y_plane,
+        width,
+        width,
+        height,
+    )?;
+    copy_plane(
+        dst.u_data_mut(),
+        dst_stride_u,
+        u_plane,
+        chroma_width,
+        chroma_width,
+        chroma_height,
+    )?;
+    copy_plane(
+        dst.v_data_mut(),
+        dst_stride_v,
+        v_plane,
+        chroma_width,
+        chroma_width,
+        chroma_height,
+    )?;
+    Some(dst)
+}
+
 /// PeerConnectionFactory と関連リソースをまとめて管理する。
 pub struct FactoryHolder {
     factory: PeerConnectionFactory,
@@ -253,26 +320,47 @@ fn tick_once(
         }
     }
 
-    if let Some(buffer) = abgr_to_i420(u32_slice_as_u8_slice(image), width, height) {
+    let chroma_width = (width.saturating_add(1)) / 2;
+    let chroma_height = (height.saturating_add(1)) / 2;
+    let mut y_plane = vec![0u8; (width.max(0) as usize).saturating_mul(height.max(0) as usize)];
+    let mut u_plane =
+        vec![0u8; (chroma_width.max(0) as usize).saturating_mul(chroma_height.max(0) as usize)];
+    let mut v_plane =
+        vec![0u8; (chroma_width.max(0) as usize).saturating_mul(chroma_height.max(0) as usize)];
+    if abgr_to_i420(
+        u32_slice_as_u8_slice(image),
+        width.saturating_mul(4),
+        &mut y_plane,
+        width,
+        &mut u_plane,
+        chroma_width,
+        &mut v_plane,
+        chroma_width,
+        width,
+        height,
+    ) {
+        let buffer = match i420_planes_to_buffer(&y_plane, &u_plane, &v_plane, width, height) {
+            Some(buffer) => buffer,
+            None => return,
+        };
         let timestamp_us = elapsed_ms * 1000;
-        let frame = VideoFrame::from_i420(&buffer, timestamp_us, 0);
         let AdaptFrameResult { applied, size } = source.adapt_frame(width, height, timestamp_us);
         let frame = if applied
-            && (size.adapted_width != frame.width() || size.adapted_height != frame.height())
+            && (size.adapted_width != buffer.width() || size.adapted_height != buffer.height())
         {
             let mut scaled = I420Buffer::new(size.adapted_width, size.adapted_height);
             scaled.scale_from(&buffer);
-            VideoFrame::from_i420(
-                &scaled,
-                timestamp_aligner.translate(timestamp_us, time_millis() * 1000),
-                0,
-            )
+            let scaled_buffer = scaled.cast_to_video_frame_buffer();
+            VideoFrame::builder(&scaled_buffer)
+                .set_timestamp_us(timestamp_aligner.translate(timestamp_us, time_millis() * 1000))
+                .set_timestamp_rtp(0)
+                .build()
         } else {
-            VideoFrame::from_i420(
-                &buffer,
-                timestamp_aligner.translate(timestamp_us, time_millis() * 1000),
-                0,
-            )
+            let frame_buffer = buffer.cast_to_video_frame_buffer();
+            VideoFrame::builder(&frame_buffer)
+                .set_timestamp_us(timestamp_aligner.translate(timestamp_us, time_millis() * 1000))
+                .set_timestamp_rtp(0)
+                .build()
         };
         source.on_frame(&frame);
     }

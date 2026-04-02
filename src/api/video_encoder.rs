@@ -1,70 +1,11 @@
 use super::video_codec_common::{
     EncodedImageRef, SdpVideoFormat, SdpVideoFormatRef, VideoCodecRef, VideoCodecStatus,
-    VideoCodecType, VideoFrameRef, VideoFrameTypeVectorRef,
+    VideoCodecType, VideoFrameBufferKind, VideoFrameRef, VideoFrameTypeVectorRef,
 };
 use crate::{CxxString, EnvironmentRef, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VideoFrameBufferType {
-    Native,
-    I420,
-    I420A,
-    I422,
-    I444,
-    I010,
-    I210,
-    I410,
-    Nv12,
-    Unknown(i32),
-}
-
-impl VideoFrameBufferType {
-    fn from_raw(value: i32) -> Self {
-        unsafe {
-            if value == ffi::webrtc_VideoFrameBuffer_Type_kNative {
-                Self::Native
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI420 {
-                Self::I420
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI420A {
-                Self::I420A
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI422 {
-                Self::I422
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI444 {
-                Self::I444
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI010 {
-                Self::I010
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI210 {
-                Self::I210
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kI410 {
-                Self::I410
-            } else if value == ffi::webrtc_VideoFrameBuffer_Type_kNV12 {
-                Self::Nv12
-            } else {
-                Self::Unknown(value)
-            }
-        }
-    }
-
-    fn to_raw(self) -> i32 {
-        unsafe {
-            match self {
-                Self::Native => ffi::webrtc_VideoFrameBuffer_Type_kNative,
-                Self::I420 => ffi::webrtc_VideoFrameBuffer_Type_kI420,
-                Self::I420A => ffi::webrtc_VideoFrameBuffer_Type_kI420A,
-                Self::I422 => ffi::webrtc_VideoFrameBuffer_Type_kI422,
-                Self::I444 => ffi::webrtc_VideoFrameBuffer_Type_kI444,
-                Self::I010 => ffi::webrtc_VideoFrameBuffer_Type_kI010,
-                Self::I210 => ffi::webrtc_VideoFrameBuffer_Type_kI210,
-                Self::I410 => ffi::webrtc_VideoFrameBuffer_Type_kI410,
-                Self::Nv12 => ffi::webrtc_VideoFrameBuffer_Type_kNV12,
-                Self::Unknown(v) => v,
-            }
-        }
-    }
-}
 
 pub struct VideoEncoderFramerateFractionInlinedVectorRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector>,
@@ -148,12 +89,12 @@ impl<'a> VideoEncoderFramerateFractionInlinedVectorRef<'a> {
 
 unsafe impl<'a> Send for VideoEncoderFramerateFractionInlinedVectorRef<'a> {}
 
-pub struct VideoFrameBufferTypeInlinedVectorRef<'a> {
+pub struct VideoFrameBufferKindInlinedVectorRef<'a> {
     raw: NonNull<ffi::webrtc_VideoFrameBuffer_Type_inlined_vector>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_EncoderInfo>,
 }
 
-impl<'a> VideoFrameBufferTypeInlinedVectorRef<'a> {
+impl<'a> VideoFrameBufferKindInlinedVectorRef<'a> {
     /// # Safety
     /// `raw` は有効な `webrtc_VideoFrameBuffer_Type_inlined_vector` を指す必要があります。
     pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoFrameBuffer_Type_inlined_vector>) -> Self {
@@ -173,7 +114,7 @@ impl<'a> VideoFrameBufferTypeInlinedVectorRef<'a> {
         self.len() == 0
     }
 
-    pub fn get(&self, index: usize) -> Option<VideoFrameBufferType> {
+    pub fn get(&self, index: usize) -> Option<VideoFrameBufferKind> {
         if index >= self.len() {
             return None;
         }
@@ -182,10 +123,10 @@ impl<'a> VideoFrameBufferTypeInlinedVectorRef<'a> {
         };
         let raw = NonNull::new(raw)?;
         let value = unsafe { ffi::webrtc_VideoFrameBuffer_Type_value(raw.as_ptr()) };
-        Some(VideoFrameBufferType::from_raw(value))
+        Some(VideoFrameBufferKind::from_raw(value))
     }
 
-    pub fn push(&mut self, value: VideoFrameBufferType) {
+    pub fn push(&mut self, value: VideoFrameBufferKind) {
         unsafe {
             ffi::webrtc_VideoFrameBuffer_Type_inlined_vector_push_back_value(
                 self.raw.as_ptr(),
@@ -194,7 +135,7 @@ impl<'a> VideoFrameBufferTypeInlinedVectorRef<'a> {
         };
     }
 
-    pub fn set(&mut self, index: usize, value: VideoFrameBufferType) -> bool {
+    pub fn set(&mut self, index: usize, value: VideoFrameBufferKind) -> bool {
         if index >= self.len() {
             return false;
         }
@@ -218,7 +159,7 @@ impl<'a> VideoFrameBufferTypeInlinedVectorRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for VideoFrameBufferTypeInlinedVectorRef<'a> {}
+unsafe impl<'a> Send for VideoFrameBufferKindInlinedVectorRef<'a> {}
 
 pub struct VideoEncoderQpThresholdsRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_QpThresholds>,
@@ -915,14 +856,14 @@ impl VideoEncoderEncoderInfo {
         };
     }
 
-    pub fn preferred_pixel_formats(&self) -> VideoFrameBufferTypeInlinedVectorRef<'_> {
+    pub fn preferred_pixel_formats(&self) -> VideoFrameBufferKindInlinedVectorRef<'_> {
         let raw = unsafe {
             ffi::webrtc_VideoEncoder_EncoderInfo_get_preferred_pixel_formats(self.as_ptr())
         };
         let raw = NonNull::new(raw).expect(
             "BUG: webrtc_VideoEncoder_EncoderInfo_get_preferred_pixel_formats が null を返しました",
         );
-        unsafe { VideoFrameBufferTypeInlinedVectorRef::from_raw(raw) }
+        unsafe { VideoFrameBufferKindInlinedVectorRef::from_raw(raw) }
     }
 
     pub fn is_qp_trusted(&self) -> Option<bool> {
@@ -2162,6 +2103,84 @@ impl VideoEncoderFactory {
         let raw = NonNull::new(unsafe { ffi::webrtc_CreateBuiltinVideoEncoderFactory() })
             .expect("webrtc_CreateBuiltinVideoEncoderFactory が null を返しました");
         Self { raw_unique: raw }
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    pub fn from_objc_default() -> Option<Self> {
+        let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoEncoderFactory_new() };
+        if objc_factory.is_null() {
+            return None;
+        }
+
+        let raw_unique = unsafe { ffi::webrtc_ObjCToNativeVideoEncoderFactory(objc_factory) };
+        unsafe { ffi::webrtc_objc_RTCVideoEncoderFactory_release(objc_factory) };
+        let raw_unique = NonNull::new(raw_unique)?;
+        Some(Self { raw_unique })
+    }
+
+    #[cfg(target_os = "android")]
+    pub fn from_android_default() -> Option<Self> {
+        let env = unsafe { ffi::webrtc_jni_AttachCurrentThreadIfNeeded() };
+        if env.is_null() {
+            return None;
+        }
+
+        let class = unsafe {
+            ffi::webrtc_GetClass(
+                env,
+                b"org/webrtc/DefaultVideoEncoderFactory\0".as_ptr().cast(),
+            )
+        };
+        if class.is_null() {
+            if unsafe { ffi::jni_JNIEnv_ExceptionCheck(env) != 0 } {
+                unsafe { ffi::jni_JNIEnv_ExceptionClear(env) };
+            }
+            return None;
+        }
+
+        let ctor = unsafe {
+            ffi::jni_JNIEnv_GetMethodID(
+                env,
+                class,
+                b"<init>\0".as_ptr().cast(),
+                b"(Lorg/webrtc/EglBase$Context;ZZ)V\0".as_ptr().cast(),
+            )
+        };
+        if ctor.is_null() {
+            unsafe { ffi::jni_JNIEnv_DeleteLocalRef(env, class) };
+            if unsafe { ffi::jni_JNIEnv_ExceptionCheck(env) != 0 } {
+                unsafe { ffi::jni_JNIEnv_ExceptionClear(env) };
+            }
+            return None;
+        }
+
+        let mut args: [ffi::jvalue; 3] = unsafe { std::mem::zeroed() };
+        args[0].l = std::ptr::null_mut();
+        args[1].z = 1;
+        args[2].z = 0;
+        let encoder_factory =
+            unsafe { ffi::jni_JNIEnv_NewObjectA(env, class, ctor, args.as_ptr()) };
+        if encoder_factory.is_null() {
+            unsafe { ffi::jni_JNIEnv_DeleteLocalRef(env, class) };
+            if unsafe { ffi::jni_JNIEnv_ExceptionCheck(env) != 0 } {
+                unsafe { ffi::jni_JNIEnv_ExceptionClear(env) };
+            }
+            return None;
+        }
+
+        let raw_unique =
+            unsafe { ffi::webrtc_JavaToNativeVideoEncoderFactory(env, encoder_factory) };
+        unsafe {
+            ffi::jni_JNIEnv_DeleteLocalRef(env, encoder_factory);
+            ffi::jni_JNIEnv_DeleteLocalRef(env, class);
+        }
+        if unsafe { ffi::jni_JNIEnv_ExceptionCheck(env) != 0 } {
+            unsafe { ffi::jni_JNIEnv_ExceptionClear(env) };
+            return None;
+        }
+
+        let raw_unique = NonNull::new(raw_unique)?;
+        Some(Self { raw_unique })
     }
 
     pub fn new_with_handler(handler: Box<dyn VideoEncoderFactoryHandler>) -> Self {

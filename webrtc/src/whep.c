@@ -144,8 +144,16 @@ static void AnsiRenderer_OnFrame(const struct webrtc_VideoFrame* frame,
   // width, height に合わせてリサイズ
   struct webrtc_I420Buffer_refcounted* buf =
       webrtc_I420Buffer_Create(renderer->width, renderer->height);
-  struct webrtc_I420Buffer_refcounted* src =
+  struct webrtc_VideoFrameBuffer_refcounted* frame_buf =
       webrtc_VideoFrame_video_frame_buffer(frame);
+  struct webrtc_I420Buffer_refcounted* src = webrtc_VideoFrameBuffer_ToI420(
+      webrtc_VideoFrameBuffer_refcounted_get(frame_buf));
+  webrtc_VideoFrameBuffer_Release(
+      webrtc_VideoFrameBuffer_refcounted_get(frame_buf));
+  if (src == NULL) {
+    webrtc_I420Buffer_Release(webrtc_I420Buffer_refcounted_get(buf));
+    return;
+  }
   webrtc_I420Buffer_ScaleFrom(webrtc_I420Buffer_refcounted_get(buf),
                               webrtc_I420Buffer_refcounted_get(src));
   webrtc_I420Buffer_Release(webrtc_I420Buffer_refcounted_get(src));
