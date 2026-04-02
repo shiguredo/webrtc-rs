@@ -12,7 +12,11 @@
 
 ## develop
 
-- [UPDATE] libwebrtc m147 (m147.7727.8.0) に上げる
+## 0.147.0
+
+**リリース日**: 2026-04-02
+
+- [UPDATE] libwebrtc m147 (m147.7727.10.0) に上げる
   - @voluntas
 
 ## 0.146.3
