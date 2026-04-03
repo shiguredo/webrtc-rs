@@ -12,7 +12,7 @@
 
 ## develop
 
-- [FIX] `VideoEncoderFactory` で `SimulcastEncoderAdapter` を使用するようにする
+- [ADD] `VideoEncoderFactory` で `SimulcastEncoderAdapter` を使用するようにする
   - `BuiltinVideoEncoderFactory` と同じパターンで simulcast に対応する
   - @voluntas
 - [ADD] `I420Buffer` / `NV12Buffer` に stride 指定生成と連続領域参照 API を追加する

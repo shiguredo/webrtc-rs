@@ -2566,11 +2566,9 @@ fn create_and_set_local_description_observers() {
     let _set_remote = SetRemoteDescriptionObserver::new_with_handler(Box::new(NoopHandler));
 }
 
-// VideoEncoderFactory で SimulcastEncoderAdapter が返される。
-// InitEncode を呼ばないと内部エンコーダーは生成されず、
-// encode は Uninitialized を返す。
+// SimulcastEncoderAdapter は InitEncode なしでは encode が Uninitialized を返す
 #[test]
-fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
+fn custom_video_encoder_factory_create_returns_simulcast_encoder_adapter() {
     struct TestVideoEncoderHandler;
     impl VideoEncoderHandler for TestVideoEncoderHandler {}
 
@@ -2978,7 +2976,7 @@ fn video_decoder_factory_get_supported_formats_returns_owned_formats() {
 }
 
 #[test]
-fn video_encoder_factory_create_calls_create_callback() {
+fn video_encoder_factory_create_returns_encoder_for_supported_codec() {
     struct TestVideoEncoderFactoryHandler;
     impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
         fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
