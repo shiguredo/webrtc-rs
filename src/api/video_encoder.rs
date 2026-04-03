@@ -1768,7 +1768,7 @@ pub trait VideoEncoderFactoryHandler: Send {
         &mut self,
         env: EnvironmentRef<'_>,
         format: SdpVideoFormatRef<'_>,
-    ) -> Option<Box<dyn VideoEncoderHandler>> {
+    ) -> Option<VideoEncoder> {
         None
     }
 }
@@ -1951,7 +1951,7 @@ unsafe extern "C" fn video_encoder_factory_create(
     let env = unsafe { EnvironmentRef::from_raw(env) };
     let format = unsafe { SdpVideoFormatRef::from_raw(format) };
     match state.handler.create(env, format) {
-        Some(handler) => VideoEncoder::new_with_handler(handler).into_raw(),
+        Some(encoder) => encoder.into_raw(),
         None => std::ptr::null_mut(),
     }
 }
@@ -2045,43 +2045,6 @@ impl VideoEncoder {
         let raw_unique =
             NonNull::new(raw).expect("webrtc_VideoEncoder_GetEncoderInfo が null を返しました");
         VideoEncoderEncoderInfo { raw_unique }
-    }
-}
-
-impl VideoEncoderHandler for VideoEncoder {
-    fn init_encode(
-        &mut self,
-        codec_settings: VideoCodecRef<'_>,
-        settings: VideoEncoderSettingsRef<'_>,
-    ) -> VideoCodecStatus {
-        VideoEncoder::init_encode(self, codec_settings, settings)
-    }
-
-    fn encode(
-        &mut self,
-        frame: VideoFrameRef<'_>,
-        frame_types: Option<VideoFrameTypeVectorRef<'_>>,
-    ) -> VideoCodecStatus {
-        VideoEncoder::encode(self, frame, frame_types)
-    }
-
-    fn register_encode_complete_callback(
-        &mut self,
-        callback: Option<VideoEncoderEncodedImageCallbackRef<'_>>,
-    ) -> VideoCodecStatus {
-        VideoEncoder::register_encode_complete_callback(self, callback)
-    }
-
-    fn release(&mut self) -> VideoCodecStatus {
-        VideoEncoder::release(self)
-    }
-
-    fn set_rates(&mut self, parameters: VideoEncoderRateControlParametersRef<'_>) {
-        VideoEncoder::set_rates(self, parameters);
-    }
-
-    fn get_encoder_info(&mut self) -> VideoEncoderEncoderInfo {
-        VideoEncoder::get_encoder_info(self)
     }
 }
 
