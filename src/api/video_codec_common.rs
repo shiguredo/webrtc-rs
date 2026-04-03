@@ -1777,6 +1777,58 @@ impl<'a> VideoFrameTypeVectorRef<'a> {
 
 unsafe impl<'a> Send for VideoFrameTypeVectorRef<'a> {}
 
+pub struct VideoCodec {
+    raw: NonNull<ffi::webrtc_VideoCodec>,
+}
+
+impl VideoCodec {
+    pub fn new() -> Self {
+        let raw = NonNull::new(unsafe { ffi::webrtc_VideoCodec_new() })
+            .expect("BUG: webrtc_VideoCodec_new が null を返しました");
+        Self { raw }
+    }
+
+    pub fn set_codec_type(&mut self, codec_type: VideoCodecType) {
+        unsafe { ffi::webrtc_VideoCodec_set_codec_type(self.raw.as_ptr(), codec_type.to_raw()) };
+    }
+
+    pub fn set_width(&mut self, width: i32) {
+        unsafe { ffi::webrtc_VideoCodec_set_width(self.raw.as_ptr(), width) };
+    }
+
+    pub fn set_height(&mut self, height: i32) {
+        unsafe { ffi::webrtc_VideoCodec_set_height(self.raw.as_ptr(), height) };
+    }
+
+    pub fn set_start_bitrate_kbps(&mut self, start_bitrate: u32) {
+        unsafe { ffi::webrtc_VideoCodec_set_start_bitrate_kbps(self.raw.as_ptr(), start_bitrate) };
+    }
+
+    pub fn set_max_bitrate_kbps(&mut self, max_bitrate: u32) {
+        unsafe { ffi::webrtc_VideoCodec_set_max_bitrate_kbps(self.raw.as_ptr(), max_bitrate) };
+    }
+
+    pub fn set_min_bitrate_kbps(&mut self, min_bitrate: u32) {
+        unsafe { ffi::webrtc_VideoCodec_set_min_bitrate_kbps(self.raw.as_ptr(), min_bitrate) };
+    }
+
+    pub fn set_max_framerate(&mut self, max_framerate: u32) {
+        unsafe { ffi::webrtc_VideoCodec_set_max_framerate(self.raw.as_ptr(), max_framerate) };
+    }
+
+    pub fn as_ref(&self) -> VideoCodecRef<'_> {
+        unsafe { VideoCodecRef::from_raw(self.raw) }
+    }
+}
+
+impl Drop for VideoCodec {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_VideoCodec_delete(self.raw.as_ptr()) };
+    }
+}
+
+unsafe impl Send for VideoCodec {}
+
 pub struct VideoCodecRef<'a> {
     raw: NonNull<ffi::webrtc_VideoCodec>,
     _marker: PhantomData<&'a ffi::webrtc_VideoCodec>,

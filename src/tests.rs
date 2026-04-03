@@ -2566,13 +2566,33 @@ fn create_and_set_local_description_observers() {
     let _set_remote = SetRemoteDescriptionObserver::new_with_handler(Box::new(NoopHandler));
 }
 
-// SimulcastEncoderAdapter は InitEncode なしでは encode が Uninitialized を返す
+// VideoEncoderFactory でカスタムエンコーダーを登録し、
+// InitEncode 後に encode callback が呼ばれることを確認する。
 #[test]
-fn custom_video_encoder_factory_create_returns_simulcast_encoder_adapter() {
-    struct TestVideoEncoderHandler;
-    impl VideoEncoderHandler for TestVideoEncoderHandler {}
+fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
+    let encode_called = Arc::new(AtomicBool::new(false));
 
-    struct TestVideoEncoderFactoryHandler;
+    struct TestVideoEncoderHandler {
+        encode_called: Arc<AtomicBool>,
+    }
+    impl VideoEncoderHandler for TestVideoEncoderHandler {
+        fn encode(
+            &mut self,
+            _frame: VideoFrameRef<'_>,
+            frame_types: Option<VideoFrameTypeVectorRef<'_>>,
+        ) -> VideoCodecStatus {
+            let frame_types = frame_types.expect("frame_types が None です");
+            assert!(frame_types.len() > 0);
+            assert_eq!(frame_types.get(0), Some(VideoFrameType::Key));
+            self.encode_called
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+            VideoCodecStatus::Ok
+        }
+    }
+
+    struct TestVideoEncoderFactoryHandler {
+        encode_called: Arc<AtomicBool>,
+    }
     impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
         fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
             vec![SdpVideoFormat::new("VP8")]
@@ -2580,33 +2600,65 @@ fn custom_video_encoder_factory_create_returns_simulcast_encoder_adapter() {
 
         fn create(
             &mut self,
-            _env: EnvironmentRef<'_>,
-            _format: SdpVideoFormatRef<'_>,
+            env: EnvironmentRef<'_>,
+            format: SdpVideoFormatRef<'_>,
         ) -> Option<Box<dyn VideoEncoderHandler>> {
-            Some(Box::new(TestVideoEncoderHandler))
+            assert!(!env.as_ptr().is_null());
+            assert_eq!(
+                format
+                    .name()
+                    .expect("SdpVideoFormatRef::name に失敗しました"),
+                "VP8"
+            );
+            Some(Box::new(TestVideoEncoderHandler {
+                encode_called: self.encode_called.clone(),
+            }))
         }
     }
 
-    let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler));
+    let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler {
+        encode_called: encode_called.clone(),
+    }));
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
     let mut encoder = factory
         .create(env.as_ref(), format.as_ref())
         .expect("custom encoder の作成に失敗しました");
 
-    // SimulcastEncoderAdapter は InitEncode なしでは Uninitialized を返す
-    let buffer = I420Buffer::new(2, 2);
+    // InitEncode で SimulcastEncoderAdapter が内部エンコーダーを生成する
+    let mut codec = VideoCodec::new();
+    codec.set_codec_type(VideoCodecType::Vp8);
+    codec.set_width(640);
+    codec.set_height(480);
+    codec.set_start_bitrate_kbps(300);
+    codec.set_max_bitrate_kbps(2000);
+    codec.set_min_bitrate_kbps(100);
+    codec.set_max_framerate(30);
+    let settings = VideoEncoderSettings::new(1, 1200);
+    let status = encoder.init_encode(codec.as_ref(), settings.as_ref());
+    assert_eq!(status, VideoCodecStatus::Ok, "InitEncode に失敗しました");
+
+    // SimulcastEncoderAdapter は RegisterEncodeCompleteCallback が必要
+    struct NoopCallbackHandler;
+    impl VideoEncoderEncodedImageCallbackHandler for NoopCallbackHandler {}
+    let callback =
+        VideoEncoderEncodedImageCallback::new_with_handler(Box::new(NoopCallbackHandler));
+    encoder.register_encode_complete_callback(Some(callback.as_ref()));
+
+    // encode callback が呼ばれることを確認する
+    let buffer = I420Buffer::new(640, 480);
     let frame_buffer = buffer.cast_to_video_frame_buffer();
     let frame = VideoFrame::builder(&frame_buffer)
         .set_timestamp_us(123)
-        .set_timestamp_rtp(0)
+        .set_timestamp_rtp(90000)
         .build();
     let mut frame_types = VideoFrameTypeVector::new(0);
     frame_types.push(VideoFrameType::Key);
 
-    assert_eq!(
-        encoder.encode(frame.as_ref(), Some(frame_types.as_ref())),
-        VideoCodecStatus::Uninitialized
+    encoder.encode(frame.as_ref(), Some(frame_types.as_ref()));
+    assert!(
+        encode_called.load(std::sync::atomic::Ordering::SeqCst),
+        "encode callback が呼ばれていません"
     );
 }
 
@@ -2976,8 +3028,10 @@ fn video_decoder_factory_get_supported_formats_returns_owned_formats() {
 }
 
 #[test]
-fn video_encoder_factory_create_returns_encoder_for_supported_codec() {
-    struct TestVideoEncoderFactoryHandler;
+fn video_encoder_factory_create_calls_create_callback() {
+    struct TestVideoEncoderFactoryHandler {
+        called: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    }
     impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
         fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
             vec![SdpVideoFormat::new("H264")]
@@ -2985,19 +3039,46 @@ fn video_encoder_factory_create_returns_encoder_for_supported_codec() {
 
         fn create(
             &mut self,
-            _env: EnvironmentRef<'_>,
-            _format: SdpVideoFormatRef<'_>,
+            env: EnvironmentRef<'_>,
+            format: SdpVideoFormatRef<'_>,
         ) -> Option<Box<dyn VideoEncoderHandler>> {
+            self.called.store(true, std::sync::atomic::Ordering::SeqCst);
+            assert!(!env.as_ptr().is_null());
+            assert_eq!(
+                format
+                    .name()
+                    .expect("SdpVideoFormatRef::name に失敗しました"),
+                "H264"
+            );
             Some(Box::new(NoopHandler))
         }
     }
 
-    let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler));
+    let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler {
+        called: called.clone(),
+    }));
     let env = Environment::new();
-    // SimulcastEncoderAdapter はサポートリストにあるコーデックで SimulcastEncoderAdapter を返す
     let format = SdpVideoFormat::new("H264");
-    let encoder = factory.create(env.as_ref(), format.as_ref());
-    assert!(encoder.is_some(), "create が None を返しました");
+    let mut encoder = factory
+        .create(env.as_ref(), format.as_ref())
+        .expect("create が None を返しました");
+
+    // InitEncode で SimulcastEncoderAdapter が内部の Create コールバックを呼ぶ
+    let mut codec = VideoCodec::new();
+    codec.set_codec_type(VideoCodecType::H264);
+    codec.set_width(640);
+    codec.set_height(480);
+    codec.set_start_bitrate_kbps(300);
+    codec.set_max_bitrate_kbps(2000);
+    codec.set_min_bitrate_kbps(100);
+    codec.set_max_framerate(30);
+    let settings = VideoEncoderSettings::new(1, 1200);
+    encoder.init_encode(codec.as_ref(), settings.as_ref());
+    assert!(
+        called.load(std::sync::atomic::Ordering::SeqCst),
+        "create callback が呼ばれていません"
+    );
     // サポートリストにないコーデックでは None を返す
     let unsupported_format = SdpVideoFormat::new("UNSUPPORTED");
     let encoder = factory.create(env.as_ref(), unsupported_format.as_ref());

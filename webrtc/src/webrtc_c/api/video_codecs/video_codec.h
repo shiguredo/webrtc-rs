@@ -44,18 +44,43 @@ WEBRTC_EXPORT extern const int webrtc_VideoFrameType_Empty;
 WEBRTC_EXPORT extern const int webrtc_VideoFrameType_Key;
 WEBRTC_EXPORT extern const int webrtc_VideoFrameType_Delta;
 
+WEBRTC_EXPORT struct webrtc_VideoCodec* webrtc_VideoCodec_new(void);
+WEBRTC_EXPORT void webrtc_VideoCodec_delete(struct webrtc_VideoCodec* self);
 WEBRTC_EXPORT int webrtc_VideoCodec_codec_type(struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_codec_type(
+    struct webrtc_VideoCodec* self,
+    int codec_type);
 WEBRTC_EXPORT int webrtc_VideoCodec_width(struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_width(struct webrtc_VideoCodec* self,
+                                               int width);
 WEBRTC_EXPORT int webrtc_VideoCodec_height(struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_height(struct webrtc_VideoCodec* self,
+                                                int height);
 WEBRTC_EXPORT unsigned int webrtc_VideoCodec_start_bitrate_kbps(
     struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_start_bitrate_kbps(
+    struct webrtc_VideoCodec* self,
+    unsigned int start_bitrate);
 WEBRTC_EXPORT unsigned int webrtc_VideoCodec_max_bitrate_kbps(
     struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_max_bitrate_kbps(
+    struct webrtc_VideoCodec* self,
+    unsigned int max_bitrate);
 WEBRTC_EXPORT unsigned int webrtc_VideoCodec_min_bitrate_kbps(
     struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_min_bitrate_kbps(
+    struct webrtc_VideoCodec* self,
+    unsigned int min_bitrate);
 WEBRTC_EXPORT uint32_t
 webrtc_VideoCodec_max_framerate(struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_max_framerate(
+    struct webrtc_VideoCodec* self,
+    uint32_t max_framerate);
 
+WEBRTC_EXPORT struct webrtc_VideoEncoder_Settings*
+webrtc_VideoEncoder_Settings_new(int number_of_cores, size_t max_payload_size);
+WEBRTC_EXPORT void webrtc_VideoEncoder_Settings_delete(
+    struct webrtc_VideoEncoder_Settings* self);
 WEBRTC_EXPORT int webrtc_VideoEncoder_Settings_number_of_cores(
     struct webrtc_VideoEncoder_Settings* self);
 WEBRTC_EXPORT size_t webrtc_VideoEncoder_Settings_max_payload_size(

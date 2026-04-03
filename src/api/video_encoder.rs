@@ -1020,6 +1020,32 @@ impl<'a> VideoEncoderSettingsRef<'a> {
 
 unsafe impl<'a> Send for VideoEncoderSettingsRef<'a> {}
 
+pub struct VideoEncoderSettings {
+    raw: NonNull<ffi::webrtc_VideoEncoder_Settings>,
+}
+
+impl VideoEncoderSettings {
+    pub fn new(number_of_cores: i32, max_payload_size: usize) -> Self {
+        let raw = NonNull::new(unsafe {
+            ffi::webrtc_VideoEncoder_Settings_new(number_of_cores, max_payload_size)
+        })
+        .expect("BUG: webrtc_VideoEncoder_Settings_new が null を返しました");
+        Self { raw }
+    }
+
+    pub fn as_ref(&self) -> VideoEncoderSettingsRef<'_> {
+        unsafe { VideoEncoderSettingsRef::from_raw(self.raw) }
+    }
+}
+
+impl Drop for VideoEncoderSettings {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_VideoEncoder_Settings_delete(self.raw.as_ptr()) };
+    }
+}
+
+unsafe impl Send for VideoEncoderSettings {}
+
 pub struct VideoEncoderRateControlParametersRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_RateControlParameters>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_RateControlParameters>,
