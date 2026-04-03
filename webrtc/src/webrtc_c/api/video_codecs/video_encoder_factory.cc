@@ -11,6 +11,7 @@
 #include <api/video_codecs/sdp_video_format.h>
 #include <api/video_codecs/video_encoder.h>
 #include <api/video_codecs/video_encoder_factory.h>
+#include <media/engine/simulcast_encoder_adapter.h>
 
 #include "../../common.h"
 #include "../../common.impl.h"
@@ -20,17 +21,18 @@
 
 namespace {
 
-class VideoEncoderFactoryImpl : public webrtc::VideoEncoderFactory {
+// Rust handler を呼んで実エンコーダーを生成する内部 factory
+class InnerVideoEncoderFactoryImpl : public webrtc::VideoEncoderFactory {
  public:
-  VideoEncoderFactoryImpl(const webrtc_VideoEncoderFactory_cbs* cbs,
-                          void* user_data)
+  InnerVideoEncoderFactoryImpl(const webrtc_VideoEncoderFactory_cbs* cbs,
+                               void* user_data)
       : user_data_(user_data) {
     if (cbs != nullptr) {
       cbs_ = *cbs;
     }
   }
 
-  ~VideoEncoderFactoryImpl() override {
+  ~InnerVideoEncoderFactoryImpl() override {
     if (cbs_.OnDestroy != nullptr) {
       cbs_.OnDestroy(user_data_);
     }
@@ -75,6 +77,34 @@ class VideoEncoderFactoryImpl : public webrtc::VideoEncoderFactory {
  private:
   webrtc_VideoEncoderFactory_cbs cbs_{};
   void* user_data_ = nullptr;
+};
+
+// SimulcastEncoderAdapter でラップする外部 factory
+// BuiltinVideoEncoderFactory と同じパターンで、simulcast 時は各レイヤーごとに
+// 内部 factory の Create を呼び、非 simulcast 時はパススルーモードで動作する
+class VideoEncoderFactoryImpl : public webrtc::VideoEncoderFactory {
+ public:
+  VideoEncoderFactoryImpl(const webrtc_VideoEncoderFactory_cbs* cbs,
+                          void* user_data)
+      : inner_(std::make_unique<InnerVideoEncoderFactoryImpl>(cbs, user_data)) {
+  }
+
+  std::vector<webrtc::SdpVideoFormat> GetSupportedFormats() const override {
+    return inner_->GetSupportedFormats();
+  }
+
+  std::unique_ptr<webrtc::VideoEncoder> Create(
+      const webrtc::Environment& env,
+      const webrtc::SdpVideoFormat& format) override {
+    if (format.IsCodecInList(inner_->GetSupportedFormats())) {
+      return std::make_unique<webrtc::SimulcastEncoderAdapter>(
+          env, inner_.get(), nullptr, format);
+    }
+    return nullptr;
+  }
+
+ private:
+  std::unique_ptr<InnerVideoEncoderFactoryImpl> inner_;
 };
 
 }  // namespace
