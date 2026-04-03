@@ -2592,6 +2592,10 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
         created: bool,
     }
     impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
+        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+            vec![SdpVideoFormat::new("VP8")]
+        }
+
         fn create(
             &mut self,
             env: EnvironmentRef<'_>,
@@ -3016,6 +3020,10 @@ fn video_encoder_factory_create_calls_create_callback() {
         called: std::sync::Arc<std::sync::atomic::AtomicBool>,
     }
     impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
+        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+            vec![SdpVideoFormat::new("H264")]
+        }
+
         fn create(
             &mut self,
             env: EnvironmentRef<'_>,
