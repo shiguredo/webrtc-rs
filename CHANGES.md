@@ -12,6 +12,9 @@
 
 ## develop
 
+- [FIX] `VideoEncoderFactory` で `SimulcastEncoderAdapter` を使用するようにする
+  - `BuiltinVideoEncoderFactory` と同じパターンで simulcast に対応する
+  - @voluntas
 - [ADD] `I420Buffer` / `NV12Buffer` に stride 指定生成と連続領域参照 API を追加する
   - C API `webrtc_I420Buffer_CreateWithStrides` / `webrtc_NV12Buffer_CreateWithStrides` を追加し、Rust API `new_with_strides` を利用できるようにする
   - Rust API `data` / `data_mut` を追加し、YUV プレーン全体を連続メモリとして扱えるようにする
