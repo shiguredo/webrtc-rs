@@ -3249,6 +3249,31 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     );
 }
 
+#[test]
+fn simulcast_encoder_adapter_new_works() {
+    let env = Environment::new();
+    let primary_factory = VideoEncoderFactory::builtin();
+    let format = SdpVideoFormat::new("VP8");
+
+    let _adapter =
+        SimulcastEncoderAdapter::new(env.as_ref(), &primary_factory, None, format.as_ref());
+}
+
+#[test]
+fn simulcast_encoder_adapter_cast_to_video_encoder_works() {
+    let env = Environment::new();
+    let primary_factory = VideoEncoderFactory::builtin();
+    let format = SdpVideoFormat::new("VP8");
+
+    let adapter =
+        SimulcastEncoderAdapter::new(env.as_ref(), &primary_factory, None, format.as_ref());
+    let encoder = adapter.cast_to_video_encoder();
+    let info = encoder.get_encoder_info();
+    let _ = info
+        .implementation_name()
+        .expect("implementation_name の取得に失敗しました");
+}
+
 // VideoDecoderFactory の create callback と、VideoDecoder の decode callback が呼ばれることを確認する。
 #[test]
 fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {

@@ -23,6 +23,10 @@
 - [ADD] libyuv の `i420_copy` / `nv12_copy` API を追加する
   - C API `libyuv_I420Copy` / `libyuv_NV12Copy` を追加し、Rust API `i420_copy` / `nv12_copy` を利用できるようにする
   - @melpon
+- [ADD] `SimulcastEncoderAdapter` の C API / Rust API を追加する
+  - C API `webrtc_SimulcastEncoderAdapter_new` と `webrtc_SimulcastEncoderAdapter_cast_to_webrtc_VideoEncoder` を追加する
+  - Rust API `SimulcastEncoderAdapter::new` / `SimulcastEncoderAdapter::cast_to_video_encoder` を追加する
+  - @melpon
 
 ## 0.147.0
 
