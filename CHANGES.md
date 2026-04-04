@@ -28,6 +28,11 @@
   - Rust API `SimulcastEncoderAdapter::new` / `SimulcastEncoderAdapter::cast_to_video_encoder` を追加する
   - @melpon
 
+### misc
+
+- [UPDATE] prebuilt パッケージに `LICENSE` と `THIRD_PARTY_LICENSES.md` を同梱する
+  - @melpon
+
 ## 0.147.0
 
 **リリース日**: 2026-04-02
