@@ -27,6 +27,13 @@
   - C API `webrtc_SimulcastEncoderAdapter_new` と `webrtc_SimulcastEncoderAdapter_cast_to_webrtc_VideoEncoder` を追加する
   - Rust API `SimulcastEncoderAdapter::new` / `SimulcastEncoderAdapter::cast_to_video_encoder` を追加する
   - @melpon
+- [ADD] `VideoCodecRef` と `VideoFrame` の可変 API を追加する
+  - C API `webrtc_SimulcastStream*` を追加し、`webrtc_VideoCodec_simulcast_stream_at` と simulcast stream の getter/setter で `webrtc::SimulcastStream` を読み書きできるようにする
+  - C API `webrtc_VideoCodec_copy` を追加し、`webrtc::VideoCodec` をコピーできるようにする
+  - Rust API `VideoCodec` 所有型と `VideoCodecRef::to_owned` を追加し、`VideoCodecRef` のコピー編集を可能にする
+  - Rust API `SimulcastStreamRef` と `VideoCodecRef` の setter 群を追加する
+  - `VideoFrame::set_video_frame_buffer` を追加し、既存 frame の buffer 差し替えを可能にする
+  - @melpon
 
 ### misc
 

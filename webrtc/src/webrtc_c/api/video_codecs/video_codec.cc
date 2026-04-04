@@ -15,6 +15,20 @@
 #include "../../common.impl.h"
 
 extern "C" {
+WEBRTC_DEFINE_UNIQUE(webrtc_VideoCodec, webrtc::VideoCodec);
+
+WEBRTC_EXPORT struct webrtc_VideoCodec_unique* webrtc_VideoCodec_new() {
+  auto codec = std::make_unique<webrtc::VideoCodec>();
+  return reinterpret_cast<struct webrtc_VideoCodec_unique*>(codec.release());
+}
+
+WEBRTC_EXPORT struct webrtc_VideoCodec_unique* webrtc_VideoCodec_copy(
+    struct webrtc_VideoCodec* self) {
+  auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
+  auto copied = std::make_unique<webrtc::VideoCodec>(*codec);
+  return reinterpret_cast<struct webrtc_VideoCodec_unique*>(copied.release());
+}
+
 WEBRTC_EXPORT const int webrtc_VideoCodecType_Generic =
     static_cast<int>(webrtc::kVideoCodecGeneric);
 WEBRTC_EXPORT const int webrtc_VideoCodecType_VP8 =
@@ -65,14 +79,33 @@ WEBRTC_EXPORT int webrtc_VideoCodec_codec_type(struct webrtc_VideoCodec* self) {
   return static_cast<int>(codec->codecType);
 }
 
+WEBRTC_EXPORT void webrtc_VideoCodec_set_codec_type(
+    struct webrtc_VideoCodec* self,
+    int codec_type) {
+  auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
+  codec->codecType = static_cast<webrtc::VideoCodecType>(codec_type);
+}
+
 WEBRTC_EXPORT int webrtc_VideoCodec_width(struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
   return static_cast<int>(codec->width);
 }
 
+WEBRTC_EXPORT void webrtc_VideoCodec_set_width(struct webrtc_VideoCodec* self,
+                                               int width) {
+  auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
+  codec->width = static_cast<decltype(codec->width)>(width);
+}
+
 WEBRTC_EXPORT int webrtc_VideoCodec_height(struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
   return static_cast<int>(codec->height);
+}
+
+WEBRTC_EXPORT void webrtc_VideoCodec_set_height(struct webrtc_VideoCodec* self,
+                                                int height) {
+  auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
+  codec->height = static_cast<decltype(codec->height)>(height);
 }
 
 WEBRTC_EXPORT unsigned int webrtc_VideoCodec_start_bitrate_kbps(
@@ -81,10 +114,26 @@ WEBRTC_EXPORT unsigned int webrtc_VideoCodec_start_bitrate_kbps(
   return codec->startBitrate;
 }
 
+WEBRTC_EXPORT void webrtc_VideoCodec_set_start_bitrate_kbps(
+    struct webrtc_VideoCodec* self,
+    unsigned int start_bitrate_kbps) {
+  auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
+  codec->startBitrate =
+      static_cast<decltype(codec->startBitrate)>(start_bitrate_kbps);
+}
+
 WEBRTC_EXPORT unsigned int webrtc_VideoCodec_max_bitrate_kbps(
     struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
   return codec->maxBitrate;
+}
+
+WEBRTC_EXPORT void webrtc_VideoCodec_set_max_bitrate_kbps(
+    struct webrtc_VideoCodec* self,
+    unsigned int max_bitrate_kbps) {
+  auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
+  codec->maxBitrate =
+      static_cast<decltype(codec->maxBitrate)>(max_bitrate_kbps);
 }
 
 WEBRTC_EXPORT unsigned int webrtc_VideoCodec_min_bitrate_kbps(
@@ -93,10 +142,60 @@ WEBRTC_EXPORT unsigned int webrtc_VideoCodec_min_bitrate_kbps(
   return codec->minBitrate;
 }
 
+WEBRTC_EXPORT void webrtc_VideoCodec_set_min_bitrate_kbps(
+    struct webrtc_VideoCodec* self,
+    unsigned int min_bitrate_kbps) {
+  auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
+  codec->minBitrate =
+      static_cast<decltype(codec->minBitrate)>(min_bitrate_kbps);
+}
+
 WEBRTC_EXPORT uint32_t
 webrtc_VideoCodec_max_framerate(struct webrtc_VideoCodec* self) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
   return codec->maxFramerate;
+}
+
+WEBRTC_EXPORT void webrtc_VideoCodec_set_max_framerate(
+    struct webrtc_VideoCodec* self,
+    uint32_t max_framerate) {
+  auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
+  codec->maxFramerate =
+      static_cast<decltype(codec->maxFramerate)>(max_framerate);
+}
+
+WEBRTC_EXPORT int webrtc_VideoCodec_number_of_simulcast_streams(
+    struct webrtc_VideoCodec* self) {
+  auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
+  return static_cast<int>(codec->numberOfSimulcastStreams);
+}
+
+WEBRTC_EXPORT void webrtc_VideoCodec_set_number_of_simulcast_streams(
+    struct webrtc_VideoCodec* self,
+    int number_of_simulcast_streams) {
+  auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
+  int value = number_of_simulcast_streams;
+  if (value < 0) {
+    value = 0;
+  }
+  const int max_streams = static_cast<int>(sizeof(codec->simulcastStream) /
+                                           sizeof(codec->simulcastStream[0]));
+  if (value > max_streams) {
+    value = max_streams;
+  }
+  codec->numberOfSimulcastStreams =
+      static_cast<decltype(codec->numberOfSimulcastStreams)>(value);
+}
+
+WEBRTC_EXPORT struct webrtc_SimulcastStream*
+webrtc_VideoCodec_simulcast_stream_at(struct webrtc_VideoCodec* self,
+                                      int index) {
+  auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
+  if (index < 0 || index >= static_cast<int>(codec->numberOfSimulcastStreams)) {
+    return nullptr;
+  }
+  return reinterpret_cast<struct webrtc_SimulcastStream*>(
+      &codec->simulcastStream[index]);
 }
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_Settings_number_of_cores(

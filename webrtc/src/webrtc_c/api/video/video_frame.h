@@ -89,6 +89,9 @@ WEBRTC_EXPORT void webrtc_VideoFrameBuilder_set_is_repeat_frame(
 WEBRTC_DECLARE_UNIQUE(webrtc_VideoFrame);
 WEBRTC_EXPORT struct webrtc_VideoFrame_unique* webrtc_VideoFrame_copy(
     const struct webrtc_VideoFrame* self);
+WEBRTC_EXPORT void webrtc_VideoFrame_set_video_frame_buffer(
+    struct webrtc_VideoFrame* self,
+    struct webrtc_VideoFrameBuffer_refcounted* buffer);
 WEBRTC_EXPORT int webrtc_VideoFrame_width(const struct webrtc_VideoFrame* self);
 WEBRTC_EXPORT int webrtc_VideoFrame_height(
     const struct webrtc_VideoFrame* self);

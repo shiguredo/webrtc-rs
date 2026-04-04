@@ -15,9 +15,15 @@ extern "C" {
 // -------------------------
 
 struct webrtc_VideoCodec;
+struct webrtc_SimulcastStream;
 struct webrtc_VideoEncoder_Settings;
 struct webrtc_VideoEncoder_RateControlParameters;
 struct webrtc_VideoFrameType;
+
+WEBRTC_DECLARE_UNIQUE(webrtc_VideoCodec);
+WEBRTC_EXPORT struct webrtc_VideoCodec_unique* webrtc_VideoCodec_new();
+WEBRTC_EXPORT struct webrtc_VideoCodec_unique* webrtc_VideoCodec_copy(
+    struct webrtc_VideoCodec* self);
 
 WEBRTC_EXPORT extern const int webrtc_VideoCodecType_Generic;
 WEBRTC_EXPORT extern const int webrtc_VideoCodecType_VP8;
@@ -45,16 +51,43 @@ WEBRTC_EXPORT extern const int webrtc_VideoFrameType_Key;
 WEBRTC_EXPORT extern const int webrtc_VideoFrameType_Delta;
 
 WEBRTC_EXPORT int webrtc_VideoCodec_codec_type(struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_codec_type(
+    struct webrtc_VideoCodec* self,
+    int codec_type);
 WEBRTC_EXPORT int webrtc_VideoCodec_width(struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_width(struct webrtc_VideoCodec* self,
+                                               int width);
 WEBRTC_EXPORT int webrtc_VideoCodec_height(struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_height(struct webrtc_VideoCodec* self,
+                                                int height);
 WEBRTC_EXPORT unsigned int webrtc_VideoCodec_start_bitrate_kbps(
     struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_start_bitrate_kbps(
+    struct webrtc_VideoCodec* self,
+    unsigned int start_bitrate_kbps);
 WEBRTC_EXPORT unsigned int webrtc_VideoCodec_max_bitrate_kbps(
     struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_max_bitrate_kbps(
+    struct webrtc_VideoCodec* self,
+    unsigned int max_bitrate_kbps);
 WEBRTC_EXPORT unsigned int webrtc_VideoCodec_min_bitrate_kbps(
     struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_min_bitrate_kbps(
+    struct webrtc_VideoCodec* self,
+    unsigned int min_bitrate_kbps);
 WEBRTC_EXPORT uint32_t
 webrtc_VideoCodec_max_framerate(struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_max_framerate(
+    struct webrtc_VideoCodec* self,
+    uint32_t max_framerate);
+WEBRTC_EXPORT int webrtc_VideoCodec_number_of_simulcast_streams(
+    struct webrtc_VideoCodec* self);
+WEBRTC_EXPORT void webrtc_VideoCodec_set_number_of_simulcast_streams(
+    struct webrtc_VideoCodec* self,
+    int number_of_simulcast_streams);
+WEBRTC_EXPORT struct webrtc_SimulcastStream*
+webrtc_VideoCodec_simulcast_stream_at(struct webrtc_VideoCodec* self,
+                                      int index);
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_Settings_number_of_cores(
     struct webrtc_VideoEncoder_Settings* self);
