@@ -360,6 +360,83 @@ fn i420_buffer_and_video_frame() {
 }
 
 #[test]
+fn video_frame_set_video_frame_buffer_replaces_buffer() {
+    let src = I420Buffer::new(2, 2);
+    let src_buffer = src.cast_to_video_frame_buffer();
+    let dst = I420Buffer::new(4, 2);
+    let dst_buffer = dst.cast_to_video_frame_buffer();
+
+    let mut frame = VideoFrame::builder(&src_buffer)
+        .set_timestamp_us(123)
+        .build();
+    frame.set_video_frame_buffer(&dst_buffer);
+
+    assert_eq!(frame.width(), 4);
+    assert_eq!(frame.height(), 2);
+    assert_eq!(frame.timestamp_us(), 123);
+}
+
+#[test]
+fn video_codec_ref_getter_setter_and_simulcast_stream_ref_roundtrip() {
+    let mut codec = VideoCodec::new();
+    codec.set_codec_type(VideoCodecType::Av1);
+    codec.set_width(1280);
+    codec.set_height(720);
+    codec.set_start_bitrate_kbps(1200);
+    codec.set_min_bitrate_kbps(300);
+    codec.set_max_bitrate_kbps(2500);
+    codec.set_max_framerate(60);
+    codec.set_number_of_simulcast_streams(2);
+
+    assert_eq!(codec.codec_type(), VideoCodecType::Av1);
+    assert_eq!(codec.width(), 1280);
+    assert_eq!(codec.height(), 720);
+    assert_eq!(codec.start_bitrate_kbps(), 1200);
+    assert_eq!(codec.min_bitrate_kbps(), 300);
+    assert_eq!(codec.max_bitrate_kbps(), 2500);
+    assert_eq!(codec.max_framerate(), 60);
+    assert_eq!(codec.number_of_simulcast_streams(), 2);
+
+    {
+        let mut stream0 = codec
+            .simulcast_stream(0)
+            .expect("simulcast stream 0 の取得に失敗");
+        stream0.set_width(640);
+        stream0.set_height(360);
+        stream0.set_min_bitrate_kbps(150);
+        stream0.set_target_bitrate_kbps(500);
+        stream0.set_max_bitrate_kbps(900);
+        assert_eq!(stream0.width(), 640);
+        assert_eq!(stream0.height(), 360);
+        assert_eq!(stream0.min_bitrate_kbps(), 150);
+        assert_eq!(stream0.target_bitrate_kbps(), 500);
+        assert_eq!(stream0.max_bitrate_kbps(), 900);
+    }
+    {
+        let mut stream1 = codec
+            .simulcast_stream(1)
+            .expect("simulcast stream 1 の取得に失敗");
+        stream1.set_width(320);
+        stream1.set_height(180);
+        stream1.set_min_bitrate_kbps(80);
+        stream1.set_target_bitrate_kbps(240);
+        stream1.set_max_bitrate_kbps(400);
+        assert_eq!(stream1.width(), 320);
+        assert_eq!(stream1.height(), 180);
+        assert_eq!(stream1.min_bitrate_kbps(), 80);
+        assert_eq!(stream1.target_bitrate_kbps(), 240);
+        assert_eq!(stream1.max_bitrate_kbps(), 400);
+    }
+
+    assert!(codec.simulcast_stream(2).is_none());
+    let cloned = codec.as_ref().to_owned();
+    assert_eq!(cloned.codec_type(), VideoCodecType::Av1);
+    assert_eq!(cloned.width(), 1280);
+    assert_eq!(cloned.height(), 720);
+    assert_eq!(cloned.number_of_simulcast_streams(), 2);
+}
+
+#[test]
 fn i420_buffer_mutable_planes_and_video_frame_rtp_timestamp() {
     let mut buf = I420Buffer::new(4, 4);
     buf.y_data_mut().fill(0x11);

@@ -220,6 +220,21 @@ WEBRTC_EXPORT struct webrtc_VideoFrame_unique* webrtc_VideoFrame_copy(
   auto copied = std::make_unique<webrtc::VideoFrame>(*frame);
   return reinterpret_cast<struct webrtc_VideoFrame_unique*>(copied.release());
 }
+WEBRTC_EXPORT void webrtc_VideoFrame_set_video_frame_buffer(
+    struct webrtc_VideoFrame* self,
+    struct webrtc_VideoFrameBuffer_refcounted* buffer) {
+  if (buffer == nullptr) {
+    return;
+  }
+  auto frame = reinterpret_cast<webrtc::VideoFrame*>(self);
+  auto raw = webrtc_VideoFrameBuffer_refcounted_get(buffer);
+  if (raw == nullptr) {
+    return;
+  }
+  webrtc::scoped_refptr<webrtc::VideoFrameBuffer> buf(
+      reinterpret_cast<webrtc::VideoFrameBuffer*>(raw));
+  frame->set_video_frame_buffer(buf);
+}
 WEBRTC_EXPORT int webrtc_VideoFrame_width(
     const struct webrtc_VideoFrame* self) {
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);

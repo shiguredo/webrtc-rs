@@ -33,6 +33,7 @@
 #include "webrtc_c/api/video/video_sink_interface.h"
 #include "webrtc_c/api/video/video_source_interface.h"
 #include "webrtc_c/api/video_codecs/sdp_video_format.h"
+#include "webrtc_c/api/video_codecs/simulcast_stream.h"
 #include "webrtc_c/api/video_codecs/video_codec.h"
 #include "webrtc_c/api/video_codecs/video_decoder.h"
 #include "webrtc_c/api/video_codecs/video_decoder_factory.h"

@@ -382,6 +382,7 @@ add_library(webrtc_c
     src/webrtc_c/api/video/video_sink_interface.cc
     src/webrtc_c/api/video/video_source_interface.cc
     src/webrtc_c/api/video_codecs/video_codec.cc
+    src/webrtc_c/api/video_codecs/simulcast_stream.cc
     src/webrtc_c/api/video_codecs/video_decoder.cc
     src/webrtc_c/api/video_codecs/video_encoder.cc
     src/webrtc_c/api/video_codecs/sdp_video_format.cc
