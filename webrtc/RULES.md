@@ -4,6 +4,10 @@
 
 - C ラッパーには libwebrtc との薄い対応のみを実装し、便利関数や機能追加を行ってはいけない
 - C ラッパーは薄く保ち、基本的に **元の C++ API のシグネチャ・名前に忠実に** 移植すること。独自の便利関数やパラメータ展開は禁止
+- **C ラッパーのファイルパスは、元になった C++ ファイルのパスと一致させること**
+  - 例えば `webrtc::VideoFrame` は `<api/video/video_frame.h>` で宣言されているので、この C 版を `"webrtc_c/api/video/video_frame.h"` ファイルを作って記述する
+  - ただし厳密にやる必要は無く、ある程度分割をサボっても良いものとする
+    - 例えば `webrtc_c/api/environment.h` は本来 `api/environment/environment.h` と `api/environment/environment_factory.h` に分かれているが、分ける意味があまり無いので纏めている。
 - C++ 側の `webrtc::Xxx` というクラスは `struct webrtc_Xxx` に対応させる。
 - C++ 側の `webrtc::Xxx` の `Yyy` 関数は `webrtc_Xxx_Yyy` 関数に対応させる。
 - `webrtc::scoped_refptr<CppType>` は `struct CType_refcounted*` として扱い、手動で `CType_AddRef` 及び `CType_Release` を呼ぶことで寿命を管理する
@@ -16,10 +20,6 @@
 - `std::optional<CppType>` は `struct CType*` として扱う
   - 引数の型が `CppType` である C++ の関数を移植するときには `struct CType*` として、必要に応じて C++ 側の内部でコピーやムーブなどを行う
 - C++ の構造体 `CppType` の `field` 変数へ読み書きする場合には `CppType_get_field` や `CppType_set_field` 関数を定義する
-- C++ 側の `webrtc::Xxx` というクラスや関数などに対応する C の構造体や関数などを定義するファイルは、基本的には `webrtc::Xxx` があったパスと合わせる
-  - 例えば `webrtc::VideoFrame` は `<api/video/video_frame.h>` で宣言されているので、この C 版を `"webrtc_c/api/video/video_frame.h"` ファイルを作って記述する
-  - ただし厳密にやる必要は無く、ある程度分割をサボっても良いものとする
-    - 例えば `webrtc_c/api/environment.h` は本来 `api/environment/environment.h` と `api/environment/environment_factory.h` に分かれているが、分ける意味があまり無いので纏めている。
 - `*_refcounted` の型を直接 C++ の型にキャストしてはならない
   - 必ず `*_refcounted_get()` 関数を経由すること
 - C++ オブジェクトを `*_refcounted` に渡すときは、必ず `webrtc::scoped_refptr<CppType>` で構築し、 `p.release()` したもののみをキャストする。

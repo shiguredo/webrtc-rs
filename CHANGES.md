@@ -12,12 +12,20 @@
 
 ## develop
 
+- [CHANGE] `VideoEncoderFactoryHandler` / `VideoDecoderFactoryHandler` の create 戻り値の型を変更する
+  - `VideoEncoderFactoryHandler::create` の戻り値を `Option<VideoEncoder>` に変更する
+  - `VideoDecoderFactoryHandler::create` の戻り値を `Option<VideoDecoder>` に変更する
+  - @melpon
 - [ADD] `I420Buffer` / `NV12Buffer` に stride 指定生成と連続領域参照 API を追加する
   - C API `webrtc_I420Buffer_CreateWithStrides` / `webrtc_NV12Buffer_CreateWithStrides` を追加し、Rust API `new_with_strides` を利用できるようにする
   - Rust API `data` / `data_mut` を追加し、YUV プレーン全体を連続メモリとして扱えるようにする
   - @melpon
 - [ADD] libyuv の `i420_copy` / `nv12_copy` API を追加する
   - C API `libyuv_I420Copy` / `libyuv_NV12Copy` を追加し、Rust API `i420_copy` / `nv12_copy` を利用できるようにする
+  - @melpon
+- [ADD] `SimulcastEncoderAdapter` の C API / Rust API を追加する
+  - C API `webrtc_SimulcastEncoderAdapter_new` と `webrtc_SimulcastEncoderAdapter_cast_to_webrtc_VideoEncoder` を追加する
+  - Rust API `SimulcastEncoderAdapter::new` / `SimulcastEncoderAdapter::cast_to_video_encoder` を追加する
   - @melpon
 
 ## 0.147.0

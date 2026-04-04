@@ -2596,7 +2596,7 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
             &mut self,
             env: EnvironmentRef<'_>,
             format: SdpVideoFormatRef<'_>,
-        ) -> Option<Box<dyn VideoEncoderHandler>> {
+        ) -> Option<VideoEncoder> {
             assert!(!env.as_ptr().is_null());
             assert_eq!(
                 format
@@ -2608,7 +2608,9 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
                 return None;
             }
             self.created = true;
-            Some(Box::new(TestVideoEncoderHandler { encode_count: 0 }))
+            Some(VideoEncoder::new_with_handler(Box::new(
+                TestVideoEncoderHandler { encode_count: 0 },
+            )))
         }
     }
 
@@ -3020,7 +3022,7 @@ fn video_encoder_factory_create_calls_create_callback() {
             &mut self,
             env: EnvironmentRef<'_>,
             format: SdpVideoFormatRef<'_>,
-        ) -> Option<Box<dyn VideoEncoderHandler>> {
+        ) -> Option<VideoEncoder> {
             self.called.store(true, std::sync::atomic::Ordering::SeqCst);
             assert!(!env.as_ptr().is_null());
             assert_eq!(
@@ -3029,7 +3031,7 @@ fn video_encoder_factory_create_calls_create_callback() {
                     .expect("SdpVideoFormatRef::name に失敗しました"),
                 "H264"
             );
-            Some(Box::new(NoopHandler))
+            Some(VideoEncoder::new_with_handler(Box::new(NoopHandler)))
         }
     }
 
@@ -3057,7 +3059,7 @@ fn video_decoder_factory_create_calls_create_callback() {
             &mut self,
             env: EnvironmentRef<'_>,
             format: SdpVideoFormatRef<'_>,
-        ) -> Option<Box<dyn VideoDecoderHandler>> {
+        ) -> Option<VideoDecoder> {
             self.called.store(true, std::sync::atomic::Ordering::SeqCst);
             assert!(!env.as_ptr().is_null());
             assert_eq!(
@@ -3066,7 +3068,7 @@ fn video_decoder_factory_create_calls_create_callback() {
                     .expect("SdpVideoFormatRef::name に失敗しました"),
                 "H264"
             );
-            Some(Box::new(NoopHandler))
+            Some(VideoDecoder::new_with_handler(Box::new(NoopHandler)))
         }
     }
 
@@ -3247,6 +3249,31 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     );
 }
 
+#[test]
+fn simulcast_encoder_adapter_new_works() {
+    let env = Environment::new();
+    let primary_factory = VideoEncoderFactory::builtin();
+    let format = SdpVideoFormat::new("VP8");
+
+    let _adapter =
+        SimulcastEncoderAdapter::new(env.as_ref(), &primary_factory, None, format.as_ref());
+}
+
+#[test]
+fn simulcast_encoder_adapter_cast_to_video_encoder_works() {
+    let env = Environment::new();
+    let primary_factory = VideoEncoderFactory::builtin();
+    let format = SdpVideoFormat::new("VP8");
+
+    let adapter =
+        SimulcastEncoderAdapter::new(env.as_ref(), &primary_factory, None, format.as_ref());
+    let encoder = adapter.cast_to_video_encoder();
+    let info = encoder.get_encoder_info();
+    let _ = info
+        .implementation_name()
+        .expect("implementation_name の取得に失敗しました");
+}
+
 // VideoDecoderFactory の create callback と、VideoDecoder の decode callback が呼ばれることを確認する。
 #[test]
 fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
@@ -3274,13 +3301,15 @@ fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
             &mut self,
             env: EnvironmentRef<'_>,
             _format: SdpVideoFormatRef<'_>,
-        ) -> Option<Box<dyn VideoDecoderHandler>> {
+        ) -> Option<VideoDecoder> {
             assert!(!env.as_ptr().is_null());
             if self.created {
                 return None;
             }
             self.created = true;
-            Some(Box::new(TestVideoDecoderHandler { decode_count: 0 }))
+            Some(VideoDecoder::new_with_handler(Box::new(
+                TestVideoDecoderHandler { decode_count: 0 },
+            )))
         }
     }
 

@@ -230,7 +230,7 @@ pub trait VideoDecoderFactoryHandler: Send {
         &mut self,
         env: EnvironmentRef<'_>,
         format: SdpVideoFormatRef<'_>,
-    ) -> Option<Box<dyn VideoDecoderHandler>> {
+    ) -> Option<VideoDecoder> {
         None
     }
 }
@@ -364,7 +364,7 @@ unsafe extern "C" fn video_decoder_factory_create(
     let env = unsafe { EnvironmentRef::from_raw(env) };
     let format = unsafe { SdpVideoFormatRef::from_raw(format) };
     match state.handler.create(env, format) {
-        Some(handler) => VideoDecoder::new_with_handler(handler).into_raw(),
+        Some(decoder) => decoder.into_raw(),
         None => std::ptr::null_mut(),
     }
 }
@@ -441,35 +441,6 @@ impl VideoDecoder {
         let raw_unique =
             NonNull::new(raw).expect("webrtc_VideoDecoder_GetDecoderInfo が null を返しました");
         VideoDecoderDecoderInfo { raw_unique }
-    }
-}
-
-impl VideoDecoderHandler for VideoDecoder {
-    fn configure(&mut self, settings: VideoDecoderSettingsRef<'_>) -> bool {
-        VideoDecoder::configure(self, settings)
-    }
-
-    fn decode(
-        &mut self,
-        input_image: EncodedImageRef<'_>,
-        render_time_ms: i64,
-    ) -> VideoCodecStatus {
-        VideoDecoder::decode(self, input_image, render_time_ms)
-    }
-
-    fn register_decode_complete_callback(
-        &mut self,
-        callback: Option<VideoDecoderDecodedImageCallbackPtr>,
-    ) -> VideoCodecStatus {
-        VideoDecoder::register_decode_complete_callback(self, callback)
-    }
-
-    fn release(&mut self) -> VideoCodecStatus {
-        VideoDecoder::release(self)
-    }
-
-    fn get_decoder_info(&mut self) -> VideoDecoderDecoderInfo {
-        VideoDecoder::get_decoder_info(self)
     }
 }
 

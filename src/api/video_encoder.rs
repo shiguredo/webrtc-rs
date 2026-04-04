@@ -1768,7 +1768,7 @@ pub trait VideoEncoderFactoryHandler: Send {
         &mut self,
         env: EnvironmentRef<'_>,
         format: SdpVideoFormatRef<'_>,
-    ) -> Option<Box<dyn VideoEncoderHandler>> {
+    ) -> Option<VideoEncoder> {
         None
     }
 }
@@ -1951,7 +1951,7 @@ unsafe extern "C" fn video_encoder_factory_create(
     let env = unsafe { EnvironmentRef::from_raw(env) };
     let format = unsafe { SdpVideoFormatRef::from_raw(format) };
     match state.handler.create(env, format) {
-        Some(handler) => VideoEncoder::new_with_handler(handler).into_raw(),
+        Some(encoder) => encoder.into_raw(),
         None => std::ptr::null_mut(),
     }
 }
@@ -2048,43 +2048,6 @@ impl VideoEncoder {
     }
 }
 
-impl VideoEncoderHandler for VideoEncoder {
-    fn init_encode(
-        &mut self,
-        codec_settings: VideoCodecRef<'_>,
-        settings: VideoEncoderSettingsRef<'_>,
-    ) -> VideoCodecStatus {
-        VideoEncoder::init_encode(self, codec_settings, settings)
-    }
-
-    fn encode(
-        &mut self,
-        frame: VideoFrameRef<'_>,
-        frame_types: Option<VideoFrameTypeVectorRef<'_>>,
-    ) -> VideoCodecStatus {
-        VideoEncoder::encode(self, frame, frame_types)
-    }
-
-    fn register_encode_complete_callback(
-        &mut self,
-        callback: Option<VideoEncoderEncodedImageCallbackRef<'_>>,
-    ) -> VideoCodecStatus {
-        VideoEncoder::register_encode_complete_callback(self, callback)
-    }
-
-    fn release(&mut self) -> VideoCodecStatus {
-        VideoEncoder::release(self)
-    }
-
-    fn set_rates(&mut self, parameters: VideoEncoderRateControlParametersRef<'_>) {
-        VideoEncoder::set_rates(self, parameters);
-    }
-
-    fn get_encoder_info(&mut self) -> VideoEncoderEncoderInfo {
-        VideoEncoder::get_encoder_info(self)
-    }
-}
-
 impl Drop for VideoEncoder {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoEncoder_unique_delete(self.raw_unique.as_ptr()) };
@@ -2092,6 +2055,67 @@ impl Drop for VideoEncoder {
 }
 
 unsafe impl Send for VideoEncoder {}
+
+/// webrtc::SimulcastEncoderAdapter のラッパー。
+pub struct SimulcastEncoderAdapter {
+    raw_unique: NonNull<ffi::webrtc_SimulcastEncoderAdapter_unique>,
+}
+
+impl SimulcastEncoderAdapter {
+    pub fn new(
+        env: EnvironmentRef<'_>,
+        primary_factory: &VideoEncoderFactory,
+        fallback_factory: Option<&VideoEncoderFactory>,
+        format: SdpVideoFormatRef<'_>,
+    ) -> Self {
+        let fallback_factory =
+            fallback_factory.map_or(std::ptr::null_mut(), |factory| factory.as_ptr());
+        let raw_unique = unsafe {
+            ffi::webrtc_SimulcastEncoderAdapter_new(
+                env.as_ptr(),
+                primary_factory.as_ptr(),
+                fallback_factory,
+                format.as_ptr(),
+            )
+        };
+        let raw_unique = NonNull::new(raw_unique)
+            .expect("BUG: webrtc_SimulcastEncoderAdapter_new が null を返しました");
+        Self { raw_unique }
+    }
+
+    pub fn as_ptr(&self) -> *mut ffi::webrtc_SimulcastEncoderAdapter {
+        unsafe { ffi::webrtc_SimulcastEncoderAdapter_unique_get(self.raw_unique.as_ptr()) }
+    }
+
+    pub fn cast_to_video_encoder(self) -> VideoEncoder {
+        let raw = NonNull::new(self.as_ptr())
+            .expect("BUG: webrtc_SimulcastEncoderAdapter_unique_get が null を返しました");
+        let casted = NonNull::new(unsafe {
+            ffi::webrtc_SimulcastEncoderAdapter_cast_to_webrtc_VideoEncoder(raw.as_ptr())
+        })
+        .expect(
+            "BUG: webrtc_SimulcastEncoderAdapter_cast_to_webrtc_VideoEncoder が null を返しました",
+        );
+        debug_assert_eq!(casted.as_ptr() as usize, raw.as_ptr() as usize);
+
+        let raw_unique = std::mem::ManuallyDrop::new(self)
+            .raw_unique
+            .as_ptr()
+            .cast::<ffi::webrtc_VideoEncoder_unique>();
+        VideoEncoder {
+            raw_unique: NonNull::new(raw_unique)
+                .expect("BUG: webrtc_SimulcastEncoderAdapter_unique が null です"),
+        }
+    }
+}
+
+impl Drop for SimulcastEncoderAdapter {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_SimulcastEncoderAdapter_unique_delete(self.raw_unique.as_ptr()) };
+    }
+}
+
+unsafe impl Send for SimulcastEncoderAdapter {}
 
 /// webrtc::VideoEncoderFactory のラッパー。
 pub struct VideoEncoderFactory {
