@@ -7,6 +7,22 @@ use std::marker::PhantomData;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 
+pub fn no_picture_id() -> i16 {
+    unsafe { ffi::webrtc_kNoPictureId }
+}
+
+pub fn no_tl0_pic_idx() -> i16 {
+    unsafe { ffi::webrtc_kNoTl0PicIdx }
+}
+
+pub fn no_temporal_idx() -> u8 {
+    unsafe { ffi::webrtc_kNoTemporalIdx }
+}
+
+pub fn no_key_idx() -> i32 {
+    unsafe { ffi::webrtc_kNoKeyIdx }
+}
+
 pub struct VideoEncoderFramerateFractionInlinedVectorRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_EncoderInfo>,
@@ -1345,9 +1361,7 @@ impl<'a> CodecSpecificInfoRef<'a> {
     }
 
     pub fn vp9_first_frame_in_picture(&self) -> bool {
-        unsafe {
-            ffi::webrtc_CodecSpecificInfo_vp9_first_frame_in_picture(self.raw.as_ptr()) != 0
-        }
+        unsafe { ffi::webrtc_CodecSpecificInfo_vp9_first_frame_in_picture(self.raw.as_ptr()) != 0 }
     }
 
     pub fn vp9_spatial_layer_resolution_present(&self) -> bool {
@@ -1494,7 +1508,11 @@ impl<'a> CodecSpecificInfoRef<'a> {
         unsafe {
             ffi::webrtc_CodecSpecificInfo_set_vp9_spatial_layer_resolution_present(
                 self.raw.as_ptr(),
-                if spatial_layer_resolution_present { 1 } else { 0 },
+                if spatial_layer_resolution_present {
+                    1
+                } else {
+                    0
+                },
             )
         };
     }

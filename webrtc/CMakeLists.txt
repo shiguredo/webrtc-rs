@@ -388,6 +388,7 @@ add_library(webrtc_c
     src/webrtc_c/api/video_codecs/sdp_video_format.cc
     src/webrtc_c/api/video_codecs/video_decoder_factory.cc
     src/webrtc_c/api/video_codecs/video_encoder_factory.cc
+    src/webrtc_c/modules/video_coding/codecs/interface/common_constants.cc
     src/webrtc_c/modules/video_coding/include/video_codec_interface.cc
     src/webrtc_c/libyuv.cc
     src/webrtc_c/media/base/adapted_video_track_source.cc
