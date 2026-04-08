@@ -7,6 +7,22 @@ use std::marker::PhantomData;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 
+pub fn no_picture_id() -> i16 {
+    unsafe { ffi::webrtc_kNoPictureId }
+}
+
+pub fn no_tl0_pic_idx() -> i16 {
+    unsafe { ffi::webrtc_kNoTl0PicIdx }
+}
+
+pub fn no_temporal_idx() -> u8 {
+    unsafe { ffi::webrtc_kNoTemporalIdx }
+}
+
+pub fn no_key_idx() -> i32 {
+    unsafe { ffi::webrtc_kNoKeyIdx }
+}
+
 pub struct VideoEncoderFramerateFractionInlinedVectorRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_EncoderInfo>,
@@ -1332,6 +1348,29 @@ impl<'a> CodecSpecificInfoRef<'a> {
         unsafe { ffi::webrtc_CodecSpecificInfo_vp9_inter_layer_predicted(self.raw.as_ptr()) != 0 }
     }
 
+    pub fn vp9_ss_data_available(&self) -> bool {
+        unsafe { ffi::webrtc_CodecSpecificInfo_vp9_ss_data_available(self.raw.as_ptr()) != 0 }
+    }
+
+    pub fn vp9_temporal_up_switch(&self) -> bool {
+        unsafe { ffi::webrtc_CodecSpecificInfo_vp9_temporal_up_switch(self.raw.as_ptr()) != 0 }
+    }
+
+    pub fn vp9_num_spatial_layers(&self) -> i32 {
+        unsafe { ffi::webrtc_CodecSpecificInfo_vp9_num_spatial_layers(self.raw.as_ptr()) }
+    }
+
+    pub fn vp9_first_frame_in_picture(&self) -> bool {
+        unsafe { ffi::webrtc_CodecSpecificInfo_vp9_first_frame_in_picture(self.raw.as_ptr()) != 0 }
+    }
+
+    pub fn vp9_spatial_layer_resolution_present(&self) -> bool {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_vp9_spatial_layer_resolution_present(self.raw.as_ptr())
+                != 0
+        }
+    }
+
     pub fn h264_packetization_mode(&self) -> H264PacketizationMode {
         let value =
             unsafe { ffi::webrtc_CodecSpecificInfo_h264_packetization_mode(self.raw.as_ptr()) };
@@ -1422,6 +1461,58 @@ impl<'a> CodecSpecificInfoRef<'a> {
             ffi::webrtc_CodecSpecificInfo_set_vp9_inter_layer_predicted(
                 self.raw.as_ptr(),
                 if inter_layer_predicted { 1 } else { 0 },
+            )
+        };
+    }
+
+    pub fn set_vp9_ss_data_available(&mut self, ss_data_available: bool) {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_set_vp9_ss_data_available(
+                self.raw.as_ptr(),
+                if ss_data_available { 1 } else { 0 },
+            )
+        };
+    }
+
+    pub fn set_vp9_temporal_up_switch(&mut self, temporal_up_switch: bool) {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_set_vp9_temporal_up_switch(
+                self.raw.as_ptr(),
+                if temporal_up_switch { 1 } else { 0 },
+            )
+        };
+    }
+
+    pub fn set_vp9_num_spatial_layers(&mut self, num_spatial_layers: i32) {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_set_vp9_num_spatial_layers(
+                self.raw.as_ptr(),
+                num_spatial_layers,
+            )
+        };
+    }
+
+    pub fn set_vp9_first_frame_in_picture(&mut self, first_frame_in_picture: bool) {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_set_vp9_first_frame_in_picture(
+                self.raw.as_ptr(),
+                if first_frame_in_picture { 1 } else { 0 },
+            )
+        };
+    }
+
+    pub fn set_vp9_spatial_layer_resolution_present(
+        &mut self,
+        spatial_layer_resolution_present: bool,
+    ) {
+        unsafe {
+            ffi::webrtc_CodecSpecificInfo_set_vp9_spatial_layer_resolution_present(
+                self.raw.as_ptr(),
+                if spatial_layer_resolution_present {
+                    1
+                } else {
+                    0
+                },
             )
         };
     }
@@ -1523,6 +1614,26 @@ impl CodecSpecificInfo {
         self.as_ref().vp9_inter_layer_predicted()
     }
 
+    pub fn vp9_ss_data_available(&self) -> bool {
+        self.as_ref().vp9_ss_data_available()
+    }
+
+    pub fn vp9_temporal_up_switch(&self) -> bool {
+        self.as_ref().vp9_temporal_up_switch()
+    }
+
+    pub fn vp9_num_spatial_layers(&self) -> i32 {
+        self.as_ref().vp9_num_spatial_layers()
+    }
+
+    pub fn vp9_first_frame_in_picture(&self) -> bool {
+        self.as_ref().vp9_first_frame_in_picture()
+    }
+
+    pub fn vp9_spatial_layer_resolution_present(&self) -> bool {
+        self.as_ref().vp9_spatial_layer_resolution_present()
+    }
+
     pub fn h264_packetization_mode(&self) -> H264PacketizationMode {
         self.as_ref().h264_packetization_mode()
     }
@@ -1579,6 +1690,31 @@ impl CodecSpecificInfo {
     pub fn set_vp9_inter_layer_predicted(&mut self, inter_layer_predicted: bool) {
         self.as_ref()
             .set_vp9_inter_layer_predicted(inter_layer_predicted);
+    }
+
+    pub fn set_vp9_ss_data_available(&mut self, ss_data_available: bool) {
+        self.as_ref().set_vp9_ss_data_available(ss_data_available);
+    }
+
+    pub fn set_vp9_temporal_up_switch(&mut self, temporal_up_switch: bool) {
+        self.as_ref().set_vp9_temporal_up_switch(temporal_up_switch);
+    }
+
+    pub fn set_vp9_num_spatial_layers(&mut self, num_spatial_layers: i32) {
+        self.as_ref().set_vp9_num_spatial_layers(num_spatial_layers);
+    }
+
+    pub fn set_vp9_first_frame_in_picture(&mut self, first_frame_in_picture: bool) {
+        self.as_ref()
+            .set_vp9_first_frame_in_picture(first_frame_in_picture);
+    }
+
+    pub fn set_vp9_spatial_layer_resolution_present(
+        &mut self,
+        spatial_layer_resolution_present: bool,
+    ) {
+        self.as_ref()
+            .set_vp9_spatial_layer_resolution_present(spatial_layer_resolution_present);
     }
 
     pub fn set_h264_packetization_mode(&mut self, packetization_mode: H264PacketizationMode) {

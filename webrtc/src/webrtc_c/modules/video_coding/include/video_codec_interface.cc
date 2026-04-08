@@ -156,6 +156,74 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_inter_layer_predicted(
   info->codecSpecific.VP9.inter_layer_predicted = inter_layer_predicted != 0;
 }
 
+WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_ss_data_available(
+    struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+  return info->codecSpecific.VP9.ss_data_available ? 1 : 0;
+}
+
+WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_ss_data_available(
+    struct webrtc_CodecSpecificInfo* self,
+    int ss_data_available) {
+  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+  info->codecSpecific.VP9.ss_data_available = ss_data_available != 0;
+}
+
+WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_temporal_up_switch(
+    struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+  return info->codecSpecific.VP9.temporal_up_switch ? 1 : 0;
+}
+
+WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_temporal_up_switch(
+    struct webrtc_CodecSpecificInfo* self,
+    int temporal_up_switch) {
+  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+  info->codecSpecific.VP9.temporal_up_switch = temporal_up_switch != 0;
+}
+
+WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_num_spatial_layers(
+    struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+  return static_cast<int>(info->codecSpecific.VP9.num_spatial_layers);
+}
+
+WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_num_spatial_layers(
+    struct webrtc_CodecSpecificInfo* self,
+    int num_spatial_layers) {
+  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+  info->codecSpecific.VP9.num_spatial_layers =
+      static_cast<uint8_t>(num_spatial_layers);
+}
+
+WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_first_frame_in_picture(
+    struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+  return info->codecSpecific.VP9.first_frame_in_picture ? 1 : 0;
+}
+
+WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_first_frame_in_picture(
+    struct webrtc_CodecSpecificInfo* self,
+    int first_frame_in_picture) {
+  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+  info->codecSpecific.VP9.first_frame_in_picture = first_frame_in_picture != 0;
+}
+
+WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_spatial_layer_resolution_present(
+    struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+  return info->codecSpecific.VP9.spatial_layer_resolution_present ? 1 : 0;
+}
+
+WEBRTC_EXPORT void
+webrtc_CodecSpecificInfo_set_vp9_spatial_layer_resolution_present(
+    struct webrtc_CodecSpecificInfo* self,
+    int spatial_layer_resolution_present) {
+  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+  info->codecSpecific.VP9.spatial_layer_resolution_present =
+      spatial_layer_resolution_present != 0;
+}
+
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_h264_packetization_mode(
     struct webrtc_CodecSpecificInfo* self) {
   auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);

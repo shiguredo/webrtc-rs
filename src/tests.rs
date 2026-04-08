@@ -113,6 +113,14 @@ fn media_type_constants() {
 }
 
 #[test]
+fn common_constants_values() {
+    assert_eq!(no_picture_id(), -1);
+    assert_eq!(no_tl0_pic_idx(), -1);
+    assert_eq!(no_temporal_idx(), 0xFF);
+    assert_eq!(no_key_idx(), -1);
+}
+
+#[test]
 fn session_description_to_string() {
     // datachannel 用の最小構成 SDP を使う。
     let sdp = "v=0\r\n\

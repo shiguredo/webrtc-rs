@@ -43,6 +43,7 @@
 #include "webrtc_c/libyuv.h"
 #include "webrtc_c/media/base/adapted_video_track_source.h"
 #include "webrtc_c/media/engine/simulcast_encoder_adapter.h"
+#include "webrtc_c/modules/video_coding/codecs/interface/common_constants.h"
 #include "webrtc_c/modules/video_coding/include/video_codec_interface.h"
 #include "webrtc_c/pc/connection_context.h"
 #include "webrtc_c/rtc_base/crypto_random.h"
