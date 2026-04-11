@@ -795,19 +795,25 @@ fn get_target_platform() -> String {
     }
 }
 
-/// `/etc/os-release` から Linux ディストリビューション識別子を解決する。
+/// `/etc/rpi-issue` や `/etc/os-release` から Linux ディストリビューション識別子を解決する。
 ///
 /// 引数: なし。
 ///
 /// 環境変数依存: なし。
 ///
 /// 戻り値:
-/// - `ubuntu-22.04` または `ubuntu-24.04`。
+/// - `ubuntu-22.04`
+/// - `ubuntu-24.04`
+/// - `raspberry-pi-os`
 ///
 /// 副作用:
 /// - `/etc/os-release` を読み込む。
 /// - サポート外の場合は panic する。
 fn detect_linux_distro() -> String {
+    if Path::new("/etc/rpi-issue").exists() {
+        return "raspberry-pi-os".to_string();
+    }
+
     if let Ok(content) = fs::read_to_string("/etc/os-release") {
         for line in content.lines() {
             if let Some(version) = line.strip_prefix("VERSION_ID=") {
