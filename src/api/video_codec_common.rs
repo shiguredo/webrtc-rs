@@ -144,6 +144,8 @@ pub struct SdpVideoFormat {
     raw_unique: NonNull<ffi::webrtc_SdpVideoFormat_unique>,
 }
 
+unsafe impl Send for SdpVideoFormat {}
+
 impl SdpVideoFormat {
     pub fn new(name: &str) -> Self {
         let raw = unsafe { ffi::webrtc_SdpVideoFormat_new(name.as_ptr() as *const _, name.len()) };
@@ -229,10 +231,18 @@ impl Clone for SdpVideoFormat {
     }
 }
 
+impl Drop for SdpVideoFormat {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_SdpVideoFormat_unique_delete(self.raw_unique.as_ptr()) };
+    }
+}
+
 pub struct SdpVideoFormatRef<'a> {
     raw: NonNull<ffi::webrtc_SdpVideoFormat>,
     _marker: PhantomData<&'a ffi::webrtc_SdpVideoFormat>,
 }
+
+unsafe impl<'a> Send for SdpVideoFormatRef<'a> {}
 
 impl<'a> SdpVideoFormatRef<'a> {
     /// # Safety
@@ -291,14 +301,6 @@ impl<'a> SdpVideoFormatRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for SdpVideoFormatRef<'a> {}
-
-impl Drop for SdpVideoFormat {
-    fn drop(&mut self) {
-        unsafe { ffi::webrtc_SdpVideoFormat_unique_delete(self.raw_unique.as_ptr()) };
-    }
-}
-
 pub fn fuzzy_match_sdp_video_format(
     supported_formats: &[SdpVideoFormat],
     format: SdpVideoFormatRef<'_>,
@@ -328,6 +330,8 @@ pub fn fuzzy_match_sdp_video_format(
 pub struct I420Buffer {
     raw_ref: ScopedRef<I420BufferHandle>,
 }
+
+unsafe impl Send for I420Buffer {}
 
 impl I420Buffer {
     pub fn new(width: i32, height: i32) -> Self {
@@ -549,6 +553,8 @@ impl I420Buffer {
 pub struct NV12Buffer {
     raw_ref: ScopedRef<NV12BufferHandle>,
 }
+
+unsafe impl Send for NV12Buffer {}
 
 impl NV12Buffer {
     pub fn new(width: i32, height: i32) -> Self {
@@ -837,6 +843,8 @@ struct VideoFrameBufferHandlerState {
     callback_thread: Option<std::thread::ThreadId>,
 }
 
+unsafe impl Send for VideoFrameBufferHandlerState {}
+
 #[cfg(debug_assertions)]
 fn assert_video_frame_buffer_handler_thread(state: &mut VideoFrameBufferHandlerState) {
     let current = std::thread::current().id();
@@ -945,6 +953,8 @@ unsafe extern "C" fn video_frame_buffer_on_destroy(user_data: *mut c_void) {
 pub struct VideoFrameBuffer {
     raw_ref: ScopedRef<VideoFrameBufferHandle>,
 }
+
+unsafe impl Send for VideoFrameBuffer {}
 
 impl VideoFrameBuffer {
     pub fn new_with_handler(handler: Box<dyn VideoFrameBufferHandler>) -> Self {
@@ -1115,11 +1125,7 @@ pub struct ColorSpace {
     raw_unique: NonNull<ffi::webrtc_ColorSpace_unique>,
 }
 
-impl Default for ColorSpace {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for ColorSpace {}
 
 impl ColorSpace {
     pub fn new() -> Self {
@@ -1150,23 +1156,23 @@ impl ColorSpace {
     }
 }
 
+impl Default for ColorSpace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for ColorSpace {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_ColorSpace_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
 
-unsafe impl Send for ColorSpace {}
-
 pub struct VideoFrameUpdateRect {
     raw_unique: NonNull<ffi::webrtc_VideoFrame_UpdateRect_unique>,
 }
 
-impl Default for VideoFrameUpdateRect {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for VideoFrameUpdateRect {}
 
 impl VideoFrameUpdateRect {
     pub fn new() -> Self {
@@ -1225,13 +1231,17 @@ impl VideoFrameUpdateRect {
     }
 }
 
+impl Default for VideoFrameUpdateRect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for VideoFrameUpdateRect {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoFrame_UpdateRect_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
-
-unsafe impl Send for VideoFrameUpdateRect {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VideoRotation {
@@ -1275,6 +1285,8 @@ impl VideoRotation {
 pub struct VideoFrameBuilder {
     raw_unique: NonNull<ffi::webrtc_VideoFrameBuilder_unique>,
 }
+
+unsafe impl Send for VideoFrameBuilder {}
 
 impl VideoFrameBuilder {
     fn new(buffer: &VideoFrameBuffer) -> Self {
@@ -1428,12 +1440,12 @@ impl Drop for VideoFrameBuilder {
     }
 }
 
-unsafe impl Send for VideoFrameBuilder {}
-
 /// webrtc::VideoFrame のラッパー。
 pub struct VideoFrame {
     raw_unique: NonNull<ffi::webrtc_VideoFrame_unique>,
 }
+
+unsafe impl Send for VideoFrame {}
 
 impl VideoFrame {
     pub fn builder(buffer: &VideoFrameBuffer) -> VideoFrameBuilder {
@@ -1538,6 +1550,8 @@ pub struct VideoFrameRef<'a> {
     raw: NonNull<ffi::webrtc_VideoFrame>,
     _marker: PhantomData<&'a ffi::webrtc_VideoFrame>,
 }
+
+unsafe impl<'a> Send for VideoFrameRef<'a> {}
 
 impl<'a> VideoFrameRef<'a> {
     /// C 側から渡された生ポインタを借用する。
@@ -1695,11 +1709,7 @@ pub struct VideoFrameTypeVector {
     raw: NonNull<ffi::webrtc_VideoFrameType_vector>,
 }
 
-impl Default for VideoFrameTypeVector {
-    fn default() -> Self {
-        Self::new(0)
-    }
-}
+unsafe impl Send for VideoFrameTypeVector {}
 
 impl VideoFrameTypeVector {
     pub fn new(size: i32) -> Self {
@@ -1731,18 +1741,24 @@ impl VideoFrameTypeVector {
     }
 }
 
+impl Default for VideoFrameTypeVector {
+    fn default() -> Self {
+        Self::new(0)
+    }
+}
+
 impl Drop for VideoFrameTypeVector {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoFrameType_vector_delete(self.raw.as_ptr()) };
     }
 }
 
-unsafe impl Send for VideoFrameTypeVector {}
-
 pub struct VideoFrameTypeVectorRef<'a> {
     raw: NonNull<ffi::webrtc_VideoFrameType_vector>,
     _marker: PhantomData<&'a ffi::webrtc_VideoFrameType_vector>,
 }
+
+unsafe impl<'a> Send for VideoFrameTypeVectorRef<'a> {}
 
 impl<'a> VideoFrameTypeVectorRef<'a> {
     /// # Safety
@@ -1783,8 +1799,6 @@ impl<'a> VideoFrameTypeVectorRef<'a> {
         self.raw.as_ptr()
     }
 }
-
-unsafe impl<'a> Send for VideoFrameTypeVectorRef<'a> {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VideoCodecType {
@@ -1943,6 +1957,8 @@ pub struct SimulcastStreamRef<'a> {
     _marker: PhantomData<&'a ffi::webrtc_SimulcastStream>,
 }
 
+unsafe impl<'a> Send for SimulcastStreamRef<'a> {}
+
 impl<'a> SimulcastStreamRef<'a> {
     /// # Safety
     /// `raw` は有効な `webrtc_SimulcastStream` を指している必要があります。
@@ -1994,17 +2010,11 @@ impl<'a> SimulcastStreamRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for SimulcastStreamRef<'a> {}
-
 pub struct VideoCodec {
     raw_unique: NonNull<ffi::webrtc_VideoCodec_unique>,
 }
 
-impl Default for VideoCodec {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for VideoCodec {}
 
 impl VideoCodec {
     pub fn new() -> Self {
@@ -2105,6 +2115,12 @@ impl VideoCodec {
     }
 }
 
+impl Default for VideoCodec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Clone for VideoCodec {
     fn clone(&self) -> Self {
         let raw_unique = NonNull::new(unsafe { ffi::webrtc_VideoCodec_copy(self.raw().as_ptr()) })
@@ -2119,12 +2135,12 @@ impl Drop for VideoCodec {
     }
 }
 
-unsafe impl Send for VideoCodec {}
-
 pub struct VideoCodecRef<'a> {
     raw: NonNull<ffi::webrtc_VideoCodec>,
     _marker: PhantomData<&'a ffi::webrtc_VideoCodec>,
 }
+
+unsafe impl<'a> Send for VideoCodecRef<'a> {}
 
 impl<'a> VideoCodecRef<'a> {
     /// # Safety
@@ -2224,11 +2240,11 @@ impl<'a> VideoCodecRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for VideoCodecRef<'a> {}
-
 pub struct EncodedImageBuffer {
     raw_ref: ScopedRef<EncodedImageBufferHandle>,
 }
+
+unsafe impl Send for EncodedImageBuffer {}
 
 impl EncodedImageBuffer {
     pub fn from_bytes(data: &[u8]) -> Self {
@@ -2265,17 +2281,11 @@ impl EncodedImageBuffer {
     }
 }
 
-unsafe impl Send for EncodedImageBuffer {}
-
 pub struct EncodedImage {
     raw_unique: NonNull<ffi::webrtc_EncodedImage_unique>,
 }
 
-impl Default for EncodedImage {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for EncodedImage {}
 
 impl EncodedImage {
     pub fn new() -> Self {
@@ -2342,18 +2352,24 @@ impl EncodedImage {
     }
 }
 
+impl Default for EncodedImage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for EncodedImage {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_EncodedImage_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
 
-unsafe impl Send for EncodedImage {}
-
 pub struct EncodedImageRef<'a> {
     raw: NonNull<ffi::webrtc_EncodedImage>,
     _marker: PhantomData<&'a ffi::webrtc_EncodedImage>,
 }
+
+unsafe impl<'a> Send for EncodedImageRef<'a> {}
 
 impl<'a> EncodedImageRef<'a> {
     /// # Safety
@@ -2422,5 +2438,3 @@ impl<'a> EncodedImageRef<'a> {
         self.raw.as_ptr()
     }
 }
-
-unsafe impl<'a> Send for EncodedImageRef<'a> {}

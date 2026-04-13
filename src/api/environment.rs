@@ -7,11 +7,7 @@ pub struct Environment {
     raw: NonNull<ffi::webrtc_Environment>,
 }
 
-impl Default for Environment {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for Environment {}
 
 impl Environment {
     /// webrtc_Environment を生成する
@@ -34,6 +30,12 @@ impl Environment {
     }
 }
 
+impl Default for Environment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for Environment {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_Environment_delete(self.raw.as_ptr()) };
@@ -45,6 +47,8 @@ pub struct EnvironmentRef<'a> {
     raw: NonNull<ffi::webrtc_Environment>,
     _marker: PhantomData<&'a ffi::webrtc_Environment>,
 }
+
+unsafe impl<'a> Send for EnvironmentRef<'a> {}
 
 impl<'a> EnvironmentRef<'a> {
     /// # Safety
@@ -61,5 +65,3 @@ impl<'a> EnvironmentRef<'a> {
         self.raw.as_ptr()
     }
 }
-
-unsafe impl<'a> Send for EnvironmentRef<'a> {}

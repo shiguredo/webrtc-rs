@@ -39,6 +39,8 @@ pub struct DtlsTransport {
     raw_ref: ScopedRef<DtlsTransportHandle>,
 }
 
+unsafe impl Send for DtlsTransport {}
+
 impl DtlsTransport {
     pub(crate) fn from_scoped_ref(raw_ref: ScopedRef<DtlsTransportHandle>) -> Self {
         Self { raw_ref }
@@ -66,8 +68,6 @@ impl DtlsTransport {
     }
 }
 
-unsafe impl Send for DtlsTransport {}
-
 // -------------------------
 // DtlsTransportObserver
 // -------------------------
@@ -81,6 +81,8 @@ pub trait DtlsTransportObserverHandler: Send {
 struct DtlsTransportObserverHandlerState {
     handler: Box<dyn DtlsTransportObserverHandler>,
 }
+
+unsafe impl Send for DtlsTransportObserverHandlerState {}
 
 unsafe extern "C" fn dtls_observer_on_state_change(new_state: i32, user_data: *mut c_void) {
     assert!(
@@ -115,6 +117,8 @@ pub struct DtlsTransportObserver {
     raw: NonNull<ffi::webrtc_DtlsTransportObserver>,
 }
 
+unsafe impl Send for DtlsTransportObserver {}
+
 impl DtlsTransportObserver {
     pub fn new_with_handler(handler: Box<dyn DtlsTransportObserverHandler>) -> Self {
         let state = Box::new(DtlsTransportObserverHandlerState { handler });
@@ -147,5 +151,3 @@ impl Drop for DtlsTransportObserver {
         unsafe { ffi::webrtc_DtlsTransportObserver_delete(self.raw.as_ptr()) };
     }
 }
-
-unsafe impl Send for DtlsTransportObserver {}

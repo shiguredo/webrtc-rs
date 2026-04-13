@@ -15,6 +15,8 @@ struct VideoSinkHandlerState {
     handler: Box<dyn VideoSinkHandler>,
 }
 
+unsafe impl Send for VideoSinkHandlerState {}
+
 unsafe extern "C" fn video_sink_on_frame(
     frame: *const ffi::webrtc_VideoFrame,
     user_data: *mut c_void,
@@ -47,11 +49,7 @@ pub struct VideoSinkWants {
     raw: NonNull<ffi::webrtc_VideoSinkWants>,
 }
 
-impl Default for VideoSinkWants {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for VideoSinkWants {}
 
 impl VideoSinkWants {
     pub fn new() -> Self {
@@ -65,6 +63,12 @@ impl VideoSinkWants {
     }
 }
 
+impl Default for VideoSinkWants {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for VideoSinkWants {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoSinkWants_delete(self.raw.as_ptr()) };
@@ -75,6 +79,8 @@ impl Drop for VideoSinkWants {
 pub struct VideoSink {
     raw: NonNull<ffi::webrtc_VideoSinkInterface>,
 }
+
+unsafe impl Send for VideoSink {}
 
 impl VideoSink {
     pub fn new_with_handler(handler: Box<dyn VideoSinkHandler>) -> Self {
@@ -107,18 +113,16 @@ impl Drop for VideoSink {
     }
 }
 
-unsafe impl Send for VideoSink {}
-
 /// webrtc::AdaptedVideoTrackSource のラッパー。
 pub struct AdaptedVideoTrackSource {
     raw_ref: ScopedRef<AdaptedVideoTrackSourceHandle>,
 }
 
-impl Default for AdaptedVideoTrackSource {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for AdaptedVideoTrackSource {}
+
+// WebRTC 側でスレッドセーフに設計されているため Send/Sync として扱う。
+// ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/media/base/adapted_video_track_source.h;l=33-36;drc=0bdeb7818cb6248017867b5e7d4e1cba33500dfc
+unsafe impl Sync for AdaptedVideoTrackSource {}
 
 impl AdaptedVideoTrackSource {
     pub fn new() -> Self {
@@ -176,6 +180,12 @@ impl AdaptedVideoTrackSource {
     }
 }
 
+impl Default for AdaptedVideoTrackSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Clone for AdaptedVideoTrackSource {
     fn clone(&self) -> Self {
         Self {
@@ -183,11 +193,6 @@ impl Clone for AdaptedVideoTrackSource {
         }
     }
 }
-
-// WebRTC 側でスレッドセーフに設計されているため Send/Sync として扱う。
-// ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/media/base/adapted_video_track_source.h;l=33-36;drc=0bdeb7818cb6248017867b5e7d4e1cba33500dfc
-unsafe impl Send for AdaptedVideoTrackSource {}
-unsafe impl Sync for AdaptedVideoTrackSource {}
 
 /// AdaptFrame の出力結果。
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -200,6 +205,8 @@ pub struct AdaptedSize {
     pub crop_y: i32,
 }
 
+unsafe impl Send for AdaptedSize {}
+
 /// AdaptFrame の結果。
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct AdaptFrameResult {
@@ -207,10 +214,14 @@ pub struct AdaptFrameResult {
     pub size: AdaptedSize,
 }
 
+unsafe impl Send for AdaptFrameResult {}
+
 /// webrtc::VideoTrackSourceInterface のラッパー。
 pub struct VideoTrackSource {
     raw_ref: ScopedRef<VideoTrackSourceHandle>,
 }
+
+unsafe impl Send for VideoTrackSource {}
 
 impl VideoTrackSource {
     pub fn as_ptr(&self) -> *mut ffi::webrtc_VideoTrackSourceInterface {
@@ -230,12 +241,17 @@ impl Clone for VideoTrackSource {
     }
 }
 
-unsafe impl Send for VideoTrackSource {}
-
 /// webrtc::VideoTrackInterface のラッパー。
 pub struct VideoTrack {
     raw_ref: ScopedRef<VideoTrackHandle>,
 }
+
+unsafe impl Send for VideoTrack {}
+
+// VideoTracklInterface の実体はシーケンシャルにする Proxy 経由で
+// アクセスするためスレッドセーフに使用できる。
+// ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/pc/media_stream_track_proxy.h;l=42-61;drc=984699a83cf8728b92819642d256ef14f1611792
+unsafe impl Sync for VideoTrack {}
 
 impl VideoTrack {
     pub(crate) fn from_scoped_ref(raw_ref: ScopedRef<VideoTrackHandle>) -> Self {
@@ -282,9 +298,3 @@ impl Clone for VideoTrack {
         }
     }
 }
-
-unsafe impl Send for VideoTrack {}
-// VideoTracklInterface の実体はシーケンシャルにする Proxy 経由で
-// アクセスするためスレッドセーフに使用できる。
-// ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/pc/media_stream_track_proxy.h;l=42-61;drc=984699a83cf8728b92819642d256ef14f1611792
-unsafe impl Sync for VideoTrack {}

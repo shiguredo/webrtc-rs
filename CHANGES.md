@@ -12,6 +12,11 @@
 
 ## develop
 
+- [ADD] `src` 配下のほぼ全ての構造体に `Send` 実装を追加し、`impl` の定義順を統一する
+  - `struct` / `unsafe impl Send` / `unsafe impl Sync` / `impl X` / `impl Trait for X` の順序に揃える
+  - @melpon
+- [CHANGE] `thread_sleep_ms()` を `Thread::sleep_ms()` にする
+  - @melpon
 - [CHANGE] `VideoEncoderFactoryHandler` / `VideoDecoderFactoryHandler` の create 戻り値の型を変更する
   - `VideoEncoderFactoryHandler::create` の戻り値を `Option<VideoEncoder>` に変更する
   - `VideoDecoderFactoryHandler::create` の戻り値を `Option<VideoDecoder>` に変更する

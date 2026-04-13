@@ -7,6 +7,13 @@ pub struct MediaStream {
     raw_ref: ScopedRef<MediaStreamHandle>,
 }
 
+unsafe impl Send for MediaStream {}
+
+// ここで生成する MediaStreamInterface の実体はシーケンシャルにする Proxy 経由で
+// アクセスするためスレッドセーフに使用できる。
+// ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/pc/media_stream_proxy.h;l=21-40;drc=702cda56c1ee1a82d800698dd6e863e45fe5da49
+unsafe impl Sync for MediaStream {}
+
 impl MediaStream {
     pub(crate) fn from_scoped_ref(raw_ref: ScopedRef<MediaStreamHandle>) -> Self {
         Self { raw_ref }
@@ -140,9 +147,3 @@ impl Clone for MediaStream {
         }
     }
 }
-
-unsafe impl Send for MediaStream {}
-// ここで生成する MediaStreamInterface の実体はシーケンシャルにする Proxy 経由で
-// アクセスするためスレッドセーフに使用できる。
-// ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/pc/media_stream_proxy.h;l=21-40;drc=702cda56c1ee1a82d800698dd6e863e45fe5da49
-unsafe impl Sync for MediaStream {}

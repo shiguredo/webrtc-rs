@@ -11,6 +11,8 @@ pub struct AudioDecoderFactory {
     raw_ref: ScopedRef<AudioDecoderFactoryHandle>,
 }
 
+unsafe impl Send for AudioDecoderFactory {}
+
 impl AudioDecoderFactory {
     pub fn builtin() -> Self {
         let raw = NonNull::new(unsafe { ffi::webrtc_CreateBuiltinAudioDecoderFactory() })
@@ -32,6 +34,8 @@ impl AudioDecoderFactory {
 pub struct AudioEncoderFactory {
     raw_ref: ScopedRef<AudioEncoderFactoryHandle>,
 }
+
+unsafe impl Send for AudioEncoderFactory {}
 
 impl AudioEncoderFactory {
     pub fn builtin() -> Self {
@@ -55,6 +59,8 @@ pub struct AudioTrackSource {
     raw_ref: ScopedRef<AudioTrackSourceHandle>,
 }
 
+unsafe impl Send for AudioTrackSource {}
+
 impl AudioTrackSource {
     pub(crate) fn from_scoped_ref(raw_ref: ScopedRef<AudioTrackSourceHandle>) -> Self {
         Self { raw_ref }
@@ -69,12 +75,17 @@ impl AudioTrackSource {
     }
 }
 
-unsafe impl Send for AudioTrackSource {}
-
 /// webrtc::AudioTrackInterface のラッパー。
 pub struct AudioTrack {
     raw_ref: ScopedRef<AudioTrackHandle>,
 }
+
+unsafe impl Send for AudioTrack {}
+
+// AudioTrackInterface の実体はシーケンシャルにする Proxy 経由で
+// アクセスするためスレッドセーフに使用できる。
+// ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/pc/media_stream_track_proxy.h;l=26-40;drc=ef55be496e45889ace33ace4b05094ca19cb499b
+unsafe impl Sync for AudioTrack {}
 
 impl AudioTrack {
     pub(crate) fn from_scoped_ref(raw_ref: ScopedRef<AudioTrackHandle>) -> Self {
@@ -112,12 +123,6 @@ impl AudioTrack {
     }
 }
 
-unsafe impl Send for AudioTrack {}
-// AudioTrackInterface の実体はシーケンシャルにする Proxy 経由で
-// アクセスするためスレッドセーフに使用できる。
-// ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/pc/media_stream_track_proxy.h;l=26-40;drc=ef55be496e45889ace33ace4b05094ca19cb499b
-unsafe impl Sync for AudioTrack {}
-
 /// 音声データを受信するためのコールバックハンドラ。
 pub trait AudioTrackSinkHandler: Send {
     /// 音声データを受信した際に呼ばれる。
@@ -134,6 +139,8 @@ pub trait AudioTrackSinkHandler: Send {
 struct AudioTrackSinkHandlerState {
     handler: Box<dyn AudioTrackSinkHandler>,
 }
+
+unsafe impl Send for AudioTrackSinkHandlerState {}
 
 unsafe extern "C" fn audio_track_sink_on_data(
     audio_data: *const c_void,
@@ -172,6 +179,8 @@ pub struct AudioTrackSink {
     raw: NonNull<ffi::webrtc_AudioTrackSinkInterface>,
 }
 
+unsafe impl Send for AudioTrackSink {}
+
 impl AudioTrackSink {
     pub fn new_with_handler(handler: Box<dyn AudioTrackSinkHandler>) -> Self {
         let state = Box::new(AudioTrackSinkHandlerState { handler });
@@ -203,12 +212,12 @@ impl Drop for AudioTrackSink {
     }
 }
 
-unsafe impl Send for AudioTrackSink {}
-
 /// webrtc::AudioProcessingBuilderInterface のラッパー。
 pub struct AudioProcessingBuilder {
     raw_unique: NonNull<ffi::webrtc_AudioProcessingBuilderInterface_unique>,
 }
+
+unsafe impl Send for AudioProcessingBuilder {}
 
 impl AudioProcessingBuilder {
     /// BuiltinAudioProcessingBuilder を生成する。

@@ -8,6 +8,8 @@ pub struct RtcError {
     raw_unique: NonNull<ffi::webrtc_RTCError_unique>,
 }
 
+unsafe impl Send for RtcError {}
+
 impl RtcError {
     // 生ポインタから生成する。null ポインタの場合はエラーを返す。
     pub fn from_unique_ptr(raw: NonNull<ffi::webrtc_RTCError_unique>) -> Self {
@@ -43,5 +45,3 @@ impl Drop for RtcError {
         unsafe { ffi::webrtc_RTCError_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
-
-unsafe impl Send for RtcError {}

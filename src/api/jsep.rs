@@ -10,6 +10,8 @@ pub struct SdpParseError {
     raw_unique: NonNull<ffi::webrtc_SdpParseError_unique>,
 }
 
+unsafe impl Send for SdpParseError {}
+
 impl SdpParseError {
     pub fn from_unique_ptr(raw: NonNull<ffi::webrtc_SdpParseError_unique>) -> Self {
         Self { raw_unique: raw }
@@ -48,8 +50,6 @@ impl Drop for SdpParseError {
         unsafe { ffi::webrtc_SdpParseError_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
-
-unsafe impl Send for SdpParseError {}
 
 /// webrtc::SdpType のラッパー。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,6 +93,8 @@ impl SdpType {
 pub struct SessionDescription {
     raw_unique: NonNull<ffi::webrtc_SessionDescriptionInterface_unique>,
 }
+
+unsafe impl Send for SessionDescription {}
 
 impl SessionDescription {
     pub fn new(sdp_type: SdpType, sdp: &str) -> Result<Self> {
@@ -154,6 +156,8 @@ pub struct IceCandidateRef<'a> {
     _marker: PhantomData<&'a ffi::webrtc_IceCandidate>,
 }
 
+unsafe impl<'a> Send for IceCandidateRef<'a> {}
+
 impl<'a> IceCandidateRef<'a> {
     /// 生ポインタから借用ラップする。
     pub fn from_raw(raw: NonNull<ffi::webrtc_IceCandidate>) -> Self {
@@ -195,6 +199,8 @@ impl<'a> IceCandidateRef<'a> {
 pub struct IceCandidate {
     raw: NonNull<ffi::webrtc_IceCandidate>,
 }
+
+unsafe impl Send for IceCandidate {}
 
 impl IceCandidate {
     /// SDP 文字列から IceCandidate を生成する。

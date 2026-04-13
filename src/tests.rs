@@ -1775,7 +1775,7 @@ fn thread_blocking_call_runs() {
 
 #[test]
 fn thread_sleep_ms_runs() {
-    thread_sleep_ms(1);
+    Thread::sleep_ms(1);
 }
 
 #[test]

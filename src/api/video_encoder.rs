@@ -28,6 +28,8 @@ pub struct VideoEncoderFramerateFractionInlinedVectorRef<'a> {
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_EncoderInfo>,
 }
 
+unsafe impl<'a> Send for VideoEncoderFramerateFractionInlinedVectorRef<'a> {}
+
 impl<'a> VideoEncoderFramerateFractionInlinedVectorRef<'a> {
     /// # Safety
     /// `raw` は有効な `webrtc_VideoEncoder_FramerateFraction_inlined_vector` を指す必要があります。
@@ -103,12 +105,12 @@ impl<'a> VideoEncoderFramerateFractionInlinedVectorRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for VideoEncoderFramerateFractionInlinedVectorRef<'a> {}
-
 pub struct VideoFrameBufferKindInlinedVectorRef<'a> {
     raw: NonNull<ffi::webrtc_VideoFrameBuffer_Type_inlined_vector>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_EncoderInfo>,
 }
+
+unsafe impl<'a> Send for VideoFrameBufferKindInlinedVectorRef<'a> {}
 
 impl<'a> VideoFrameBufferKindInlinedVectorRef<'a> {
     /// # Safety
@@ -175,12 +177,12 @@ impl<'a> VideoFrameBufferKindInlinedVectorRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for VideoFrameBufferKindInlinedVectorRef<'a> {}
-
 pub struct VideoEncoderQpThresholdsRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_QpThresholds>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_QpThresholds>,
 }
+
+unsafe impl<'a> Send for VideoEncoderQpThresholdsRef<'a> {}
 
 impl<'a> VideoEncoderQpThresholdsRef<'a> {
     /// # Safety
@@ -209,17 +211,11 @@ impl<'a> VideoEncoderQpThresholdsRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for VideoEncoderQpThresholdsRef<'a> {}
-
 pub struct VideoEncoderQpThresholds {
     raw: NonNull<ffi::webrtc_VideoEncoder_QpThresholds>,
 }
 
-impl Default for VideoEncoderQpThresholds {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for VideoEncoderQpThresholds {}
 
 impl VideoEncoderQpThresholds {
     pub fn new() -> Self {
@@ -253,18 +249,24 @@ impl VideoEncoderQpThresholds {
     }
 }
 
+impl Default for VideoEncoderQpThresholds {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for VideoEncoderQpThresholds {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoEncoder_QpThresholds_delete(self.raw.as_ptr()) };
     }
 }
 
-unsafe impl Send for VideoEncoderQpThresholds {}
-
 pub struct VideoEncoderScalingSettingsRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_ScalingSettings>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_ScalingSettings>,
 }
+
+unsafe impl<'a> Send for VideoEncoderScalingSettingsRef<'a> {}
 
 impl<'a> VideoEncoderScalingSettingsRef<'a> {
     /// # Safety
@@ -324,17 +326,11 @@ impl<'a> VideoEncoderScalingSettingsRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for VideoEncoderScalingSettingsRef<'a> {}
-
 pub struct VideoEncoderScalingSettings {
     raw: NonNull<ffi::webrtc_VideoEncoder_ScalingSettings>,
 }
 
-impl Default for VideoEncoderScalingSettings {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for VideoEncoderScalingSettings {}
 
 impl VideoEncoderScalingSettings {
     pub fn new() -> Self {
@@ -368,18 +364,24 @@ impl VideoEncoderScalingSettings {
     }
 }
 
+impl Default for VideoEncoderScalingSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for VideoEncoderScalingSettings {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoEncoder_ScalingSettings_delete(self.raw.as_ptr()) };
     }
 }
 
-unsafe impl Send for VideoEncoderScalingSettings {}
-
 pub struct VideoEncoderResolutionBitrateLimitsRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_ResolutionBitrateLimits>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_ResolutionBitrateLimits>,
 }
+
+unsafe impl<'a> Send for VideoEncoderResolutionBitrateLimitsRef<'a> {}
 
 impl<'a> VideoEncoderResolutionBitrateLimitsRef<'a> {
     /// # Safety
@@ -456,11 +458,11 @@ impl<'a> VideoEncoderResolutionBitrateLimitsRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for VideoEncoderResolutionBitrateLimitsRef<'a> {}
-
 pub struct VideoEncoderResolutionBitrateLimits {
     raw: NonNull<ffi::webrtc_VideoEncoder_ResolutionBitrateLimits>,
 }
+
+unsafe impl Send for VideoEncoderResolutionBitrateLimits {}
 
 impl VideoEncoderResolutionBitrateLimits {
     pub fn new(
@@ -529,12 +531,12 @@ impl Drop for VideoEncoderResolutionBitrateLimits {
     }
 }
 
-unsafe impl Send for VideoEncoderResolutionBitrateLimits {}
-
 pub struct VideoEncoderResolutionBitrateLimitsVectorRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_vector>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_EncoderInfo>,
 }
+
+unsafe impl<'a> Send for VideoEncoderResolutionBitrateLimitsVectorRef<'a> {}
 
 impl<'a> VideoEncoderResolutionBitrateLimitsVectorRef<'a> {
     /// # Safety
@@ -601,12 +603,12 @@ impl<'a> VideoEncoderResolutionBitrateLimitsVectorRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for VideoEncoderResolutionBitrateLimitsVectorRef<'a> {}
-
 pub struct VideoEncoderResolutionRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_Resolution>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_Resolution>,
 }
+
+unsafe impl<'a> Send for VideoEncoderResolutionRef<'a> {}
 
 impl<'a> VideoEncoderResolutionRef<'a> {
     /// # Safety
@@ -635,17 +637,11 @@ impl<'a> VideoEncoderResolutionRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for VideoEncoderResolutionRef<'a> {}
-
 pub struct VideoEncoderResolution {
     raw: NonNull<ffi::webrtc_VideoEncoder_Resolution>,
 }
 
-impl Default for VideoEncoderResolution {
-    fn default() -> Self {
-        Self::new(0, 0)
-    }
-}
+unsafe impl Send for VideoEncoderResolution {}
 
 impl VideoEncoderResolution {
     pub fn new(width: i32, height: i32) -> Self {
@@ -679,23 +675,23 @@ impl VideoEncoderResolution {
     }
 }
 
+impl Default for VideoEncoderResolution {
+    fn default() -> Self {
+        Self::new(0, 0)
+    }
+}
+
 impl Drop for VideoEncoderResolution {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoEncoder_Resolution_delete(self.raw.as_ptr()) };
     }
 }
 
-unsafe impl Send for VideoEncoderResolution {}
-
 pub struct VideoEncoderEncoderInfo {
     raw_unique: NonNull<ffi::webrtc_VideoEncoder_EncoderInfo_unique>,
 }
 
-impl Default for VideoEncoderEncoderInfo {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for VideoEncoderEncoderInfo {}
 
 impl VideoEncoderEncoderInfo {
     pub fn new() -> Self {
@@ -985,18 +981,24 @@ impl VideoEncoderEncoderInfo {
     }
 }
 
+impl Default for VideoEncoderEncoderInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for VideoEncoderEncoderInfo {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoEncoder_EncoderInfo_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
 
-unsafe impl Send for VideoEncoderEncoderInfo {}
-
 pub struct VideoEncoderSettingsRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_Settings>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_Settings>,
 }
+
+unsafe impl<'a> Send for VideoEncoderSettingsRef<'a> {}
 
 impl<'a> VideoEncoderSettingsRef<'a> {
     /// # Safety
@@ -1034,12 +1036,12 @@ impl<'a> VideoEncoderSettingsRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for VideoEncoderSettingsRef<'a> {}
-
 pub struct VideoEncoderRateControlParametersRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_RateControlParameters>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_RateControlParameters>,
 }
+
+unsafe impl<'a> Send for VideoEncoderRateControlParametersRef<'a> {}
 
 impl<'a> VideoEncoderRateControlParametersRef<'a> {
     /// # Safety
@@ -1078,8 +1080,6 @@ impl<'a> VideoEncoderRateControlParametersRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for VideoEncoderRateControlParametersRef<'a> {}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VideoEncoderEncodedImageCallbackResultError {
     Ok,
@@ -1111,6 +1111,8 @@ impl VideoEncoderEncodedImageCallbackResultError {
 pub struct VideoEncoderEncodedImageCallbackResult {
     raw_unique: NonNull<ffi::webrtc_VideoEncoder_EncodedImageCallback_Result_unique>,
 }
+
+unsafe impl Send for VideoEncoderEncodedImageCallbackResult {}
 
 impl VideoEncoderEncodedImageCallbackResult {
     pub fn new(error: VideoEncoderEncodedImageCallbackResultError) -> Self {
@@ -1218,12 +1220,12 @@ impl Drop for VideoEncoderEncodedImageCallbackResult {
     }
 }
 
-unsafe impl Send for VideoEncoderEncodedImageCallbackResult {}
-
 #[derive(Clone, Copy)]
 pub struct VideoEncoderEncodedImageCallbackPtr {
     raw: NonNull<ffi::webrtc_VideoEncoder_EncodedImageCallback>,
 }
+
+unsafe impl Send for VideoEncoderEncodedImageCallbackPtr {}
 
 impl VideoEncoderEncodedImageCallbackPtr {
     /// # Safety
@@ -1263,8 +1265,6 @@ impl VideoEncoderEncodedImageCallbackPtr {
     }
 }
 
-unsafe impl Send for VideoEncoderEncodedImageCallbackPtr {}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum H264PacketizationMode {
     NonInterleaved,
@@ -1296,6 +1296,8 @@ pub struct CodecSpecificInfoRef<'a> {
     raw: NonNull<ffi::webrtc_CodecSpecificInfo>,
     _marker: PhantomData<&'a ffi::webrtc_CodecSpecificInfo>,
 }
+
+unsafe impl<'a> Send for CodecSpecificInfoRef<'a> {}
 
 impl<'a> CodecSpecificInfoRef<'a> {
     /// # Safety
@@ -1555,17 +1557,11 @@ impl<'a> CodecSpecificInfoRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for CodecSpecificInfoRef<'a> {}
-
 pub struct CodecSpecificInfo {
     raw_unique: NonNull<ffi::webrtc_CodecSpecificInfo_unique>,
 }
 
-impl Default for CodecSpecificInfo {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for CodecSpecificInfo {}
 
 impl CodecSpecificInfo {
     pub fn new() -> Self {
@@ -1744,13 +1740,17 @@ impl CodecSpecificInfo {
     }
 }
 
+impl Default for CodecSpecificInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for CodecSpecificInfo {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_CodecSpecificInfo_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
-
-unsafe impl Send for CodecSpecificInfo {}
 
 pub trait VideoEncoderEncodedImageCallbackHandler: Send {
     #[expect(unused_variables)]
@@ -1766,6 +1766,8 @@ pub trait VideoEncoderEncodedImageCallbackHandler: Send {
 pub struct VideoEncoderEncodedImageCallback {
     raw: NonNull<ffi::webrtc_VideoEncoder_EncodedImageCallback>,
 }
+
+unsafe impl Send for VideoEncoderEncodedImageCallback {}
 
 impl VideoEncoderEncodedImageCallback {
     pub fn new_with_handler(handler: Box<dyn VideoEncoderEncodedImageCallbackHandler>) -> Self {
@@ -1811,12 +1813,12 @@ impl Drop for VideoEncoderEncodedImageCallback {
     }
 }
 
-unsafe impl Send for VideoEncoderEncodedImageCallback {}
-
 pub struct VideoEncoderEncodedImageCallbackRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_EncodedImageCallback>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_EncodedImageCallback>,
 }
+
+unsafe impl<'a> Send for VideoEncoderEncodedImageCallbackRef<'a> {}
 
 impl<'a> VideoEncoderEncodedImageCallbackRef<'a> {
     /// # Safety
@@ -1852,8 +1854,6 @@ impl<'a> VideoEncoderEncodedImageCallbackRef<'a> {
         unsafe { VideoEncoderEncodedImageCallbackResult::from_raw_unique(raw_unique) }
     }
 }
-
-unsafe impl<'a> Send for VideoEncoderEncodedImageCallbackRef<'a> {}
 
 pub trait VideoEncoderHandler: Send {
     #[expect(unused_variables)]
@@ -1913,13 +1913,19 @@ struct VideoEncoderHandlerState {
     handler: Box<dyn VideoEncoderHandler>,
 }
 
+unsafe impl Send for VideoEncoderHandlerState {}
+
 struct VideoEncoderEncodedImageHandlerState {
     handler: Box<dyn VideoEncoderEncodedImageCallbackHandler>,
 }
 
+unsafe impl Send for VideoEncoderEncodedImageHandlerState {}
+
 struct VideoEncoderFactoryHandlerState {
     handler: Box<dyn VideoEncoderFactoryHandler>,
 }
+
+unsafe impl Send for VideoEncoderFactoryHandlerState {}
 
 unsafe extern "C" fn video_encoder_on_destroy(user_data: *mut c_void) {
     assert!(
@@ -2097,6 +2103,8 @@ pub struct VideoEncoder {
     raw_unique: NonNull<ffi::webrtc_VideoEncoder_unique>,
 }
 
+unsafe impl Send for VideoEncoder {}
+
 impl VideoEncoder {
     pub fn new_with_handler(handler: Box<dyn VideoEncoderHandler>) -> Self {
         let state = Box::new(VideoEncoderHandlerState { handler });
@@ -2190,12 +2198,12 @@ impl Drop for VideoEncoder {
     }
 }
 
-unsafe impl Send for VideoEncoder {}
-
 /// webrtc::SimulcastEncoderAdapter のラッパー。
 pub struct SimulcastEncoderAdapter {
     raw_unique: NonNull<ffi::webrtc_SimulcastEncoderAdapter_unique>,
 }
+
+unsafe impl Send for SimulcastEncoderAdapter {}
 
 impl SimulcastEncoderAdapter {
     pub fn new(
@@ -2251,12 +2259,12 @@ impl Drop for SimulcastEncoderAdapter {
     }
 }
 
-unsafe impl Send for SimulcastEncoderAdapter {}
-
 /// webrtc::VideoEncoderFactory のラッパー。
 pub struct VideoEncoderFactory {
     raw_unique: NonNull<ffi::webrtc_VideoEncoderFactory_unique>,
 }
+
+unsafe impl Send for VideoEncoderFactory {}
 
 impl VideoEncoderFactory {
     pub fn builtin() -> Self {
@@ -2406,5 +2414,3 @@ impl Drop for VideoEncoderFactory {
         unsafe { ffi::webrtc_VideoEncoderFactory_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
-
-unsafe impl Send for VideoEncoderFactory {}

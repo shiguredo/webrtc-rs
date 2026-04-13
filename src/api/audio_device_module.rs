@@ -10,6 +10,11 @@ pub struct AudioDeviceModule {
     raw_ref: ScopedRef<AudioDeviceModuleHandle>,
 }
 
+// AudioDeviceModule は生成と削除を同じスレッドで実行する必要がある（※）ため Send/Sync にはしない。
+// ※同一スレッドの制約があるのは一部のプラットフォーム（iOS, Android）のみ。実装によってはロックも取っていることもある
+// unsafe impl Send for AudioDeviceModule {}
+// unsafe impl Sync for AudioDeviceModule {}
+
 impl AudioDeviceModule {
     pub fn new(env: &Environment, audio_type: AudioDeviceModuleAudioLayer) -> Result<Self> {
         let raw = NonNull::new(unsafe {
@@ -179,11 +184,6 @@ impl Clone for AudioDeviceModule {
     }
 }
 
-// AudioDeviceModule は生成と削除を同じスレッドで実行する必要がある（※）ため Send/Sync にはしない。
-// ※同一スレッドの制約があるのは一部のプラットフォーム（iOS, Android）のみ。実装によってはロックも取っていることもある
-// unsafe impl Send for AudioDeviceModule {}
-// unsafe impl Sync for AudioDeviceModule {}
-
 /// AudioDeviceModule の AudioLayer。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AudioDeviceModuleAudioLayer {
@@ -247,6 +247,8 @@ impl AudioDeviceModuleAudioLayer {
 pub struct AudioTransportRef {
     raw: NonNull<ffi::webrtc_AudioTransport>,
 }
+
+unsafe impl Send for AudioTransportRef {}
 
 impl AudioTransportRef {
     fn from_raw(raw: *mut ffi::webrtc_AudioTransport) -> Option<Self> {
@@ -364,12 +366,12 @@ impl AudioTransportRef {
     }
 }
 
-unsafe impl Send for AudioTransportRef {}
-
 /// Rust 側でカスタム実装を持てる webrtc::AudioTransport の所有型。
 pub struct AudioTransport {
     raw: NonNull<ffi::webrtc_AudioTransport>,
 }
+
+unsafe impl Send for AudioTransport {}
 
 impl AudioTransport {
     pub fn new_with_handler(handler: Box<dyn AudioTransportHandler>) -> Self {
@@ -545,6 +547,8 @@ struct AudioTransportHandlerState {
     handler: Box<dyn AudioTransportHandler>,
 }
 
+unsafe impl Send for AudioTransportHandlerState {}
+
 unsafe extern "C" fn audio_transport_on_destroy(user_data: *mut c_void) {
     assert!(
         !user_data.is_null(),
@@ -655,6 +659,8 @@ pub struct AudioParameters {
     raw: NonNull<ffi::webrtc_AudioParameters_unique>,
 }
 
+unsafe impl Send for AudioParameters {}
+
 impl AudioParameters {
     pub fn new(sample_rate: i32, channels: usize, frames_per_buffer: usize) -> Self {
         let raw = NonNull::new(unsafe {
@@ -697,6 +703,8 @@ impl Drop for AudioParameters {
 pub struct AudioDeviceModuleStats {
     raw: NonNull<ffi::webrtc_AudioDeviceModule_Stats_unique>,
 }
+
+unsafe impl Send for AudioDeviceModuleStats {}
 
 impl AudioDeviceModuleStats {
     pub fn new(
@@ -990,6 +998,8 @@ pub trait AudioDeviceModuleHandler: Send + Sync {
 struct AudioDeviceModuleHandlerState {
     handler: Box<dyn AudioDeviceModuleHandler>,
 }
+
+unsafe impl Send for AudioDeviceModuleHandlerState {}
 
 fn bool_to_i32(value: bool) -> i32 {
     if value { 1 } else { 0 }

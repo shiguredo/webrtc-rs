@@ -11,11 +11,7 @@ pub struct VideoDecoderDecoderInfo {
     raw_unique: NonNull<ffi::webrtc_VideoDecoder_DecoderInfo_unique>,
 }
 
-impl Default for VideoDecoderDecoderInfo {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for VideoDecoderDecoderInfo {}
 
 impl VideoDecoderDecoderInfo {
     pub fn new() -> Self {
@@ -66,18 +62,24 @@ impl VideoDecoderDecoderInfo {
     }
 }
 
+impl Default for VideoDecoderDecoderInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for VideoDecoderDecoderInfo {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoDecoder_DecoderInfo_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
 
-unsafe impl Send for VideoDecoderDecoderInfo {}
-
 pub struct VideoDecoderSettingsRef<'a> {
     raw: NonNull<ffi::webrtc_VideoDecoder_Settings>,
     _marker: PhantomData<&'a ffi::webrtc_VideoDecoder_Settings>,
 }
+
+unsafe impl<'a> Send for VideoDecoderSettingsRef<'a> {}
 
 impl<'a> VideoDecoderSettingsRef<'a> {
     /// # Safety
@@ -119,13 +121,13 @@ impl<'a> VideoDecoderSettingsRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for VideoDecoderSettingsRef<'a> {}
-
 #[allow(dead_code)]
 pub struct VideoDecoderDecodedImageCallbackRef<'a> {
     raw: NonNull<ffi::webrtc_VideoDecoder_DecodedImageCallback>,
     _marker: PhantomData<&'a ffi::webrtc_VideoDecoder_DecodedImageCallback>,
 }
+
+unsafe impl<'a> Send for VideoDecoderDecodedImageCallbackRef<'a> {}
 
 impl<'a> VideoDecoderDecodedImageCallbackRef<'a> {
     /// # Safety
@@ -152,12 +154,12 @@ impl<'a> VideoDecoderDecodedImageCallbackRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for VideoDecoderDecodedImageCallbackRef<'a> {}
-
 #[derive(Clone, Copy)]
 pub struct VideoDecoderDecodedImageCallbackPtr {
     raw: NonNull<ffi::webrtc_VideoDecoder_DecodedImageCallback>,
 }
+
+unsafe impl Send for VideoDecoderDecodedImageCallbackPtr {}
 
 impl VideoDecoderDecodedImageCallbackPtr {
     /// # Safety
@@ -185,8 +187,6 @@ impl VideoDecoderDecodedImageCallbackPtr {
         };
     }
 }
-
-unsafe impl Send for VideoDecoderDecodedImageCallbackPtr {}
 
 pub trait VideoDecoderHandler: Send {
     #[expect(unused_variables)]
@@ -239,9 +239,13 @@ struct VideoDecoderHandlerState {
     handler: Box<dyn VideoDecoderHandler>,
 }
 
+unsafe impl Send for VideoDecoderHandlerState {}
+
 struct VideoDecoderFactoryHandlerState {
     handler: Box<dyn VideoDecoderFactoryHandler>,
 }
+
+unsafe impl Send for VideoDecoderFactoryHandlerState {}
 
 unsafe extern "C" fn video_decoder_on_destroy(user_data: *mut c_void) {
     assert!(
@@ -374,6 +378,8 @@ pub struct VideoDecoder {
     raw_unique: NonNull<ffi::webrtc_VideoDecoder_unique>,
 }
 
+unsafe impl Send for VideoDecoder {}
+
 impl VideoDecoder {
     pub fn new_with_handler(handler: Box<dyn VideoDecoderHandler>) -> Self {
         let state = Box::new(VideoDecoderHandlerState { handler });
@@ -450,12 +456,12 @@ impl Drop for VideoDecoder {
     }
 }
 
-unsafe impl Send for VideoDecoder {}
-
 /// webrtc::VideoDecoderFactory のラッパー。
 pub struct VideoDecoderFactory {
     raw_unique: NonNull<ffi::webrtc_VideoDecoderFactory_unique>,
 }
+
+unsafe impl Send for VideoDecoderFactory {}
 
 impl VideoDecoderFactory {
     pub fn builtin() -> Self {
@@ -603,5 +609,3 @@ impl Drop for VideoDecoderFactory {
         unsafe { ffi::webrtc_VideoDecoderFactory_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
-
-unsafe impl Send for VideoDecoderFactory {}
