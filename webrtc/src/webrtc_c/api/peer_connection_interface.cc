@@ -386,6 +386,16 @@ webrtc_PeerConnectionInterface_RTCConfiguration_set_enable_gcm_crypto_suites(
   config->crypto_options.srtp.enable_gcm_crypto_suites =
       enable_gcm_crypto_suites != 0;
 }
+WEBRTC_EXPORT void
+webrtc_PeerConnectionInterface_RTCConfiguration_set_always_negotiate_data_channels(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    int always_negotiate_data_channels) {
+  auto config =
+      reinterpret_cast<webrtc::PeerConnectionInterface::RTCConfiguration*>(
+          self);
+  config->always_negotiate_data_channels =
+      always_negotiate_data_channels != 0;
+}
 WEBRTC_EXPORT struct webrtc_PeerConnectionDependencies*
 webrtc_PeerConnectionDependencies_new(
     struct webrtc_PeerConnectionObserver* observer) {

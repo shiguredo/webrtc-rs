@@ -12,6 +12,10 @@
 
 ## develop
 
+- [ADD] `PeerConnectionRtcConfiguration` に `always_negotiate_data_channels` オプションを追加する
+  - C API `webrtc_PeerConnectionInterface_RTCConfiguration_set_always_negotiate_data_channels` を追加する
+  - Rust API `PeerConnectionRtcConfiguration::set_always_negotiate_data_channels` を追加する
+  - @voluntas
 - [ADD] `src` 配下のほぼ全ての構造体に `Send` 実装を追加し、`impl` の定義順を統一する
   - `struct` / `unsafe impl Send` / `unsafe impl Sync` / `impl X` / `impl Trait for X` の順序に揃える
   - @melpon

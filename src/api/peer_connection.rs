@@ -473,6 +473,16 @@ impl PeerConnectionRtcConfiguration {
         }
     }
 
+    /// DataChannel 未生成でも SDP に DataChannel 用の m=application セクションを常にネゴシエートする。
+    pub fn set_always_negotiate_data_channels(&mut self, enable: bool) {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_RTCConfiguration_set_always_negotiate_data_channels(
+                self.raw.as_ptr(),
+                enable as i32,
+            );
+        }
+    }
+
     /// servers への可変参照を取得する。寿命は self に束縛される。
     pub fn servers(&mut self) -> IceServerVectorRef<'_> {
         let raw = NonNull::new(unsafe {
