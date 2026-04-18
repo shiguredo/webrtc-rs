@@ -968,9 +968,12 @@ fn video_frame_buffer_crop_and_scale_from_i420_buffer() {
 
 #[test]
 fn video_frame_buffer_handler_crop_and_scale_callback() {
+    // (offset_x, offset_y, crop_width, crop_height, scaled_width, scaled_height)
+    type CropAndScaleArgs = (i32, i32, i32, i32, i32, i32);
+
     struct CropAndScaleBufferHandler {
         called: Arc<AtomicBool>,
-        args: Arc<Mutex<Option<(i32, i32, i32, i32, i32, i32)>>>,
+        args: Arc<Mutex<Option<CropAndScaleArgs>>>,
     }
 
     impl VideoFrameBufferHandler for CropAndScaleBufferHandler {
