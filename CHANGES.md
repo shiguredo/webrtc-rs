@@ -48,6 +48,8 @@
 
 - [UPDATE] prebuilt パッケージに `LICENSE` と `THIRD_PARTY_LICENSES.md` を同梱する
   - @melpon
+- [ADD] `skills/` 配下に shiguredo_webrtc と libwebrtc_c の skill を追加する
+  - @voluntas
 
 ## 0.147.0
 
