@@ -393,8 +393,7 @@ webrtc_PeerConnectionInterface_RTCConfiguration_set_always_negotiate_data_channe
   auto config =
       reinterpret_cast<webrtc::PeerConnectionInterface::RTCConfiguration*>(
           self);
-  config->always_negotiate_data_channels =
-      always_negotiate_data_channels != 0;
+  config->always_negotiate_data_channels = always_negotiate_data_channels != 0;
 }
 WEBRTC_EXPORT struct webrtc_PeerConnectionDependencies*
 webrtc_PeerConnectionDependencies_new(
