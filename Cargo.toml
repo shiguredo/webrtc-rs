@@ -3,29 +3,21 @@ name = "shiguredo_webrtc"
 version = "0.147.1"
 edition = "2024"
 rust-version = "1.88"
-authors = ["Shiguredo Inc."]
-license = "Apache-2.0"
 description = "Rust bindings for libwebrtc"
+readme = "README.md"
 homepage = "https://github.com/shiguredo/webrtc-rs"
 repository = "https://github.com/shiguredo/webrtc-rs"
-readme = "README.md"
+license = "Apache-2.0"
 build = "build.rs"
 include = [
-    "/src/**",
-    "/webrtc/**",
-    "build.rs",
-    "sysroot/*",
-    "Cargo.toml",
-    "README.md",
-    "LICENSE",
+  "/src/**",
+  "/webrtc/**",
+  "Cargo.toml",
+  "LICENSE",
+  "README.md",
+  "build.rs",
+  "sysroot/*",
 ]
-
-[features]
-default = []
-local-export = []
-source-build = []
-
-[dependencies]
 
 [package.metadata.external-dependencies]
 webrtc-build = { version = "m147.7727.10.0", base-url = "https://github.com/shiguredo-webrtc-build/webrtc-build/releases/download" }
@@ -36,11 +28,18 @@ android-platform = "android-24"
 android-commandlinetools-version = "14742923"
 android-ndk-version = "27.2.12479018"
 
-[build-dependencies]
-bindgen = "0.72"
-shiguredo_cmake = "4.3"
-shiguredo_toml = "2026.1"
-nojson = "0.3"
-
 [workspace]
 members = ["examples/*"]
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.72"
+nojson = "0.3"
+shiguredo_cmake = "4.3"
+shiguredo_toml = "2026.1"
+
+[features]
+default = []
+local-export = []
+source-build = []
