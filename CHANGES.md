@@ -12,6 +12,13 @@
 
 ## develop
 
+### misc
+
+
+## 0.147.0
+
+**リリース日**: 2026-04-20
+
 - [ADD] `PeerConnectionRtcConfiguration` に `always_negotiate_data_channels` オプションを追加する
   - C API `webrtc_PeerConnectionInterface_RTCConfiguration_set_always_negotiate_data_channels` を追加する
   - Rust API `PeerConnectionRtcConfiguration::set_always_negotiate_data_channels` を追加する
