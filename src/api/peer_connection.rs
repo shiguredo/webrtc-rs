@@ -23,11 +23,7 @@ pub struct PeerConnectionFactoryDependencies {
     raw: NonNull<ffi::webrtc_PeerConnectionFactoryDependencies>,
 }
 
-impl Default for PeerConnectionFactoryDependencies {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for PeerConnectionFactoryDependencies {}
 
 impl PeerConnectionFactoryDependencies {
     pub fn new() -> Self {
@@ -145,6 +141,12 @@ impl PeerConnectionFactoryDependencies {
     }
 }
 
+impl Default for PeerConnectionFactoryDependencies {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for PeerConnectionFactoryDependencies {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_PeerConnectionFactoryDependencies_delete(self.raw.as_ptr()) };
@@ -156,11 +158,7 @@ pub struct PeerConnectionFactoryOptions {
     raw: NonNull<ffi::webrtc_PeerConnectionFactoryInterface_Options>,
 }
 
-impl Default for PeerConnectionFactoryOptions {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for PeerConnectionFactoryOptions {}
 
 impl PeerConnectionFactoryOptions {
     pub fn new() -> Self {
@@ -192,6 +190,12 @@ impl PeerConnectionFactoryOptions {
     }
 }
 
+impl Default for PeerConnectionFactoryOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for PeerConnectionFactoryOptions {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_PeerConnectionFactoryInterface_Options_delete(self.raw.as_ptr()) };
@@ -202,6 +206,13 @@ impl Drop for PeerConnectionFactoryOptions {
 pub struct PeerConnectionFactory {
     raw_ref: ScopedRef<PeerConnectionFactoryHandle>,
 }
+
+unsafe impl Send for PeerConnectionFactory {}
+
+// ここで生成する PeerConnectionFactoryInterface の実体はシーケンシャルにする Proxy 経由で
+// アクセスするためスレッドセーフに使用できる。
+// ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/pc/peer_connection_factory_proxy.h;l=32-59;drc=ef55be496e45889ace33ace4b05094ca19cb499b
+unsafe impl Sync for PeerConnectionFactory {}
 
 impl PeerConnectionFactory {
     /// CreateModularPeerConnectionFactory 相当を生成する。
@@ -355,16 +366,16 @@ impl PeerConnectionFactory {
     }
 }
 
-unsafe impl Send for PeerConnectionFactory {}
-// ここで生成する PeerConnectionFactoryInterface の実体はシーケンシャルにする Proxy 経由で
-// アクセスするためスレッドセーフに使用できる。
-// ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/pc/peer_connection_factory_proxy.h;l=32-59;drc=ef55be496e45889ace33ace4b05094ca19cb499b
-unsafe impl Sync for PeerConnectionFactory {}
-
 /// webrtc::ConnectionContext のラッパー。
 pub struct ConnectionContext {
     raw_ref: ScopedRef<ConnectionContextHandle>,
 }
+
+unsafe impl Send for ConnectionContext {}
+
+// webrtc::ConnectionContext はスレッドセーフではないが、C ラッパー側で signaling thread 経由で
+// アクセスするようにしているため、Rust 側では Sync を実装しても問題ない。
+unsafe impl Sync for ConnectionContext {}
 
 impl ConnectionContext {
     pub(crate) fn from_scoped_ref(raw_ref: ScopedRef<ConnectionContextHandle>) -> Self {
@@ -392,17 +403,14 @@ impl ConnectionContext {
     }
 }
 
-unsafe impl Send for ConnectionContext {}
-// webrtc::ConnectionContext はスレッドセーフではないが、C ラッパー側で signaling thread 経由で
-// アクセスするようにしているため、Rust 側では Sync を実装しても問題ない。
-unsafe impl Sync for ConnectionContext {}
-
 /// rtc::NetworkManager への借用ラッパー。
 #[derive(Clone, Copy)]
 pub struct NetworkManagerRef<'a> {
     raw: NonNull<ffi::webrtc_NetworkManager>,
     _marker: PhantomData<&'a ConnectionContext>,
 }
+
+unsafe impl<'a> Send for NetworkManagerRef<'a> {}
 
 impl<'a> NetworkManagerRef<'a> {
     pub fn from_raw(raw: NonNull<ffi::webrtc_NetworkManager>) -> Self {
@@ -424,6 +432,8 @@ pub struct PacketSocketFactoryRef<'a> {
     _marker: PhantomData<&'a ConnectionContext>,
 }
 
+unsafe impl<'a> Send for PacketSocketFactoryRef<'a> {}
+
 impl<'a> PacketSocketFactoryRef<'a> {
     pub fn from_raw(raw: NonNull<ffi::webrtc_PacketSocketFactory>) -> Self {
         Self {
@@ -442,11 +452,7 @@ pub struct PeerConnectionRtcConfiguration {
     raw: NonNull<ffi::webrtc_PeerConnectionInterface_RTCConfiguration>,
 }
 
-impl Default for PeerConnectionRtcConfiguration {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for PeerConnectionRtcConfiguration {}
 
 impl PeerConnectionRtcConfiguration {
     pub fn new() -> Self {
@@ -467,6 +473,16 @@ impl PeerConnectionRtcConfiguration {
         }
     }
 
+    /// DataChannel 未生成でも SDP に DataChannel 用の m=application セクションを常にネゴシエートする。
+    pub fn set_always_negotiate_data_channels(&mut self, enable: bool) {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_RTCConfiguration_set_always_negotiate_data_channels(
+                self.raw.as_ptr(),
+                enable as i32,
+            );
+        }
+    }
+
     /// servers への可変参照を取得する。寿命は self に束縛される。
     pub fn servers(&mut self) -> IceServerVectorRef<'_> {
         let raw = NonNull::new(unsafe {
@@ -480,6 +496,12 @@ impl PeerConnectionRtcConfiguration {
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_RTCConfiguration {
         self.raw.as_ptr()
+    }
+}
+
+impl Default for PeerConnectionRtcConfiguration {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -548,11 +570,7 @@ pub struct IceServer {
     raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>,
 }
 
-impl Default for IceServer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for IceServer {}
 
 impl IceServer {
     pub fn new() -> Self {
@@ -595,6 +613,12 @@ impl IceServer {
     }
 }
 
+impl Default for IceServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for IceServer {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_delete(self.raw.as_ptr()) };
@@ -606,6 +630,8 @@ pub struct IceServerRef<'a> {
     raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>,
     _marker: PhantomData<&'a mut ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
 }
+
+unsafe impl<'a> Send for IceServerRef<'a> {}
 
 impl<'a> IceServerRef<'a> {
     pub fn from_raw(raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>) -> Self {
@@ -678,6 +704,8 @@ pub struct IceServerVector {
     raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
 }
 
+unsafe impl Send for IceServerVector {}
+
 impl IceServerVector {
     pub fn new(size: i32) -> Self {
         let raw =
@@ -724,6 +752,8 @@ pub struct IceServerVectorRef<'a> {
     raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
     _marker: PhantomData<&'a mut ffi::webrtc_PeerConnectionInterface_RTCConfiguration>,
 }
+
+unsafe impl<'a> Send for IceServerVectorRef<'a> {}
 
 impl<'a> IceServerVectorRef<'a> {
     pub fn from_raw(raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer_vector>) -> Self {
@@ -773,11 +803,7 @@ pub struct PeerConnectionOfferAnswerOptions {
     raw: NonNull<ffi::webrtc_PeerConnectionInterface_RTCOfferAnswerOptions>,
 }
 
-impl Default for PeerConnectionOfferAnswerOptions {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for PeerConnectionOfferAnswerOptions {}
 
 impl PeerConnectionOfferAnswerOptions {
     pub fn new() -> Self {
@@ -928,6 +954,12 @@ impl PeerConnectionOfferAnswerOptions {
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_RTCOfferAnswerOptions {
         self.raw.as_ptr()
+    }
+}
+
+impl Default for PeerConnectionOfferAnswerOptions {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -1134,6 +1166,8 @@ pub struct IceCandidateError {
     pub error_text: String,
 }
 
+unsafe impl Send for IceCandidateError {}
+
 pub trait PeerConnectionObserverHandler: Send {
     #[expect(unused_variables)]
     fn on_connection_change(&mut self, new_state: PeerConnectionState) {}
@@ -1156,6 +1190,8 @@ pub trait PeerConnectionObserverHandler: Send {
 struct PeerConnectionObserverHandlerState {
     handler: Box<dyn PeerConnectionObserverHandler>,
 }
+
+unsafe impl Send for PeerConnectionObserverHandlerState {}
 
 unsafe extern "C" fn observer_on_connection_change(new_state: i32, user_data: *mut c_void) {
     assert!(!user_data.is_null());
@@ -1291,6 +1327,8 @@ pub struct PeerConnectionObserver {
     raw: NonNull<ffi::webrtc_PeerConnectionObserver>,
 }
 
+unsafe impl Send for PeerConnectionObserver {}
+
 impl PeerConnectionObserver {
     pub fn new_with_handler(handler: Box<dyn PeerConnectionObserverHandler>) -> Self {
         let state = Box::new(PeerConnectionObserverHandlerState { handler });
@@ -1330,12 +1368,12 @@ impl Drop for PeerConnectionObserver {
     }
 }
 
-unsafe impl Send for PeerConnectionObserver {}
-
 /// PeerConnectionDependencies のラッパー。
 pub struct PeerConnectionDependencies {
     raw: NonNull<ffi::webrtc_PeerConnectionDependencies>,
 }
+
+unsafe impl Send for PeerConnectionDependencies {}
 
 impl PeerConnectionDependencies {
     pub fn new(observer: &PeerConnectionObserver) -> Self {
@@ -1396,6 +1434,8 @@ struct PeerConnectionStatsCallbackState {
     on_stats: Box<dyn FnOnce(RTCStatsReport) + Send + 'static>,
 }
 
+unsafe impl Send for PeerConnectionStatsCallbackState {}
+
 unsafe extern "C" fn peer_connection_on_stats(
     report: *const ffi::webrtc_RTCStatsReport_refcounted,
     user_data: *mut c_void,
@@ -1422,6 +1462,8 @@ pub trait CreateSessionDescriptionObserverHandler: Send {
 struct CreateSessionDescriptionObserverHandlerState {
     handler: Box<dyn CreateSessionDescriptionObserverHandler>,
 }
+
+unsafe impl Send for CreateSessionDescriptionObserverHandlerState {}
 
 unsafe extern "C" fn csd_on_success(
     desc: *mut ffi::webrtc_SessionDescriptionInterface_unique,
@@ -1452,6 +1494,8 @@ unsafe extern "C" fn csd_on_destroy(user_data: *mut c_void) {
 pub struct CreateSessionDescriptionObserver {
     raw: NonNull<ffi::webrtc_CreateSessionDescriptionObserver>,
 }
+
+unsafe impl Send for CreateSessionDescriptionObserver {}
 
 impl CreateSessionDescriptionObserver {
     pub fn new_with_handler(handler: Box<dyn CreateSessionDescriptionObserverHandler>) -> Self {
@@ -1487,8 +1531,6 @@ impl Drop for CreateSessionDescriptionObserver {
     }
 }
 
-unsafe impl Send for CreateSessionDescriptionObserver {}
-
 pub trait SetLocalDescriptionObserverHandler: Send {
     #[expect(unused_variables)]
     fn on_set_local_description_complete(&mut self, error: RtcError) {}
@@ -1497,6 +1539,8 @@ pub trait SetLocalDescriptionObserverHandler: Send {
 struct SetLocalDescriptionObserverHandlerState {
     handler: Box<dyn SetLocalDescriptionObserverHandler>,
 }
+
+unsafe impl Send for SetLocalDescriptionObserverHandlerState {}
 
 unsafe extern "C" fn sld_on_complete(
     error: *mut ffi::webrtc_RTCError_unique,
@@ -1516,6 +1560,8 @@ unsafe extern "C" fn sld_on_destroy(user_data: *mut c_void) {
 pub struct SetLocalDescriptionObserver {
     raw_ref: ScopedRef<SetLocalDescriptionObserverHandle>,
 }
+
+unsafe impl Send for SetLocalDescriptionObserver {}
 
 impl SetLocalDescriptionObserver {
     pub fn new_with_handler(handler: Box<dyn SetLocalDescriptionObserverHandler>) -> Self {
@@ -1553,8 +1599,6 @@ impl SetLocalDescriptionObserver {
     }
 }
 
-unsafe impl Send for SetLocalDescriptionObserver {}
-
 pub trait SetRemoteDescriptionObserverHandler: Send {
     #[expect(unused_variables)]
     fn on_set_remote_description_complete(&mut self, error: RtcError) {}
@@ -1563,6 +1607,8 @@ pub trait SetRemoteDescriptionObserverHandler: Send {
 struct SetRemoteDescriptionObserverHandlerState {
     handler: Box<dyn SetRemoteDescriptionObserverHandler>,
 }
+
+unsafe impl Send for SetRemoteDescriptionObserverHandlerState {}
 
 unsafe extern "C" fn srd_on_complete(
     error: *mut ffi::webrtc_RTCError_unique,
@@ -1582,6 +1628,8 @@ unsafe extern "C" fn srd_on_destroy(user_data: *mut c_void) {
 pub struct SetRemoteDescriptionObserver {
     raw_ref: ScopedRef<SetRemoteDescriptionObserverHandle>,
 }
+
+unsafe impl Send for SetRemoteDescriptionObserver {}
 
 impl SetRemoteDescriptionObserver {
     pub fn new_with_handler(handler: Box<dyn SetRemoteDescriptionObserverHandler>) -> Self {
@@ -1617,12 +1665,17 @@ impl SetRemoteDescriptionObserver {
     }
 }
 
-unsafe impl Send for SetRemoteDescriptionObserver {}
-
 /// PeerConnectionInterface のラッパー。
 pub struct PeerConnection {
     raw_ref: ScopedRef<PeerConnectionHandle>,
 }
+
+unsafe impl Send for PeerConnection {}
+
+// SAFETY: PeerConnectionInterface の実体はシーケンシャルにする Proxy 経由で
+// アクセスするためスレッドセーフに使用できる。
+// ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/pc/peer_connection_proxy.h;l=56-204;drc=ef55be496e45889ace33ace4b05094ca19cb499b
+unsafe impl Sync for PeerConnection {}
 
 impl PeerConnection {
     pub fn create(
@@ -1902,9 +1955,3 @@ impl PeerConnection {
         self.raw_ref.as_ptr()
     }
 }
-
-unsafe impl Send for PeerConnection {}
-// SAFETY: PeerConnectionInterface の実体はシーケンシャルにする Proxy 経由で
-// アクセスするためスレッドセーフに使用できる。
-// ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/pc/peer_connection_proxy.h;l=56-204;drc=ef55be496e45889ace33ace4b05094ca19cb499b
-unsafe impl Sync for PeerConnection {}

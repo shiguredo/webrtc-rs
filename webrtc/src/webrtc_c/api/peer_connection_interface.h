@@ -93,6 +93,10 @@ WEBRTC_EXPORT void
 webrtc_PeerConnectionInterface_RTCConfiguration_set_enable_gcm_crypto_suites(
     struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
     int enable_gcm_crypto_suites);
+WEBRTC_EXPORT void
+webrtc_PeerConnectionInterface_RTCConfiguration_set_always_negotiate_data_channels(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    int always_negotiate_data_channels);
 struct webrtc_PeerConnectionDependencies;
 WEBRTC_EXPORT struct webrtc_PeerConnectionDependencies*
 webrtc_PeerConnectionDependencies_new(

@@ -15,7 +15,7 @@ use shiguredo_webrtc::{
     SetLocalDescriptionObserver, SetLocalDescriptionObserverHandler, SetRemoteDescriptionObserver,
     SetRemoteDescriptionObserverHandler, Thread, TimestampAligner, VideoDecoderFactory,
     VideoEncoderFactory, VideoFrame, VideoTrackSource, abgr_to_i420, log, random_string,
-    thread_sleep_ms, time_millis,
+    time_millis,
 };
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -249,7 +249,7 @@ impl FakeVideoCapturer {
                         on_tick.as_ref(),
                     );
                     let sleep_ms = (1000 / fps).saturating_sub(2).max(1);
-                    thread_sleep_ms(sleep_ms);
+                    Thread::sleep_ms(sleep_ms);
                 }
             });
         match handle {

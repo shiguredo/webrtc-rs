@@ -12,6 +12,56 @@
 
 ## develop
 
+### misc
+
+
+## 0.147.0
+
+**リリース日**: 2026-04-20
+
+- [ADD] `PeerConnectionRtcConfiguration` に `always_negotiate_data_channels` オプションを追加する
+  - C API `webrtc_PeerConnectionInterface_RTCConfiguration_set_always_negotiate_data_channels` を追加する
+  - Rust API `PeerConnectionRtcConfiguration::set_always_negotiate_data_channels` を追加する
+  - @voluntas
+- [ADD] `src` 配下のほぼ全ての構造体に `Send` 実装を追加し、`impl` の定義順を統一する
+  - `struct` / `unsafe impl Send` / `unsafe impl Sync` / `impl X` / `impl Trait for X` の順序に揃える
+  - @melpon
+- [CHANGE] `thread_sleep_ms()` を `Thread::sleep_ms()` にする
+  - @melpon
+- [CHANGE] `VideoEncoderFactoryHandler` / `VideoDecoderFactoryHandler` の create 戻り値の型を変更する
+  - `VideoEncoderFactoryHandler::create` の戻り値を `Option<VideoEncoder>` に変更する
+  - `VideoDecoderFactoryHandler::create` の戻り値を `Option<VideoDecoder>` に変更する
+  - @melpon
+- [ADD] `modules/video_coding/codecs/interface/common_constants.h` の値を C API / Rust API で公開する
+  - C API `webrtc_kNoPictureId` / `webrtc_kNoTl0PicIdx` / `webrtc_kNoTemporalIdx` / `webrtc_kNoKeyIdx` を追加する
+  - Rust API `no_picture_id` / `no_tl0_pic_idx` / `no_temporal_idx` / `no_key_idx` を追加する
+  - @melpon
+- [ADD] `I420Buffer` / `NV12Buffer` に stride 指定生成と連続領域参照 API を追加する
+  - C API `webrtc_I420Buffer_CreateWithStrides` / `webrtc_NV12Buffer_CreateWithStrides` を追加し、Rust API `new_with_strides` を利用できるようにする
+  - Rust API `data` / `data_mut` を追加し、YUV プレーン全体を連続メモリとして扱えるようにする
+  - @melpon
+- [ADD] libyuv の `i420_copy` / `nv12_copy` API を追加する
+  - C API `libyuv_I420Copy` / `libyuv_NV12Copy` を追加し、Rust API `i420_copy` / `nv12_copy` を利用できるようにする
+  - @melpon
+- [ADD] `SimulcastEncoderAdapter` の C API / Rust API を追加する
+  - C API `webrtc_SimulcastEncoderAdapter_new` と `webrtc_SimulcastEncoderAdapter_cast_to_webrtc_VideoEncoder` を追加する
+  - Rust API `SimulcastEncoderAdapter::new` / `SimulcastEncoderAdapter::cast_to_video_encoder` を追加する
+  - @melpon
+- [ADD] `VideoCodecRef` と `VideoFrame` の可変 API を追加する
+  - C API `webrtc_SimulcastStream*` を追加し、`webrtc_VideoCodec_simulcast_stream_at` と simulcast stream の getter/setter で `webrtc::SimulcastStream` を読み書きできるようにする
+  - C API `webrtc_VideoCodec_copy` を追加し、`webrtc::VideoCodec` をコピーできるようにする
+  - Rust API `VideoCodec` 所有型と `VideoCodecRef::to_owned` を追加し、`VideoCodecRef` のコピー編集を可能にする
+  - Rust API `SimulcastStreamRef` と `VideoCodecRef` の setter 群を追加する
+  - `VideoFrame::set_video_frame_buffer` を追加し、既存 frame の buffer 差し替えを可能にする
+  - @melpon
+
+### misc
+
+- [UPDATE] prebuilt パッケージに `LICENSE` と `THIRD_PARTY_LICENSES.md` を同梱する
+  - @melpon
+- [ADD] `skills/` 配下に shiguredo_webrtc と libwebrtc_c の skill を追加する
+  - @voluntas
+
 ## 0.147.0
 
 **リリース日**: 2026-04-02

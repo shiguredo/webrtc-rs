@@ -9,11 +9,7 @@ pub struct CxxString {
     raw_unique: NonNull<ffi::std_string_unique>,
 }
 
-impl Default for CxxString {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for CxxString {}
 
 impl CxxString {
     /// 空文字列を生成する。
@@ -86,6 +82,12 @@ impl CxxString {
     }
 }
 
+impl Default for CxxString {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for CxxString {
     fn drop(&mut self) {
         unsafe { ffi::std_string_unique_delete(self.raw_unique.as_ptr()) };
@@ -96,6 +98,8 @@ pub struct CxxStringRef<'a> {
     raw: NonNull<ffi::std_string>,
     _marker: PhantomData<&'a ffi::std_string>,
 }
+
+unsafe impl<'a> Send for CxxStringRef<'a> {}
 
 impl<'a> CxxStringRef<'a> {
     pub fn from_ptr(raw: NonNull<ffi::std_string>) -> Self {
@@ -153,6 +157,8 @@ pub struct StringVector {
     raw: NonNull<ffi::std_string_vector>,
 }
 
+unsafe impl Send for StringVector {}
+
 impl StringVector {
     /// size 要素で初期化したベクタを生成する。
     pub fn new(size: i32) -> Self {
@@ -203,6 +209,8 @@ pub struct StringVectorRef<'a> {
     _marker: PhantomData<&'a ()>,
 }
 
+unsafe impl<'a> Send for StringVectorRef<'a> {}
+
 impl<'a> StringVectorRef<'a> {
     pub fn from_raw(raw: NonNull<ffi::std_string_vector>) -> Self {
         Self {
@@ -242,6 +250,8 @@ pub struct MapStringString<'a> {
     raw: NonNull<ffi::std_map_string_string>,
     _marker: PhantomData<&'a mut ffi::std_map_string_string>,
 }
+
+unsafe impl<'a> Send for MapStringString<'a> {}
 
 impl<'a> MapStringString<'a> {
     /// C 側のポインタから生成する。
@@ -294,6 +304,8 @@ pub struct MapStringStringIter<'a> {
     raw: NonNull<ffi::std_map_string_string_iter>,
     _marker: PhantomData<&'a ffi::std_map_string_string>,
 }
+
+unsafe impl<'a> Send for MapStringStringIter<'a> {}
 
 impl<'a> Iterator for MapStringStringIter<'a> {
     type Item = (String, String);

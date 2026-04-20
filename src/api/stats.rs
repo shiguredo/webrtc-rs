@@ -7,6 +7,8 @@ pub struct RTCStatsReport {
     raw_ref: ScopedRef<RTCStatsReportHandle>,
 }
 
+unsafe impl Send for RTCStatsReport {}
+
 impl RTCStatsReport {
     pub fn from_refcounted_ptr(raw_ref: NonNull<ffi::webrtc_RTCStatsReport_refcounted>) -> Self {
         let raw_ref = ScopedRef::<RTCStatsReportHandle>::from_raw(raw_ref);

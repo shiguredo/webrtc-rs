@@ -28,6 +28,14 @@ WEBRTC_EXPORT struct webrtc_NV12Buffer_refcounted* webrtc_NV12Buffer_Create(
   auto buf = webrtc::NV12Buffer::Create(width, height);
   return reinterpret_cast<struct webrtc_NV12Buffer_refcounted*>(buf.release());
 }
+WEBRTC_EXPORT struct webrtc_NV12Buffer_refcounted*
+webrtc_NV12Buffer_CreateWithStrides(int width,
+                                    int height,
+                                    int stride_y,
+                                    int stride_uv) {
+  auto buf = webrtc::NV12Buffer::Create(width, height, stride_y, stride_uv);
+  return reinterpret_cast<struct webrtc_NV12Buffer_refcounted*>(buf.release());
+}
 WEBRTC_EXPORT int webrtc_NV12Buffer_width(
     const struct webrtc_NV12Buffer* self) {
   auto buf = reinterpret_cast<const webrtc::NV12Buffer*>(self);

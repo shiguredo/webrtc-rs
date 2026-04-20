@@ -10,6 +10,8 @@ pub struct SSLCertificateRef<'a> {
     _marker: PhantomData<&'a ffi::webrtc_SSLCertificate>,
 }
 
+unsafe impl<'a> Send for SSLCertificateRef<'a> {}
+
 impl<'a> SSLCertificateRef<'a> {
     pub fn from_raw(raw: NonNull<ffi::webrtc_SSLCertificate>) -> Self {
         Self {
@@ -40,14 +42,14 @@ impl<'a> SSLCertificateRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for SSLCertificateRef<'a> {}
-
 /// webrtc::SSLCertChain の借用ラッパー。
 #[derive(Clone, Copy)]
 pub struct SSLCertChainRef<'a> {
     raw: NonNull<ffi::webrtc_SSLCertChain>,
     _marker: PhantomData<&'a ffi::webrtc_SSLCertChain>,
 }
+
+unsafe impl<'a> Send for SSLCertChainRef<'a> {}
 
 impl<'a> SSLCertChainRef<'a> {
     pub fn from_raw(raw: NonNull<ffi::webrtc_SSLCertChain>) -> Self {
@@ -83,8 +85,6 @@ impl<'a> SSLCertChainRef<'a> {
     }
 }
 
-unsafe impl<'a> Send for SSLCertChainRef<'a> {}
-
 pub trait SSLCertificateVerifierHandler: Send {
     #[expect(unused_variables)]
     fn verify_chain(&mut self, chain: SSLCertChainRef<'_>) -> bool {
@@ -95,6 +95,8 @@ pub trait SSLCertificateVerifierHandler: Send {
 struct SSLCertificateVerifierHandlerState {
     handler: Box<dyn SSLCertificateVerifierHandler>,
 }
+
+unsafe impl Send for SSLCertificateVerifierHandlerState {}
 
 unsafe extern "C" fn ssl_certificate_verifier_verify_chain(
     chain: *const ffi::webrtc_SSLCertChain,
@@ -127,6 +129,8 @@ unsafe extern "C" fn ssl_certificate_verifier_on_destroy(user_data: *mut c_void)
 pub struct SSLCertificateVerifier {
     raw_unique: NonNull<ffi::webrtc_SSLCertificateVerifier_unique>,
 }
+
+unsafe impl Send for SSLCertificateVerifier {}
 
 impl SSLCertificateVerifier {
     pub fn new_with_handler(handler: Box<dyn SSLCertificateVerifierHandler>) -> Self {
@@ -162,5 +166,3 @@ impl Drop for SSLCertificateVerifier {
         unsafe { ffi::webrtc_SSLCertificateVerifier_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
-
-unsafe impl Send for SSLCertificateVerifier {}

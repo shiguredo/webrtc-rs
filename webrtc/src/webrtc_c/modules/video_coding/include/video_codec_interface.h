@@ -70,6 +70,32 @@ WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_inter_layer_predicted(
 WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_inter_layer_predicted(
     struct webrtc_CodecSpecificInfo* self,
     int inter_layer_predicted);
+WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_ss_data_available(
+    struct webrtc_CodecSpecificInfo* self);
+WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_ss_data_available(
+    struct webrtc_CodecSpecificInfo* self,
+    int ss_data_available);
+WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_temporal_up_switch(
+    struct webrtc_CodecSpecificInfo* self);
+WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_temporal_up_switch(
+    struct webrtc_CodecSpecificInfo* self,
+    int temporal_up_switch);
+WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_num_spatial_layers(
+    struct webrtc_CodecSpecificInfo* self);
+WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_num_spatial_layers(
+    struct webrtc_CodecSpecificInfo* self,
+    int num_spatial_layers);
+WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_first_frame_in_picture(
+    struct webrtc_CodecSpecificInfo* self);
+WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_first_frame_in_picture(
+    struct webrtc_CodecSpecificInfo* self,
+    int first_frame_in_picture);
+WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_spatial_layer_resolution_present(
+    struct webrtc_CodecSpecificInfo* self);
+WEBRTC_EXPORT void
+webrtc_CodecSpecificInfo_set_vp9_spatial_layer_resolution_present(
+    struct webrtc_CodecSpecificInfo* self,
+    int spatial_layer_resolution_present);
 
 WEBRTC_EXPORT extern const int webrtc_H264PacketizationMode_NonInterleaved;
 WEBRTC_EXPORT extern const int webrtc_H264PacketizationMode_SingleNalUnit;

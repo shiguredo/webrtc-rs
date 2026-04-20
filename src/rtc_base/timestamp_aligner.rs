@@ -6,11 +6,7 @@ pub struct TimestampAligner {
     raw_unique: NonNull<ffi::webrtc_TimestampAligner_unique>,
 }
 
-impl Default for TimestampAligner {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for TimestampAligner {}
 
 impl TimestampAligner {
     /// 新しい TimestampAligner を生成する。
@@ -36,10 +32,14 @@ impl TimestampAligner {
     }
 }
 
+impl Default for TimestampAligner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for TimestampAligner {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_TimestampAligner_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
-
-unsafe impl Send for TimestampAligner {}

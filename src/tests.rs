@@ -3,6 +3,7 @@ use std::ptr::NonNull;
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
+    mpsc,
 };
 use std::time::Duration;
 
@@ -110,6 +111,14 @@ fn media_type_constants() {
         MediaType::from_int(MediaType::Video.to_int()),
         MediaType::Video
     );
+}
+
+#[test]
+fn common_constants_values() {
+    assert_eq!(no_picture_id(), -1);
+    assert_eq!(no_tl0_pic_idx(), -1);
+    assert_eq!(no_temporal_idx(), 0xFF);
+    assert_eq!(no_key_idx(), -1);
 }
 
 #[test]
@@ -360,6 +369,83 @@ fn i420_buffer_and_video_frame() {
 }
 
 #[test]
+fn video_frame_set_video_frame_buffer_replaces_buffer() {
+    let src = I420Buffer::new(2, 2);
+    let src_buffer = src.cast_to_video_frame_buffer();
+    let dst = I420Buffer::new(4, 2);
+    let dst_buffer = dst.cast_to_video_frame_buffer();
+
+    let mut frame = VideoFrame::builder(&src_buffer)
+        .set_timestamp_us(123)
+        .build();
+    frame.set_video_frame_buffer(&dst_buffer);
+
+    assert_eq!(frame.width(), 4);
+    assert_eq!(frame.height(), 2);
+    assert_eq!(frame.timestamp_us(), 123);
+}
+
+#[test]
+fn video_codec_ref_getter_setter_and_simulcast_stream_ref_roundtrip() {
+    let mut codec = VideoCodec::new();
+    codec.set_codec_type(VideoCodecType::Av1);
+    codec.set_width(1280);
+    codec.set_height(720);
+    codec.set_start_bitrate_kbps(1200);
+    codec.set_min_bitrate_kbps(300);
+    codec.set_max_bitrate_kbps(2500);
+    codec.set_max_framerate(60);
+    codec.set_number_of_simulcast_streams(2);
+
+    assert_eq!(codec.codec_type(), VideoCodecType::Av1);
+    assert_eq!(codec.width(), 1280);
+    assert_eq!(codec.height(), 720);
+    assert_eq!(codec.start_bitrate_kbps(), 1200);
+    assert_eq!(codec.min_bitrate_kbps(), 300);
+    assert_eq!(codec.max_bitrate_kbps(), 2500);
+    assert_eq!(codec.max_framerate(), 60);
+    assert_eq!(codec.number_of_simulcast_streams(), 2);
+
+    {
+        let mut stream0 = codec
+            .simulcast_stream(0)
+            .expect("simulcast stream 0 の取得に失敗");
+        stream0.set_width(640);
+        stream0.set_height(360);
+        stream0.set_min_bitrate_kbps(150);
+        stream0.set_target_bitrate_kbps(500);
+        stream0.set_max_bitrate_kbps(900);
+        assert_eq!(stream0.width(), 640);
+        assert_eq!(stream0.height(), 360);
+        assert_eq!(stream0.min_bitrate_kbps(), 150);
+        assert_eq!(stream0.target_bitrate_kbps(), 500);
+        assert_eq!(stream0.max_bitrate_kbps(), 900);
+    }
+    {
+        let mut stream1 = codec
+            .simulcast_stream(1)
+            .expect("simulcast stream 1 の取得に失敗");
+        stream1.set_width(320);
+        stream1.set_height(180);
+        stream1.set_min_bitrate_kbps(80);
+        stream1.set_target_bitrate_kbps(240);
+        stream1.set_max_bitrate_kbps(400);
+        assert_eq!(stream1.width(), 320);
+        assert_eq!(stream1.height(), 180);
+        assert_eq!(stream1.min_bitrate_kbps(), 80);
+        assert_eq!(stream1.target_bitrate_kbps(), 240);
+        assert_eq!(stream1.max_bitrate_kbps(), 400);
+    }
+
+    assert!(codec.simulcast_stream(2).is_none());
+    let cloned = codec.as_ref().to_owned();
+    assert_eq!(cloned.codec_type(), VideoCodecType::Av1);
+    assert_eq!(cloned.width(), 1280);
+    assert_eq!(cloned.height(), 720);
+    assert_eq!(cloned.number_of_simulcast_streams(), 2);
+}
+
+#[test]
 fn i420_buffer_mutable_planes_and_video_frame_rtp_timestamp() {
     let mut buf = I420Buffer::new(4, 4);
     buf.y_data_mut().fill(0x11);
@@ -558,6 +644,65 @@ fn i420_buffer_chroma_dimensions_for_odd_size() {
 }
 
 #[test]
+fn i420_buffer_new_with_strides_preserves_stride_and_plane_lengths() {
+    let width = 5;
+    let height = 3;
+    let stride_y = 8;
+    let stride_u = 4;
+    let stride_v = 6;
+    let buf = I420Buffer::new_with_strides(width, height, stride_y, stride_u, stride_v);
+
+    assert_eq!(buf.width(), width);
+    assert_eq!(buf.height(), height);
+    assert_eq!(buf.stride_y(), stride_y);
+    assert_eq!(buf.stride_u(), stride_u);
+    assert_eq!(buf.stride_v(), stride_v);
+    assert_eq!(buf.y_data().len(), (stride_y * height) as usize);
+    assert_eq!(
+        buf.u_data().len(),
+        (stride_u * buf.chroma_height()) as usize
+    );
+    assert_eq!(
+        buf.v_data().len(),
+        (stride_v * buf.chroma_height()) as usize
+    );
+}
+
+#[test]
+fn i420_buffer_data_and_data_mut_use_contiguous_memory_with_padding() {
+    let width = 5;
+    let height = 3;
+    let stride_y = 8;
+    let stride_u = 4;
+    let stride_v = 6;
+    let chroma_height = (height as usize).div_ceil(2);
+    let len_y = (stride_y as usize) * (height as usize);
+    let len_u = (stride_u as usize) * chroma_height;
+    let len_v = (stride_v as usize) * chroma_height;
+    let total_len = len_y + len_u + len_v;
+    let mut buf = I420Buffer::new_with_strides(width, height, stride_y, stride_u, stride_v);
+
+    let base = buf.data().as_ptr() as usize;
+    assert_eq!(buf.data().len(), total_len);
+    assert_eq!(buf.y_data().as_ptr() as usize, base);
+    assert_eq!(buf.u_data().as_ptr() as usize - base, len_y);
+    assert_eq!(buf.v_data().as_ptr() as usize - base, len_y + len_u);
+
+    {
+        let data = buf.data_mut();
+        data[0] = 0x11;
+        data[len_y] = 0x22;
+        data[len_y + len_u] = 0x33;
+        data[total_len - 1] = 0x44;
+    }
+
+    assert_eq!(buf.y_data()[0], 0x11);
+    assert_eq!(buf.u_data()[0], 0x22);
+    assert_eq!(buf.v_data()[0], 0x33);
+    assert_eq!(buf.v_data()[len_v - 1], 0x44);
+}
+
+#[test]
 fn nv12_buffer_planes_kind_and_to_i420() {
     let width = 4;
     let height = 3;
@@ -602,6 +747,54 @@ fn nv12_buffer_chroma_dimensions_for_odd_size() {
         buf.uv_data().len(),
         (buf.stride_uv() as usize) * (buf.chroma_height() as usize)
     );
+}
+
+#[test]
+fn nv12_buffer_new_with_strides_preserves_stride_and_plane_lengths() {
+    let width = 5;
+    let height = 3;
+    let stride_y = 8;
+    let stride_uv = 8;
+    let buf = NV12Buffer::new_with_strides(width, height, stride_y, stride_uv);
+
+    assert_eq!(buf.width(), width);
+    assert_eq!(buf.height(), height);
+    assert_eq!(buf.stride_y(), stride_y);
+    assert_eq!(buf.stride_uv(), stride_uv);
+    assert_eq!(buf.y_data().len(), (stride_y * height) as usize);
+    assert_eq!(
+        buf.uv_data().len(),
+        (stride_uv * buf.chroma_height()) as usize
+    );
+}
+
+#[test]
+fn nv12_buffer_data_and_data_mut_use_contiguous_memory_with_padding() {
+    let width = 5;
+    let height = 3;
+    let stride_y = 8;
+    let stride_uv = 8;
+    let chroma_height = (height as usize).div_ceil(2);
+    let len_y = (stride_y as usize) * (height as usize);
+    let len_uv = (stride_uv as usize) * chroma_height;
+    let total_len = len_y + len_uv;
+    let mut buf = NV12Buffer::new_with_strides(width, height, stride_y, stride_uv);
+
+    let base = buf.data().as_ptr() as usize;
+    assert_eq!(buf.data().len(), total_len);
+    assert_eq!(buf.y_data().as_ptr() as usize, base);
+    assert_eq!(buf.uv_data().as_ptr() as usize - base, len_y);
+
+    {
+        let data = buf.data_mut();
+        data[0] = 0x11;
+        data[len_y] = 0x22;
+        data[total_len - 1] = 0x33;
+    }
+
+    assert_eq!(buf.y_data()[0], 0x11);
+    assert_eq!(buf.uv_data()[0], 0x22);
+    assert_eq!(buf.uv_data()[len_uv - 1], 0x33);
 }
 
 #[test]
@@ -776,9 +969,12 @@ fn video_frame_buffer_crop_and_scale_from_i420_buffer() {
 
 #[test]
 fn video_frame_buffer_handler_crop_and_scale_callback() {
+    // (offset_x, offset_y, crop_width, crop_height, scaled_width, scaled_height)
+    type CropAndScaleArgs = (i32, i32, i32, i32, i32, i32);
+
     struct CropAndScaleBufferHandler {
         called: Arc<AtomicBool>,
-        args: Arc<Mutex<Option<(i32, i32, i32, i32, i32, i32)>>>,
+        args: Arc<Mutex<Option<CropAndScaleArgs>>>,
     }
 
     impl VideoFrameBufferHandler for CropAndScaleBufferHandler {
@@ -1286,6 +1482,281 @@ fn i420_buffer_planes_mut_to_nv12_round_trip() {
 }
 
 #[test]
+fn i420_copy_with_odd_size_and_padding() {
+    let width = 5;
+    let height = 3;
+    let chroma_width = (width + 1) / 2;
+    let chroma_height = (height + 1) / 2;
+
+    let src_stride_y = 8;
+    let src_stride_u = 4;
+    let src_stride_v = 6;
+    let mut src_y = vec![0u8; (src_stride_y * height) as usize];
+    let mut src_u = vec![0u8; (src_stride_u * chroma_height) as usize];
+    let mut src_v = vec![0u8; (src_stride_v * chroma_height) as usize];
+
+    for row in 0..height as usize {
+        let row_begin = row * src_stride_y as usize;
+        let row_end = row_begin + width as usize;
+        for (col, px) in src_y[row_begin..row_end].iter_mut().enumerate() {
+            *px = (row as u8).wrapping_mul(13).wrapping_add(col as u8);
+        }
+    }
+    for row in 0..chroma_height as usize {
+        let row_begin = row * src_stride_u as usize;
+        let row_end = row_begin + chroma_width as usize;
+        for (col, px) in src_u[row_begin..row_end].iter_mut().enumerate() {
+            *px = 0x40u8
+                .wrapping_add((row as u8).wrapping_mul(7))
+                .wrapping_add(col as u8);
+        }
+    }
+    for row in 0..chroma_height as usize {
+        let row_begin = row * src_stride_v as usize;
+        let row_end = row_begin + chroma_width as usize;
+        for (col, px) in src_v[row_begin..row_end].iter_mut().enumerate() {
+            *px = 0x80u8
+                .wrapping_add((row as u8).wrapping_mul(11))
+                .wrapping_add(col as u8);
+        }
+    }
+
+    let dst_stride_y = 9;
+    let dst_stride_u = 5;
+    let dst_stride_v = 7;
+    let mut dst_y = vec![0u8; (dst_stride_y * height) as usize];
+    let mut dst_u = vec![0u8; (dst_stride_u * chroma_height) as usize];
+    let mut dst_v = vec![0u8; (dst_stride_v * chroma_height) as usize];
+    assert!(i420_copy(
+        &src_y,
+        src_stride_y,
+        &src_u,
+        src_stride_u,
+        &src_v,
+        src_stride_v,
+        &mut dst_y,
+        dst_stride_y,
+        &mut dst_u,
+        dst_stride_u,
+        &mut dst_v,
+        dst_stride_v,
+        width,
+        height,
+    ));
+
+    let assert_plane_eq =
+        |lhs: &[u8], lhs_stride: i32, rhs: &[u8], rhs_stride: i32, row_bytes: i32, rows: i32| {
+            let lhs_stride = lhs_stride as usize;
+            let rhs_stride = rhs_stride as usize;
+            let row_bytes = row_bytes as usize;
+            let rows = rows as usize;
+            for row in 0..rows {
+                let lhs_begin = row * lhs_stride;
+                let lhs_end = lhs_begin + row_bytes;
+                let rhs_begin = row * rhs_stride;
+                let rhs_end = rhs_begin + row_bytes;
+                assert_eq!(lhs[lhs_begin..lhs_end], rhs[rhs_begin..rhs_end]);
+            }
+        };
+
+    assert_plane_eq(&src_y, src_stride_y, &dst_y, dst_stride_y, width, height);
+    assert_plane_eq(
+        &src_u,
+        src_stride_u,
+        &dst_u,
+        dst_stride_u,
+        chroma_width,
+        chroma_height,
+    );
+    assert_plane_eq(
+        &src_v,
+        src_stride_v,
+        &dst_v,
+        dst_stride_v,
+        chroma_width,
+        chroma_height,
+    );
+}
+
+#[test]
+fn i420_copy_returns_false_when_source_plane_is_too_short() {
+    let width = 4;
+    let height = 4;
+    let src_y = vec![0u8; (width * height) as usize];
+    let src_u = vec![0u8; ((width / 2) * (height / 2) - 1) as usize];
+    let src_v = vec![0u8; ((width / 2) * (height / 2)) as usize];
+    let mut dst_y = vec![0u8; (width * height) as usize];
+    let mut dst_u = vec![0u8; ((width / 2) * (height / 2)) as usize];
+    let mut dst_v = vec![0u8; ((width / 2) * (height / 2)) as usize];
+
+    assert!(!i420_copy(
+        &src_y,
+        width,
+        &src_u,
+        width / 2,
+        &src_v,
+        width / 2,
+        &mut dst_y,
+        width,
+        &mut dst_u,
+        width / 2,
+        &mut dst_v,
+        width / 2,
+        width,
+        height,
+    ));
+}
+
+#[test]
+fn i420_copy_returns_false_when_destination_plane_is_too_short() {
+    let width = 4;
+    let height = 4;
+    let src_y = vec![0u8; (width * height) as usize];
+    let src_u = vec![0u8; ((width / 2) * (height / 2)) as usize];
+    let src_v = vec![0u8; ((width / 2) * (height / 2)) as usize];
+    let mut dst_y = vec![0u8; (width * height) as usize];
+    let mut dst_u = vec![0u8; ((width / 2) * (height / 2)) as usize];
+    let mut dst_v = vec![0u8; ((width / 2) * (height / 2) - 1) as usize];
+
+    assert!(!i420_copy(
+        &src_y,
+        width,
+        &src_u,
+        width / 2,
+        &src_v,
+        width / 2,
+        &mut dst_y,
+        width,
+        &mut dst_u,
+        width / 2,
+        &mut dst_v,
+        width / 2,
+        width,
+        height,
+    ));
+}
+
+#[test]
+fn nv12_copy_with_odd_size_and_padding() {
+    let width = 5;
+    let height = 3;
+    let chroma_width = (width + 1) / 2;
+    let chroma_height = (height + 1) / 2;
+    let uv_row_bytes = chroma_width * 2;
+
+    let src_stride_y = 8;
+    let src_stride_uv = 10;
+    let mut src_y = vec![0u8; (src_stride_y * height) as usize];
+    let mut src_uv = vec![0u8; (src_stride_uv * chroma_height) as usize];
+    for row in 0..height as usize {
+        let row_begin = row * src_stride_y as usize;
+        let row_end = row_begin + width as usize;
+        for (col, px) in src_y[row_begin..row_end].iter_mut().enumerate() {
+            *px = 0x20u8
+                .wrapping_add((row as u8).wrapping_mul(9))
+                .wrapping_add(col as u8);
+        }
+    }
+    for row in 0..chroma_height as usize {
+        let row_begin = row * src_stride_uv as usize;
+        let row_end = row_begin + uv_row_bytes as usize;
+        for (col, px) in src_uv[row_begin..row_end].iter_mut().enumerate() {
+            *px = 0x60u8
+                .wrapping_add((row as u8).wrapping_mul(5))
+                .wrapping_add(col as u8);
+        }
+    }
+
+    let dst_stride_y = 9;
+    let dst_stride_uv = 11;
+    let mut dst_y = vec![0u8; (dst_stride_y * height) as usize];
+    let mut dst_uv = vec![0u8; (dst_stride_uv * chroma_height) as usize];
+    assert!(nv12_copy(
+        &src_y,
+        src_stride_y,
+        &src_uv,
+        src_stride_uv,
+        &mut dst_y,
+        dst_stride_y,
+        &mut dst_uv,
+        dst_stride_uv,
+        width,
+        height,
+    ));
+
+    let assert_plane_eq =
+        |lhs: &[u8], lhs_stride: i32, rhs: &[u8], rhs_stride: i32, row_bytes: i32, rows: i32| {
+            let lhs_stride = lhs_stride as usize;
+            let rhs_stride = rhs_stride as usize;
+            let row_bytes = row_bytes as usize;
+            let rows = rows as usize;
+            for row in 0..rows {
+                let lhs_begin = row * lhs_stride;
+                let lhs_end = lhs_begin + row_bytes;
+                let rhs_begin = row * rhs_stride;
+                let rhs_end = rhs_begin + row_bytes;
+                assert_eq!(lhs[lhs_begin..lhs_end], rhs[rhs_begin..rhs_end]);
+            }
+        };
+
+    assert_plane_eq(&src_y, src_stride_y, &dst_y, dst_stride_y, width, height);
+    assert_plane_eq(
+        &src_uv,
+        src_stride_uv,
+        &dst_uv,
+        dst_stride_uv,
+        uv_row_bytes,
+        chroma_height,
+    );
+}
+
+#[test]
+fn nv12_copy_returns_false_when_source_plane_is_too_short() {
+    let width = 4;
+    let height = 4;
+    let src_y = vec![0u8; (width * height) as usize];
+    let src_uv = vec![0u8; (width * (height / 2) - 1) as usize];
+    let mut dst_y = vec![0u8; (width * height) as usize];
+    let mut dst_uv = vec![0u8; (width * (height / 2)) as usize];
+
+    assert!(!nv12_copy(
+        &src_y,
+        width,
+        &src_uv,
+        width,
+        &mut dst_y,
+        width,
+        &mut dst_uv,
+        width,
+        width,
+        height,
+    ));
+}
+
+#[test]
+fn nv12_copy_returns_false_when_destination_plane_is_too_short() {
+    let width = 4;
+    let height = 4;
+    let src_y = vec![0u8; (width * height) as usize];
+    let src_uv = vec![0u8; (width * (height / 2)) as usize];
+    let mut dst_y = vec![0u8; (width * height) as usize];
+    let mut dst_uv = vec![0u8; (width * (height / 2) - 1) as usize];
+
+    assert!(!nv12_copy(
+        &src_y,
+        width,
+        &src_uv,
+        width,
+        &mut dst_y,
+        width,
+        &mut dst_uv,
+        width,
+        width,
+        height,
+    ));
+}
+
+#[test]
 fn logging_functions_are_callable() {
     // severity は 0 にしておく。実際のログ内容は検証しない。
     log::log_to_debug(log::Severity::Info);
@@ -1308,7 +1779,7 @@ fn thread_blocking_call_runs() {
 
 #[test]
 fn thread_sleep_ms_runs() {
-    thread_sleep_ms(1);
+    Thread::sleep_ms(1);
 }
 
 #[test]
@@ -2184,6 +2655,98 @@ fn create_and_set_local_description_observers() {
     let _set_remote = SetRemoteDescriptionObserver::new_with_handler(Box::new(NoopHandler));
 }
 
+#[test]
+fn always_negotiate_data_channels_adds_data_section() {
+    struct OfferHandler {
+        tx: mpsc::Sender<Result<String>>,
+    }
+
+    impl CreateSessionDescriptionObserverHandler for OfferHandler {
+        fn on_success(&mut self, desc: SessionDescription) {
+            let sdp = desc.to_string();
+            let _ = self.tx.send(sdp);
+        }
+
+        fn on_failure(&mut self, err: RtcError) {
+            let _ = self.tx.send(Err(err.into()));
+        }
+    }
+
+    fn create_offer_sdp(
+        factory: &PeerConnectionFactory,
+        config: &mut PeerConnectionRtcConfiguration,
+    ) -> String {
+        let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
+        let mut pc_deps = PeerConnectionDependencies::new(&observer);
+        let pc = PeerConnection::create(factory, config, &mut pc_deps)
+            .expect("PeerConnection の生成に失敗しました");
+
+        let mut opts = PeerConnectionOfferAnswerOptions::new();
+        let (tx, rx) = mpsc::channel::<Result<String>>();
+        let mut obs =
+            CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferHandler { tx }));
+        pc.create_offer(&mut obs, &mut opts);
+        let sdp = rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("createOffer がタイムアウトしました")
+            .expect("createOffer が失敗しました");
+
+        drop(obs);
+        drop(pc);
+        drop(pc_deps);
+        sdp
+    }
+
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc);
+    deps_factory.set_audio_decoder_factory(&dec);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    // always_negotiate_data_channels=true かつ DataChannel 未生成でも m=application が含まれる。
+    let mut pc_config_on = PeerConnectionRtcConfiguration::new();
+    pc_config_on.set_always_negotiate_data_channels(true);
+    let sdp_on = create_offer_sdp(&factory, &mut pc_config_on);
+    assert!(
+        sdp_on.contains("m=application"),
+        "always_negotiate_data_channels=true で SDP に m=application が含まれません: {sdp_on}"
+    );
+
+    // 対照実験: デフォルト (false) で DataChannel 未生成なら m=application は含まれない。
+    let mut pc_config_off = PeerConnectionRtcConfiguration::new();
+    let sdp_off = create_offer_sdp(&factory, &mut pc_config_off);
+    assert!(
+        !sdp_off.contains("m=application"),
+        "always_negotiate_data_channels=false で SDP に m=application が含まれました: {sdp_off}"
+    );
+
+    drop(factory);
+    drop(deps_factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
 // VideoEncoderFactory でカスタムエンコーダーを登録して encode を呼び、
 // encode callback が呼ばれることを確認する。
 #[test]
@@ -2214,7 +2777,7 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
             &mut self,
             env: EnvironmentRef<'_>,
             format: SdpVideoFormatRef<'_>,
-        ) -> Option<Box<dyn VideoEncoderHandler>> {
+        ) -> Option<VideoEncoder> {
             assert!(!env.as_ptr().is_null());
             assert_eq!(
                 format
@@ -2226,7 +2789,9 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
                 return None;
             }
             self.created = true;
-            Some(Box::new(TestVideoEncoderHandler { encode_count: 0 }))
+            Some(VideoEncoder::new_with_handler(Box::new(
+                TestVideoEncoderHandler { encode_count: 0 },
+            )))
         }
     }
 
@@ -2638,7 +3203,7 @@ fn video_encoder_factory_create_calls_create_callback() {
             &mut self,
             env: EnvironmentRef<'_>,
             format: SdpVideoFormatRef<'_>,
-        ) -> Option<Box<dyn VideoEncoderHandler>> {
+        ) -> Option<VideoEncoder> {
             self.called.store(true, std::sync::atomic::Ordering::SeqCst);
             assert!(!env.as_ptr().is_null());
             assert_eq!(
@@ -2647,7 +3212,7 @@ fn video_encoder_factory_create_calls_create_callback() {
                     .expect("SdpVideoFormatRef::name に失敗しました"),
                 "H264"
             );
-            Some(Box::new(NoopHandler))
+            Some(VideoEncoder::new_with_handler(Box::new(NoopHandler)))
         }
     }
 
@@ -2675,7 +3240,7 @@ fn video_decoder_factory_create_calls_create_callback() {
             &mut self,
             env: EnvironmentRef<'_>,
             format: SdpVideoFormatRef<'_>,
-        ) -> Option<Box<dyn VideoDecoderHandler>> {
+        ) -> Option<VideoDecoder> {
             self.called.store(true, std::sync::atomic::Ordering::SeqCst);
             assert!(!env.as_ptr().is_null());
             assert_eq!(
@@ -2684,7 +3249,7 @@ fn video_decoder_factory_create_calls_create_callback() {
                     .expect("SdpVideoFormatRef::name に失敗しました"),
                 "H264"
             );
-            Some(Box::new(NoopHandler))
+            Some(VideoDecoder::new_with_handler(Box::new(NoopHandler)))
         }
     }
 
@@ -2865,6 +3430,31 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     );
 }
 
+#[test]
+fn simulcast_encoder_adapter_new_works() {
+    let env = Environment::new();
+    let primary_factory = VideoEncoderFactory::builtin();
+    let format = SdpVideoFormat::new("VP8");
+
+    let _adapter =
+        SimulcastEncoderAdapter::new(env.as_ref(), &primary_factory, None, format.as_ref());
+}
+
+#[test]
+fn simulcast_encoder_adapter_cast_to_video_encoder_works() {
+    let env = Environment::new();
+    let primary_factory = VideoEncoderFactory::builtin();
+    let format = SdpVideoFormat::new("VP8");
+
+    let adapter =
+        SimulcastEncoderAdapter::new(env.as_ref(), &primary_factory, None, format.as_ref());
+    let encoder = adapter.cast_to_video_encoder();
+    let info = encoder.get_encoder_info();
+    let _ = info
+        .implementation_name()
+        .expect("implementation_name の取得に失敗しました");
+}
+
 // VideoDecoderFactory の create callback と、VideoDecoder の decode callback が呼ばれることを確認する。
 #[test]
 fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
@@ -2892,13 +3482,15 @@ fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
             &mut self,
             env: EnvironmentRef<'_>,
             _format: SdpVideoFormatRef<'_>,
-        ) -> Option<Box<dyn VideoDecoderHandler>> {
+        ) -> Option<VideoDecoder> {
             assert!(!env.as_ptr().is_null());
             if self.created {
                 return None;
             }
             self.created = true;
-            Some(Box::new(TestVideoDecoderHandler { decode_count: 0 }))
+            Some(VideoDecoder::new_with_handler(Box::new(
+                TestVideoDecoderHandler { decode_count: 0 },
+            )))
         }
     }
 

@@ -37,6 +37,13 @@ pub struct DataChannel {
     raw_ref: ScopedRef<DataChannelHandle>,
 }
 
+unsafe impl Send for DataChannel {}
+
+// SAFETY: DataChannelInterface の実体はシーケンシャルにする Proxy 経由で
+// アクセスするためスレッドセーフに使用できる。
+// https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/pc/sctp_data_channel.cc;l=56-84;drc=b610a104128a46d031dc5ae3e6d486430b61efa6
+unsafe impl Sync for DataChannel {}
+
 impl DataChannel {
     pub(crate) fn from_scoped_ref(raw_ref: ScopedRef<DataChannelHandle>) -> Self {
         Self { raw_ref }
@@ -94,12 +101,6 @@ impl DataChannel {
     }
 }
 
-unsafe impl Send for DataChannel {}
-// SAFETY: DataChannelInterface の実体はシーケンシャルにする Proxy 経由で
-// アクセスするためスレッドセーフに使用できる。
-// https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/pc/sctp_data_channel.cc;l=56-84;drc=b610a104128a46d031dc5ae3e6d486430b61efa6
-unsafe impl Sync for DataChannel {}
-
 // -------------------------
 // DataChannelObserver
 // -------------------------
@@ -113,6 +114,8 @@ pub trait DataChannelObserverHandler: Send {
 struct DataChannelObserverHandlerState {
     handler: Box<dyn DataChannelObserverHandler>,
 }
+
+unsafe impl Send for DataChannelObserverHandlerState {}
 
 unsafe extern "C" fn dc_observer_on_state_change(user_data: *mut c_void) {
     assert!(
@@ -151,6 +154,8 @@ pub struct DataChannelObserver {
     raw: NonNull<ffi::webrtc_DataChannelObserver>,
 }
 
+unsafe impl Send for DataChannelObserver {}
+
 impl DataChannelObserver {
     pub fn new_with_handler(handler: Box<dyn DataChannelObserverHandler>) -> Self {
         let state = Box::new(DataChannelObserverHandlerState { handler });
@@ -183,9 +188,6 @@ impl Drop for DataChannelObserver {
     }
 }
 
-unsafe impl Send for DataChannelObserver {}
-unsafe impl Sync for DataChannelObserver {}
-
 // -------------------------
 // DataChannelInit
 // -------------------------
@@ -194,6 +196,8 @@ unsafe impl Sync for DataChannelObserver {}
 pub struct DataChannelInit {
     raw: NonNull<ffi::webrtc_DataChannelInit>,
 }
+
+unsafe impl Send for DataChannelInit {}
 
 impl DataChannelInit {
     pub fn new() -> Self {

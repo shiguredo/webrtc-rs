@@ -9,6 +9,8 @@ pub struct SSLIdentity {
     raw_unique: NonNull<ffi::webrtc_SSLIdentity_unique>,
 }
 
+unsafe impl Send for SSLIdentity {}
+
 impl SSLIdentity {
     /// PEM 形式の秘密鍵と証明書から SSLIdentity を生成する。
     pub fn create_from_pem_strings(private_key: &str, certificate: &str) -> Option<Self> {
@@ -51,5 +53,3 @@ impl Drop for SSLIdentity {
         unsafe { ffi::webrtc_SSLIdentity_unique_delete(self.raw_unique.as_ptr()) };
     }
 }
-
-unsafe impl Send for SSLIdentity {}

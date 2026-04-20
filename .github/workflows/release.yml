@@ -85,6 +85,8 @@ jobs:
           mkdir -p staging/lib staging/include
           cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
           cp "$OUT_DIR/bindings.rs" staging/
+          cp LICENSE staging/
+          cp THIRD_PARTY_LICENSES.md staging/
           while IFS= read -r -d '' header; do
             rel_path="${header#webrtc/src/}"
             dest_path="staging/include/${rel_path}"
@@ -108,6 +110,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path "staging/include" | Out-Null
           Copy-Item "$($outDir.FullName)/lib/webrtc_c.lib" "staging/lib/"
           Copy-Item "$($outDir.FullName)/bindings.rs" "staging/"
+          Copy-Item "LICENSE" "staging/"
+          Copy-Item "THIRD_PARTY_LICENSES.md" "staging/"
           $srcRoot = (Resolve-Path "webrtc/src").Path
           Get-ChildItem -Path $srcRoot -Recurse -File -Filter "*.h" |
             Where-Object { $_.Name -notlike "*.impl.h" } |
@@ -125,6 +129,8 @@ jobs:
           archive="libwebrtc_c-${{ matrix.target }}.tar.gz"
           tar tzf "$archive" | grep -Eq '(^|\./)bindings\.rs$'
           tar tzf "$archive" | grep -Eq '(^|\./)include/webrtc_c\.h$'
+          tar tzf "$archive" | grep -Eq '(^|\./)LICENSE$'
+          tar tzf "$archive" | grep -Eq '(^|\./)THIRD_PARTY_LICENSES\.md$'
           if tar tzf "$archive" | grep -Eq '(^|\./)include/.*\.impl\.h$'; then
             echo "ERROR: include contains forbidden *.impl.h headers"
             exit 1
@@ -140,6 +146,14 @@ jobs:
           }
           if (-not ($entries | Select-String -Pattern '(^|\./)include/webrtc_c\.h$')) {
             Write-Error "ERROR: include/webrtc_c.h is missing in package"
+            exit 1
+          }
+          if (-not ($entries | Select-String -Pattern '(^|\./)LICENSE$')) {
+            Write-Error "ERROR: LICENSE is missing in package"
+            exit 1
+          }
+          if (-not ($entries | Select-String -Pattern '(^|\./)THIRD_PARTY_LICENSES\.md$')) {
+            Write-Error "ERROR: THIRD_PARTY_LICENSES.md is missing in package"
             exit 1
           }
           if ($entries | Select-String -Pattern '(^|\./)include/.*\.impl\.h$') {
@@ -224,6 +238,8 @@ jobs:
           mkdir -p staging/lib staging/include
           cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
           cp "$OUT_DIR/bindings.rs" staging/
+          cp LICENSE staging/
+          cp THIRD_PARTY_LICENSES.md staging/
           while IFS= read -r -d '' header; do
             rel_path="${header#webrtc/src/}"
             dest_path="staging/include/${rel_path}"
@@ -236,6 +252,8 @@ jobs:
           archive="libwebrtc_c-${{ matrix.target }}.tar.gz"
           tar tzf "$archive" | grep -Eq '(^|\./)bindings\.rs$'
           tar tzf "$archive" | grep -Eq '(^|\./)include/webrtc_c\.h$'
+          tar tzf "$archive" | grep -Eq '(^|\./)LICENSE$'
+          tar tzf "$archive" | grep -Eq '(^|\./)THIRD_PARTY_LICENSES\.md$'
           if tar tzf "$archive" | grep -Eq '(^|\./)include/.*\.impl\.h$'; then
             echo "ERROR: include contains forbidden *.impl.h headers"
             exit 1
@@ -281,6 +299,8 @@ jobs:
           mkdir -p staging/lib staging/include staging/jar
           cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
           cp "$OUT_DIR/bindings.rs" staging/
+          cp LICENSE staging/
+          cp THIRD_PARTY_LICENSES.md staging/
           while IFS= read -r -d '' header; do
             rel_path="${header#webrtc/src/}"
             dest_path="staging/include/${rel_path}"
@@ -300,6 +320,8 @@ jobs:
           tar tzf "$archive" | grep -Eq '(^|\./)bindings\.rs$'
           tar tzf "$archive" | grep -Eq '(^|\./)include/webrtc_c\.h$'
           tar tzf "$archive" | grep -Eq '(^|\./)jar/webrtc\.jar$'
+          tar tzf "$archive" | grep -Eq '(^|\./)LICENSE$'
+          tar tzf "$archive" | grep -Eq '(^|\./)THIRD_PARTY_LICENSES\.md$'
           if tar tzf "$archive" | grep -Eq '(^|\./)include/.*\.impl\.h$'; then
             echo "ERROR: include contains forbidden *.impl.h headers"
             exit 1
@@ -341,6 +363,8 @@ jobs:
           mkdir -p staging/lib staging/include
           cp "$OUT_DIR/lib/libwebrtc_c.a" staging/lib/
           cp "$OUT_DIR/bindings.rs" staging/
+          cp LICENSE staging/
+          cp THIRD_PARTY_LICENSES.md staging/
           while IFS= read -r -d '' header; do
             rel_path="${header#webrtc/src/}"
             dest_path="staging/include/${rel_path}"
@@ -353,6 +377,8 @@ jobs:
           archive="libwebrtc_c-ios_arm64.tar.gz"
           tar tzf "$archive" | grep -Eq '(^|\./)bindings\.rs$'
           tar tzf "$archive" | grep -Eq '(^|\./)include/webrtc_c\.h$'
+          tar tzf "$archive" | grep -Eq '(^|\./)LICENSE$'
+          tar tzf "$archive" | grep -Eq '(^|\./)THIRD_PARTY_LICENSES\.md$'
           if tar tzf "$archive" | grep -Eq '(^|\./)include/.*\.impl\.h$'; then
             echo "ERROR: include contains forbidden *.impl.h headers"
             exit 1

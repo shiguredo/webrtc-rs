@@ -27,11 +27,7 @@ pub struct Thread {
     raw_unique: NonNull<ffi::webrtc_Thread_unique>,
 }
 
-impl Default for Thread {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for Thread {}
 
 impl Thread {
     pub fn into_raw(self) -> *mut ffi::webrtc_Thread_unique {
@@ -107,17 +103,21 @@ impl Thread {
         let raw = unsafe { ffi::webrtc_Thread_unique_get(self.raw_unique.as_ptr()) };
         NonNull::new(raw).expect("BUG: webrtc_Thread_unique_get が null を返しました")
     }
+
+    /// スレッドを一定時間スリープさせるヘルパー。
+    pub fn sleep_ms(millis: i32) {
+        unsafe { ffi::webrtc_Thread_SleepMs(millis) };
+    }
+}
+
+impl Default for Thread {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Drop for Thread {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_Thread_unique_delete(self.raw_unique.as_ptr()) };
     }
-}
-
-unsafe impl Send for Thread {}
-
-/// スレッドを一定時間スリープさせるヘルパー。
-pub fn thread_sleep_ms(millis: i32) {
-    unsafe { ffi::webrtc_Thread_SleepMs(millis) };
 }

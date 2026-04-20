@@ -6,11 +6,7 @@ pub struct RtcEventLogFactory {
     raw_unique: NonNull<ffi::webrtc_RtcEventLogFactory_unique>,
 }
 
-impl Default for RtcEventLogFactory {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for RtcEventLogFactory {}
 
 impl RtcEventLogFactory {
     pub fn new() -> Self {
@@ -25,6 +21,12 @@ impl RtcEventLogFactory {
 
     pub fn into_raw(self) -> *mut ffi::webrtc_RtcEventLogFactory_unique {
         std::mem::ManuallyDrop::new(self).raw_unique.as_ptr()
+    }
+}
+
+impl Default for RtcEventLogFactory {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

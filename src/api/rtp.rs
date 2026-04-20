@@ -14,6 +14,8 @@ pub struct RtpCapabilities {
     raw: NonNull<ffi::webrtc_RtpCapabilities>,
 }
 
+unsafe impl Send for RtpCapabilities {}
+
 impl RtpCapabilities {
     pub fn from_raw(raw: NonNull<ffi::webrtc_RtpCapabilities>) -> Self {
         Self { raw }
@@ -48,11 +50,7 @@ pub struct RtpCodec {
     raw: NonNull<ffi::webrtc_RtpCodec>,
 }
 
-impl Default for RtpCodec {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for RtpCodec {}
 
 impl RtpCodec {
     pub fn new() -> Self {
@@ -103,19 +101,25 @@ impl RtpCodec {
     }
 }
 
+impl Default for RtpCodec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for RtpCodec {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_RtpCodec_delete(self.raw.as_ptr()) };
     }
 }
 
-unsafe impl Send for RtpCodec {}
-
 /// webrtc::RtpCodec の借用ラッパー。
 pub struct RtpCodecRef<'a> {
     raw: NonNull<ffi::webrtc_RtpCodec>,
     _marker: PhantomData<&'a ffi::webrtc_RtpCodec>,
 }
+
+unsafe impl<'a> Send for RtpCodecRef<'a> {}
 
 impl<'a> RtpCodecRef<'a> {
     pub fn from_raw(raw: NonNull<ffi::webrtc_RtpCodec>) -> Self {
@@ -200,11 +204,7 @@ pub struct RtpCodecCapability {
     raw: NonNull<ffi::webrtc_RtpCodecCapability>,
 }
 
-impl Default for RtpCodecCapability {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for RtpCodecCapability {}
 
 impl RtpCodecCapability {
     pub fn new() -> Self {
@@ -260,6 +260,12 @@ impl RtpCodecCapability {
     }
 }
 
+impl Default for RtpCodecCapability {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for RtpCodecCapability {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_RtpCodecCapability_delete(self.raw.as_ptr()) };
@@ -271,6 +277,8 @@ pub struct RtpCodecCapabilityRef<'a> {
     raw: NonNull<ffi::webrtc_RtpCodecCapability>,
     _marker: PhantomData<&'a ffi::webrtc_RtpCodecCapability_vector>,
 }
+
+unsafe impl<'a> Send for RtpCodecCapabilityRef<'a> {}
 
 impl<'a> RtpCodecCapabilityRef<'a> {
     pub fn from_raw(raw: NonNull<ffi::webrtc_RtpCodecCapability>) -> Self {
@@ -330,6 +338,8 @@ pub struct RtpCodecCapabilityVector {
     raw: NonNull<ffi::webrtc_RtpCodecCapability_vector>,
 }
 
+unsafe impl Send for RtpCodecCapabilityVector {}
+
 impl RtpCodecCapabilityVector {
     pub fn new(size: i32) -> Self {
         let raw = NonNull::new(unsafe { ffi::webrtc_RtpCodecCapability_vector_new(size) })
@@ -381,6 +391,8 @@ pub struct RtpCodecCapabilityVectorRef<'a> {
     raw: NonNull<ffi::webrtc_RtpCodecCapability_vector>,
     _marker: PhantomData<&'a ffi::webrtc_RtpCapabilities>,
 }
+
+unsafe impl<'a> Send for RtpCodecCapabilityVectorRef<'a> {}
 
 impl<'a> RtpCodecCapabilityVectorRef<'a> {
     pub fn from_raw(raw: NonNull<ffi::webrtc_RtpCodecCapability_vector>) -> Self {
@@ -435,15 +447,12 @@ impl<'a> RtpCodecCapabilityVectorRef<'a> {
         true
     }
 }
+
 pub struct Resolution {
     raw: NonNull<ffi::webrtc_Resolution>,
 }
 
-impl Default for Resolution {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for Resolution {}
 
 impl Resolution {
     pub fn new() -> Self {
@@ -473,24 +482,24 @@ impl Resolution {
     }
 }
 
+impl Default for Resolution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for Resolution {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_Resolution_delete(self.raw.as_ptr()) };
     }
 }
 
-unsafe impl Send for Resolution {}
-
 /// RtpEncodingParameters のラッパー。
 pub struct RtpEncodingParameters {
     raw: NonNull<ffi::webrtc_RtpEncodingParameters>,
 }
 
-impl Default for RtpEncodingParameters {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for RtpEncodingParameters {}
 
 impl RtpEncodingParameters {
     pub fn new() -> Self {
@@ -628,6 +637,12 @@ impl RtpEncodingParameters {
     }
 }
 
+impl Default for RtpEncodingParameters {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for RtpEncodingParameters {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_RtpEncodingParameters_delete(self.raw.as_ptr()) };
@@ -639,6 +654,8 @@ pub struct RtpEncodingParametersRef<'a> {
     raw: NonNull<ffi::webrtc_RtpEncodingParameters>,
     _marker: PhantomData<&'a ffi::webrtc_RtpEncodingParameters_vector>,
 }
+
+unsafe impl<'a> Send for RtpEncodingParametersRef<'a> {}
 
 impl<'a> RtpEncodingParametersRef<'a> {
     pub fn from_raw(raw: NonNull<ffi::webrtc_RtpEncodingParameters>) -> Self {
@@ -1001,6 +1018,8 @@ pub struct RtpEncodingParametersVector {
     raw: NonNull<ffi::webrtc_RtpEncodingParameters_vector>,
 }
 
+unsafe impl Send for RtpEncodingParametersVector {}
+
 impl RtpEncodingParametersVector {
     pub fn new(size: i32) -> Self {
         let raw = NonNull::new(unsafe { ffi::webrtc_RtpEncodingParameters_vector_new(size) })
@@ -1173,11 +1192,7 @@ pub struct RtpParameters {
     raw: NonNull<ffi::webrtc_RtpParameters>,
 }
 
-impl Default for RtpParameters {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for RtpParameters {}
 
 impl RtpParameters {
     pub fn new() -> Self {
@@ -1281,6 +1296,12 @@ impl RtpParameters {
     }
 }
 
+impl Default for RtpParameters {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for RtpParameters {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_RtpParameters_delete(self.raw.as_ptr()) };
@@ -1288,8 +1309,6 @@ impl Drop for RtpParameters {
 }
 
 // 安全性: 所有ポインタは drop 時に解放されるだけで共有状態を持たない。
-unsafe impl Send for RtpParameters {}
-
 /// RtpTransceiverDirection のラッパー。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RtpTransceiverDirection {
@@ -1321,11 +1340,7 @@ pub struct RtpTransceiverInit {
     raw: NonNull<ffi::webrtc_RtpTransceiverInit>,
 }
 
-impl Default for RtpTransceiverInit {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+unsafe impl Send for RtpTransceiverInit {}
 
 impl RtpTransceiverInit {
     pub fn new() -> Self {
@@ -1364,15 +1379,24 @@ impl RtpTransceiverInit {
     }
 }
 
+impl Default for RtpTransceiverInit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for RtpTransceiverInit {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_RtpTransceiverInit_delete(self.raw.as_ptr()) };
     }
 }
+
 /// RtpTransceiverInterface のラッパー。
 pub struct RtpTransceiver {
     raw_ref: ScopedRef<RtpTransceiverHandle>,
 }
+
+unsafe impl Send for RtpTransceiver {}
 
 impl RtpTransceiver {
     pub(crate) fn from_scoped_ref(raw_ref: ScopedRef<RtpTransceiverHandle>) -> Self {
@@ -1408,12 +1432,12 @@ impl RtpTransceiver {
 }
 
 // 安全性: libwebrtc 側で参照カウント管理されたポインタのみを保持する。
-unsafe impl Send for RtpTransceiver {}
-
 /// webrtc::RtpReceiverInterface のラッパー。
 pub struct RtpReceiver {
     raw_ref: ScopedRef<RtpReceiverHandle>,
 }
+
+unsafe impl Send for RtpReceiver {}
 
 impl RtpReceiver {
     pub(crate) fn from_scoped_ref(raw_ref: ScopedRef<RtpReceiverHandle>) -> Self {
@@ -1430,12 +1454,12 @@ impl RtpReceiver {
 }
 
 // 安全性: libwebrtc 側で参照カウント管理されたポインタのみを保持する。
-unsafe impl Send for RtpReceiver {}
-
 /// webrtc::RtpSenderInterface のラッパー。
 pub struct RtpSender {
     raw_ref: ScopedRef<RtpSenderHandle>,
 }
+
+unsafe impl Send for RtpSender {}
 
 impl RtpSender {
     pub(crate) fn from_scoped_ref(raw_ref: ScopedRef<RtpSenderHandle>) -> Self {
@@ -1478,12 +1502,12 @@ impl RtpSender {
 }
 
 // 安全性: libwebrtc 側で参照カウント管理されたポインタのみを保持する。
-unsafe impl Send for RtpSender {}
-
 /// webrtc::MediaStreamTrackInterface のラッパー。
 pub struct MediaStreamTrack {
     raw_ref: ScopedRef<MediaStreamTrackHandle>,
 }
+
+unsafe impl Send for MediaStreamTrack {}
 
 impl MediaStreamTrack {
     pub(crate) fn from_scoped_ref(raw_ref: ScopedRef<MediaStreamTrackHandle>) -> Self {
