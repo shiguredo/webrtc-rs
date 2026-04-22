@@ -20,7 +20,7 @@ include = [
 ]
 
 [package.metadata.external-dependencies]
-webrtc-build = { version = "m147.7727.10.0", base-url = "https://github.com/shiguredo-webrtc-build/webrtc-build/releases/download" }
+webrtc-build = { version = "m147.7727.11.0", base-url = "https://github.com/shiguredo-webrtc-build/webrtc-build/releases/download" }
 
 [package.metadata.build-config]
 cmake-osx-deployment-target = "16.0"
