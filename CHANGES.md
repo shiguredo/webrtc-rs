@@ -9,12 +9,16 @@
 - FIX
   - バグ修正
 
-
 ## develop
+
+### misc
+
+## 0.148.0
+
+**リリース日**: 2026-05-16
 
 - [UPDATE] libwebrtc m148 (m148.7778.7.0) に上げる
   - @voluntas
-
 
 ### misc
 
@@ -24,14 +28,12 @@
 - [UPDATE] examples/whip と examples/whep の `rustls-platform-verifier` を 0.7 に上げる
   - @voluntas
 
-
 ## 0.147.2
 
 **リリース日**: 2026-04-20
 
 - [UPDATE] libwebrtc m147 (m147.7727.11.0) に上げる
   - @voluntas
-
 
 ## 0.147.1
 
