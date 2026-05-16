@@ -1,6 +1,6 @@
 [package]
 name = "shiguredo_webrtc"
-version = "0.147.2"
+version = "0.148.0"
 edition = "2024"
 rust-version = "1.88"
 description = "Rust bindings for libwebrtc"
@@ -20,7 +20,7 @@ include = [
 ]
 
 [package.metadata.external-dependencies]
-webrtc-build = { version = "m147.7727.11.0", base-url = "https://github.com/shiguredo-webrtc-build/webrtc-build/releases/download" }
+webrtc-build = { version = "m148.7778.7.0", base-url = "https://github.com/shiguredo-webrtc-build/webrtc-build/releases/download" }
 
 [package.metadata.build-config]
 cmake-osx-deployment-target = "16.0"
@@ -37,7 +37,7 @@ members = ["examples/*"]
 bindgen = "0.72"
 nojson = "0.3"
 shiguredo_cmake = "4.3"
-shiguredo_toml = "2026.1"
+shiguredo_toml = "2026.2"
 
 [features]
 default = []
