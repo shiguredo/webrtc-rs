@@ -18,6 +18,12 @@
 
 ### misc
 
+- [UPDATE] examples/whip と examples/whep の `shiguredo_http11` を 2026.4 に上げる
+  - 2026.4 系での API 変更 (`Request::new` / `header` / `encode` が `Result` を返す、`Response::body` フィールドが private 化され `body_bytes()` 経由に) に追従する
+  - @voluntas
+- [UPDATE] examples/whip と examples/whep の `rustls-platform-verifier` を 0.7 に上げる
+  - @voluntas
+
 
 ## 0.147.2
 

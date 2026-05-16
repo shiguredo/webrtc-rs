@@ -581,17 +581,26 @@ fn build_request_target(url: &str) -> Result<RequestTarget, String> {
 fn send_offer(url: &str, sdp: &str) -> Result<LinkHeaderBody, String> {
     let target = build_request_target(url)?;
     let request = Request::new("POST", &target.path)
+        .map_err(|e| e.to_string())?
         .header("Host", &target.host_header)
+        .map_err(|e| e.to_string())?
         .header("Content-Type", "application/sdp")
+        .map_err(|e| e.to_string())?
         .header("Connection", "close")
+        .map_err(|e| e.to_string())?
         .header("User-Agent", "Whep-Client")
+        .map_err(|e| e.to_string())?
         .body(sdp.as_bytes().to_vec());
     let response = send_http_request(&target, &request)?;
     let link_header = response
         .get_header("Link")
         .ok_or_else(|| "Link ヘッダーがありません".to_string())?
         .to_string();
-    let body = String::from_utf8(response.body).map_err(|e| e.to_string())?;
+    let body_bytes = response
+        .body_bytes()
+        .ok_or_else(|| "レスポンスボディがありません".to_string())?
+        .to_vec();
+    let body = String::from_utf8(body_bytes).map_err(|e| e.to_string())?;
     let parsed = parse_link_header(&link_header);
     Ok(LinkHeaderBody {
         ice_urls: parsed.urls,
@@ -602,7 +611,7 @@ fn send_offer(url: &str, sdp: &str) -> Result<LinkHeaderBody, String> {
 }
 
 fn send_http_request(target: &RequestTarget, request: &Request) -> Result<Response, String> {
-    let request_bytes = request.encode();
+    let request_bytes = request.encode().map_err(|e| e.to_string())?;
     if target.scheme == "https" {
         https_request(&target.host, target.port, &request_bytes)
     } else {
