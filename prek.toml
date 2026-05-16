@@ -2,30 +2,72 @@
 # See https://prek.j178.dev for more information.
 #:schema https://www.schemastore.org/prek.json
 
+# `prek install` 実行時に pre-commit と pre-push の両方の Git shim を導入する
+default_install_hook_types = ["pre-commit", "pre-push"]
+
+# prek 同梱の Rust 製ビルトイン hooks (ネットワーク不要)
+[[repos]]
+repo = "builtin"
+
+[[repos.hooks]]
+id = "check-toml"
+
+[[repos.hooks]]
+id = "check-yaml"
+
+[[repos.hooks]]
+id = "check-merge-conflict"
+
+[[repos.hooks]]
+id = "check-added-large-files"
+args = ["--maxkb=500"]
+
+[[repos.hooks]]
+id = "end-of-file-fixer"
+
+[[repos.hooks]]
+id = "trailing-whitespace"
+
+[[repos.hooks]]
+id = "mixed-line-ending"
+args = ["--fix=lf"]
+
+[[repos.hooks]]
+id = "detect-private-key"
+
+# プロジェクト固有のローカル hooks
 [[repos]]
 repo = "local"
-hooks = [
-  {
-    id = "cargo-fmt",
-    name = "cargo fmt",
-    entry = "cargo fmt --all -- --check",
-    language = "system",
-    types = ["rust"],
-    pass_filenames = false
-  },
-  {
-    id = "cargo-check",
-    name = "cargo check",
-    entry = "cargo check --workspace --features source-build",
-    language = "system",
-    types = ["rust"],
-    pass_filenames = false
-  },
-  {
-    id = "clang-format",
-    name = "clang-format",
-    entry = "python3 webrtc/run.py format --check",
-    language = "system",
-    pass_filenames = false
-  }
-]
+
+[[repos.hooks]]
+id = "cargo-fmt"
+name = "cargo fmt"
+entry = "cargo fmt --all -- --check"
+language = "system"
+types = ["rust"]
+pass_filenames = false
+
+[[repos.hooks]]
+id = "cargo-check"
+name = "cargo check"
+entry = "cargo check --workspace --features source-build"
+language = "system"
+types = ["rust"]
+pass_filenames = false
+
+[[repos.hooks]]
+id = "cargo-clippy"
+name = "cargo clippy"
+entry = "cargo clippy --workspace --features source-build -- -D warnings"
+language = "system"
+types = ["rust"]
+pass_filenames = false
+
+[[repos.hooks]]
+id = "clang-format"
+name = "clang-format"
+entry = "python3 webrtc/run.py format --check"
+language = "system"
+# webrtc/src/webrtc_c/ 配下の C/C++/Objective-C ソースが変更された時のみ実行する
+files = "^webrtc/src/webrtc_c/.*\\.(c|cc|cpp|h|hpp|m|mm)$"
+pass_filenames = false
