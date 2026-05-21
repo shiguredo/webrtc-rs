@@ -82,6 +82,15 @@ core_lib="$tmpdir/libwebrtc_core.a"
 objc_list="$tmpdir/objc_members.txt"
 objc_dir="$tmpdir/objc_members"
 objc_blob="$tmpdir/webrtc_objc_blob.o"
+sanitized_output="$tmpdir/libwebrtc_c_sanitized.a"
+
+# SPM 側で -all_load / -force_load を併用しても重複シンボルを起こさないよう、
+# 実行エントリを持つ不要オブジェクトを最終成果物から除去する。
+drop_members="
+main.o
+cppgen_plugin.o
+protozero_plugin.o
+"
 
 # 非 fat 前提でアーキテクチャ一致だけを検証する
 target_arch="$(non_fat_arch "$target_obj")"
@@ -119,8 +128,13 @@ if [ -s "$objc_list" ]; then
   # private extern を保持して、未解決シンボル解決で blob が選択される状態を作る
   ld -r -all_load -keep_private_externs -arch "$target_arch" -o "$objc_blob" "$objc_dir"/*.o
 
-  libtool -static -o "$output" "$target_obj" "$core_lib" "$objc_blob" "$@"
+  libtool -static -o "$sanitized_output" "$target_obj" "$core_lib" "$objc_blob" "$@"
 else
   # 抽出対象がない場合は従来どおりに結合する
-  libtool -static -o "$output" "$target_obj" "$core_lib" "$@"
+  libtool -static -o "$sanitized_output" "$target_obj" "$core_lib" "$@"
 fi
+
+cp "$sanitized_output" "$output"
+for member in $drop_members; do
+  "$ar_bin" -d "$output" "$member" 2>/dev/null || true
+done
