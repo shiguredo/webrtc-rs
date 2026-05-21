@@ -64,6 +64,9 @@ zip_path="$out_dir/libwebrtc_c.xcframework.zip"
 rm -rf "$xcframework_path"
 rm -f "$zip_path" "$zip_path.sha256" "$zip_path.swift-checksum.txt"
 
+# 現在は iOS と macOS で同一のヘッダー (webrtc_c.h) のみを扱うため、両スライスに同じ
+# --headers を指定している。将来的にプラットフォーム間で異なるヘッダーが必要に
+# なった場合は、各スライスに個別のヘッダーディレクトリを用意すること。
 xcodebuild -create-xcframework \
   -library "$ios_lib" -headers "$workdir/headers" \
   -library "$macos_lib" -headers "$workdir/headers" \
