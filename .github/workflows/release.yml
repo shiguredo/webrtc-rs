@@ -394,8 +394,38 @@ jobs:
             "libwebrtc_c-ios_arm64.tar.gz.sha256" \
             --clobber
 
+  # Apple XCFramework パッケージ
+  build-prebuilt-apple-xcframework:
+    name: "Build prebuilt (apple_xcframework)"
+    needs: [create-release, build-prebuilt, build-prebuilt-ios]
+    permissions:
+      contents: write
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Download release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p release-assets
+          gh release download "${GITHUB_REF_NAME}" \
+            --pattern "libwebrtc_c-ios_arm64.tar.gz" \
+            --pattern "libwebrtc_c-macos_arm64.tar.gz" \
+            --dir release-assets
+      - name: Build and upload XCFramework
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          scripts/package_apple_xcframework.sh \
+            --ios-tar release-assets/libwebrtc_c-ios_arm64.tar.gz \
+            --macos-tar release-assets/libwebrtc_c-macos_arm64.tar.gz \
+            --tag "${GITHUB_REF_NAME}" \
+            --out-dir dist/apple-xcframework
+
   publish:
-    needs: [build-prebuilt, build-prebuilt-cross, build-prebuilt-android, build-prebuilt-ios]
+    needs: [build-prebuilt, build-prebuilt-cross, build-prebuilt-android, build-prebuilt-ios, build-prebuilt-apple-xcframework]
     runs-on: ubuntu-24.04
     environment: release
     permissions:
@@ -409,7 +439,7 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
   slack_notify:
-    needs: [create-release, build-prebuilt, build-prebuilt-cross, build-prebuilt-android, build-prebuilt-ios, publish]
+    needs: [create-release, build-prebuilt, build-prebuilt-cross, build-prebuilt-android, build-prebuilt-ios, build-prebuilt-apple-xcframework, publish]
     runs-on: ubuntu-slim
     if: ${{ !cancelled() }}
     steps:
