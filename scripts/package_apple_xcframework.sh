@@ -7,13 +7,13 @@ Usage:
   scripts/package_apple_xcframework.sh \
     --ios-tar <libwebrtc_c-ios_arm64.tar.gz> \
     --macos-tar <libwebrtc_c-macos_arm64.tar.gz> \
-    [--out-dir <output-dir>]
+    --out-dir <output-dir>
 USAGE
 }
 
 ios_tar=""
 macos_tar=""
-out_dir="dist/apple-xcframework"
+out_dir=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -27,6 +27,7 @@ done
 
 # iOS / macOS の入力アーカイブは必須。
 [ -n "$ios_tar" ] && [ -n "$macos_tar" ] || { echo "ERROR: --ios-tar and --macos-tar are required" >&2; exit 1; }
+[ -n "$out_dir" ] || { echo "ERROR: --out-dir is required" >&2; exit 1; }
 
 # 利用ツールの存在を先に確認して、後続処理の失敗を早めに検知する。
 for cmd in tar xcodebuild zip shasum swift ar; do
