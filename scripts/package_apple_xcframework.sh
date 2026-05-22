@@ -30,7 +30,7 @@ done
 
 [ -n "$ios_tar" ] && [ -n "$macos_tar" ] || { echo "ERROR: --ios-tar and --macos-tar are required" >&2; exit 1; }
 
-for cmd in tar xcodebuild zip shasum swift; do
+for cmd in tar xcodebuild zip shasum swift ar; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: required command not found: $cmd" >&2; exit 1; }
 done
 [ -z "$tag" ] || command -v gh >/dev/null 2>&1 || { echo "ERROR: required command not found: gh" >&2; exit 1; }
@@ -49,6 +49,19 @@ macos_lib="$workdir/macos/lib/libwebrtc_c.a"
 [ -f "$ios_lib" ] || { echo "ERROR: missing file: $ios_lib" >&2; exit 1; }
 [ -f "$macos_lib" ] || { echo "ERROR: missing file: $macos_lib" >&2; exit 1; }
 [ -f "$workdir/ios/include/webrtc_c.h" ] || { echo "ERROR: missing header: webrtc_c.h" >&2; exit 1; }
+
+strip_unwanted_members() {
+  local archive="$1"
+  # XCFramework では libwebrtc_c.a を -all_load でリンクするため、
+  # 実行エントリを含む不要オブジェクトが残っていると duplicate symbol(_main) を引き起こす。
+  # そのため、Apple 向け配布物では該当メンバーを事前に除去する。
+  for member in main.o cppgen_plugin.o protozero_plugin.o; do
+    ar -d "$archive" "$member" 2>/dev/null || true
+  done
+}
+
+strip_unwanted_members "$ios_lib"
+strip_unwanted_members "$macos_lib"
 
 cp -R "$workdir/ios/include"/. "$workdir/headers"/
 cat > "$workdir/headers/module.modulemap" <<'MODULEMAP'
