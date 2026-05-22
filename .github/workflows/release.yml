@@ -428,15 +428,20 @@ jobs:
         with:
           name: libwebrtc_c-macos_arm64
           path: release-assets/macos
-      - name: Build and upload XCFramework
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build XCFramework
         run: |
           scripts/package_apple_xcframework.sh \
             --ios-tar release-assets/ios/libwebrtc_c-ios_arm64.tar.gz \
             --macos-tar release-assets/macos/libwebrtc_c-macos_arm64.tar.gz \
-            --tag "${GITHUB_REF_NAME}" \
             --out-dir dist/apple-xcframework
+      - name: Upload XCFramework to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" \
+            dist/apple-xcframework/libwebrtc_c.xcframework.zip \
+            dist/apple-xcframework/libwebrtc_c.xcframework.zip.sha256 \
+            --clobber
 
   publish:
     needs: [build-prebuilt, build-prebuilt-cross, build-prebuilt-android, build-prebuilt-ios, build-prebuilt-apple-xcframework]

@@ -7,7 +7,6 @@ Usage:
   scripts/package_apple_xcframework.sh \
     --ios-tar <libwebrtc_c-ios_arm64.tar.gz> \
     --macos-tar <libwebrtc_c-macos_arm64.tar.gz> \
-    [--tag <release-tag>] \
     [--out-dir <output-dir>]
 USAGE
 }
@@ -15,29 +14,30 @@ USAGE
 ios_tar=""
 macos_tar=""
 out_dir="dist/apple-xcframework"
-tag=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --ios-tar) ios_tar="$2"; shift 2 ;;
     --macos-tar) macos_tar="$2"; shift 2 ;;
-    --tag) tag="$2"; shift 2 ;;
     --out-dir) out_dir="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "ERROR: unknown argument: $1" >&2; usage; exit 1 ;;
   esac
 done
 
+# iOS / macOS の入力アーカイブは必須。
 [ -n "$ios_tar" ] && [ -n "$macos_tar" ] || { echo "ERROR: --ios-tar and --macos-tar are required" >&2; exit 1; }
 
+# 利用ツールの存在を先に確認して、後続処理の失敗を早めに検知する。
 for cmd in tar xcodebuild zip shasum swift ar; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: required command not found: $cmd" >&2; exit 1; }
 done
-[ -z "$tag" ] || command -v gh >/dev/null 2>&1 || { echo "ERROR: required command not found: gh" >&2; exit 1; }
 
+# 一時作業ディレクトリは終了時に必ず削除する。
 workdir="$(mktemp -d "${TMPDIR:-/tmp}/webrtc_apple_xcframework.XXXXXX")"
 trap 'rm -rf "$workdir"' EXIT
 
+# 各アーカイブを展開し、XCFramework 生成用の入力を組み立てる。
 mkdir -p "$workdir/ios" "$workdir/macos" "$workdir/headers" "$out_dir"
 
 tar -xzf "$ios_tar" -C "$workdir/ios"
@@ -63,6 +63,7 @@ strip_unwanted_members() {
 strip_unwanted_members "$ios_lib"
 strip_unwanted_members "$macos_lib"
 
+# 公開用ヘッダーは iOS 側を基準に採用する。
 cp -R "$workdir/ios/include"/. "$workdir/headers"/
 cat > "$workdir/headers/module.modulemap" <<'MODULEMAP'
 module webrtc_c {
@@ -85,6 +86,7 @@ xcodebuild -create-xcframework \
   -library "$macos_lib" -headers "$workdir/headers" \
   -output "$xcframework_path"
 
+# SwiftPM 配布向けに zip と checksum を生成する。
 (
   cd "$out_dir"
   zip -r -q "$(basename "$zip_path")" "$(basename "$xcframework_path")"
@@ -92,10 +94,6 @@ xcodebuild -create-xcframework \
 
 shasum -a 256 "$zip_path" > "$zip_path.sha256"
 swift package compute-checksum "$zip_path" > "$zip_path.swift-checksum.txt"
-
-if [ -n "$tag" ]; then
-  gh release upload "$tag" "$zip_path" "$zip_path.sha256" --clobber
-fi
 
 echo "INFO: created $xcframework_path"
 echo "INFO: created $zip_path"
