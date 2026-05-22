@@ -426,9 +426,13 @@ jobs:
           path: release-assets
       - name: Build XCFramework
         run: |
+          mkdir -p release-assets/extracted/ios release-assets/extracted/macos
+          tar -xzf release-assets/libwebrtc_c-ios_arm64.tar.gz -C release-assets/extracted/ios
+          tar -xzf release-assets/libwebrtc_c-macos_arm64.tar.gz -C release-assets/extracted/macos
           scripts/package_apple_xcframework.sh \
-            --ios-tar release-assets/libwebrtc_c-ios_arm64.tar.gz \
-            --macos-tar release-assets/libwebrtc_c-macos_arm64.tar.gz \
+            --library release-assets/extracted/ios/lib/libwebrtc_c.a \
+            --library release-assets/extracted/macos/lib/libwebrtc_c.a \
+            --headers release-assets/extracted/ios/include \
             --out-dir dist/apple-xcframework
       - name: Upload XCFramework to GitHub Release
         env:
