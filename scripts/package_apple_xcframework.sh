@@ -12,6 +12,7 @@ Usage:
 USAGE
 }
 
+# --library は複数指定を受け付ける。
 libraries=()
 headers_dir=""
 out_dir=""
@@ -56,13 +57,17 @@ strip_unwanted_members() {
   done
 }
 
+# xcodebuild -create-xcframework に渡す -library/-headers 引数を組み立てる。
 library_args=()
 library_index=0
 for library_path in "${libraries[@]}"; do
   [ -f "$library_path" ] || { echo "ERROR: missing file: $library_path" >&2; exit 1; }
+  # 元ファイルを直接変更しないよう、テンポラリに複製してから加工する。
   copied_library="$workdir/libs/lib$(printf "%02d" "$library_index").a"
   cp "$library_path" "$copied_library"
+  # duplicate symbol 回避のため、不要オブジェクトを除去する。
   strip_unwanted_members "$copied_library"
+  # 各ライブラリに同一の公開ヘッダーセットを対応付ける。
   library_args+=(-library "$copied_library" -headers "$workdir/headers")
   library_index=$((library_index + 1))
 done
