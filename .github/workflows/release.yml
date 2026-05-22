@@ -424,31 +424,31 @@ jobs:
             --tag "${GITHUB_REF_NAME}" \
             --out-dir dist/apple-xcframework
 
-  # publish:
-  #   needs: [build-prebuilt, build-prebuilt-cross, build-prebuilt-android, build-prebuilt-ios, build-prebuilt-apple-xcframework]
-  #   runs-on: ubuntu-24.04
-  #   environment: release
-  #   permissions:
-  #     id-token: write
-  #   steps:
-  #     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-  #     - uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe # v1.0.4
-  #       id: auth
-  #     - run: cargo publish
-  #       env:
-  #         CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+  publish:
+    needs: [build-prebuilt, build-prebuilt-cross, build-prebuilt-android, build-prebuilt-ios, build-prebuilt-apple-xcframework]
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe # v1.0.4
+        id: auth
+      - run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
-  # slack_notify:
-  #   needs: [create-release, build-prebuilt, build-prebuilt-cross, build-prebuilt-android, build-prebuilt-ios, build-prebuilt-apple-xcframework, publish]
-  #   runs-on: ubuntu-slim
-  #   if: ${{ !cancelled() }}
-  #   steps:
-  #     - name: Slack Notification
-  #       uses: shiguredo/github-actions/.github/actions/slack-notify@main
-  #       with:
-  #         status: ${{ job.status }}
-  #         slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
-  #         slack_channel: sora-rust-sdk
-  #         notify_mode: failure_and_fixed
-  #       env:
-  #         GH_TOKEN: ${{ github.token }}
+  slack_notify:
+    needs: [create-release, build-prebuilt, build-prebuilt-cross, build-prebuilt-android, build-prebuilt-ios, build-prebuilt-apple-xcframework, publish]
+    runs-on: ubuntu-slim
+    if: ${{ !cancelled() }}
+    steps:
+      - name: Slack Notification
+        uses: shiguredo/github-actions/.github/actions/slack-notify@main
+        with:
+          status: ${{ job.status }}
+          slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
+          slack_channel: sora-rust-sdk
+          notify_mode: failure_and_fixed
+        env:
+          GH_TOKEN: ${{ github.token }}
