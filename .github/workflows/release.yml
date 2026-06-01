@@ -436,6 +436,7 @@ jobs:
             [ -f "$archive_path" ] || { echo "ERROR: missing XCFramework source archive: $archive_path"; exit 1; }
             extract_dir="release-assets/extracted/${archive_name#libwebrtc_c-}"
             extract_dir="${extract_dir%.tar.gz}"
+            mkdir -p "$extract_dir"
             tar -xzf "$archive_path" -C "$extract_dir"
 
             library_path="$extract_dir/lib/libwebrtc_c.a"
