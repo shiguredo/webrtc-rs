@@ -2,12 +2,12 @@
 set -euo pipefail
 
 usage() {
-  cat <<'USAGE'
+  cat <<USAGE
 Usage:
-  scripts/package_apple_xcframework.sh \
-    --library <path-to-static-library> \
-    [--library <path-to-static-library> ...] \
-    --headers <path-to-headers-dir> \
+  $0
+    --library <path-to-static-library>
+    [--library <path-to-static-library> ...]
+    --headers <path-to-headers-dir>
     --out-dir <output-dir>
 USAGE
 }
