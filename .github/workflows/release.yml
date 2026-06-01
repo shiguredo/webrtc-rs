@@ -444,9 +444,14 @@ jobs:
             library_args+=(--library "$library_path")
           done
 
+          # 現状は iOS / macOS の公開ヘッダーを同一内容でパッケージしているため、
+          # XCFramework 生成時に iOS 側の include を共通ヘッダーとして利用しても問題ない。
+          # 将来的にターゲットごとにヘッダー内容が分岐した場合は、
+          # package_apple_xcframework.sh の引数設計と呼び出し側を見直し、
+          # 各ターゲットに対応するヘッダーを個別に渡すよう修正が必要。
           scripts/package_apple_xcframework.sh \
             "${library_args[@]}" \
-            --headers release-assets/extracted/ios/include \
+            --headers release-assets/extracted/ios_arm64/include \
             --out-dir dist/apple-xcframework
       - name: Upload XCFramework to GitHub Release
         env:
