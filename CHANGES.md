@@ -13,6 +13,10 @@
 
 ### misc
 
+- [ADD] iOS / macOS arm64 の既存 prebuilt アーカイブから `libwebrtc_c.xcframework` を生成して GitHub Release へ配置するスクリプト `scripts/package_apple_xcframework.sh` を追加する
+  - `release.yml` に `build-prebuilt-apple-xcframework` ジョブを追加し、タグリリース時に自動生成とアップロードを実行する
+  - @zztkm
+
 ## 0.148.0
 
 **リリース日**: 2026-05-16
