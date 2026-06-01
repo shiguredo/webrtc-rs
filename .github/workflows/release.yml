@@ -427,13 +427,11 @@ jobs:
       - name: Build XCFramework
         run: |
           mkdir -p release-assets/extracted/ios release-assets/extracted/macos
-          # download-artifact の pattern に合致して配置された tar.gz を動的に列挙し、
-          # mapfile で配列に読み込んでから後続のループで順に展開する。
-          mapfile -t xcframework_sources < <(compgen -G "release-assets/libwebrtc_c-*.tar.gz" | sort)
-          [ "${#xcframework_sources[@]}" -gt 0 ] || { echo "ERROR: no XCFramework source archives found"; exit 1; }
+          # download-artifact の pattern に合致して配置された tar.gz を動的に列挙する。
+          xcframework_sources=$(ls -1 release-assets/*.tar.gz)
 
           library_args=()
-          for archive_path in "${xcframework_sources[@]}"; do
+          for archive_path in $xcframework_sources; do
             archive_name="$(basename "$archive_path")"
             [ -f "$archive_path" ] || { echo "ERROR: missing XCFramework source archive: $archive_path"; exit 1; }
             extract_dir="release-assets/extracted/${archive_name#libwebrtc_c-}"
