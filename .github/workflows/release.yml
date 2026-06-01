@@ -427,11 +427,26 @@ jobs:
       - name: Build XCFramework
         run: |
           mkdir -p release-assets/extracted/ios release-assets/extracted/macos
-          tar -xzf release-assets/libwebrtc_c-ios_arm64.tar.gz -C release-assets/extracted/ios
-          tar -xzf release-assets/libwebrtc_c-macos_arm64.tar.gz -C release-assets/extracted/macos
+          xcframework_sources=(
+            "libwebrtc_c-ios_arm64.tar.gz"
+            "libwebrtc_c-macos_arm64.tar.gz"
+          )
+
+          library_args=()
+          for archive_name in "${xcframework_sources[@]}"; do
+            archive_path="release-assets/${archive_name}"
+            [ -f "$archive_path" ] || { echo "ERROR: missing XCFramework source archive: $archive_path"; exit 1; }
+            extract_dir="release-assets/extracted/${archive_name#libwebrtc_c-}"
+            extract_dir="${extract_dir%.tar.gz}"
+            tar -xzf "$archive_path" -C "$extract_dir"
+
+            library_path="$extract_dir/lib/libwebrtc_c.a"
+            [ -f "$library_path" ] || { echo "ERROR: missing static library in archive: $library_path"; exit 1; }
+            library_args+=(--library "$library_path")
+          done
+
           scripts/package_apple_xcframework.sh \
-            --library release-assets/extracted/ios/lib/libwebrtc_c.a \
-            --library release-assets/extracted/macos/lib/libwebrtc_c.a \
+            "${library_args[@]}" \
             --headers release-assets/extracted/ios/include \
             --out-dir dist/apple-xcframework
       - name: Upload XCFramework to GitHub Release
