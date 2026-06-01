@@ -426,7 +426,6 @@ jobs:
           path: release-assets
       - name: Build XCFramework
         run: |
-          mkdir -p release-assets/extracted/ios release-assets/extracted/macos
           # download-artifact の pattern に合致して配置された tar.gz を動的に列挙する。
           xcframework_sources=$(ls -1 release-assets/*.tar.gz)
 
