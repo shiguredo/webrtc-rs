@@ -33,8 +33,12 @@ fn get_build_metadata(manifest_dir: &Path) -> BuildMetadata {
             e
         )
     });
-    let cargo_toml =
-        shiguredo_toml::from_str(&cargo_toml_content).expect("Failed to parse Cargo.toml");
+    // Cargo.toml を TOML v1.1.0 として解析する
+    let cargo_toml = shiguredo_toml::from_str_with_version(
+        &cargo_toml_content,
+        shiguredo_toml::TomlVersion::V1_1,
+    )
+    .expect("Failed to parse Cargo.toml");
     let metadata = shiguredo_toml::Value::Table(cargo_toml);
     let package_metadata = metadata
         .get("package")
