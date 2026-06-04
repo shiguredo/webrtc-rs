@@ -11,6 +11,9 @@
 
 ## develop
 
+- [UPDATE] libwebrtc m150 (m150.7871.0.0) に上げる
+  - @voluntas
+
 ### misc
 
 ## 0.149.0
