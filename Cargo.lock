@@ -564,7 +564,7 @@ checksum = "b475c218cf15d056ed3e48c9e98693135b261b79530881e63b162650b236fdec"
 
 [[package]]
 name = "shiguredo_webrtc"
-version = "0.148.1"
+version = "0.149.0"
 dependencies = [
  "bindgen",
  "nojson",
