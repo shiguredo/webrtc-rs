@@ -12,6 +12,7 @@
 ## develop
 
 - [UPDATE] libwebrtc m150 (m150.7871.0.0) に上げる
+  - EncodedImageCallback に追加された純粋仮想メソッド OnFrameDropped に追従する
   - @voluntas
 
 ### misc

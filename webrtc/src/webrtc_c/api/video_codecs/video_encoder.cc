@@ -76,6 +76,17 @@ class EncodedImageCallbackImpl : public webrtc::EncodedImageCallback {
     return result;
   }
 
+  // libwebrtc m150 で webrtc::EncodedImageCallback に純粋仮想メソッドとして
+  // 追加されたフレームドロップ通知。
+  // 根拠: api/video_codecs/video_encoder.h の
+  //   webrtc::EncodedImageCallback::OnFrameDropped。
+  // 現状の C API はフレームドロップ通知を公開していないため no-op とする。
+  // 将来 Rust 側で必要になった場合はコールバック構造体への追加を検討する。
+  // libwebrtc 側のシグネチャは将来変更される可能性がある。
+  void OnFrameDropped(uint32_t /*rtp_timestamp*/,
+                      int /*spatial_id*/,
+                      bool /*is_end_of_temporal_unit*/) override {}
+
  private:
   webrtc_VideoEncoder_EncodedImageCallback_cbs cbs_{};
   void* user_data_ = nullptr;
