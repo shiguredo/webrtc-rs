@@ -11,6 +11,10 @@
 
 ## develop
 
+### misc
+
+## 0.148.1
+
 **リリース日**: 2026-06-04
 
 - [UPDATE] libwebrtc m148 (m148.7778.12.0) に上げる
@@ -19,6 +23,8 @@
 ### misc
 
 - [UPDATE] build.rs の Cargo.toml パースを TOML v1.1.0 で行うようにする
+  - @voluntas
+- [UPDATE] examples/whip と examples/whep の `shiguredo_http11` を 2026.6 に上げる
   - @voluntas
 - [ADD] iOS / macOS arm64 の既存 prebuilt アーカイブから `libwebrtc_c.xcframework` を生成して GitHub Release へ配置するスクリプト `scripts/package_apple_xcframework.sh` を追加する
   - `release.yml` に `build-prebuilt-apple-xcframework` ジョブを追加し、タグリリース時に自動生成とアップロードを実行する
