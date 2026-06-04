@@ -18,6 +18,8 @@
 
 ### misc
 
+- [UPDATE] build.rs の Cargo.toml パースを TOML v1.1.0 で行うようにする
+  - @voluntas
 - [ADD] iOS / macOS arm64 の既存 prebuilt アーカイブから `libwebrtc_c.xcframework` を生成して GitHub Release へ配置するスクリプト `scripts/package_apple_xcframework.sh` を追加する
   - `release.yml` に `build-prebuilt-apple-xcframework` ジョブを追加し、タグリリース時に自動生成とアップロードを実行する
   - @zztkm
