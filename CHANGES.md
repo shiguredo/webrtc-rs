@@ -11,6 +11,11 @@
 
 ## develop
 
+**リリース日**: 2026-06-04
+
+- [UPDATE] libwebrtc m148 (m148.7778.12.0) に上げる
+  - @voluntas
+
 ### misc
 
 - [ADD] iOS / macOS arm64 の既存 prebuilt アーカイブから `libwebrtc_c.xcframework` を生成して GitHub Release へ配置するスクリプト `scripts/package_apple_xcframework.sh` を追加する
