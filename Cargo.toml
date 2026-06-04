@@ -19,8 +19,9 @@ include = [
   "sysroot/*",
 ]
 
-[package.metadata.external-dependencies]
-webrtc-build = { version = "m148.7778.12.0", base-url = "https://github.com/shiguredo-webrtc-build/webrtc-build/releases/download" }
+[package.metadata.external-dependencies.webrtc-build]
+version = "m148.7778.12.0"
+base-url = "https://github.com/shiguredo-webrtc-build/webrtc-build/releases/download"
 
 [package.metadata.build-config]
 cmake-osx-deployment-target = "16.0"
