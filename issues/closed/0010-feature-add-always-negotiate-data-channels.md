@@ -1,6 +1,7 @@
 # RTCConfiguration に always_negotiate_data_channels オプションを追加する
 
 Created: 2026-04-18
+Completed: 2026-04-19
 Model: Claude Opus 4.7
 
 ## 概要
@@ -31,3 +32,14 @@ libwebrtc に 2025-10-23 に `always_negotiate_data_channels` オプションが
 - `webrtc/src/webrtc_c/api/peer_connection_interface.cc` に setter を実装する
 - `src/api/peer_connection.rs` の `PeerConnectionRtcConfiguration` に `set_always_negotiate_data_channels` メソッドを追加する
 - `CHANGES.md` の `## develop` に `[ADD]` エントリを追加する
+
+## 解決方法
+
+コミット `0e0aecf` で実装し、develop へは `83b5a11` (#55, 2026-04-19) でマージ済み。
+issue の対応内容 4 項目をすべて実装した。行番号は実装当時のもので、以降の変更でずれる可能性がある。
+
+- C API 宣言: `webrtc/src/webrtc_c/api/peer_connection_interface.h:96-99` に `webrtc_PeerConnectionInterface_RTCConfiguration_set_always_negotiate_data_channels` を宣言した
+- C API 実装: `webrtc/src/webrtc_c/api/peer_connection_interface.cc:389-397` で `RTCConfiguration::always_negotiate_data_channels` フィールドへ代入する実装を追加した
+- Rust API: `src/api/peer_connection.rs:476-484` に `PeerConnectionRtcConfiguration::set_always_negotiate_data_channels` を追加した
+- 変更履歴: `CHANGES.md` に `[ADD]` エントリとして記載した。リリース時に `## develop` から `## 0.147.1` (リリース日 2026-04-20) へ昇格している
+- テスト: `src/tests.rs` の `always_negotiate_data_channels_adds_data_section()` で、createOffer 実行時に `set_always_negotiate_data_channels(true)` なら SDP に `m=application` が含まれ、デフォルト (false) では含まれないことを対照実験で検証した
