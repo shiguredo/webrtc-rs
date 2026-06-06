@@ -1,9 +1,9 @@
 # 未使用の pc_observer フィールドを削除する
 
 - Priority: Low
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/refactor-whip-whep-remove-pc-observer
+- Model: Opus 4.8
 
 ## 目的
 

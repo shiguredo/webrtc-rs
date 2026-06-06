@@ -1,9 +1,9 @@
 # whip.cpp と whep.cpp の重複を共通化する
 
 - Priority: Medium
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/refactor-whip-whep-cpp-dedup
+- Model: Opus 4.8
 
 ## 目的
 

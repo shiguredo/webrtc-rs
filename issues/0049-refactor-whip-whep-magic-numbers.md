@@ -1,9 +1,9 @@
 # whip/whep のマジックナンバーを定数化する
 
 - Priority: Low
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/refactor-whip-whep-magic-numbers
+- Model: Opus 4.8
 
 ## 目的
 

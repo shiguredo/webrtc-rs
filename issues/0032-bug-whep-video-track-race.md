@@ -1,9 +1,9 @@
 # whep の受信トラック操作を mutex で保護する
 
 - Priority: High
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-whep-video-track-race
+- Model: Opus 4.8
 
 ## 目的
 
@@ -61,7 +61,7 @@ struct SignalingWhep {
 
 ### C++ 実装 (`webrtc/src/whep.cpp`)
 
-C++ 側には `video_mutex_` メンバが宣言されているが (`webrtc/src/whep.cpp:860`)、`OnTrack` / `OnRemoveTrack` では使用されていない。`OnTrack` は `video_track_` をロックなしで読み書きし (`webrtc/src/whep.cpp:834-838`)、`OnRemoveTrack` は `DetachVideoSink` を呼ぶだけである (`webrtc/src/whep.cpp:851`)。
+C++ 側には `video_mutex_` メンバが宣言されているが (`webrtc/src/whep.cpp:860`)、`OnTrack` / `OnRemoveTrack` では使用されていない。`OnTrack` は `video_track_` をロックなしで読み書きし (`webrtc/src/whep.cpp:834-838`)、`OnRemoveTrack` は `DetachVideoSink` を呼ぶだけである (`webrtc/src/whep.cpp:851`)。`DetachVideoSink` (whep.cpp:649-655) もロックなしで `video_track_` にアクセスしている。
 
 ```cpp
     auto* video_track = static_cast<webrtc::VideoTrackInterface*>(track.get());

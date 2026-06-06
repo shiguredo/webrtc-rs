@@ -1,9 +1,9 @@
 # whep の RGB 値コメントに半角スペースを入れる
 
 - Priority: Low
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-whep-rgb-fullwidth-space
+- Model: Opus 4.8
 
 ## 目的
 

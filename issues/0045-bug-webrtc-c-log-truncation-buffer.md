@@ -1,9 +1,9 @@
 # webrtc_c のログ固定バッファによる切り詰めを解消する
 
 - Priority: Low
+- Polished: 2026-06-06
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-webrtc-c-log-truncation-buffer
+- Model: Opus 4.8
 
 ## 目的
 
@@ -47,11 +47,51 @@ WEBRTC_EXPORT void webrtc_LogMessage_Print(int severity,
 
 ## 設計方針
 
-- `vsnprintf` が返す「本来必要な長さ」を利用して、必要な長さ分のバッファを動的に確保し直してから整形し直す、といった方法でメッセージ全体を出力できるようにする。
-- もしくは、固定長を維持したうえで切り詰めが発生したことを明示的に扱う（切り詰めを示す表示を付けるなど）方針も検討する。
-- 入力バイナリのデコードではなくログ整形という確定的な用途であり、必要長は `vsnprintf` の戻り値から判明するため、その値に基づいて確保する。
+### 推奨案: バッファサイズの拡張
+
+動的確保の複雑さとメモリ不足時のログ喪失リスクを考慮し、第一段階として
+バッファサイズを `4096` → `65536` (64KB) に拡張する。
+
+- SDP 等の長文ログは通常数 KB〜十数 KB であり、64KB で十分カバーできる
+- スタックバッファのままであり、メモリ不足時にもログ関数自体はクラッシュしない
+- 変更は 1 行（マクロ定数の変更）で完了し、リスクが最小
+
+### 代替案: vsnprintf の二度呼びによる動的確保
+
+より厳密な対応が必要な場合は以下を検討する（本 issue では推奨案を優先）:
+
+```cpp
+WEBRTC_EXPORT void webrtc_LogMessage_Print(int severity,
+                                           const char* file,
+                                           int line,
+                                           const char* fmt,
+                                           ...) {
+  va_list args;
+  va_start(args, fmt);
+  int needed = vsnprintf(nullptr, 0, fmt, args);
+  va_end(args);
+  if (needed < 0) {
+    return;  // フォーマットエラー
+  }
+  std::vector<char> buf(static_cast<size_t>(needed) + 1);
+  va_start(args, fmt);
+  vsnprintf(buf.data(), buf.size(), fmt, args);
+  va_end(args);
+  RTC_LOG_FILE_LINE(static_cast<webrtc::LoggingSeverity>(severity), file, line)
+      << buf.data();
+}
+```
+
+ただし、ログ関数はメモリ不足時にも呼ばれうるため、`std::vector` 確保失敗時に
+`std::bad_alloc` を送出してログ関数自体がクラッシュするリスクがある。
+
+## テスト戦略
+
+- 4096 バイトを超えるメッセージを実際に出力し、切り詰められていないことを確認する
+- 既存の短いメッセージの出力結果が変わらないことを確認する
 
 ## 完了条件
 
-- 4096 バイトを超える長さのログメッセージが、欠落せずに出力される（または切り詰めが明示的に扱われる）。
-- 既存の短いメッセージの出力結果は変わらない。
+- ログバッファサイズが 65536 バイトに拡張されている、または動的確保方式が実装されている
+- 長文ログが欠落せずに出力される
+- 既存の短いメッセージの出力結果は変わらない

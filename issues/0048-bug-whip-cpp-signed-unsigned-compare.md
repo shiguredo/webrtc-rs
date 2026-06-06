@@ -1,9 +1,9 @@
 # whip.cpp の int と size_t の符号混在比較を修正する
 
 - Priority: Low
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-whip-cpp-signed-unsigned-compare
+- Model: Opus 4.8
 
 ## 目的
 

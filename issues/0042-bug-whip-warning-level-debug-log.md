@@ -1,9 +1,9 @@
 # whip.c の通常動作ログを適切なログレベルにする
 
 - Priority: Low
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-whip-warning-level-debug-log
+- Model: Opus 4.8
 
 ## 目的
 

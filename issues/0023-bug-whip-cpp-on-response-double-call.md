@@ -1,9 +1,9 @@
 # whip.cpp の on_response 二重呼び出しを修正する
 
 - Priority: High
+- Polished: 2026-06-06
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-whip-cpp-on-response-double-call
+- Model: Opus 4.8
 
 ## 目的
 
@@ -63,13 +63,12 @@ if (IsInvalidSocket(sock)) {
 
 ## 設計方針
 
-- `on_response` が必ずちょうど 1 回だけ呼ばれるようにする。いずれかの方針を採る。
-  - 方針 A: `ScopeExit` による保険呼び出しに一本化し、早期 return パスにある明示的な `on_response(std::nullopt)` 呼び出しを削除する。失敗を伝えたい場合は `response_body` を `std::nullopt` のままにしておけば、ガードが `std::nullopt` を渡す。
-  - 方針 B: 明示呼び出しに一本化し、`ScopeExit` による保険呼び出しをやめる。すべての return パスで明示的に `on_response` を呼ぶ。
-  - 方針 C: 呼び出し済みフラグ（あるいは `std::function` を呼び出し後に空へする等）を持ち、`on_response` が二重に呼ばれないようにする。
-- いずれの方針でも、すべての経路（正常終了・各失敗の早期 return）で `on_response` がちょうど 1 回呼ばれることを保証する。
-- `whip.cpp` を対象とする。`whep.cpp` にも同じ構造の問題があるため、合わせて修正する。
-- ログメッセージ・エラーメッセージは英語で記述する。
+方針 A（`ScopeExit` に一本化、明示呼び出しを削除）を採用する。理由:
+
+- `getaddrinfo` 失敗時とソケット接続失敗時の 2 箇所の `on_response(std::nullopt)` を削除する
+  だけで修正が完了する（2 行削除）
+- SSL 系の早期 return パスと一貫性が取れる（これらは既に `ScopeExit` 任せ）
+- `whip.cpp` を対象とする。`whep.cpp` にも同じバグがあるため合わせて修正する
 
 ## 完了条件
 

@@ -1,9 +1,9 @@
 # whip.c と whep.c の大規模重複を共通化する
 
 - Priority: Medium
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/refactor-whip-whep-c-dedup
+- Model: Opus 4.8
 
 ## 目的
 

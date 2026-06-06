@@ -1,9 +1,15 @@
 # std_map イテレータの無効化リスクを解消する
 
 - Priority: Medium
+- Polished: 2026-06-06
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-webrtc-c-std-map-iterator-lifetime
+- Model: Opus 4.8
+
+## pending 理由
+
+イテレータの無効化リスクに対する対応方針が 2 択（契約のコメント明記 / スナップショット方式）で
+未確定。スナップショット方式は `webrtc/RULES.md:5-6` の「薄いラッパー」原則との整合性確認が
+必要であり、設計判断が未解決のため pending とする。
 
 ## 目的
 

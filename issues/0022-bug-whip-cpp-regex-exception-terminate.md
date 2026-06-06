@@ -1,80 +1,73 @@
 # whip.cpp の std::regex 例外で terminate しないようにする
 
 - Priority: High
+- Polished: 2026-06-06
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-whip-cpp-regex-exception-terminate
+- Model: Opus 4.8
 
 ## 目的
 
-`webrtc/src/whip.cpp` の `SendRequest` のレスポンスコールバックは、サーバから受け取った HTTP レスポンス（攻撃者が制御し得る入力）を `std::regex` に直接渡してヘッダ行や `Link` ヘッダの各エントリを解析している。`std::regex` のコンストラクタや `std::regex_match` / `std::regex_search` は、入力やパターンの複雑さによっては `std::regex_error`（あるいは内部の再帰によるスタック枯渇）を送出し得る。これらの呼び出しは `try` / `catch` で保護されておらず、例外が送出されると `std::terminate` でプロセスが落ちる。攻撃者由来のレスポンスでプロセスを終了させられないよう、regex 使用箇所を例外安全にする（または regex を使わない堅実なパーサに置換する）。
+`webrtc/src/whip.cpp` と `webrtc/src/whep.cpp` は、サーバから受け取った HTTP レスポンスを
+`std::regex` で解析している。`std::regex` のコンストラクタや `regex_match` / `regex_search` は、
+入力によって `std::regex_error` を送出し得る。これらの呼び出しは `try` / `catch` で保護されておらず、
+例外が送出されると `std::terminate` でプロセスが落ちる。
+外部入力起因でプロセスが終了しないよう、regex 使用箇所を例外安全にする。
+
+## 再現手順
+
+1. `whip.cpp` または `whep.cpp` をビルドする
+2. ヘッダ行が極端に長い（数万文字のヘッダ名や値）HTTP レスポンスを返すサーバに対して
+   シグナリングを実行する
+3. `std::regex` の内部実装によっては `std::regex_error`（complexity 超過やスタック枯渇）が
+   送出され、try/catch が無いため `std::terminate` でプロセスが異常終了する
 
 ## 優先度根拠
 
-High。WHIP のシグナリング相手（あるいは中間者）が細工したレスポンスを返すだけで `std::terminate` を誘発し、プロセス全体を巻き込んでクラッシュさせられる可能性がある。サービス可用性に直結する DoS の入り口であり、外部入力起因のため優先度を高くする。
+High。WHIP のシグナリング相手（あるいは中間者）が細工したレスポンスを返すだけで `std::terminate` を
+誘発し、プロセス全体をクラッシュさせられる。サービス可用性に直結する DoS の入り口であり、
+外部入力起因のため優先度を高くする。
 
 ## 現状
 
-`webrtc/src/whip.cpp` は冒頭で `#include <regex>` しており（`webrtc/src/whip.cpp:16`）、`SendRequest` のレスポンスコールバック内でヘッダ行のパースに `std::regex` を使っている。`webrtc/src/whip.cpp:781` 付近:
+`whip.cpp:781-786` のヘッダ行パースと `whip.cpp:804-860` の Link ヘッダ解析で
+`std::regex` を使用している。全呼び出しが try/catch で保護されていない。
+`whep.cpp:522-567` も同一構造。
 
-```cpp
-for (const auto& line : lines) {
-  std::smatch m;
-  auto r =
-      std::regex_match(line.begin(), line.end(), m,
-                       std::regex(R"(([^:]+):[ \t]*(.+))"));
-  if (r) {
-    headers[absl::AsciiStrToLower(m[1].str())] = m[2].str();
-  }
-}
-```
-
-ここで `line` は HTTP レスポンスのヘッダ部を `\r\n` で分割した各行であり、外部入力そのものである。さらに `Link` ヘッダの各エントリ解析でも、外部入力 `str` に対して `std::regex_search` を 3 回呼んでいる。`webrtc/src/whip.cpp:804` 付近:
-
-```cpp
-for (const auto& str : strs) {
-  std::smatch m;
-  if (!std::regex_search(str.begin(), str.end(), m,
-                         std::regex(R"(<([^>]+)>)"))) {
-    RTC_LOG(LS_ERROR)
-        << "Failed to match <...>: str=" << str;
-    return;
-  }
-  server.urls.push_back(m[1].str());
-  if (!std::regex_search(
-          str.begin(), str.end(), m,
-          std::regex(R"|(username="([^"]+)")|"))) {
-    RTC_LOG(LS_ERROR)
-        << "Failed to match username=\"...\": str=" << str;
-    return;
-  }
-  server.username = m[1].str();
-  if (!std::regex_search(
-          str.begin(), str.end(), m,
-          std::regex(R"|(credential="([^"]+)")|"))) {
-    RTC_LOG(LS_ERROR)
-        << "Failed to match credential=\"...\": str="
-        << str;
-    return;
-  }
-  server.password = m[1].str();
-  ...
-}
-```
-
-これら `std::regex` の構築および `regex_match` / `regex_search` の呼び出しは、いずれも `try` / `catch` で囲まれていない。ファイル全体を検索しても、これらを保護する `try` / `catch` は存在しない（`webrtc/src/whip.cpp` 内に `try` / `catch` / `regex_error` の語は出現しない。1139 行目付近に現れる `catch` は別の文字列の一部であり例外処理ではない）。なお `webrtc/src/whep.cpp` も `#include <regex>`（`webrtc/src/whep.cpp:10`）し、`webrtc/src/whep.cpp:522` 付近以降に同じ構造の `std::regex` 使用箇所があり、同様に保護されていない。
+C 版の `whip.c` / `whep.c` は `strchr` / `strstr` による文字列探索で実装されており、
+例外の問題はない。
 
 ## 設計方針
 
-- `std::regex` を使う箇所を例外安全にする。いずれかの方針を採る。
-  - 方針 A: regex の構築と `regex_match` / `regex_search` 呼び出しを `try` / `catch (const std::regex_error&)`（必要に応じて `std::exception`）で囲み、例外時はそのレスポンスをエラーとして扱って状態を `kClosed` に遷移させる。例外でプロセスを落とさない。
-  - 方針 B: regex を使わず、文字列探索ベースの手堅いパーサに置換する（C 版 `whip.c` がすでに `strchr` / `strstr` 等で行っている方式に揃える）。これにより `std::regex` 由来の例外そのものを排除する。
-- いずれの方針でも、解析対象とする入力サイズに上限を設け、過大なレスポンスやヘッダ行を解析に渡さないようにする（DoS 緩和）。
-- `whip.cpp` を対象とする。`whep.cpp` にも同じ構造の問題があるため、合わせて修正する。
-- ログメッセージ・エラーメッセージは英語で記述する。
+方針 B（regex を使わない文字列パーサへの置換）を推奨する。理由:
+
+- AGENTS.md「依存は最小限にすること」に合致する（`<regex>` ヘッダの依存を削除できる）
+- C 版 `whip.c` / `whep.c` が既に `strchr` / `strstr` / `strncasecmp` で実装済みであり、
+  同様のアプローチで C++ 版も統一できる
+- `std::regex` の例外挙動は libstdc++ / libc++ / MSVC で異なり、
+  try/catch でも移植性の問題が残る
+
+regex の置換対象:
+- ヘッダ行パース（`([^:]+):[ \t]*(.+)`）→ `:` の位置で名前と値を分割する文字列操作
+- Link ヘッダ解析（`<([^>]+)>`, `username="..."`, `credential="..."`） →
+  `strchr('<')` / `strchr('>')` と `strstr` による抽出
+
+### 依存関係
+
+- 本 issue は `issues/0021`（Link ヘッダ解析の堅牢化）の前提作業とする。
+  #0021 で行う堅牢なパーサへの置換を #0022 で先に済ませておくことで、
+  regex 例外リスクを早期に除去できる
+- 解析対象の入力サイズに上限を設け、過大な入力による DoS を緩和する
+
+## テスト戦略
+
+- 通常の HTTP レスポンスに対するパース結果が regex 版と一致することを
+  単体テストで確認する（`main` 内テスト）
+- 極端に長いヘッダ行を含むレスポンスでもクラッシュしないことを検証する
 
 ## 完了条件
 
-- 細工された（regex 例外を誘発し得る）レスポンスを受け取っても `std::terminate` でプロセスが落ちず、当該レスポンスがエラーとして扱われる。
-- 解析対象の入力サイズに上限が設けられている。
-- `whip.cpp` と `whep.cpp` の双方で同じ対策が施されている。
+- `std::regex` の使用を `whip.cpp` と `whep.cpp` から完全に削除する
+- 細工されたレスポンスを受け取っても `std::terminate` でプロセスが落ちない
+- C 版のパーサと同等の堅牢性を持つ文字列ベースのパーサに置換される
+- 解析対象の入力サイズに上限が設けられている
+- `<regex>` ヘッダの include が削除される

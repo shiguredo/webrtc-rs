@@ -1,9 +1,9 @@
 # whip.cpp の pc_ を Disconnect 時に保護し状態遷移の競合を解消する
 
 - Priority: High
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-whip-cpp-pc-disconnect-race
+- Model: Opus 4.8
 
 ## 目的
 
@@ -11,7 +11,11 @@
 
 ## 優先度根拠
 
-High とする。`pc_` はシグナリングスレッドのコールバック (CreateOffer / SetLocalDescription / SetRemoteDescription / レスポンス処理) から参照される一方、`Disconnect` は別スレッド (呼び出し側) から `pc_ = nullptr` を実行し得る。`PeerConnectionInterface` の参照カウント付きポインタを保護なしで一方が破棄し他方が参照するため、解放済みオブジェクトへのアクセスに直結する。加えて状態機械が ABA 問題を抱えており、`kConnecting` から抜けたという判定だけで `kConnected` を期待する箇所が、間に `kClosed` を経由して再度遷移したケースを取りこぼし得る。メモリ安全性と接続状態の整合性の双方に関わるため優先度を高くする。
+High とする。`pc_` はシグナリングスレッドのコールバック (CreateOffer / SetLocalDescription /
+SetRemoteDescription / レスポンス処理) から参照される一方、`Disconnect` は別スレッド (呼び出し側)
+から `pc_ = nullptr` を実行し得る。`PeerConnectionInterface` の参照カウント付きポインタを保護なしで
+一方が破棄し他方が参照するため、解放済みオブジェクトへのアクセスに直結する。
+メモリ安全性と接続状態の整合性の双方に関わるため優先度を高くする。
 
 ## 現状
 

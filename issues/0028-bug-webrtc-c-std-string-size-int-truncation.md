@@ -1,9 +1,9 @@
 # std_string_size の size_t から int への切り詰めを修正する
 
 - Priority: Medium
+- Polished: 2026-06-06
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-webrtc-c-std-string-size-int-truncation
+- Model: Opus 4.8
 
 ## 目的
 
@@ -37,6 +37,24 @@ WEBRTC_EXPORT int std_string_size(struct std_string* self);
 ## 設計方針
 
 `std_string_size` の戻り値型を `int` から `size_t` に変更する。実装側 (`webrtc/src/webrtc_c/std.cc:19-22`) の `static_cast<int>` を撤去し、`size()` の戻り値をそのまま `size_t` で返す。ヘッダ側 (`webrtc/src/webrtc_c/std.h:16`) の宣言も `size_t` に合わせる。Rust 側など C API の利用箇所が `std_string_size` の戻り値型に依存している場合は、`size_t` への変更に追従させる。
+
+## 後方互換への影響
+
+戻り値型を `int` から `size_t` に変更するのは後方互換のない破壊的変更である。
+`CHANGES.md` の `## develop` セクションに `[CHANGE]` として追記する。
+
+## スコープ外
+
+同種の `size_t` → `int` 切り詰めは以下にも存在するが、本 issue では扱わない:
+- `std_map_string_string_size` (`std.cc:80`)
+- `_vector_size` 系マクロ (`common.impl.h:85` 等)
+これらは別 issue で対応する。
+
+## テスト戦略
+
+- `bindgen` 再生成後の FFI バインディングで `std_string_size` の戻り値型が
+  `usize` になっていることを確認する
+- 既存の whip.c / whep.c がビルド可能であることを確認する
 
 ## 完了条件
 

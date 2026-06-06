@@ -1,9 +1,9 @@
 # whip/whep の接続処理にタイムアウトを設ける
 
 - Priority: Medium
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-whip-whep-connect-no-timeout
+- Model: Opus 4.8
 
 ## 目的
 

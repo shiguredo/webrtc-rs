@@ -1,9 +1,9 @@
 # webrtc_c のエラー伝達方法を統一する
 
 - Priority: Low
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/refactor-webrtc-c-error-return-consistency
+- Model: Opus 4.8
 
 ## 目的
 

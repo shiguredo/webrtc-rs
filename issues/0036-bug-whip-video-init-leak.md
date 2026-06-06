@@ -1,9 +1,9 @@
 # whip.c の video_init の早期 return によるリークを解消する
 
 - Priority: Low
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-whip-video-init-leak
+- Model: Opus 4.8
 
 ## 目的
 

@@ -1,9 +1,9 @@
 # whep.c で libyuv の C ラッパーを使う
 
 - Priority: Medium
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/refactor-whep-c-use-libyuv-wrapper
+- Model: Opus 4.8
 
 ## 目的
 

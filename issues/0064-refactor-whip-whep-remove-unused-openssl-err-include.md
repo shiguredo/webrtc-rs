@@ -1,9 +1,9 @@
 # whip.c/whep.c の未使用 openssl/err.h を削除する
 
 - Priority: Low
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/refactor-whip-whep-remove-unused-openssl-err-include
+- Model: Opus 4.8
 
 ## 目的
 

@@ -1,9 +1,9 @@
 # whip.c の手書き strlen による HTTP リクエスト組み立てを整理する
 
 - Priority: Low
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/refactor-whip-manual-strlen-http-build
+- Model: Opus 4.8
 
 ## 目的
 

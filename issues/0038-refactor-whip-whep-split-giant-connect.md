@@ -1,9 +1,9 @@
 # whip/whep の巨大な接続関数を分割する
 
 - Priority: Medium
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/refactor-whip-whep-split-giant-connect
+- Model: Opus 4.8
 
 ## 目的
 

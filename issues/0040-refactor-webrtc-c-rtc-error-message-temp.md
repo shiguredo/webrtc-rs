@@ -1,9 +1,9 @@
 # webrtc_RTCError_message の一時文字列二重構築を解消する
 
 - Priority: Low
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/refactor-webrtc-c-rtc-error-message-temp
+- Model: Opus 4.8
 
 ## 目的
 

@@ -1,9 +1,9 @@
 # SSLCertChain_Get が返す借用ポインタの寿命を明確化する
 
 - Priority: Medium
+- Polished: 2026-06-06
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-webrtc-c-ssl-cert-chain-get-lifetime
+- Model: Opus 4.8
 
 ## 目的
 
@@ -40,12 +40,44 @@ WEBRTC_EXPORT const struct webrtc_SSLCertificate* webrtc_SSLCertChain_Get(
 
 ## 設計方針
 
-以下のいずれかを検討する。
+採用方針: **寿命契約のコメント明記**。
 
-- 寿命契約のコメント明記: `webrtc_SSLCertChain_Get` の返り値が親 `webrtc_SSLCertChain` の所有する証明書への借用であり、(1) 呼び出し側が解放してはならないこと、(2) 親 `webrtc_SSLCertChain` が生存している間のみ有効であること、をヘッダ宣言 (`webrtc/src/webrtc_c/rtc_base/ssl_certificate.h`) および実装 (`webrtc/src/webrtc_c/rtc_base/ssl_certificate.cc`) のコメントに明記する。RULES.md の薄いラッパー原則 (`webrtc/RULES.md:5-6`) に沿うため、まずはこの方針を基本とする。
-- 所有権を返す API への変更: 元の C++ `webrtc::SSLCertChain::Get` のシグネチャは参照を返す借用であるため、所有権を返す形に変えることは元の C++ API から逸脱する。クローンを返すなどの設計は薄いラッパー原則に反する可能性があるため、採用する場合は元 C++ API との対応関係と RULES.md との整合を確認し、必要なら許可を得ること。
+理由:
+- 元の C++ `webrtc::SSLCertChain::Get` のシグネチャは参照を返す借用であり、これに忠実な
+  薄いラッパーが RULES.md の方針に沿う
+- 所有権を返す API（クローン返却等）は元 C++ API から逸脱し、RULES.md の
+  薄いラッパー原則 (`webrtc/RULES.md:5-6`) に反する
+- コードベース全体で借用ポインタを返す C API は本関数が唯一であり、この特異性を
+  明示的に文書化することが重要
 
-## 完了条件
+以下の具体的なコメントを追記する:
 
-- `webrtc_SSLCertChain_Get` の返り値の寿命 (借用であること、解放禁止、親生存期間内のみ有効) がヘッダおよび実装のコメントで明確になっている、または所有権を返す API として再設計され寿命が明確になっている。
-- 採用した方針が RULES.md の薄いラッパー原則と整合していることを確認している。
+`ssl_certificate.h` の `webrtc_SSLCertChain_Get` 宣言に追記:
+```c
+// 戻り値は親 SSLCertChain が所有する証明書への借用ポインタである。
+// 呼び出し側で解放してはならない。
+// 返されたポインタは親 SSLCertChain の生存期間中のみ有効。
+WEBRTC_EXPORT const struct webrtc_SSLCertificate* webrtc_SSLCertChain_Get(
+    const struct webrtc_SSLCertChain* self,
+    int index);
+```
+
+`ssl_certificate.cc` の実装にも同様のコメントを追記する。
+
+### Rust 側の状況
+
+Rust ラッパー `SSLCertChainRef::get()` (`src/rtc_base/ssl_certificate.rs:75-85`) は
+`PhantomData<&'a>` によりライフタイムを型で強制しており、Rust 利用者にはこの
+未定義動作は到達不可能。本 issue の修正は Rust 側に影響しない。
+
+### テスト方針
+
+寿命違反は静的解析・ASan 等でも検出困難なため、本 issue ではテスト不要。
+コメントによる契約明示のみで対処する。
+
+### 完了条件
+
+- `ssl_certificate.h` の `webrtc_SSLCertChain_Get` 宣言に借用・解放禁止・寿命の
+  コメントが追加されている
+- `ssl_certificate.cc` の実装にも同様のコメントが追加されている
+- コメント文案が上記の通りであること（レビューで確認）

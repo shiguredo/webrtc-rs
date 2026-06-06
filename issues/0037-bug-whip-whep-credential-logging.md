@@ -1,9 +1,9 @@
 # whip/whep が ICE/TURN 資格情報をログ出力しないようにする
 
 - Priority: Medium
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-whip-whep-credential-logging
+- Model: Opus 4.8
 
 ## 目的
 

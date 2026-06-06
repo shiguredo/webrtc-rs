@@ -1,9 +1,9 @@
 # webrtc_Thread_Start の戻り値破棄と Quit 欠落に対処する
 
 - Priority: Medium
+- Polished: 2026-06-06
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-webrtc-c-thread-start-return-and-quit
+- Model: Opus 4.8
 
 ## 目的
 
@@ -34,11 +34,34 @@ WEBRTC_EXPORT void webrtc_Thread_Start(struct webrtc_Thread* self);
 
 ## 設計方針
 
-- `webrtc_Thread_Start` の戻り値を、元の C++ `webrtc::Thread::Start()` の `bool` に合わせて呼び出し側へ伝える。RULES.md の「元の C++ API のシグネチャに忠実に移植する」原則 (`webrtc/RULES.md:5-6`、`webrtc/RULES.md:12`) に従い、ラッパーの戻り値型を C で扱える型 (例えば `int` あるいは `bool`) に変更する。実装 (`webrtc/src/webrtc_c/rtc_base/thread.cc`) とヘッダ (`webrtc/src/webrtc_c/rtc_base/thread.h`) の双方を更新する。戻り値型変更に伴う既存呼び出し側 (存在する場合) の追従も行う。
-- Quit 相当の C API 追加を検討する。元の `webrtc::Thread` に対応するメンバ関数を確認し、RULES.md の命名規則 (`webrtc/RULES.md:12`、`webrtc_Xxx_Yyy` 形式) に従って `webrtc_Thread_Quit` などを追加するかを判断する。薄いラッパー原則に照らし、実際に必要なライフサイクル操作のみを最小限で追加すること。追加が不要と判断する場合はその理由を明記する。
+### Start 戻り値の修正
+
+- `webrtc_Thread_Start` の戻り値型を `void` から `bool` に変更する。
+  `webrtc::Thread::Start()` の戻り値 `bool` に忠実に従う（RULES.md のシグネチャ原則）。
+  C で `bool` を使うため `#include <stdbool.h>` を実装側に追加する。
+- 実装とヘッダの両方を更新する。
+- Rust ラッパー `Thread::start(&mut self)` (`src/rtc_base/thread.rs:54`) は戻り値型を
+  `bool` に変更し、呼び出し元で成否を確認できるようにする。
+- 戻り値型の変更は後方互換のない破壊的変更のため、CHANGES.md に `[CHANGE]` として追記する。
+
+### Quit API の扱い
+
+`webrtc::Thread` は `MessageQueue` を継承しており `Quit()` を持つが、
+本 issue では Start 戻り値の修正のみを行い、Quit の C API 追加は**別 issue** とする。
+Quit 相当のライフサイクル制御は Start/Stop とは独立した要件であり、
+スコープを分割して着手を容易にする。
+
+## テスト戦略
+
+- Rust 側: `Thread::start()` が `bool` を返すようになった後、
+  `create()` で生成したスレッドの `start()` が `true` を返すことを確認する単体テストを追加する
+  （起動失敗は通常環境では再現困難なため、正常系のみテストする）
 
 ## 完了条件
 
-- `webrtc_Thread_Start` がスレッド起動の成否 (`webrtc::Thread::Start()` の `bool` 戻り値) を呼び出し側へ返せるようになり、起動失敗を検知できる。
-- 実装とヘッダの戻り値型が一致し、RULES.md の命名・シグネチャ原則に沿っている。
-- Quit 相当の C API について、追加するか見送るかが判断され、追加する場合は RULES.md の命名規則に沿った形で実装されている (見送る場合は理由が明記されている)。
+- `webrtc_Thread_Start` の戻り値型が `bool` になり、`webrtc::Thread::Start()` の戻り値を
+  呼び出し側へ伝達する
+- ヘッダ（`.h`）と実装（`.cc`）の戻り値型が一致している
+- Rust ラッパー `Thread::start()` が `bool` を返すようになっている
+- CHANGES.md の `## develop` セクションに `[CHANGE]` エントリが追加されている
+- Quit 追加は別 issue 化されている

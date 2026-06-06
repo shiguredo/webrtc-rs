@@ -1,9 +1,9 @@
 # whip.cpp の未使用コーデック変数とコメントアウトを削除する
 
 - Priority: Low
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/refactor-whip-cpp-remove-unused-codec
+- Model: Opus 4.8
 
 ## 目的
 

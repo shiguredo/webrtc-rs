@@ -1,9 +1,9 @@
 # URLParts の未使用 user_pass を削除する
 
 - Priority: Low
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/refactor-whip-whep-remove-urlparts-user-pass
+- Model: Opus 4.8
 
 ## 目的
 

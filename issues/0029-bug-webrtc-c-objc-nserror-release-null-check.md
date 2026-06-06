@@ -1,9 +1,9 @@
 # objc_NSError_release に null チェックを追加する
 
 - Priority: Medium
+- Polished: 2026-06-06
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/fix-webrtc-c-objc-nserror-release-null-check
+- Model: Opus 4.8
 
 ## 目的
 
@@ -39,6 +39,12 @@ WEBRTC_EXPORT void objc_NSString_release(struct objc_NSString* self) {
 ## 設計方針
 
 `objc_NSError_release` の冒頭に、`objc_NSString_release` と同じ `null` チェックを追加する。すなわち `self == nullptr` の場合は何もせず早期 return し、`null` でない場合のみ `CFBridgingRelease` を呼ぶ。これにより両 `release` 関数の `null` に対する挙動を対称にする。
+
+## テスト戦略
+
+- iOS ビルド環境で `objc_NSError_release(nullptr)` がクラッシュしないことを確認する
+- 非 null の正常系で `objc_NSError_release` が解放後にクラッシュしないことを確認する
+- `#if defined(WEBRTC_IOS)` ガード内のコードのため、非 iOS 環境では影響なし
 
 ## 完了条件
 

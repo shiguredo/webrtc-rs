@@ -1,9 +1,9 @@
 # peer_connection_interface.h のコメントアウト済み旧仮想関数を削除する
 
 - Priority: Low
+- Polished: 2026-06-05
 - Created: 2026-06-05
-- Model: Claude Opus 4.8
-- Branch: feature/refactor-pc-interface-remove-commented-code
+- Model: Opus 4.8
 
 ## 目的
 
