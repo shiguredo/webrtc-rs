@@ -25,21 +25,16 @@ class VideoEncoderFactoryImpl : public webrtc::VideoEncoderFactory {
   VideoEncoderFactoryImpl(const webrtc_VideoEncoderFactory_cbs* cbs,
                           void* user_data)
       : user_data_(user_data) {
-    if (cbs != nullptr) {
-      cbs_ = *cbs;
-    }
+    assert(cbs != nullptr);
+    assert(cbs->GetSupportedFormats != nullptr);
+    assert(cbs->Create != nullptr);
+    assert(cbs->OnDestroy != nullptr);
+    cbs_ = *cbs;
   }
 
-  ~VideoEncoderFactoryImpl() override {
-    if (cbs_.OnDestroy != nullptr) {
-      cbs_.OnDestroy(user_data_);
-    }
-  }
+  ~VideoEncoderFactoryImpl() override { cbs_.OnDestroy(user_data_); }
 
   std::vector<webrtc::SdpVideoFormat> GetSupportedFormats() const override {
-    if (cbs_.GetSupportedFormats == nullptr) {
-      return {};
-    }
     auto raw_formats = cbs_.GetSupportedFormats(user_data_);
     if (raw_formats == nullptr) {
       return {};
@@ -54,9 +49,6 @@ class VideoEncoderFactoryImpl : public webrtc::VideoEncoderFactory {
   std::unique_ptr<webrtc::VideoEncoder> Create(
       const webrtc::Environment& env,
       const webrtc::SdpVideoFormat& format) override {
-    if (cbs_.Create == nullptr) {
-      return nullptr;
-    }
     auto raw_encoder =
         cbs_.Create(reinterpret_cast<struct webrtc_Environment*>(
                         const_cast<webrtc::Environment*>(&env)),
@@ -96,9 +88,9 @@ WEBRTC_EXPORT struct webrtc_VideoEncoder_unique*
 webrtc_VideoEncoderFactory_Create(struct webrtc_VideoEncoderFactory* self,
                                   struct webrtc_Environment* env,
                                   struct webrtc_SdpVideoFormat* format) {
-  if (self == nullptr || env == nullptr || format == nullptr) {
-    return nullptr;
-  }
+  assert(self != nullptr);
+  assert(env != nullptr);
+  assert(format != nullptr);
   auto factory = reinterpret_cast<webrtc::VideoEncoderFactory*>(self);
   auto cpp_env = reinterpret_cast<webrtc::Environment*>(env);
   auto cpp_format = reinterpret_cast<webrtc::SdpVideoFormat*>(format);
@@ -110,9 +102,7 @@ webrtc_VideoEncoderFactory_Create(struct webrtc_VideoEncoderFactory* self,
 WEBRTC_EXPORT struct webrtc_SdpVideoFormat_vector*
 webrtc_VideoEncoderFactory_GetSupportedFormats(
     struct webrtc_VideoEncoderFactory* self) {
-  if (self == nullptr) {
-    return nullptr;
-  }
+  assert(self != nullptr);
   auto factory = reinterpret_cast<webrtc::VideoEncoderFactory*>(self);
   auto formats = factory->GetSupportedFormats();
   auto vec = new std::vector<webrtc::SdpVideoFormat>(formats);

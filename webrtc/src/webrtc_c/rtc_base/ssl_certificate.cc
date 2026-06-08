@@ -1,5 +1,6 @@
 #include "ssl_certificate.h"
 
+#include <assert.h>
 #include <stddef.h>
 #include <cstdint>
 #include <memory>
@@ -21,21 +22,15 @@ class SSLCertificateVerifierImpl : public webrtc::SSLCertificateVerifier {
       const struct webrtc_SSLCertificateVerifier_cbs* cbs,
       void* user_data)
       : user_data_(user_data) {
-    if (cbs != nullptr) {
-      cbs_ = *cbs;
-    }
+    assert(cbs != nullptr);
+    assert(cbs->VerifyChain != nullptr);
+    assert(cbs->OnDestroy != nullptr);
+    cbs_ = *cbs;
   }
 
-  ~SSLCertificateVerifierImpl() override {
-    if (cbs_.OnDestroy != nullptr) {
-      cbs_.OnDestroy(user_data_);
-    }
-  }
+  ~SSLCertificateVerifierImpl() override { cbs_.OnDestroy(user_data_); }
 
   bool VerifyChain(const webrtc::SSLCertChain& chain) override {
-    if (cbs_.VerifyChain == nullptr) {
-      return false;
-    }
     auto* c_chain = reinterpret_cast<const struct webrtc_SSLCertChain*>(&chain);
     return cbs_.VerifyChain(c_chain, user_data_) != 0;
   }

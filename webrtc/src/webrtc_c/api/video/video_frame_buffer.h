@@ -17,6 +17,8 @@ WEBRTC_DECLARE_REFCOUNTED(webrtc_VideoFrameBuffer);
 struct webrtc_I420Buffer_refcounted;
 struct webrtc_NV12Buffer_refcounted;
 
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_VideoFrameBuffer_cbs {
   int (*type)(void* user_data);
   int (*width)(void* user_data);

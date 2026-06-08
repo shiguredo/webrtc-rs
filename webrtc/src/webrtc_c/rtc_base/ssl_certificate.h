@@ -37,6 +37,8 @@ WEBRTC_EXPORT const struct webrtc_SSLCertificate* webrtc_SSLCertChain_Get(
 // -------------------------
 
 WEBRTC_DECLARE_UNIQUE(webrtc_SSLCertificateVerifier);
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_SSLCertificateVerifier_cbs {
   int (*VerifyChain)(const struct webrtc_SSLCertChain* chain, void* user_data);
   void (*OnDestroy)(void* user_data);

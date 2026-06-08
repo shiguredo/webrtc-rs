@@ -13,6 +13,8 @@ extern "C" {
 
 WEBRTC_DECLARE_REFCOUNTED(webrtc_SetRemoteDescriptionObserverInterface);
 
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_SetRemoteDescriptionObserverInterface_cbs {
   void (*OnSetRemoteDescriptionComplete)(struct webrtc_RTCError_unique* error,
                                          void* user_data);

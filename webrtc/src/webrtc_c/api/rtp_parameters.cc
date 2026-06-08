@@ -44,7 +44,8 @@ WEBRTC_EXPORT void webrtc_RtpCodec_set_name(struct webrtc_RtpCodec* self,
                                             const char* name,
                                             size_t name_len) {
   auto codec = reinterpret_cast<webrtc::RtpCodec*>(self);
-  codec->name = name != nullptr ? std::string(name, name_len) : std::string();
+  assert(name != nullptr);
+  codec->name = std::string(name, name_len);
 }
 WEBRTC_EXPORT void webrtc_RtpCodec_get_clock_rate(struct webrtc_RtpCodec* self,
                                                   int* out_has,
@@ -168,7 +169,8 @@ WEBRTC_EXPORT void webrtc_RtpEncodingParameters_set_rid(
     const char* rid,
     size_t rid_len) {
   auto params = reinterpret_cast<webrtc::RtpEncodingParameters*>(self);
-  params->rid = rid != nullptr ? std::string(rid, rid_len) : std::string();
+  assert(rid != nullptr);
+  params->rid = std::string(rid, rid_len);
 }
 WEBRTC_EXPORT struct std_string* webrtc_RtpEncodingParameters_get_rid(
     struct webrtc_RtpEncodingParameters* self) {
@@ -430,8 +432,8 @@ WEBRTC_EXPORT void webrtc_RtpParameters_set_transaction_id(
     const char* value,
     size_t value_len) {
   auto params = reinterpret_cast<webrtc::RtpParameters*>(self);
-  params->transaction_id =
-      value != nullptr ? std::string(value, value_len) : std::string();
+  assert(value != nullptr);
+  params->transaction_id = std::string(value, value_len);
 }
 
 WEBRTC_EXPORT struct std_string* webrtc_RtpParameters_get_mid(
@@ -444,8 +446,8 @@ WEBRTC_EXPORT void webrtc_RtpParameters_set_mid(
     const char* value,
     size_t value_len) {
   auto params = reinterpret_cast<webrtc::RtpParameters*>(self);
-  params->mid =
-      value != nullptr ? std::string(value, value_len) : std::string();
+  assert(value != nullptr);
+  params->mid = std::string(value, value_len);
 }
 
 WEBRTC_EXPORT struct webrtc_RtpEncodingParameters_vector*

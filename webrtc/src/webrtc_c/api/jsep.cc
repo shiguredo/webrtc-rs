@@ -1,5 +1,6 @@
 #include "jsep.h"
 
+#include <cassert>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -31,9 +32,8 @@ WEBRTC_EXPORT const int webrtc_SdpType_kRollback =
     static_cast<int>(webrtc::SdpType::kRollback);
 
 WEBRTC_EXPORT int webrtc_SdpTypeFromString(const char* type, size_t type_len) {
-  std::string type_str =
-      type != nullptr ? std::string(type, type_len) : std::string();
-  auto sdp_type = webrtc::SdpTypeFromString(type_str);
+  assert(type != nullptr);
+  auto sdp_type = webrtc::SdpTypeFromString(std::string(type, type_len));
   return static_cast<int>(sdp_type.value_or(webrtc::SdpType::kOffer));
 }
 WEBRTC_EXPORT const char* webrtc_SdpTypeToString(int type) {
@@ -51,6 +51,7 @@ WEBRTC_DEFINE_UNIQUE(webrtc_SessionDescriptionInterface,
 
 WEBRTC_EXPORT struct webrtc_SessionDescriptionInterface_unique*
 webrtc_CreateSessionDescription(int sdp_type, const char* sdp, size_t sdp_len) {
+  assert(sdp != nullptr);
   auto type = static_cast<webrtc::SdpType>(sdp_type);
   auto desc = webrtc::CreateSessionDescription(type, std::string(sdp, sdp_len));
   if (!desc) {
@@ -85,24 +86,20 @@ WEBRTC_EXPORT void webrtc_SdpParseError_line(struct webrtc_SdpParseError* self,
                                              const char** out_line,
                                              size_t* out_len) {
   auto error = reinterpret_cast<webrtc::SdpParseError*>(self);
-  if (out_line != nullptr) {
-    *out_line = error->line.c_str();
-  }
-  if (out_len != nullptr) {
-    *out_len = error->line.size();
-  }
+  assert(out_line != nullptr);
+  *out_line = error->line.c_str();
+  assert(out_len != nullptr);
+  *out_len = error->line.size();
 }
 WEBRTC_EXPORT void webrtc_SdpParseError_description(
     struct webrtc_SdpParseError* self,
     const char** out_description,
     size_t* out_len) {
   auto error = reinterpret_cast<webrtc::SdpParseError*>(self);
-  if (out_description != nullptr) {
-    *out_description = error->description.c_str();
-  }
-  if (out_len != nullptr) {
-    *out_len = error->description.size();
-  }
+  assert(out_description != nullptr);
+  *out_description = error->description.c_str();
+  assert(out_len != nullptr);
+  *out_len = error->description.size();
 }
 WEBRTC_EXPORT struct webrtc_IceCandidate* webrtc_CreateIceCandidate(
     const char* sdp_mid,
@@ -111,19 +108,18 @@ WEBRTC_EXPORT struct webrtc_IceCandidate* webrtc_CreateIceCandidate(
     const char* sdp,
     size_t sdp_len,
     struct webrtc_SdpParseError_unique** out_error) {
+  assert(sdp_mid != nullptr);
+  assert(sdp != nullptr);
+  assert(out_error != nullptr);
   webrtc::SdpParseError error;
   auto* ice_candidate = webrtc::CreateIceCandidate(
       std::string(sdp_mid, sdp_mid_len), sdp_mline_index,
       std::string(sdp, sdp_len), &error);
-  if (out_error != nullptr) {
-    *out_error = nullptr;
-  }
+  *out_error = nullptr;
   if (!ice_candidate) {
-    if (out_error != nullptr) {
-      auto out = std::make_unique<webrtc::SdpParseError>(std::move(error));
-      *out_error =
-          reinterpret_cast<struct webrtc_SdpParseError_unique*>(out.release());
-    }
+    auto out = std::make_unique<webrtc::SdpParseError>(std::move(error));
+    *out_error =
+        reinterpret_cast<struct webrtc_SdpParseError_unique*>(out.release());
     return nullptr;
   }
   return reinterpret_cast<struct webrtc_IceCandidate*>(ice_candidate);
@@ -171,15 +167,15 @@ class CreateSessionDescriptionObserverImpl
       const struct webrtc_CreateSessionDescriptionObserver_cbs* cbs,
       void* user_data)
       : user_data_(user_data) {
-    if (cbs != nullptr) {
-      cbs_ = *cbs;
-    }
+    assert(cbs != nullptr);
+    assert(cbs->OnSuccess != nullptr);
+    assert(cbs->OnFailure != nullptr);
+    assert(cbs->OnDestroy != nullptr);
+    cbs_ = *cbs;
   }
 
   ~CreateSessionDescriptionObserverImpl() override {
-    if (cbs_.OnDestroy != nullptr) {
-      cbs_.OnDestroy(user_data_);
-    }
+    cbs_.OnDestroy(user_data_);
   }
 
   void OnSuccess(webrtc::SessionDescriptionInterface* desc) override {

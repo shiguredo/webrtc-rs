@@ -2,6 +2,7 @@
 
 #include <stdarg.h>
 #include <stddef.h>
+#include <cassert>
 #include <cstring>
 #include <memory>
 #include <utility>
@@ -27,21 +28,17 @@ class SetLocalDescriptionObserverInterfaceImpl
       const struct webrtc_SetLocalDescriptionObserverInterface_cbs* cbs,
       void* user_data)
       : user_data_(user_data) {
-    if (cbs != nullptr) {
-      cbs_ = *cbs;
-    }
+    assert(cbs != nullptr);
+    assert(cbs->OnSetLocalDescriptionComplete != nullptr);
+    assert(cbs->OnDestroy != nullptr);
+    cbs_ = *cbs;
   }
 
   ~SetLocalDescriptionObserverInterfaceImpl() override {
-    if (cbs_.OnDestroy != nullptr) {
-      cbs_.OnDestroy(user_data_);
-    }
+    cbs_.OnDestroy(user_data_);
   }
 
   void OnSetLocalDescriptionComplete(webrtc::RTCError error) override {
-    if (cbs_.OnSetLocalDescriptionComplete == nullptr) {
-      return;
-    }
     auto rtc_error = std::make_unique<webrtc::RTCError>(std::move(error));
     cbs_.OnSetLocalDescriptionComplete(
         reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error.release()),

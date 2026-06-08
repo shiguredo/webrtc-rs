@@ -2,6 +2,7 @@
 
 #include <stdarg.h>
 #include <stddef.h>
+#include <cassert>
 #include <exception>
 #include <memory>
 #include <string>
@@ -92,96 +93,83 @@ class PeerConnectionObserverImpl : public webrtc::PeerConnectionObserver {
       const struct webrtc_PeerConnectionObserver_cbs* observer,
       void* user_data)
       : user_data_(user_data) {
-    if (observer != nullptr) {
-      observer_ = *observer;
-    }
+    assert(observer != nullptr);
+    assert(observer->OnStandardizedIceConnectionChange != nullptr);
+    assert(observer->OnConnectionChange != nullptr);
+    assert(observer->OnIceCandidate != nullptr);
+    assert(observer->OnIceCandidateError != nullptr);
+    assert(observer->OnIceGatheringChange != nullptr);
+    assert(observer->OnDataChannel != nullptr);
+    assert(observer->OnTrack != nullptr);
+    assert(observer->OnRemoveTrack != nullptr);
+    assert(observer->OnDestroy != nullptr);
+    observer_ = *observer;
   }
 
-  ~PeerConnectionObserverImpl() override {
-    if (observer_.OnDestroy != nullptr) {
-      observer_.OnDestroy(user_data_);
-    }
-  }
+  ~PeerConnectionObserverImpl() override { observer_.OnDestroy(user_data_); }
 
   void OnSignalingChange(
       webrtc::PeerConnectionInterface::SignalingState new_state) override {}
   void OnDataChannel(webrtc::scoped_refptr<webrtc::DataChannelInterface>
                          data_channel) override {
-    if (observer_.OnDataChannel != nullptr) {
-      webrtc::scoped_refptr<webrtc::DataChannelInterface> data_channel_ref(
-          data_channel);
-      observer_.OnDataChannel(
-          reinterpret_cast<struct webrtc_DataChannelInterface_refcounted*>(
-              data_channel_ref.release()),
-          user_data_);
-    }
+    webrtc::scoped_refptr<webrtc::DataChannelInterface> data_channel_ref(
+        data_channel);
+    observer_.OnDataChannel(
+        reinterpret_cast<struct webrtc_DataChannelInterface_refcounted*>(
+            data_channel_ref.release()),
+        user_data_);
   }
   void OnStandardizedIceConnectionChange(
       webrtc::PeerConnectionInterface::IceConnectionState new_state) override {
-    if (observer_.OnStandardizedIceConnectionChange != nullptr) {
-      observer_.OnStandardizedIceConnectionChange(
-          static_cast<webrtc_PeerConnectionInterface_IceConnectionState>(
-              new_state),
-          user_data_);
-    }
+    observer_.OnStandardizedIceConnectionChange(
+        static_cast<webrtc_PeerConnectionInterface_IceConnectionState>(
+            new_state),
+        user_data_);
   }
   void OnConnectionChange(
       webrtc::PeerConnectionInterface::PeerConnectionState new_state) override {
-    if (observer_.OnConnectionChange != nullptr) {
-      observer_.OnConnectionChange(
-          static_cast<webrtc_PeerConnectionInterface_PeerConnectionState>(
-              new_state),
-          user_data_);
-    }
+    observer_.OnConnectionChange(
+        static_cast<webrtc_PeerConnectionInterface_PeerConnectionState>(
+            new_state),
+        user_data_);
   }
   void OnIceGatheringChange(
       webrtc::PeerConnectionInterface::IceGatheringState new_state) override {
-    if (observer_.OnIceGatheringChange != nullptr) {
-      observer_.OnIceGatheringChange(
-          static_cast<webrtc_PeerConnectionInterface_IceGatheringState>(
-              new_state),
-          user_data_);
-    }
+    observer_.OnIceGatheringChange(
+        static_cast<webrtc_PeerConnectionInterface_IceGatheringState>(
+            new_state),
+        user_data_);
   }
   void OnIceCandidate(const webrtc::IceCandidate* candidate) override {
-    if (observer_.OnIceCandidate != nullptr) {
-      observer_.OnIceCandidate(
-          reinterpret_cast<const struct webrtc_IceCandidate*>(candidate),
-          user_data_);
-    }
+    observer_.OnIceCandidate(
+        reinterpret_cast<const struct webrtc_IceCandidate*>(candidate),
+        user_data_);
   }
   void OnIceCandidateError(const std::string& address,
                            int port,
                            const std::string& url,
                            int error_code,
                            const std::string& error_text) override {
-    if (observer_.OnIceCandidateError != nullptr) {
-      observer_.OnIceCandidateError(
-          address.c_str(), address.size(), port, url.c_str(), url.size(),
-          error_code, error_text.c_str(), error_text.size(), user_data_);
-    }
+    observer_.OnIceCandidateError(
+        address.c_str(), address.size(), port, url.c_str(), url.size(),
+        error_code, error_text.c_str(), error_text.size(), user_data_);
   }
   void OnTrack(webrtc::scoped_refptr<webrtc::RtpTransceiverInterface>
                    transceiver) override {
-    if (observer_.OnTrack != nullptr) {
-      webrtc::scoped_refptr<webrtc::RtpTransceiverInterface> transceiver_ref(
-          transceiver);
-      observer_.OnTrack(
-          reinterpret_cast<struct webrtc_RtpTransceiverInterface_refcounted*>(
-              transceiver_ref.release()),
-          user_data_);
-    }
+    webrtc::scoped_refptr<webrtc::RtpTransceiverInterface> transceiver_ref(
+        transceiver);
+    observer_.OnTrack(
+        reinterpret_cast<struct webrtc_RtpTransceiverInterface_refcounted*>(
+            transceiver_ref.release()),
+        user_data_);
   }
   void OnRemoveTrack(
       webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) override {
-    if (observer_.OnRemoveTrack != nullptr) {
-      webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver_ref(
-          receiver);
-      observer_.OnRemoveTrack(
-          reinterpret_cast<struct webrtc_RtpReceiverInterface_refcounted*>(
-              receiver_ref.release()),
-          user_data_);
-    }
+    webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver_ref(receiver);
+    observer_.OnRemoveTrack(
+        reinterpret_cast<struct webrtc_RtpReceiverInterface_refcounted*>(
+            receiver_ref.release()),
+        user_data_);
   }
 
  private:
@@ -194,14 +182,14 @@ class RTCStatsCollectorCallbackImpl : public webrtc::RTCStatsCollectorCallback {
   RTCStatsCollectorCallbackImpl(
       struct webrtc_RTCStatsCollectorCallback_cbs* cbs,
       void* user_data)
-      : cbs_(*cbs), user_data_(user_data) {}
+      : cbs_(*cbs), user_data_(user_data) {
+    assert(cbs != nullptr);
+    assert(cbs->OnStatsDelivered != nullptr);
+  }
 
   void OnStatsDelivered(
       const webrtc::scoped_refptr<const webrtc::RTCStatsReport>& report)
       override {
-    if (cbs_.OnStatsDelivered == nullptr) {
-      return;
-    }
     webrtc::scoped_refptr<const webrtc::RTCStatsReport> report_ref(report);
     cbs_.OnStatsDelivered(
         reinterpret_cast<const struct webrtc_RTCStatsReport_refcounted*>(
@@ -689,9 +677,8 @@ webrtc_PeerConnectionInterface_LookupDtlsTransportByMid(
     struct webrtc_PeerConnectionInterface* self,
     const char* mid,
     size_t mid_len) {
-  if (self == nullptr || mid == nullptr) {
-    return nullptr;
-  }
+  assert(self != nullptr);
+  assert(mid != nullptr);
   auto pc = reinterpret_cast<webrtc::PeerConnectionInterface*>(self);
   auto transport = pc->LookupDtlsTransportByMid(std::string(mid, mid_len));
   if (transport == nullptr) {
@@ -705,9 +692,8 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_GetStats(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_RTCStatsCollectorCallback_cbs* cbs,
     void* user_data) {
-  if (self == nullptr || cbs == nullptr) {
-    return;
-  }
+  assert(self != nullptr);
+  assert(cbs != nullptr);
   auto pc = reinterpret_cast<webrtc::PeerConnectionInterface*>(self);
   auto callback =
       webrtc::make_ref_counted<RTCStatsCollectorCallbackImpl>(cbs, user_data);
@@ -1138,9 +1124,7 @@ WEBRTC_EXPORT struct webrtc_PeerConnectionFactoryInterface_refcounted*
 webrtc_CreateModularPeerConnectionFactoryWithContext(
     struct webrtc_PeerConnectionFactoryDependencies* dependencies,
     struct webrtc_ConnectionContext_refcounted** out_context) {
-  if (out_context == nullptr) {
-    return nullptr;
-  }
+  assert(out_context != nullptr);
   *out_context = nullptr;
   auto deps = reinterpret_cast<webrtc::PeerConnectionFactoryDependencies*>(
       dependencies);

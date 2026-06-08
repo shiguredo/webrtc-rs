@@ -279,6 +279,8 @@ webrtc_VideoEncoder_EncodedImageCallback_Result_set_drop_next_frame(
     struct webrtc_VideoEncoder_EncodedImageCallback_Result* self,
     int drop_next_frame);
 
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_VideoEncoder_EncodedImageCallback_cbs {
   struct webrtc_VideoEncoder_EncodedImageCallback_Result_unique* (
       *OnEncodedImage)(struct webrtc_EncodedImage* encoded_image,
@@ -299,6 +301,8 @@ webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage(
     struct webrtc_EncodedImage* encoded_image,
     struct webrtc_CodecSpecificInfo* codec_specific_info);
 
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_VideoEncoder_cbs {
   int32_t (*InitEncode)(struct webrtc_VideoCodec* codec_settings,
                         struct webrtc_VideoEncoder_Settings* settings,
