@@ -64,7 +64,7 @@
 
 #define WEBRTC_DEFINE_VECTOR(type, cpptype)                               \
   WEBRTC_EXPORT struct WEBRTC_CONCAT(type, _vector) *                     \
-      WEBRTC_CONCAT(type, _vector_new)(int size) {                        \
+      WEBRTC_CONCAT(type, _vector_new)(size_t size) {                     \
     auto vec = new std::vector<cpptype>(size);                            \
     return reinterpret_cast<struct WEBRTC_CONCAT(type, _vector)*>(vec);   \
   }                                                                       \
@@ -85,7 +85,7 @@
     return static_cast<int>(vec->size());                                 \
   }                                                                       \
   WEBRTC_EXPORT void WEBRTC_CONCAT(type, _vector_resize)(                 \
-      struct WEBRTC_CONCAT(type, _vector) * self, int size) {             \
+      struct WEBRTC_CONCAT(type, _vector) * self, size_t size) {          \
     auto vec = reinterpret_cast<std::vector<cpptype>*>(self);             \
     vec->resize(size);                                                    \
   }                                                                       \
@@ -150,7 +150,7 @@
 
 #define WEBRTC_DEFINE_REFCOUNTED_VECTOR(type, cpptype)                        \
   WEBRTC_EXPORT struct WEBRTC_CONCAT(type, _refcounted_vector) *              \
-      WEBRTC_CONCAT(type, _refcounted_vector_new)(int size) {                 \
+      WEBRTC_CONCAT(type, _refcounted_vector_new)(size_t size) {              \
     auto vec = new std::vector<webrtc::scoped_refptr<cpptype>>(size);         \
     return reinterpret_cast<struct WEBRTC_CONCAT(type, _refcounted_vector)*>( \
         vec);                                                                 \
@@ -177,7 +177,7 @@
     return static_cast<int>(vec->size());                                     \
   }                                                                           \
   WEBRTC_EXPORT void WEBRTC_CONCAT(type, _refcounted_vector_resize)(          \
-      struct WEBRTC_CONCAT(type, _refcounted_vector) * self, int size) {      \
+      struct WEBRTC_CONCAT(type, _refcounted_vector) * self, size_t size) {   \
     auto vec =                                                                \
         reinterpret_cast<std::vector<webrtc::scoped_refptr<cpptype>>*>(self); \
     vec->resize(size);                                                        \
@@ -209,7 +209,7 @@
 
 #define WEBRTC_DEFINE_INLINED_VECTOR(type, cpptype, max_size)              \
   WEBRTC_EXPORT struct WEBRTC_CONCAT(type, _inlined_vector) *              \
-      WEBRTC_CONCAT(type, _inlined_vector_new)(int size) {                 \
+      WEBRTC_CONCAT(type, _inlined_vector_new)(size_t size) {              \
     auto vec = new absl::InlinedVector<cpptype, max_size>(size);           \
     return reinterpret_cast<struct WEBRTC_CONCAT(type, _inlined_vector)*>( \
         vec);                                                              \
@@ -234,7 +234,7 @@
     return static_cast<int>(vec->size());                                  \
   }                                                                        \
   WEBRTC_EXPORT void WEBRTC_CONCAT(type, _inlined_vector_resize)(          \
-      struct WEBRTC_CONCAT(type, _inlined_vector) * self, int size) {      \
+      struct WEBRTC_CONCAT(type, _inlined_vector) * self, size_t size) {   \
     auto vec =                                                             \
         reinterpret_cast<absl::InlinedVector<cpptype, max_size>*>(self);   \
     vec->resize(size);                                                     \

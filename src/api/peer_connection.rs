@@ -707,7 +707,7 @@ pub struct IceServerVector {
 unsafe impl Send for IceServerVector {}
 
 impl IceServerVector {
-    pub fn new(size: i32) -> Self {
+    pub fn new(size: usize) -> Self {
         let raw =
             NonNull::new(unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_vector_new(size) })
                 .expect(

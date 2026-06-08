@@ -15,6 +15,11 @@
   - webrtc_CreateRandomString の C API 引数型 (size_t) と一致させる
   - @melpon
 
+- [CHANGE] WEBRTC_DEFINE_VECTOR 系マクロの _new / _resize のサイズ引数型を int から size_t に変更する
+  - 負値による符号拡張で C++ 例外が C 境界を越える問題を型レベルで防止する
+  - Rust ラッパー側の new 引数も i32 → usize に変更する
+  - @melpon
+
 - [UPDATE] libwebrtc m150 (m150.7871.0.0) に上げる
   - EncodedImageCallback に追加された純粋仮想メソッド OnFrameDropped に追従する
   - @voluntas

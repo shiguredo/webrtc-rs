@@ -2,6 +2,7 @@
 
 - Priority: Medium
 - Polished: 2026-06-08
+- Completed: 2026-06-08
 - Created: 2026-06-05
 - Model: Opus 4.8
 
@@ -143,3 +144,33 @@ C ソース側 (`whip.c`: `_vector_new(0)` 2 回, `_vector_new(3)` 1 回, `whep.
 - 既存の whip.c / whep.c がビルド可能で、警告が増えていない
 - Cargo の全単体テストが pass する
 - スコープ外の項目（`_vector_get` / `_vector_set` の `int index`、`_vector_size` 戻り値の `int`）が issue に明記されている
+
+## 解決方法
+
+以下の 3 つのカテゴリの変更を実施した:
+
+### C 側マクロ変更
+
+- `common.h` の `WEBRTC_DECLARE_VECTOR` / `WEBRTC_DECLARE_REFCOUNTED_VECTOR` / `WEBRTC_DECLARE_INLINED_VECTOR` の `_new` / `_resize` のサイズ引数型を `int` から `size_t` に変更した
+- `common.impl.h` の `WEBRTC_DEFINE_VECTOR` / `WEBRTC_DEFINE_REFCOUNTED_VECTOR` / `WEBRTC_DEFINE_INLINED_VECTOR` の定義側も同様に `int` から `size_t` に変更した
+- 宣言と定義の型を一致させた
+
+### Rust 側変更
+
+- `src/cxxstd.rs`: `StringVector::new(size: i32)` → `size: usize`
+- `src/api/peer_connection.rs`: `IceServerVector::new(size: i32)` → `size: usize`
+- `src/api/rtp.rs`: `RtpCodecCapabilityVector::new(size: i32)` → `size: usize`
+- `src/api/rtp.rs`: `RtpCodecCapabilityVectorRef::resize` の `i32::try_from(len).unwrap_or(i32::MAX)` を削除し `len` を直接渡す
+- `src/api/rtp.rs`: `RtpEncodingParametersVector::new(size: i32)` → `size: usize`
+- `src/api/rtp.rs`: `RtpEncodingParametersVector::resize` の `i32::try_from(len).unwrap_or(i32::MAX)` を削除し `len` を直接渡す
+- `src/api/video_codec_common.rs`: `VideoFrameTypeVector::new(size: i32)` → `size: usize`
+- `src/api/video_encoder.rs`: `resize` の `i32::try_from(len).unwrap_or(i32::MAX)` を削除し `len` を直接渡す (2 箇所)
+
+### CHANGES.md
+
+- `[CHANGE]` エントリを追加した
+
+### テスト
+
+- `cargo test --all-targets` で全 101 件のテストが pass することを確認した
+- `cargo check` でビルドが警告なしで完了することを確認した

@@ -92,7 +92,6 @@ impl<'a> VideoEncoderFramerateFractionInlinedVectorRef<'a> {
     }
 
     pub fn resize(&mut self, len: usize) {
-        let len = i32::try_from(len).unwrap_or(i32::MAX);
         unsafe {
             ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector_resize(self.raw.as_ptr(), len)
         };
@@ -168,7 +167,6 @@ impl<'a> VideoFrameBufferKindInlinedVectorRef<'a> {
     }
 
     pub fn resize(&mut self, len: usize) {
-        let len = i32::try_from(len).unwrap_or(i32::MAX);
         unsafe { ffi::webrtc_VideoFrameBuffer_Type_inlined_vector_resize(self.raw.as_ptr(), len) };
     }
 
