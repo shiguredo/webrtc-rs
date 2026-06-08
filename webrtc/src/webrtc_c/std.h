@@ -13,7 +13,7 @@ extern "C" {
 // -------------------------
 
 WEBRTC_DECLARE_UNIQUE(std_string);
-WEBRTC_EXPORT int std_string_size(struct std_string* self);
+WEBRTC_EXPORT size_t std_string_size(struct std_string* self);
 WEBRTC_EXPORT const char* std_string_c_str(struct std_string* self);
 WEBRTC_EXPORT void std_string_append(struct std_string* self,
                                      const char* str,

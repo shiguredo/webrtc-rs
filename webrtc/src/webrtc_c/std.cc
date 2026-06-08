@@ -16,9 +16,9 @@
 extern "C" {
 WEBRTC_DEFINE_UNIQUE(std_string, std::string);
 
-WEBRTC_EXPORT int std_string_size(struct std_string* self) {
+WEBRTC_EXPORT size_t std_string_size(struct std_string* self) {
   auto str = reinterpret_cast<std::string*>(self);
-  return static_cast<int>(str->size());
+  return str->size();
 }
 WEBRTC_EXPORT const char* std_string_c_str(struct std_string* self) {
   auto str = reinterpret_cast<std::string*>(self);

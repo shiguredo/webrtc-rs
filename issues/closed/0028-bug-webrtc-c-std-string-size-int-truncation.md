@@ -3,6 +3,7 @@
 - Priority: Medium
 - Polished: 2026-06-06
 - Created: 2026-06-05
+- Completed: 2026-06-08
 - Model: Opus 4.8
 
 ## 目的
@@ -62,3 +63,15 @@ WEBRTC_EXPORT int std_string_size(struct std_string* self);
 - ヘッダの宣言と実装の戻り値型が一致している。
 - 2GiB を超える文字列に対しても切り詰めなく正しいサイズが返る。
 - 戻り値型の変更に伴う呼び出し側 (存在する場合) の追従が完了している。
+
+## 解決方法
+
+以下の3箇所を修正した:
+
+1. `webrtc/src/webrtc_c/std.h:16` — 宣言の戻り値型を `int` から `size_t` に変更
+2. `webrtc/src/webrtc_c/std.cc:19-22` — 実装の戻り値型を `size_t` に変更し、`static_cast<int>` を撤去して `str->size()` をそのまま返すようにした
+3. `src/cxxstd.rs:114-115` — `ffi::std_string_size` の戻り値が `size_t` (Rust 側では `usize`) になったため、`len.max(0) as usize` のガード処理を撤去し、戻り値をそのまま使うようにした
+
+なお whip.c は戻り値を `size_t` として受け取っても呼び出し側で暗黙変換されるため修正不要だった。
+
+`CHANGES.md` の `## develop` に `[CHANGE]` エントリを追記した。

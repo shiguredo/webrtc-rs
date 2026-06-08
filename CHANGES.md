@@ -11,6 +11,11 @@
 
 ## develop
 
+- [CHANGE] std_string_size の戻り値型を int から size_t に変更する
+  - 2 GiB を超える文字列で値が破綻する問題の根本解決
+  - Rust ラッパー側の len() も usize をそのまま返すように追従
+  - @melpon
+
 - [CHANGE] random_string の引数型を i32 から usize に変更する
   - webrtc_CreateRandomString の C API 引数型 (size_t) と一致させる
   - @melpon
