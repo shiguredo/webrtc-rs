@@ -3,6 +3,7 @@
 - Priority: Low
 - Polished: 2026-06-05
 - Created: 2026-06-05
+- Completed: 2026-06-08
 - Model: Opus 4.8
 
 ## 目的
@@ -40,3 +41,7 @@ C++ のキャストへ置き換え、意図を明示する。
 
 - `webrtc/src/webrtc_c/libyuv.cc` から C スタイルキャストが解消され、適切な C++ キャストに置き換えられている。
 - 変換の挙動が変更前と一致している。
+
+## 解決方法
+
+`webrtc/src/webrtc_c/libyuv.cc:157` の `(libyuv::RotationMode)mode` を `static_cast<libyuv::RotationMode>(mode)` に置き換えた。同ファイル内に他に C スタイルキャストは存在しないことを確認済み。挙動の変更はない。

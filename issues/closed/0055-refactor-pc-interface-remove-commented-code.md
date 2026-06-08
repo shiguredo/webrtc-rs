@@ -3,6 +3,7 @@
 - Priority: Low
 - Polished: 2026-06-05
 - Created: 2026-06-05
+- Completed: 2026-06-08
 - Model: Opus 4.8
 
 ## 目的
@@ -47,3 +48,7 @@ struct webrtc_PeerConnectionObserver_cbs {
 
 - 当該コメントアウトが除去される。
 - 構造体の実メンバ定義が変わらないこと。
+
+## 解決方法
+
+`webrtc/src/webrtc_c/api/peer_connection_interface.h` の `struct webrtc_PeerConnectionObserver_cbs` 内の冒頭 (旧 292-297 行) と末尾 (旧 326-329 行) にあったコメントアウト済み旧仮想関数 10 行を削除した。実メンバの定義には手を加えていない。
