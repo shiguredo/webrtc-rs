@@ -48,9 +48,6 @@ WEBRTC_EXPORT const char* objc_NSString_UTF8String(struct objc_NSString* self) {
 }
 
 WEBRTC_EXPORT void objc_NSString_release(struct objc_NSString* self) {
-  if (self == nullptr) {
-    return;
-  }
   CFBridgingRelease(reinterpret_cast<CFTypeRef>(self));
 }
 

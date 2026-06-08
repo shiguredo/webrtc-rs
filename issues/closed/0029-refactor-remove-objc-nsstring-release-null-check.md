@@ -2,6 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-06-05
+- Completed: 2026-06-08
 - Model: Opus 4.8
 - Branch: feature/refactor-remove-objc-nsstring-release-null-check
 - Polished: 2026-06-08
@@ -89,3 +90,8 @@ WEBRTC_EXPORT void objc_NSString_release(struct objc_NSString* self) {
 
 - `objc_NSString_release` から冗長な `null` チェックが削除されている
 - `objc_NSString_release` と `objc_NSError_release` の実装パターンが対称になっている
+
+## 解決方法
+
+`webrtc/src/webrtc_c/objc.mm` の `objc_NSString_release` 関数から不要な `null` チェック (`if (self == nullptr) { return; }`) を削除し、`objc_NSError_release` と同じ実装パターンに揃えた。
+`CFBridgingRelease` は Apple により `_Nullable` と宣言されており、`null` 入力を API 仕様として許容しているため、実行時の挙動に変更はない。

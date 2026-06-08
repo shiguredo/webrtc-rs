@@ -34,6 +34,10 @@
 - [FIX] peer_connection_interface.cc の _refcounted 直接キャストを _refcounted_get() 経由にする
   - @melpon
 
+- [UPDATE] objc_NSString_release の冗長な null チェックを削除する
+  - CFBridgingRelease は null 安全であり、objc_NSError_release と実装パターンを揃える
+  - @melpon
+
 ## 0.149.0
 
 **リリース日**: 2026-06-04
