@@ -70,6 +70,24 @@ fn random_bytes_length_matches() {
 }
 
 #[test]
+fn random_string_zero_length() {
+    let s = random_string(0);
+    assert_eq!(s.len(), 0, "長さ 0 を指定したら空文字列が返ること");
+}
+
+#[test]
+fn random_bytes_zero_length() {
+    let b = random_bytes(0);
+    assert_eq!(b.len(), 0, "長さ 0 を指定したら空 Vec が返ること");
+}
+
+#[test]
+fn random_string_usize_values() {
+    let s = random_string(65536);
+    assert_eq!(s.len(), 65536, "65536 バイトの文字列が返ること");
+}
+
+#[test]
 fn timestamp_aligner_translates() {
     let mut aligner = TimestampAligner::new();
     let base = aligner.translate(1_000_000, 2_000_000);

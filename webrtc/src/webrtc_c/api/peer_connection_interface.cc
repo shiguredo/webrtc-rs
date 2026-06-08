@@ -13,6 +13,8 @@
 #include <api/audio/audio_processing.h>
 #include <api/audio_codecs/audio_decoder_factory.h>
 #include <api/audio_codecs/audio_encoder_factory.h>
+
+// WebRTC C
 #include <api/audio_options.h>
 #include <api/create_modular_peer_connection_factory.h>
 #include <api/data_channel_interface.h>
@@ -58,6 +60,7 @@
 #include "../rtc_base/thread.h"
 #include "../std.h"
 #include "api/rtp_sender_interface.h"
+#include "audio/audio_device.h"
 #include "audio/audio_processing.h"
 #include "audio_codecs/audio_decoder_factory.h"
 #include "audio_codecs/audio_encoder_factory.h"
@@ -975,7 +978,8 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryDependencies_set_adm(
     struct webrtc_AudioDeviceModule_refcounted* adm) {
   auto deps =
       reinterpret_cast<webrtc::PeerConnectionFactoryDependencies*>(self);
-  auto audio_device_module = reinterpret_cast<webrtc::AudioDeviceModule*>(adm);
+  auto audio_device_module = reinterpret_cast<webrtc::AudioDeviceModule*>(
+      webrtc_AudioDeviceModule_refcounted_get(adm));
   deps->adm = audio_device_module;
 }
 WEBRTC_EXPORT void
@@ -995,8 +999,8 @@ webrtc_PeerConnectionFactoryDependencies_set_audio_encoder_factory(
     struct webrtc_AudioEncoderFactory_refcounted* audio_encoder_factory) {
   auto deps =
       reinterpret_cast<webrtc::PeerConnectionFactoryDependencies*>(self);
-  auto factory =
-      reinterpret_cast<webrtc::AudioEncoderFactory*>(audio_encoder_factory);
+  auto factory = reinterpret_cast<webrtc::AudioEncoderFactory*>(
+      webrtc_AudioEncoderFactory_refcounted_get(audio_encoder_factory));
   deps->audio_encoder_factory = factory;
 }
 WEBRTC_EXPORT void
@@ -1005,8 +1009,8 @@ webrtc_PeerConnectionFactoryDependencies_set_audio_decoder_factory(
     struct webrtc_AudioDecoderFactory_refcounted* audio_decoder_factory) {
   auto deps =
       reinterpret_cast<webrtc::PeerConnectionFactoryDependencies*>(self);
-  auto factory =
-      reinterpret_cast<webrtc::AudioDecoderFactory*>(audio_decoder_factory);
+  auto factory = reinterpret_cast<webrtc::AudioDecoderFactory*>(
+      webrtc_AudioDecoderFactory_refcounted_get(audio_decoder_factory));
   deps->audio_decoder_factory = factory;
 }
 WEBRTC_EXPORT void

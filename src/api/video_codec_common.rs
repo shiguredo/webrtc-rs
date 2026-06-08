@@ -1712,7 +1712,7 @@ pub struct VideoFrameTypeVector {
 unsafe impl Send for VideoFrameTypeVector {}
 
 impl VideoFrameTypeVector {
-    pub fn new(size: i32) -> Self {
+    pub fn new(size: usize) -> Self {
         let raw = unsafe { ffi::webrtc_VideoFrameType_vector_new(size) };
         Self {
             raw: NonNull::new(raw)
