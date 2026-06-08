@@ -51,9 +51,6 @@
 #include <rtc_base/ssl_identity.h>
 #include <rtc_base/ssl_stream_adapter.h>
 #include <rtc_base/thread.h>
-#include "audio/audio_device.h"
-#include "audio_codecs/audio_decoder_factory.h"
-#include "audio_codecs/audio_encoder_factory.h"
 
 #include "../common.h"
 #include "../common.impl.h"
@@ -63,6 +60,7 @@
 #include "../rtc_base/thread.h"
 #include "../std.h"
 #include "api/rtp_sender_interface.h"
+#include "audio/audio_device.h"
 #include "audio/audio_processing.h"
 #include "audio_codecs/audio_decoder_factory.h"
 #include "audio_codecs/audio_encoder_factory.h"
