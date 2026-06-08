@@ -3,7 +3,7 @@ use crate::ffi;
 use std::ptr::NonNull;
 
 /// webrtc_CreateRandomString の安全ラッパー。
-pub fn random_string(len: i32) -> String {
+pub fn random_string(len: usize) -> String {
     let raw = unsafe { ffi::webrtc_CreateRandomString(len) };
     CxxString::from_unique(
         NonNull::new(raw).expect("BUG: webrtc_CreateRandomString が null を返しました"),
@@ -14,5 +14,5 @@ pub fn random_string(len: i32) -> String {
 
 /// webrtc::CreateRandomString を byte array として扱うヘルパー。
 pub fn random_bytes(len: usize) -> Vec<u8> {
-    random_string(len as i32).into_bytes()
+    random_string(len).into_bytes()
 }

@@ -11,6 +11,10 @@
 
 ## develop
 
+- [CHANGE] random_string の引数型を i32 から usize に変更する
+  - webrtc_CreateRandomString の C API 引数型 (size_t) と一致させる
+  - @melpon
+
 - [UPDATE] libwebrtc m150 (m150.7871.0.0) に上げる
   - EncodedImageCallback に追加された純粋仮想メソッド OnFrameDropped に追従する
   - @voluntas

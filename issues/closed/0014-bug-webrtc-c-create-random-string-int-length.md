@@ -4,6 +4,9 @@
 - Created: 2026-06-05
 - Model: Opus 4.8
 - Polished: 2026-06-06
+- Completed: 2026-06-08
+
+## 解決方法
 
 ## 目的
 
@@ -180,6 +183,30 @@ fn random_string_usize_values() {
 - `random_bytes` が `random_string` の薄いラッパーになっていない問題（RULES.md 違反の可能性）—
   本 issue では型変更のみ行い、関数の存廃は別 issue で扱う
 - `SIZE_MAX` 等の極端な値に対する防護— C ラッパー全般の設計課題として別途扱う
+
+## 解決方法
+
+以下の修正を行った:
+
+1. **C ヘッダー** (`webrtc/src/webrtc_c/rtc_base/crypto_random.h`):
+   `webrtc_CreateRandomString` の長さ引数の型を `int` から `size_t` に変更した
+
+2. **C 実装** (`webrtc/src/webrtc_c/rtc_base/crypto_random.cc`):
+   同上、定義側の型を `int` から `size_t` に変更した
+
+3. **Rust ラッパー** (`src/rtc_base/crypto_random.rs`):
+   - `random_string` の引数型を `i32` から `usize` に変更した
+   - `random_bytes` 内の `random_string(len as i32)` のキャストを削除し、`random_string(len)` に変更した
+
+4. **テスト追加** (`src/tests.rs`):
+   - `random_string_zero_length`: 長さ 0 で空文字列が返ることの確認
+   - `random_bytes_zero_length`: 長さ 0 で空 Vec が返ることの確認
+   - `random_string_usize_values`: 65536 バイトの文字列が返ることの確認
+
+5. **変更履歴** (`CHANGES.md`):
+   `[CHANGE] random_string の引数型を i32 から usize に変更する` を develop セクションに追記した
+
+呼び出し元 (`whip.c`, `examples/whip/src/main.rs`) の引数はすべてリテラルであり、変更不要。
 
 ## 完了条件
 
