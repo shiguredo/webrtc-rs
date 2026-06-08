@@ -1,5 +1,6 @@
 #include "video_frame.h"
 
+#include <assert.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -295,12 +296,9 @@ WEBRTC_EXPORT void webrtc_VideoFrame_color_space(
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
   const auto& color_space = frame->color_space();
   const bool has_value = color_space.has_value();
-  if (out_has != nullptr) {
-    *out_has = has_value ? 1 : 0;
-  }
-  if (out_value == nullptr) {
-    return;
-  }
+  assert(out_has != nullptr);
+  *out_has = has_value ? 1 : 0;
+  assert(out_value != nullptr);
   if (!has_value) {
     *out_value = nullptr;
     return;

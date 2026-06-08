@@ -3,6 +3,7 @@
 - Priority: Low
 - Polished: 2026-06-05
 - Created: 2026-06-05
+- Completed: 2026-06-09
 - Model: Opus 4.8
 
 ## 目的
@@ -55,3 +56,23 @@ WEBRTC_EXPORT void webrtc_DataChannelInit_set_protocol(
 
 - セッター系の同種 C-API において、ポインタ引数の null チェックの方針が統一されている。
 - 上記 2 つの API を含め、同種の API のチェック有無が一貫している。
+
+## 解決方法
+
+webrtc_c の全 Cbs 構造体（18 種）とその Impl クラス、および全 .cc ファイルの防御的 null チェックを以下の方針で統一した:
+
+1. **Cbs 構造体**: 全 .h ファイルに「全コールバックは必須（null 非許容）」のコメントを追加
+2. **Cbs Impl クラス**:
+   - コンストラクタ: `if (cbs != nullptr) { cbs_ = *cbs; }` を `assert(cbs != nullptr); assert(cbs->OnXxx != nullptr); ... cbs_ = *cbs;` に変更
+   - ディスパッチ・デストラクタ: `if (cbs_.OnXxx != nullptr)` による null チェックをすべて削除し無条件呼び出しに統一
+3. **防御的 null チェック**: `if (self == nullptr) return;` を `assert(self != nullptr);` に置換
+4. **出力引数ガード**: `if (out_xxx != nullptr)` を `assert(out_xxx != nullptr);` に置換
+5. **複合条件**: `if (self == nullptr || other == nullptr)` を独立した assert に分解
+6. **デフォルト値差し替え**: `ptr != nullptr ? ptr : &default_storage` を削除し ptr をそのまま使用
+7. **std::string 構築時 null ガード**: `ptr != nullptr ? std::string(ptr, len) : std::string()` を `assert(ptr != nullptr); std::string(ptr, len)` に置換
+8. **assert + if 二重防衛**: assert を残し if の防御的 return を削除
+9. **std.impl.h**: `OptionalGet`/`OptionalSet`/`OptionalGetAs`/`OptionalSetAs` の null チェックを assert に置換
+10. **RULES.md**: C ラッパーの null チェック方針を追記
+11. **CHANGES.md**: 変更エントリを追加
+
+修正対象ファイル数: 39 ファイル（18 .h + 16 .cc + 1 std.impl.h + RULES.md + CHANGES.md）

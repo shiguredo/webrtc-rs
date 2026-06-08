@@ -1,5 +1,7 @@
 #include "video_sink_interface.h"
 
+#include <assert.h>
+
 #include <api/video/video_frame.h>
 #include <api/video/video_sink_interface.h>
 
@@ -12,30 +14,21 @@ class VideoSinkInterfaceImpl
   VideoSinkInterfaceImpl(const struct webrtc_VideoSinkInterface_cbs* cbs,
                          void* user_data)
       : user_data_(user_data) {
-    if (cbs != nullptr) {
-      cbs_ = *cbs;
-    }
+    assert(cbs != nullptr);
+    assert(cbs->OnFrame != nullptr);
+    assert(cbs->OnDiscardedFrame != nullptr);
+    assert(cbs->OnDestroy != nullptr);
+    cbs_ = *cbs;
   }
 
-  ~VideoSinkInterfaceImpl() override {
-    if (cbs_.OnDestroy != nullptr) {
-      cbs_.OnDestroy(user_data_);
-    }
-  }
+  ~VideoSinkInterfaceImpl() override { cbs_.OnDestroy(user_data_); }
 
   void OnFrame(const webrtc::VideoFrame& frame) override {
-    if (cbs_.OnFrame != nullptr) {
-      auto* frame_ptr =
-          reinterpret_cast<const struct webrtc_VideoFrame*>(&frame);
-      cbs_.OnFrame(frame_ptr, user_data_);
-    }
+    auto* frame_ptr = reinterpret_cast<const struct webrtc_VideoFrame*>(&frame);
+    cbs_.OnFrame(frame_ptr, user_data_);
   }
 
-  void OnDiscardedFrame() override {
-    if (cbs_.OnDiscardedFrame != nullptr) {
-      cbs_.OnDiscardedFrame(user_data_);
-    }
-  }
+  void OnDiscardedFrame() override { cbs_.OnDiscardedFrame(user_data_); }
 
  private:
   webrtc_VideoSinkInterface_cbs cbs_{};

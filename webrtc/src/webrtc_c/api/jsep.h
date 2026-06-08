@@ -71,6 +71,8 @@ WEBRTC_EXPORT int webrtc_IceCandidate_ToString(
 
 WEBRTC_DECLARE_REFCOUNTED(webrtc_CreateSessionDescriptionObserver);
 
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_CreateSessionDescriptionObserver_cbs {
   void (*OnSuccess)(struct webrtc_SessionDescriptionInterface_unique* desc,
                     void* user_data);

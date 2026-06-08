@@ -288,6 +288,8 @@ webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_use_obsolete_sctp_sdp(
 // webrtc::PeerConnectionObserver
 // -------------------------
 
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_PeerConnectionObserver_cbs {
   void (*OnStandardizedIceConnectionChange)(
       webrtc_PeerConnectionInterface_IceConnectionState new_state,

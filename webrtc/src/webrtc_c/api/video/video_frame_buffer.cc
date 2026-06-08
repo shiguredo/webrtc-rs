@@ -22,51 +22,33 @@ class VideoFrameBufferImpl : public webrtc::VideoFrameBuffer {
   VideoFrameBufferImpl(const struct webrtc_VideoFrameBuffer_cbs* cbs,
                        void* user_data)
       : user_data_(user_data) {
-    if (cbs != nullptr) {
-      cbs_ = *cbs;
-    }
+    assert(cbs != nullptr);
+    assert(cbs->type != nullptr);
+    assert(cbs->width != nullptr);
+    assert(cbs->height != nullptr);
+    assert(cbs->ToI420 != nullptr);
+    assert(cbs->CropAndScale != nullptr);
+    assert(cbs->OnDestroy != nullptr);
+    cbs_ = *cbs;
   }
 
-  ~VideoFrameBufferImpl() override {
-    if (cbs_.OnDestroy != nullptr) {
-      cbs_.OnDestroy(user_data_);
-    }
-  }
+  ~VideoFrameBufferImpl() override { cbs_.OnDestroy(user_data_); }
 
   Type type() const override {
-    if (cbs_.type == nullptr) {
-      return Type::kNative;
-    }
     return static_cast<Type>(cbs_.type(user_data_));
   }
 
-  int width() const override {
-    if (cbs_.width == nullptr) {
-      return 0;
-    }
-    return cbs_.width(user_data_);
-  }
+  int width() const override { return cbs_.width(user_data_); }
 
-  int height() const override {
-    if (cbs_.height == nullptr) {
-      return 0;
-    }
-    return cbs_.height(user_data_);
-  }
+  int height() const override { return cbs_.height(user_data_); }
 
   webrtc::scoped_refptr<webrtc::I420BufferInterface> ToI420() override {
-    if (cbs_.ToI420 == nullptr) {
-      return nullptr;
-    }
     auto raw_ref = cbs_.ToI420(user_data_);
     if (raw_ref == nullptr) {
       return nullptr;
     }
     auto raw = webrtc_I420Buffer_refcounted_get(raw_ref);
     assert(raw != nullptr);
-    if (raw == nullptr) {
-      return nullptr;
-    }
     auto i420 = reinterpret_cast<webrtc::I420Buffer*>(raw);
     webrtc::scoped_refptr<webrtc::I420Buffer> buffer(i420);
     webrtc_I420Buffer_Release(reinterpret_cast<struct webrtc_I420Buffer*>(raw));
@@ -80,9 +62,6 @@ class VideoFrameBufferImpl : public webrtc::VideoFrameBuffer {
       int crop_height,
       int scaled_width,
       int scaled_height) override {
-    if (cbs_.CropAndScale == nullptr) {
-      return nullptr;
-    }
     auto raw_ref = cbs_.CropAndScale(
         reinterpret_cast<struct webrtc_VideoFrameBuffer*>(this), offset_x,
         offset_y, crop_width, crop_height, scaled_width, scaled_height,
@@ -92,9 +71,6 @@ class VideoFrameBufferImpl : public webrtc::VideoFrameBuffer {
     }
     auto raw = webrtc_VideoFrameBuffer_refcounted_get(raw_ref);
     assert(raw != nullptr);
-    if (raw == nullptr) {
-      return nullptr;
-    }
     auto frame_buffer = reinterpret_cast<webrtc::VideoFrameBuffer*>(raw);
     webrtc::scoped_refptr<webrtc::VideoFrameBuffer> buffer(frame_buffer);
     webrtc_VideoFrameBuffer_Release(raw);

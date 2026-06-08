@@ -17,6 +17,8 @@ extern "C" {
 WEBRTC_DECLARE_UNIQUE(webrtc_VideoEncoderFactory);
 WEBRTC_EXPORT struct webrtc_VideoEncoderFactory_unique*
 webrtc_CreateBuiltinVideoEncoderFactory();
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_VideoEncoderFactory_cbs {
   struct webrtc_SdpVideoFormat_vector* (*GetSupportedFormats)(void* user_data);
   struct webrtc_VideoEncoder_unique* (*Create)(

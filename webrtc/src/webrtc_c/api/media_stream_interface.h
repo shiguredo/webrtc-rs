@@ -64,6 +64,8 @@ WEBRTC_DECLARE_REFCOUNTED(webrtc_AudioSourceInterface);
 
 struct webrtc_AudioTrackSinkInterface;
 
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_AudioTrackSinkInterface_cbs {
   void (*OnData)(const void* audio_data,
                  int bits_per_sample,

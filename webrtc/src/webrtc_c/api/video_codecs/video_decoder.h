@@ -52,6 +52,8 @@ WEBRTC_EXPORT void webrtc_VideoDecoder_DecodedImageCallback_Decoded(
     struct webrtc_VideoDecoder_DecodedImageCallback* self,
     struct webrtc_VideoFrame* decoded_image);
 
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_VideoDecoder_cbs {
   int (*Configure)(struct webrtc_VideoDecoder_Settings* settings,
                    void* user_data);

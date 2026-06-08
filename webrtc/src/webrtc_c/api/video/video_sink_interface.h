@@ -9,6 +9,8 @@ extern "C" {
 
 struct webrtc_VideoSinkInterface;
 
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_VideoSinkInterface_cbs {
   void (*OnFrame)(const struct webrtc_VideoFrame* frame, void* user_data);
   void (*OnDiscardedFrame)(void* user_data);

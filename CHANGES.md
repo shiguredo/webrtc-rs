@@ -38,6 +38,12 @@
   - CFBridgingRelease は null 安全であり、objc_NSError_release と実装パターンを揃える
   - @melpon
 
+- [CHANGE] webrtc_c の C API における null チェック方針を統一する
+  - C → C++ 方向: null はそのまま渡し、防御的 null チェックを削除。デリファレンス直前に assert を追加
+  - C++ → C 方向: null を正しく伝えるための null チェックは維持
+  - Cbs 構造体: 関数ポインタを null 非許容とし、ディスパッチ時の null チェックを削除し無条件呼び出しに統一
+  - @melpon
+
 ## 0.149.0
 
 **リリース日**: 2026-06-04
