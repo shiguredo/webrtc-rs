@@ -2,6 +2,7 @@
 
 #include "../common.h"
 #include "../std.h"
+#include "rtc_error.h"
 #include "rtp_parameters.h"
 #include "rtp_receiver_interface.h"
 
@@ -33,10 +34,10 @@ WEBRTC_EXPORT void webrtc_RtpTransceiverInit_set_send_encodings(
 
 WEBRTC_DECLARE_REFCOUNTED(webrtc_RtpTransceiverInterface);
 
-WEBRTC_EXPORT struct webrtc_RTCError_unique*
-webrtc_RtpTransceiverInterface_SetCodecPreferences(
+WEBRTC_EXPORT void webrtc_RtpTransceiverInterface_SetCodecPreferences(
     struct webrtc_RtpTransceiverInterface* self,
-    struct webrtc_RtpCodecCapability_vector* codecs);
+    struct webrtc_RtpCodecCapability_vector* codecs,
+    struct webrtc_RTCError_unique** out_rtc_error);
 WEBRTC_EXPORT struct webrtc_RtpReceiverInterface_refcounted*
 webrtc_RtpTransceiverInterface_receiver(
     struct webrtc_RtpTransceiverInterface* self);

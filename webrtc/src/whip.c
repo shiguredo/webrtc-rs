@@ -1320,8 +1320,8 @@ void SignalingWhip_Connect(struct SignalingWhip* self) {
     }
     webrtc_RtpCapabilities_delete(caps);
 
-    rtc_error = webrtc_RtpTransceiverInterface_SetCodecPreferences(
-        webrtc_RtpTransceiverInterface_refcounted_get(transceiver), codecs);
+    webrtc_RtpTransceiverInterface_SetCodecPreferences(
+        webrtc_RtpTransceiverInterface_refcounted_get(transceiver), codecs, &rtc_error);
     webrtc_RtpCodecCapability_vector_delete(codecs);
     webrtc_RtpTransceiverInterface_Release(
         webrtc_RtpTransceiverInterface_refcounted_get(transceiver));
@@ -1474,8 +1474,8 @@ void SignalingWhip_Connect(struct SignalingWhip* self) {
         }
       }
 
-      rtc_error = webrtc_RtpTransceiverInterface_SetCodecPreferences(
-          webrtc_RtpTransceiverInterface_refcounted_get(transceiver), codecs);
+      webrtc_RtpTransceiverInterface_SetCodecPreferences(
+          webrtc_RtpTransceiverInterface_refcounted_get(transceiver), codecs, &rtc_error);
       webrtc_RtpCodecCapability_vector_delete(codecs);
       webrtc_RtpCapabilities_delete(caps);
       webrtc_RtpTransceiverInterface_Release(

@@ -11,6 +11,15 @@
 
 ## develop
 
+- [CHANGE] webrtc_c のエラー伝達方法を out パラメータ方式に統一する
+  - webrtc_RtpTransceiverInterface_SetCodecPreferences と webrtc_RtpSenderInterface_SetParameters の戻り値型を webrtc_RTCError_unique* から void に変更し、out_rtc_error 引数を追加する
+  - @melpon
+
+### misc
+
+- [UPDATE] peer_connection_interface.cc の out パラメータデリファレンス前に assert を追加する
+  - @melpon
+
 ## 0.150.0
 
 **リリース日**: 2026-06-09
@@ -31,6 +40,16 @@
   - @voluntas
 
 ### misc
+
+- [FIX] webrtc_c の new webrtc::RTCError を std::make_unique + release() に修正する
+  - @melpon
+
+- [FIX] peer_connection_interface.cc の _refcounted 直接キャストを _refcounted_get() 経由にする
+  - @melpon
+
+- [UPDATE] objc_NSString_release の冗長な null チェックを削除する
+  - CFBridgingRelease は null 安全であり、objc_NSError_release と実装パターンを揃える
+  - @melpon
 
 - [CHANGE] webrtc_c の C API における null チェック方針を統一する
   - C → C++ 方向: null はそのまま渡し、防御的 null チェックを削除。デリファレンス直前に assert を追加
