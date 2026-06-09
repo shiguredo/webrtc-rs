@@ -1,7 +1,9 @@
 #include "rtp_transceiver_interface.h"
 
+#include <assert.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <memory>
 #include <vector>
 
 // WebRTC
@@ -60,18 +62,20 @@ WEBRTC_EXPORT void webrtc_RtpTransceiverInit_set_send_encodings(
 WEBRTC_DEFINE_REFCOUNTED(webrtc_RtpTransceiverInterface,
                          webrtc::RtpTransceiverInterface);
 
-WEBRTC_EXPORT webrtc_RTCError_unique*
-webrtc_RtpTransceiverInterface_SetCodecPreferences(
+WEBRTC_EXPORT void webrtc_RtpTransceiverInterface_SetCodecPreferences(
     struct webrtc_RtpTransceiverInterface* self,
-    struct webrtc_RtpCodecCapability_vector* codecs) {
+    struct webrtc_RtpCodecCapability_vector* codecs,
+    struct webrtc_RTCError_unique** out_rtc_error) {
+  assert(out_rtc_error != nullptr);
   auto transceiver = reinterpret_cast<webrtc::RtpTransceiverInterface*>(self);
   auto vec = reinterpret_cast<std::vector<webrtc::RtpCodecCapability>*>(codecs);
   auto result = transceiver->SetCodecPreferences(*vec);
   if (result.ok()) {
-    return nullptr;
+    *out_rtc_error = nullptr;
   } else {
-    return reinterpret_cast<webrtc_RTCError_unique*>(
-        new webrtc::RTCError(result));
+    auto error = std::make_unique<webrtc::RTCError>(result);
+    *out_rtc_error =
+        reinterpret_cast<struct webrtc_RTCError_unique*>(error.release());
   }
 }
 

@@ -11,6 +11,10 @@
 
 ## develop
 
+- [CHANGE] webrtc_c のエラー伝達方法を out パラメータ方式に統一する
+  - webrtc_RtpTransceiverInterface_SetCodecPreferences と webrtc_RtpSenderInterface_SetParameters の戻り値型を webrtc_RTCError_unique* から void に変更し、out_rtc_error 引数を追加する
+  - @melpon
+
 - [CHANGE] std_string_size の戻り値型を int から size_t に変更する
   - 2 GiB を超える文字列で値が破綻する問題の根本解決
   - Rust ラッパー側の len() も usize をそのまま返すように追従
@@ -30,6 +34,9 @@
   - @voluntas
 
 ### misc
+
+- [FIX] webrtc_c の new webrtc::RTCError を std::make_unique + release() に修正する
+  - @melpon
 
 - [FIX] peer_connection_interface.cc の _refcounted 直接キャストを _refcounted_get() 経由にする
   - @melpon

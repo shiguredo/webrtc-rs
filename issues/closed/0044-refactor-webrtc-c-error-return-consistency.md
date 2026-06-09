@@ -2,6 +2,7 @@
 
 - Priority: Low
 - Polished: 2026-06-09
+- Completed: 2026-06-09
 - Created: 2026-06-05
 - Model: DeepSeek V4 Pro
 
@@ -253,3 +254,17 @@ pub fn set_codec_preferences(&mut self, codecs: &RtpCodecCapabilityVector) -> Re
 - CHANGES.md の `## develop` セクションに `[CHANGE]` エントリ（エラー伝達方式の統一）と `[FIX]` エントリ（RULES.md 違反修正）を追加している。
   - `[CHANGE]` には「`webrtc_c` のエラー伝達方法を out パラメータ方式に統一する」を記載する
   - `[FIX]` には「`webrtc_c` の `new webrtc::RTCError` を `std::make_unique` + `release()` に修正する」を記載する（`### misc` サブセクションに配置）
+
+## 解決方法
+
+- `webrtc_RtpTransceiverInterface_SetCodecPreferences` と `webrtc_RtpSenderInterface_SetParameters` の戻り値型を `webrtc_RTCError_unique*` から `void` に変更し、`webrtc_RTCError_unique** out_rtc_error` 引数を追加した
+- 両関数の実装で、成功時は `*out_rtc_error = nullptr`、失敗時は `std::make_unique<webrtc::RTCError>(result).release()` を `reinterpret_cast` する方式に変更した
+- `rtp_sender_interface.cc` のランタイム null チェック (`if (parameters == nullptr)`) ブロックを削除し、`assert(parameters != nullptr)` は維持した
+- `webrtc_c/api/peer_connection_interface.cc` の全 7 箇所の `new webrtc::RTCError(...)` を `std::make_unique<webrtc::RTCError>(...).release()` に修正した
+- `webrtc/src/whip.c` の `SetCodecPreferences` 呼び出し (2 箇所) を out パラメータ方式に変更した
+- `src/api/rtp.rs` の `set_codec_preferences` と `set_parameters` を out パラメータ方式に変更し、`.unwrap()` を `.expect("BUG: error is null")` に修正した
+- `webrtc/RULES.md` の「細かい部分」に out パラメータ統一の例外を追記した
+- `CHANGES.md` の `## develop` に `[CHANGE]` エントリ、`### misc` に `[FIX]` エントリを追加した
+- `rtp_transceiver_interface.cc` に `#include <memory>` と `#include <assert.h>` を追加し、`rtp_sender_interface.cc` に `#include <memory>` を追加した
+- `rtp_transceiver_interface.h` に `#include "rtc_error.h"` を追加した
+- `source-build` ビルドと `cargo test --lib` 全 101 テストが通過することを確認した

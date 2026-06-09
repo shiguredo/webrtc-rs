@@ -479,9 +479,9 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_CreateDataChannelOrError(
     *out_rtc_error = nullptr;
   } else {
     *out_data_channel = nullptr;
-    auto rtc_error = new webrtc::RTCError(r.error());
+    auto error = std::make_unique<webrtc::RTCError>(r.error());
     *out_rtc_error =
-        reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error);
+        reinterpret_cast<struct webrtc_RTCError_unique*>(error.release());
   }
 }
 
@@ -502,9 +502,9 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTransceiver(
     *out_rtc_error = nullptr;
   } else {
     *out_transceiver = nullptr;
-    auto rtc_error = new webrtc::RTCError(r.error());
+    auto error = std::make_unique<webrtc::RTCError>(r.error());
     *out_rtc_error =
-        reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error);
+        reinterpret_cast<struct webrtc_RTCError_unique*>(error.release());
   }
 }
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTransceiverWithTrack(
@@ -527,9 +527,9 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTransceiverWithTrack(
     *out_rtc_error = nullptr;
   } else {
     *out_transceiver = nullptr;
-    auto rtc_error = new webrtc::RTCError(r.error());
+    auto error = std::make_unique<webrtc::RTCError>(r.error());
     *out_rtc_error =
-        reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error);
+        reinterpret_cast<struct webrtc_RTCError_unique*>(error.release());
   }
 }
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTrack(
@@ -553,9 +553,9 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTrack(
     *out_rtc_error = nullptr;
   } else {
     *out_sender = nullptr;
-    auto rtc_error = new webrtc::RTCError(r.error());
+    auto error = std::make_unique<webrtc::RTCError>(r.error());
     *out_rtc_error =
-        reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error);
+        reinterpret_cast<struct webrtc_RTCError_unique*>(error.release());
   }
 }
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_RemoveTrackOrError(
@@ -570,9 +570,9 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_RemoveTrackOrError(
   if (error.ok()) {
     *out_rtc_error = nullptr;
   } else {
-    auto rtc_error = new webrtc::RTCError(error);
+    auto rtc_error = std::make_unique<webrtc::RTCError>(error);
     *out_rtc_error =
-        reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error);
+        reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error.release());
   }
 }
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_CreateOffer(
@@ -666,9 +666,9 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_SetConfiguration(
   if (result.ok()) {
     *out_rtc_error = nullptr;
   } else {
-    auto rtc_error = new webrtc::RTCError(result);
+    auto error = std::make_unique<webrtc::RTCError>(result);
     *out_rtc_error =
-        reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error);
+        reinterpret_cast<struct webrtc_RTCError_unique*>(error.release());
   }
 }
 
@@ -1163,9 +1163,9 @@ webrtc_PeerConnectionFactoryInterface_CreatePeerConnectionOrError(
     *out_rtc_error = nullptr;
   } else {
     *out_pc = nullptr;
-    auto rtc_error = new webrtc::RTCError(result.error());
+    auto error = std::make_unique<webrtc::RTCError>(result.error());
     *out_rtc_error =
-        reinterpret_cast<struct webrtc_RTCError_unique*>(rtc_error);
+        reinterpret_cast<struct webrtc_RTCError_unique*>(error.release());
   }
 }
 WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateVideoTrack(
