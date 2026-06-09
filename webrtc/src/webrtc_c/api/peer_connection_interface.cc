@@ -468,6 +468,8 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_CreateDataChannelOrError(
     struct webrtc_DataChannelInterface_refcounted** out_data_channel,
     struct webrtc_RTCError_unique** out_rtc_error) {
   auto pc = reinterpret_cast<webrtc::PeerConnectionInterface*>(self);
+  assert(out_data_channel != nullptr);
+  assert(out_rtc_error != nullptr);
   auto label_str = std::string(label, label_len);
   auto dc_init = reinterpret_cast<webrtc::DataChannelInit*>(init);
   auto r = pc->CreateDataChannelOrError(label_str, dc_init);
@@ -492,6 +494,8 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTransceiver(
     struct webrtc_RtpTransceiverInterface_refcounted** out_transceiver,
     struct webrtc_RTCError_unique** out_rtc_error) {
   auto pc = reinterpret_cast<webrtc::PeerConnectionInterface*>(self);
+  assert(out_transceiver != nullptr);
+  assert(out_rtc_error != nullptr);
   auto r =
       pc->AddTransceiver(static_cast<webrtc::MediaType>(media_type),
                          *reinterpret_cast<webrtc::RtpTransceiverInit*>(init));
@@ -514,6 +518,8 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTransceiverWithTrack(
     struct webrtc_RtpTransceiverInterface_refcounted** out_transceiver,
     struct webrtc_RTCError_unique** out_rtc_error) {
   auto pc = reinterpret_cast<webrtc::PeerConnectionInterface*>(self);
+  assert(out_transceiver != nullptr);
+  assert(out_rtc_error != nullptr);
   auto media_track = reinterpret_cast<webrtc::VideoTrackInterface*>(
       webrtc_VideoTrackInterface_refcounted_get(track));
   webrtc::scoped_refptr<webrtc::MediaStreamTrackInterface> track_ref(
@@ -539,6 +545,8 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTrack(
     struct webrtc_RtpSenderInterface_refcounted** out_sender,
     struct webrtc_RTCError_unique** out_rtc_error) {
   auto pc = reinterpret_cast<webrtc::PeerConnectionInterface*>(self);
+  assert(out_sender != nullptr);
+  assert(out_rtc_error != nullptr);
   auto raw_track = webrtc_MediaStreamTrackInterface_refcounted_get(track);
   auto media_track =
       reinterpret_cast<webrtc::MediaStreamTrackInterface*>(raw_track);
@@ -563,6 +571,7 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_RemoveTrackOrError(
     struct webrtc_RtpSenderInterface_refcounted* sender,
     struct webrtc_RTCError_unique** out_rtc_error) {
   auto pc = reinterpret_cast<webrtc::PeerConnectionInterface*>(self);
+  assert(out_rtc_error != nullptr);
   auto raw_sender = webrtc_RtpSenderInterface_refcounted_get(sender);
   auto rtp_sender = reinterpret_cast<webrtc::RtpSenderInterface*>(raw_sender);
   webrtc::scoped_refptr<webrtc::RtpSenderInterface> sender_ref(rtp_sender);
@@ -659,6 +668,7 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_SetConfiguration(
     struct webrtc_PeerConnectionInterface_RTCConfiguration* config,
     struct webrtc_RTCError_unique** out_rtc_error) {
   auto pc = reinterpret_cast<webrtc::PeerConnectionInterface*>(self);
+  assert(out_rtc_error != nullptr);
   auto cfg =
       reinterpret_cast<webrtc::PeerConnectionInterface::RTCConfiguration*>(
           config);
@@ -1150,6 +1160,8 @@ webrtc_PeerConnectionFactoryInterface_CreatePeerConnectionOrError(
     struct webrtc_RTCError_unique** out_rtc_error) {
   auto factory =
       reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
+  assert(out_pc != nullptr);
+  assert(out_rtc_error != nullptr);
   auto config =
       reinterpret_cast<webrtc::PeerConnectionInterface::RTCConfiguration*>(
           rtc_config);
@@ -1176,6 +1188,7 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateVideoTrack(
     struct webrtc_VideoTrackInterface_refcounted** out_track) {
   auto factory =
       reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
+  assert(out_track != nullptr);
   auto track_source = reinterpret_cast<webrtc::VideoTrackSourceInterface*>(
       webrtc_VideoTrackSourceInterface_refcounted_get(source));
   webrtc::scoped_refptr<webrtc::VideoTrackSourceInterface> track_source_ref(
@@ -1197,6 +1210,7 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream(
     struct webrtc_MediaStreamInterface_refcounted** out_stream) {
   auto factory =
       reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
+  assert(out_stream != nullptr);
   auto stream_id_str = std::string(stream_id, stream_id_len);
   auto stream = factory->CreateLocalMediaStream(stream_id_str);
   if (stream) {
@@ -1276,6 +1290,7 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateAudioSource(
     struct webrtc_AudioSourceInterface_refcounted** out_source) {
   auto factory =
       reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
+  assert(out_source != nullptr);
   webrtc::AudioOptions options;
   auto source = factory->CreateAudioSource(options);
   if (source) {
@@ -1295,6 +1310,7 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateAudioTrack(
     struct webrtc_AudioTrackInterface_refcounted** out_track) {
   auto factory =
       reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
+  assert(out_track != nullptr);
   auto audio_source = reinterpret_cast<webrtc::AudioSourceInterface*>(
       webrtc_AudioSourceInterface_refcounted_get(source));
   webrtc::scoped_refptr<webrtc::AudioSourceInterface> source_ref(audio_source);

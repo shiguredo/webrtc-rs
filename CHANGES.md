@@ -51,6 +51,9 @@
   - Cbs 構造体: 関数ポインタを null 非許容とし、ディスパッチ時の null チェックを削除し無条件呼び出しに統一
   - @melpon
 
+- [UPDATE] peer_connection_interface.cc の out パラメータデリファレンス前に assert を追加する
+  - @melpon
+
 ## 0.149.0
 
 **リリース日**: 2026-06-04
