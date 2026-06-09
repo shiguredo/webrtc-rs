@@ -1,5 +1,7 @@
 #include "dtls_transport_interface.h"
 
+#include <assert.h>
+
 // WebRTC
 #include <api/dtls_transport_interface.h>
 
@@ -24,9 +26,7 @@ WEBRTC_EXPORT extern const int webrtc_DtlsTransportState_kFailed =
 
 WEBRTC_EXPORT webrtc_DtlsTransportState webrtc_DtlsTransportInterface_state(
     struct webrtc_DtlsTransportInterface* self) {
-  if (self == nullptr) {
-    return webrtc_DtlsTransportState_kClosed;
-  }
+  assert(self != nullptr);
   auto transport = reinterpret_cast<webrtc::DtlsTransportInterface*>(self);
   return static_cast<webrtc_DtlsTransportState>(
       transport->Information().state());
@@ -43,29 +43,21 @@ class DtlsTransportObserverImpl
   DtlsTransportObserverImpl(const struct webrtc_DtlsTransportObserver_cbs* cbs,
                             void* user_data)
       : user_data_(user_data) {
-    if (cbs != nullptr) {
-      cbs_ = *cbs;
-    }
+    assert(cbs != nullptr);
+    assert(cbs->OnStateChange != nullptr);
+    assert(cbs->OnError != nullptr);
+    assert(cbs->OnDestroy != nullptr);
+    cbs_ = *cbs;
   }
 
-  ~DtlsTransportObserverImpl() override {
-    if (cbs_.OnDestroy != nullptr) {
-      cbs_.OnDestroy(user_data_);
-    }
-  }
+  ~DtlsTransportObserverImpl() override { cbs_.OnDestroy(user_data_); }
 
   void OnStateChange(webrtc::DtlsTransportInformation info) override {
-    if (cbs_.OnStateChange != nullptr) {
-      cbs_.OnStateChange(static_cast<webrtc_DtlsTransportState>(info.state()),
-                         user_data_);
-    }
+    cbs_.OnStateChange(static_cast<webrtc_DtlsTransportState>(info.state()),
+                       user_data_);
   }
 
-  void OnError(webrtc::RTCError error) override {
-    if (cbs_.OnError != nullptr) {
-      cbs_.OnError(user_data_);
-    }
-  }
+  void OnError(webrtc::RTCError error) override { cbs_.OnError(user_data_); }
 
  private:
   webrtc_DtlsTransportObserver_cbs cbs_{};

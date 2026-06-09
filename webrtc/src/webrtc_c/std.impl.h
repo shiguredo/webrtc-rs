@@ -10,11 +10,11 @@ template <typename T>
 inline void OptionalGet(const std::optional<T>& src,
                         int* out_has,
                         T* out_value) {
+  assert(out_has != nullptr);
+  assert(out_value != nullptr);
   const bool has = src.has_value();
-  if (out_has != nullptr) {
-    *out_has = has ? 1 : 0;
-  }
-  if (out_value != nullptr && has) {
+  *out_has = has ? 1 : 0;
+  if (has) {
     *out_value = *src;
   }
 }
@@ -26,9 +26,6 @@ inline void OptionalSet(std::optional<T>& dst, int has, const T* value) {
     return;
   }
   assert(value != nullptr);
-  if (value == nullptr) {
-    return;
-  }
   dst = *value;
 }
 
@@ -37,11 +34,11 @@ inline void OptionalGetAs(const std::optional<SrcT>& src,
                           int* out_has,
                           DstT* out_value,
                           Builder&& build_value) {
+  assert(out_has != nullptr);
+  assert(out_value != nullptr);
   const bool has = src.has_value();
-  if (out_has != nullptr) {
-    *out_has = has ? 1 : 0;
-  }
-  if (out_value != nullptr && has) {
+  *out_has = has ? 1 : 0;
+  if (has) {
     *out_value = build_value();
   }
 }
@@ -56,9 +53,6 @@ inline void OptionalSetAs(std::optional<DstT>& dst,
     return;
   }
   assert(value != nullptr);
-  if (value == nullptr) {
-    return;
-  }
   dst = build_value();
 }
 

@@ -290,6 +290,8 @@ WEBRTC_EXPORT int webrtc_AudioDeviceModule_GetStats(
 // AudioDeviceModule (Callbacks)
 // -------------------------
 
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_AudioDeviceModule_cbs {
   int32_t (*ActiveAudioLayer)(int* audio_layer, void* user_data);
   int32_t (*RegisterAudioCallback)(

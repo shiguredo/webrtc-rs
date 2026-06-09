@@ -11,7 +11,44 @@
 
 ## develop
 
+## 0.150.0
+
+**リリース日**: 2026-06-09
+
+- [CHANGE] std_string_size の戻り値型を int から size_t に変更する
+  - 2 GiB を超える文字列で値が破綻する問題の根本解決
+  - Rust ラッパー側の len() も usize をそのまま返すように追従
+  - @melpon
+- [CHANGE] random_string の引数型を i32 から usize に変更する
+  - webrtc_CreateRandomString の C API 引数型 (size_t) と一致させる
+  - @melpon
+- [CHANGE] WEBRTC_DEFINE_VECTOR 系マクロの _new /_resize のサイズ引数型を int から size_t に変更する
+  - 負値による符号拡張で C++ 例外が C 境界を越える問題を型レベルで防止する
+  - Rust ラッパー側の new 引数も i32 → usize に変更する
+  - @melpon
+- [UPDATE] libwebrtc m150 (m150.7871.0.0) に上げる
+  - EncodedImageCallback に追加された純粋仮想メソッド OnFrameDropped に追従する
+  - @voluntas
+
 ### misc
+
+- [CHANGE] webrtc_c の C API における null チェック方針を統一する
+  - C → C++ 方向: null はそのまま渡し、防御的 null チェックを削除。デリファレンス直前に assert を追加
+  - C++ → C 方向: null を正しく伝えるための null チェックは維持
+  - Cbs 構造体: 関数ポインタを null 非許容とし、ディスパッチ時の null チェックを削除し無条件呼び出しに統一
+  - @melpon
+- [UPDATE] objc_NSString_release の冗長な null チェックを削除する
+  - CFBridgingRelease は null 安全であり、objc_NSError_release と実装パターンを揃える
+  - @melpon
+- [FIX] peer_connection_interface.cc の _refcounted 直接キャストを_refcounted_get() 経由にする
+  - @melpon
+
+## 0.149.0
+
+**リリース日**: 2026-06-04
+
+- [UPDATE] libwebrtc m149 (m149.7827.5.0) に上げる
+  - @voluntas
 
 ## 0.148.1
 

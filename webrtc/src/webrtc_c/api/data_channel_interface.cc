@@ -1,5 +1,6 @@
 #include "data_channel_interface.h"
 
+#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -23,28 +24,20 @@ class DataChannelObserverImpl : public webrtc::DataChannelObserver {
   DataChannelObserverImpl(const struct webrtc_DataChannelObserver_cbs* cbs,
                           void* user_data)
       : user_data_(user_data) {
-    if (cbs != nullptr) {
-      cbs_ = *cbs;
-    }
+    assert(cbs != nullptr);
+    assert(cbs->OnStateChange != nullptr);
+    assert(cbs->OnMessage != nullptr);
+    assert(cbs->OnDestroy != nullptr);
+    cbs_ = *cbs;
   }
 
-  ~DataChannelObserverImpl() override {
-    if (cbs_.OnDestroy != nullptr) {
-      cbs_.OnDestroy(user_data_);
-    }
-  }
+  ~DataChannelObserverImpl() override { cbs_.OnDestroy(user_data_); }
 
-  void OnStateChange() override {
-    if (cbs_.OnStateChange != nullptr) {
-      cbs_.OnStateChange(user_data_);
-    }
-  }
+  void OnStateChange() override { cbs_.OnStateChange(user_data_); }
 
   void OnMessage(const webrtc::DataBuffer& buffer) override {
-    if (cbs_.OnMessage != nullptr) {
-      cbs_.OnMessage(buffer.data.data<uint8_t>(), buffer.data.size(),
-                     buffer.binary ? 1 : 0, user_data_);
-    }
+    cbs_.OnMessage(buffer.data.data<uint8_t>(), buffer.data.size(),
+                   buffer.binary ? 1 : 0, user_data_);
   }
 
  private:

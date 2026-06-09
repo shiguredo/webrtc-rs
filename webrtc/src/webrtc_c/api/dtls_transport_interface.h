@@ -27,6 +27,8 @@ webrtc_DtlsTransportInterface_state(struct webrtc_DtlsTransportInterface* self);
 // -------------------------
 
 struct webrtc_DtlsTransportObserver;
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_DtlsTransportObserver_cbs {
   void (*OnStateChange)(webrtc_DtlsTransportState new_state, void* user_data);
   void (*OnError)(void* user_data);

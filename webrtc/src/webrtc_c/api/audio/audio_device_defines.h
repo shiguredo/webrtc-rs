@@ -32,6 +32,8 @@ WEBRTC_EXPORT size_t webrtc_AudioParameters_get_frames_per_buffer(
 
 struct webrtc_AudioTransport;
 
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_AudioTransport_cbs {
   int32_t (*RecordedDataIsAvailable)(const void* audio_samples,
                                      size_t n_samples,

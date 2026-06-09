@@ -11,7 +11,8 @@ extern "C" {
 // webrtc::CreateRandomString
 // -------------------------
 
-WEBRTC_EXPORT struct std_string_unique* webrtc_CreateRandomString(int length);
+WEBRTC_EXPORT struct std_string_unique* webrtc_CreateRandomString(
+    size_t length);
 
 #if defined(__cplusplus)
 }

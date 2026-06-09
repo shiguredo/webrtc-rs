@@ -1,6 +1,7 @@
 #include "sdp_video_format.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <map>
 #include <memory>
@@ -103,7 +104,8 @@ WEBRTC_EXPORT struct std_string_unique* webrtc_ScalabilityModeToString(
 WEBRTC_EXPORT struct webrtc_SdpVideoFormat_unique* webrtc_SdpVideoFormat_new(
     const char* name,
     size_t name_len) {
-  std::string n = name != nullptr ? std::string(name, name_len) : std::string();
+  assert(name != nullptr);
+  std::string n(name, name_len);
   auto fmt = std::make_unique<webrtc::SdpVideoFormat>(n);
   return reinterpret_cast<struct webrtc_SdpVideoFormat_unique*>(fmt.release());
 }
@@ -115,7 +117,8 @@ webrtc_SdpVideoFormat_new_with_parameters(
     struct std_map_string_string* parameters,
     const int* scalability_modes,
     size_t scalability_modes_len) {
-  std::string n = name != nullptr ? std::string(name, name_len) : std::string();
+  assert(name != nullptr);
+  std::string n(name, name_len);
   std::map<std::string, std::string> params;
   if (parameters != nullptr) {
     auto parameter_map =

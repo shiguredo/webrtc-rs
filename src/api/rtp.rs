@@ -341,7 +341,7 @@ pub struct RtpCodecCapabilityVector {
 unsafe impl Send for RtpCodecCapabilityVector {}
 
 impl RtpCodecCapabilityVector {
-    pub fn new(size: i32) -> Self {
+    pub fn new(size: usize) -> Self {
         let raw = NonNull::new(unsafe { ffi::webrtc_RtpCodecCapability_vector_new(size) })
             .expect("BUG: webrtc_RtpCodecCapability_vector_new が null を返しました");
         Self { raw }
@@ -429,7 +429,6 @@ impl<'a> RtpCodecCapabilityVectorRef<'a> {
     }
 
     pub fn resize(&mut self, len: usize) {
-        let len = i32::try_from(len).unwrap_or(i32::MAX);
         unsafe { ffi::webrtc_RtpCodecCapability_vector_resize(self.raw.as_ptr(), len) };
     }
 
@@ -1021,7 +1020,7 @@ pub struct RtpEncodingParametersVector {
 unsafe impl Send for RtpEncodingParametersVector {}
 
 impl RtpEncodingParametersVector {
-    pub fn new(size: i32) -> Self {
+    pub fn new(size: usize) -> Self {
         let raw = NonNull::new(unsafe { ffi::webrtc_RtpEncodingParameters_vector_new(size) })
             .expect("BUG: webrtc_RtpEncodingParameters_vector_new が null を返しました");
         Self { raw }
@@ -1055,7 +1054,6 @@ impl RtpEncodingParametersVector {
     }
 
     pub fn resize(&mut self, len: usize) {
-        let len = i32::try_from(len).unwrap_or(i32::MAX);
         unsafe { ffi::webrtc_RtpEncodingParameters_vector_resize(self.raw.as_ptr(), len) };
     }
 

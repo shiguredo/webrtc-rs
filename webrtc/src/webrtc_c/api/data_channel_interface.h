@@ -43,6 +43,8 @@ WEBRTC_EXPORT void webrtc_DataChannelInterface_Close(
 
 struct webrtc_DataChannelObserver;
 
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_DataChannelObserver_cbs {
   void (*OnStateChange)(void* user_data);
   void (*OnMessage)(const uint8_t* data,

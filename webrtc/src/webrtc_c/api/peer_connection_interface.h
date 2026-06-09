@@ -288,13 +288,9 @@ webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_use_obsolete_sctp_sdp(
 // webrtc::PeerConnectionObserver
 // -------------------------
 
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_PeerConnectionObserver_cbs {
-  // void OnSignalingChange(
-  //     webrtc::PeerConnectionInterface::SignalingState new_state) override {
-  //   RTC_LOG(LS_INFO) << "OnSignalingChange: new_state="
-  //                    << webrtc::PeerConnectionInterface::AsString(new_state);
-  // }
-  // void OnDataChannel(webrtc::scoped_refptr<webrtc::DataChannelInterface> data_channel) override {}
   void (*OnStandardizedIceConnectionChange)(
       webrtc_PeerConnectionInterface_IceConnectionState new_state,
       void* user_data);
@@ -323,10 +319,6 @@ struct webrtc_PeerConnectionObserver_cbs {
   void (*OnIceGatheringChange)(
       webrtc_PeerConnectionInterface_IceGatheringState new_state,
       void* user_data);
-  // void OnIceCandidate(const webrtc::IceCandidate* candidate) override {}
-  // void OnIceCandidateError(const std::string& address, int port, const std::string& url, int error_code, const std::string& error_text) override {}
-  // void OnTrack(webrtc::scoped_refptr<webrtc::RtpTransceiverInterface> transceiver) override {}
-  // void OnRemoveTrack(webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) override {}
 };
 WEBRTC_EXPORT struct webrtc_PeerConnectionObserver*
 webrtc_PeerConnectionObserver_new(

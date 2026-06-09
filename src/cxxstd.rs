@@ -111,8 +111,7 @@ impl<'a> CxxStringRef<'a> {
 
     /// 長さを取得する。
     pub fn len(&self) -> usize {
-        let len = unsafe { ffi::std_string_size(self.as_ptr()) };
-        len.max(0) as usize
+        unsafe { ffi::std_string_size(self.as_ptr()) }
     }
 
     /// 空かどうかを返す。
@@ -161,7 +160,7 @@ unsafe impl Send for StringVector {}
 
 impl StringVector {
     /// size 要素で初期化したベクタを生成する。
-    pub fn new(size: i32) -> Self {
+    pub fn new(size: usize) -> Self {
         let raw = unsafe { ffi::std_string_vector_new(size) };
         Self {
             raw: NonNull::new(raw).expect("BUG: std_string_vector_new が null を返しました"),
