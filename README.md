@@ -379,7 +379,7 @@ impl FactoryHolder {
   - イベントログ
 - `TimestampAligner`
   - タイムスタンプ調整
-- `abgr_to_i420` / `convert_from_i420` / `i420_to_nv12` / `nv12_to_i420` / `yuy2_to_i420`
+- `abgr_to_i420` / `convert_from_i420` / `convert_to_i420` / `i420_copy` / `i420_to_nv12` / `mjpg_size` / `mjpg_to_i420` / `mjpg_to_nv12` / `nv12_copy` / `nv12_to_i420` / `yuy2_to_i420`
   - カラーフォーマット変換 (libyuv)
 - `LibyuvFourcc`
   - `convert_from_i420` 用の出力フォーマット指定
