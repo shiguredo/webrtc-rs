@@ -11,6 +11,10 @@
 
 ## develop
 
+- [ADD] libyuv の `mjpg_to_i420` / `mjpg_to_nv12` / `mjpg_size` / `convert_to_i420` API を追加する
+  - C API `libyuv_MJPGToI420` / `libyuv_MJPGToNV12` / `libyuv_MJPGSize` / `libyuv_ConvertToI420` と FourCC `libyuv_FOURCC_MJPG` を追加し、Rust API から MJPEG 変換・サイズ取得・汎用変換を利用できるようにする
+  - `LibyuvFourcc` に `Mjpg` バリアントを追加する
+  - @melpon
 - [CHANGE] webrtc_c のエラー伝達方法を out パラメータ方式に統一する
   - webrtc_RtpTransceiverInterface_SetCodecPreferences と webrtc_RtpSenderInterface_SetParameters の戻り値型を webrtc_RTCError_unique* から void に変更し、out_rtc_error 引数を追加する
   - @melpon
