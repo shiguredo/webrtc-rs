@@ -1029,8 +1029,8 @@ fn ensure_windows_libclang(out_dir: &Path) {
     }
 
     let installation_path = find_visual_studio_installation(&vswhere_path).expect(
-        "Visual Studio 2022 の検出に失敗しました。\
-         Visual Studio 2022 に `Desktop development with C++` と \
+        "Visual Studio 2022 または 2026 の検出に失敗しました。\
+         Visual Studio 2022 または 2026 に `Desktop development with C++` と \
          `C++ Clang tools for Windows (Microsoft.VisualStudio.Component.VC.Llvm.Clang)` \
          をインストールしてください。",
     );
@@ -1044,7 +1044,7 @@ fn ensure_windows_libclang(out_dir: &Path) {
     if !libclang_dll.exists() {
         panic!(
             "Visual Studio の LLVM コンポーネントが見つかりません: {}\n\
-             Visual Studio 2022 に `C++ Clang tools for Windows \
+             Visual Studio 2022 または 2026 に `C++ Clang tools for Windows \
              (Microsoft.VisualStudio.Component.VC.Llvm.Clang)` をインストールしてください。",
             libclang_dll.display()
         );
@@ -1074,7 +1074,7 @@ fn find_visual_studio_installation(vswhere_path: &Path) -> Result<String, String
             "-products",
             "*",
             "-version",
-            "[17.0,18.0)",
+            "[17.0,19.0)",
             "-requires",
             "Microsoft.VisualStudio.Component.VC.Llvm.Clang",
             "-property",
@@ -1094,7 +1094,7 @@ fn find_visual_studio_installation(vswhere_path: &Path) -> Result<String, String
         .map(str::trim)
         .find(|line| !line.is_empty())
         .map(ToOwned::to_owned)
-        .ok_or_else(|| "Visual Studio 2022 のインストールが見つかりません".to_string())
+        .ok_or_else(|| "Visual Studio 2022 または 2026 のインストールが見つかりません".to_string())
 }
 
 /// `local-export` 有効時に `webrtc/_build` への参照リンクを整備する。

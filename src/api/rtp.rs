@@ -1415,14 +1415,16 @@ impl RtpTransceiver {
     }
 
     pub fn set_codec_preferences(&mut self, codecs: &RtpCodecCapabilityVector) -> Result<()> {
-        let err = unsafe {
+        let mut err: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
+        unsafe {
             ffi::webrtc_RtpTransceiverInterface_SetCodecPreferences(
                 self.raw_ref.as_ptr(),
                 codecs.as_ptr(),
+                &mut err,
             )
         };
         if !err.is_null() {
-            let rtc = RtcError::from_unique_ptr(NonNull::new(err).unwrap());
+            let rtc = RtcError::from_unique_ptr(NonNull::new(err).expect("BUG: error is null"));
             return Err(Error::RtcError(rtc));
         }
         Ok(())
@@ -1488,11 +1490,16 @@ impl RtpSender {
     }
 
     pub fn set_parameters(&mut self, parameters: &RtpParameters) -> Result<()> {
-        let err = unsafe {
-            ffi::webrtc_RtpSenderInterface_SetParameters(self.as_ptr(), parameters.as_ptr())
+        let mut err: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
+        unsafe {
+            ffi::webrtc_RtpSenderInterface_SetParameters(
+                self.as_ptr(),
+                parameters.as_ptr(),
+                &mut err,
+            )
         };
         if !err.is_null() {
-            let rtc = RtcError::from_unique_ptr(NonNull::new(err).unwrap());
+            let rtc = RtcError::from_unique_ptr(NonNull::new(err).expect("BUG: error is null"));
             return Err(Error::RtcError(rtc));
         }
         Ok(())

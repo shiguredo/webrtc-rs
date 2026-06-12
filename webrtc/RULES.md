@@ -54,6 +54,7 @@
 - `webrtc::RTCErrorOr<T>` のような、複数の値を持つ型を返す関数を移植する場合、それぞれの値を受け取るための引数を追加する。
   - `webrtc::RTCErrorOr<webrtc::scoped_refptr<CppType>>` の場合は `struct webrtc_RTCError*` と `struct CppType_refcounted*` を追加してそこに結果を出力する
 - `std::string` を返す関数を移植する場合は `struct std_string_unique*` にして、利用後は C アプリケーション側で `std_string_unique_delete` を呼んで解放する
+- `*_unique` でない C 関数の移植で C++ 側が戻り値を返す場合、C-API 全体の一貫性を優先して out パラメータ方式で統一することがある
 
 ## ビルドと実行
 

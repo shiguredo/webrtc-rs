@@ -4,6 +4,7 @@ use crate::ffi;
 pub enum LibyuvFourcc {
     Argb,
     Bgra,
+    Mjpg,
 }
 
 impl LibyuvFourcc {
@@ -11,6 +12,26 @@ impl LibyuvFourcc {
         match self {
             LibyuvFourcc::Argb => unsafe { ffi::libyuv_FOURCC_ARGB },
             LibyuvFourcc::Bgra => unsafe { ffi::libyuv_FOURCC_BGRA },
+            LibyuvFourcc::Mjpg => unsafe { ffi::libyuv_FOURCC_MJPG },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LibyuvRotationMode {
+    Rotate0,
+    Rotate90,
+    Rotate180,
+    Rotate270,
+}
+
+impl LibyuvRotationMode {
+    fn as_raw(self) -> i32 {
+        match self {
+            LibyuvRotationMode::Rotate0 => unsafe { ffi::libyuv_kRotate0 },
+            LibyuvRotationMode::Rotate90 => unsafe { ffi::libyuv_kRotate90 },
+            LibyuvRotationMode::Rotate180 => unsafe { ffi::libyuv_kRotate180 },
+            LibyuvRotationMode::Rotate270 => unsafe { ffi::libyuv_kRotate270 },
         }
     }
 }
@@ -376,6 +397,179 @@ pub fn yuy2_to_i420(
             dst_stride_v,
             width,
             height,
+        ) == 0
+    }
+}
+
+/// MJPEG バイト列を I420 へ変換する。
+///
+/// - `sample`: MJPG (baseline JPEG) のバイト列。
+/// - `src_width` / `src_height`: 入力 MJPG にエンコードされている元解像度。
+///   JPEG ヘッダの値と一致しない場合、libyuv 内部で失敗扱いとなり `false` を返す。
+/// - `dst_width` / `dst_height`: 出力 I420 の解像度。
+///   libyuv は `dst_width == src_width` 必須かつ `dst_height <= src_height` のみ
+///   受け付ける (vertical crop のみ可、水平リサイズ・スケーリング不可)。
+///
+/// 変換に成功した場合 (libyuv が `0` を返した場合) のみ `true` を返す。
+/// それ以外 (libyuv が `-1` または `1` を返した場合、事前検証に失敗した場合) は `false`。
+/// iOS など MJPEG サポートを含まないビルドでは常に `false` を返す。
+#[allow(clippy::too_many_arguments)]
+pub fn mjpg_to_i420(
+    sample: &[u8],
+    dst_y: &mut [u8],
+    dst_stride_y: i32,
+    dst_u: &mut [u8],
+    dst_stride_u: i32,
+    dst_v: &mut [u8],
+    dst_stride_v: i32,
+    src_width: i32,
+    src_height: i32,
+    dst_width: i32,
+    dst_height: i32,
+) -> bool {
+    let Some((chroma_width, chroma_height)) = i420_chroma_size(dst_width, dst_height) else {
+        return false;
+    };
+
+    if !has_required_len(dst_y.len(), dst_stride_y, dst_height, dst_width)
+        || !has_required_len(dst_u.len(), dst_stride_u, chroma_height, chroma_width)
+        || !has_required_len(dst_v.len(), dst_stride_v, chroma_height, chroma_width)
+    {
+        return false;
+    }
+
+    unsafe {
+        ffi::libyuv_MJPGToI420(
+            sample.as_ptr(),
+            sample.len(),
+            dst_y.as_mut_ptr(),
+            dst_stride_y,
+            dst_u.as_mut_ptr(),
+            dst_stride_u,
+            dst_v.as_mut_ptr(),
+            dst_stride_v,
+            src_width,
+            src_height,
+            dst_width,
+            dst_height,
+        ) == 0
+    }
+}
+
+/// MJPEG バイト列を NV12 へ変換する。
+///
+/// 出力形式以外の、入力、制約、戻り値の仕様は `mjpg_to_i420` と同じ。
+#[allow(clippy::too_many_arguments)]
+pub fn mjpg_to_nv12(
+    sample: &[u8],
+    dst_y: &mut [u8],
+    dst_stride_y: i32,
+    dst_uv: &mut [u8],
+    dst_stride_uv: i32,
+    src_width: i32,
+    src_height: i32,
+    dst_width: i32,
+    dst_height: i32,
+) -> bool {
+    let Some((chroma_width, chroma_height)) = i420_chroma_size(dst_width, dst_height) else {
+        return false;
+    };
+    let Some(dst_uv_row_bytes) = chroma_width.checked_mul(2) else {
+        return false;
+    };
+
+    if !has_required_len(dst_y.len(), dst_stride_y, dst_height, dst_width)
+        || !has_required_len(dst_uv.len(), dst_stride_uv, chroma_height, dst_uv_row_bytes)
+    {
+        return false;
+    }
+
+    unsafe {
+        ffi::libyuv_MJPGToNV12(
+            sample.as_ptr(),
+            sample.len(),
+            dst_y.as_mut_ptr(),
+            dst_stride_y,
+            dst_uv.as_mut_ptr(),
+            dst_stride_uv,
+            src_width,
+            src_height,
+            dst_width,
+            dst_height,
+        ) == 0
+    }
+}
+
+/// MJPEG バイト列から画像の幅と高さを取得する。
+///
+/// 成功した場合は `Some((width, height))` を返す。
+/// iOS など MJPEG サポートを含まないビルドでは常に `None` を返す。
+pub fn mjpg_size(sample: &[u8]) -> Option<(i32, i32)> {
+    let mut width: i32 = 0;
+    let mut height: i32 = 0;
+    unsafe {
+        if ffi::libyuv_MJPGSize(sample.as_ptr(), sample.len(), &mut width, &mut height) == 0 {
+            Some((width, height))
+        } else {
+            None
+        }
+    }
+}
+
+/// 任意のフォーマットから I420 へ変換する。
+///
+/// `fourcc` で入力フォーマットを指定する。
+/// MJPEG 入力の場合、src_width/src_height が JPEG ヘッダの値と一致する必要がある。
+/// iOS など MJPEG サポートを含まないビルドでは MJPG fourcc 指定時の変換は常に失敗する
+///
+/// 変換に成功した場合 (libyuv が `0` を返した場合) のみ `true` を返す。
+#[allow(clippy::too_many_arguments)]
+pub fn convert_to_i420(
+    src_frame: &[u8],
+    dst_y: &mut [u8],
+    dst_stride_y: i32,
+    dst_u: &mut [u8],
+    dst_stride_u: i32,
+    dst_v: &mut [u8],
+    dst_stride_v: i32,
+    crop_x: i32,
+    crop_y: i32,
+    src_width: i32,
+    src_height: i32,
+    crop_width: i32,
+    crop_height: i32,
+    rotation: LibyuvRotationMode,
+    fourcc: LibyuvFourcc,
+) -> bool {
+    let Some((chroma_width, chroma_height)) = i420_chroma_size(crop_width, crop_height) else {
+        return false;
+    };
+
+    if !has_required_len(dst_y.len(), dst_stride_y, crop_height, crop_width)
+        || !has_required_len(dst_u.len(), dst_stride_u, chroma_height, chroma_width)
+        || !has_required_len(dst_v.len(), dst_stride_v, chroma_height, chroma_width)
+    {
+        return false;
+    }
+
+    unsafe {
+        ffi::libyuv_ConvertToI420(
+            src_frame.as_ptr(),
+            src_frame.len(),
+            dst_y.as_mut_ptr(),
+            dst_stride_y,
+            dst_u.as_mut_ptr(),
+            dst_stride_u,
+            dst_v.as_mut_ptr(),
+            dst_stride_v,
+            crop_x,
+            crop_y,
+            src_width,
+            src_height,
+            crop_width,
+            crop_height,
+            rotation.as_raw(),
+            fourcc.as_raw(),
         ) == 0
     }
 }

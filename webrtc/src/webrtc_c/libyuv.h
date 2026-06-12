@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "common.h"
@@ -14,6 +15,12 @@ extern "C" {
 
 WEBRTC_EXPORT extern const uint32_t libyuv_FOURCC_ARGB;
 WEBRTC_EXPORT extern const uint32_t libyuv_FOURCC_BGRA;
+WEBRTC_EXPORT extern const uint32_t libyuv_FOURCC_MJPG;
+
+WEBRTC_EXPORT extern const int libyuv_kRotate0;
+WEBRTC_EXPORT extern const int libyuv_kRotate90;
+WEBRTC_EXPORT extern const int libyuv_kRotate180;
+WEBRTC_EXPORT extern const int libyuv_kRotate270;
 
 WEBRTC_EXPORT int libyuv_ABGRToI420(const uint8_t* src_abgr,
                                     int src_stride_abgr,
@@ -115,6 +122,52 @@ WEBRTC_EXPORT int libyuv_I420Rotate(const uint8_t* src_y,
                                     int width,
                                     int height,
                                     int mode);
+
+WEBRTC_EXPORT int libyuv_MJPGToI420(const uint8_t* sample,
+                                    size_t sample_size,
+                                    uint8_t* dst_y,
+                                    int dst_stride_y,
+                                    uint8_t* dst_u,
+                                    int dst_stride_u,
+                                    uint8_t* dst_v,
+                                    int dst_stride_v,
+                                    int src_width,
+                                    int src_height,
+                                    int dst_width,
+                                    int dst_height);
+
+WEBRTC_EXPORT int libyuv_MJPGToNV12(const uint8_t* sample,
+                                    size_t sample_size,
+                                    uint8_t* dst_y,
+                                    int dst_stride_y,
+                                    uint8_t* dst_uv,
+                                    int dst_stride_uv,
+                                    int src_width,
+                                    int src_height,
+                                    int dst_width,
+                                    int dst_height);
+
+WEBRTC_EXPORT int libyuv_MJPGSize(const uint8_t* sample,
+                                  size_t sample_size,
+                                  int* width,
+                                  int* height);
+
+WEBRTC_EXPORT int libyuv_ConvertToI420(const uint8_t* src_frame,
+                                       size_t src_size,
+                                       uint8_t* dst_y,
+                                       int dst_stride_y,
+                                       uint8_t* dst_u,
+                                       int dst_stride_u,
+                                       uint8_t* dst_v,
+                                       int dst_stride_v,
+                                       int crop_x,
+                                       int crop_y,
+                                       int src_width,
+                                       int src_height,
+                                       int crop_width,
+                                       int crop_height,
+                                       int rotation,
+                                       uint32_t fourcc);
 
 #if defined(__cplusplus)
 }
