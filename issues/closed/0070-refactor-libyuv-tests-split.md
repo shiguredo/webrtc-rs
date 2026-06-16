@@ -2,7 +2,7 @@
 
 - Priority: Low
 - Created: 2026-06-10
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-06-16
 - Model: Opus 4.7
 - Branch: feature/refactor-libyuv-tests-split
 - Polished: {YYYY-MM-DD}
@@ -50,47 +50,23 @@
 
 ### 1. tests/test_libyuv.rs の新規作成
 
-`tests/` ディレクトリを新規作成し、`tests/test_libyuv.rs` を以下の構造で作成する。
+- `tests/` ディレクトリを新規作成
+- `src/tests.rs` の全 libyuv 関連テスト (行 1272-2657, 定数 2 個・テスト 31 件) を `tests/test_libyuv.rs` に抽出
+- `use shiguredo_webrtc::{...}` で必要な public API を明示的にインポート:
+  - `LibyuvFourcc`, `LibyuvRotationMode`, `abgr_to_i420`, `convert_from_i420`, `convert_to_i420`, `i420_copy`, `i420_rotate`, `i420_to_nv12`, `mjpg_size`, `mjpg_to_i420`, `mjpg_to_nv12`, `nv12_copy`, `nv12_to_i420`
+  - `I420Buffer`, `NV12Buffer`
+- internal item への依存は無し。全テストが public API のみで動作することを確認
 
-```rust
-// 既存 src/tests.rs から libyuv 関連テストをすべて移植する。
-// public API のみを利用する。
+### 2. src/tests.rs からの削除
 
-use shiguredo_webrtc::{
-    LibyuvFourcc, abgr_to_i420, convert_from_i420, i420_copy, i420_to_nv12, nv12_copy,
-    nv12_to_i420, yuy2_to_i420,
-    I420Buffer, NV12Buffer, // i420_buffer_planes_mut_to_nv12_round_trip で利用
-};
+- 行 1272-2658 を削除 (4637 行 → 3250 行)
 
-#[test]
-fn abgr_to_i420_conversion() {
-    // 既存 src/tests.rs:1273-1299 の内容をそのまま移植
-    // ...
-}
+### 3. ビルド・テスト確認
 
-// 他テスト関数も同様に移植
-```
+- `cargo test --features source-build --workspace`: 全 122 テスト通過 (src/tests.rs: 91 + tests/test_libyuv.rs: 31)
+- `cargo test --test test_libyuv --features source-build`: 31 テスト個別実行可能
+- `Cargo.toml` の `[[test]]` セクション追加不要 (Cargo が `tests/*.rs` を自動検出)
 
-実装時の手順:
+### 4. 変更履歴
 
-1. `src/tests.rs:1273-1775` を切り取って `tests/test_libyuv.rs` に貼り付ける
-2. `use super::*;` を `use shiguredo_webrtc::{...}` に書き換える (public API として再エクスポートされている identifier のみインポート)
-3. internal item に依存しているテストがあれば、(a) 対象 item を public 化する、(b) 該当テストだけ `src/tests.rs` に残す、のいずれかを個別判断する
-4. `src/tests.rs` 側の対応行を削除する
-
-### 2. ビルド・テスト確認
-
-- `cargo build --features source-build --workspace`
-- `cargo test --features source-build --workspace` で移行前と同じテストがすべて通ることを確認
-- `cargo test --test test_libyuv --features source-build` で個別実行できることを確認
-
-### 3. 変更履歴
-
-`shiguredo-changelog` 規約「機能に直接影響しない変更はミスサブセクション」に従い、`CHANGES.md` の `## develop` の `### misc` 配下に以下を追加する。
-
-```
-- [UPDATE] `src/tests.rs` の libyuv 関連テストを `tests/test_libyuv.rs` に分離する
-  - `shiguredo-rust` 規約のテスト配置 (`tests/test_<module>.rs`) に揃える第一歩
-  - 他モジュールのテスト分離は別途 issue を起票する
-  - @<implementer>
-```
+- `CHANGES.md` の `## develop` → `### misc` 配下に変更履歴を追記

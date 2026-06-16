@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-06-10
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-06-16
 - Model: Opus 4.7
 - Branch: feature/add-libyuv-mjpg-to-i420-nv12-wrappers
 - Polished: 2026-06-10
