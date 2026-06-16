@@ -18,6 +18,8 @@
 
 - [UPDATE] `src/libyuv.rs` の `#[allow(clippy::too_many_arguments)]` を `#[expect(clippy::too_many_arguments)]` に揃える
   - @melpon
+- [UPDATE] `src/tests.rs` の libyuv 関連テストを `tests/test_libyuv.rs` に分離する
+  - @melpon
 
 ## 0.150.1
 
