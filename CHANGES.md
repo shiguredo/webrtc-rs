@@ -12,7 +12,11 @@
 ## develop
 
 - [ADD] libyuv の `i420_rotate` API を追加する
-  - C API `libyuv_I420Rotate` は既に公開済み、Rust API `i420_rotate` と `LibyuvRotationMode` enum を追加する
+  - @melpon
+
+### misc
+
+- [UPDATE] `src/libyuv.rs` の `#[allow(clippy::too_many_arguments)]` を `#[expect(clippy::too_many_arguments)]` に揃える
   - @melpon
 
 ## 0.150.1

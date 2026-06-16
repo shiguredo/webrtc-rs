@@ -62,7 +62,7 @@ fn has_required_len(len: usize, stride: i32, rows: i32, row_bytes: i32) -> bool 
 
 /// `libyuv::ConvertFromI420` を呼び出して、I420 を指定フォーマットへ変換する。
 /// 変換に失敗した場合は `false` を返す。
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn convert_from_i420(
     src_y: &[u8],
     src_stride_y: i32,
@@ -110,7 +110,7 @@ pub fn convert_from_i420(
 
 /// `libyuv::I420ToNV12` を呼び出して、I420 を NV12 へ変換する。
 /// 変換に失敗した場合は `false` を返す。
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn i420_to_nv12(
     src_y: &[u8],
     src_stride_y: i32,
@@ -161,7 +161,7 @@ pub fn i420_to_nv12(
 
 /// `libyuv::I420Copy` を呼び出して、I420 を I420 へコピーする。
 /// コピーに失敗した場合は `false` を返す。
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn i420_copy(
     src_y: &[u8],
     src_stride_y: i32,
@@ -218,7 +218,7 @@ pub fn i420_copy(
 /// Rotate0 / Rotate180 では dst の解像度は src と同じ (dst_width = width, dst_height = height)。
 /// Rotate90 / Rotate270 では dst の解像度は src と逆になる (dst_width = height, dst_height = width)。
 /// 回転に失敗した場合は `false` を返す。
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn i420_rotate(
     src_y: &[u8],
     src_stride_y: i32,
@@ -293,7 +293,7 @@ pub fn i420_rotate(
 
 /// `libyuv::NV12Copy` を呼び出して、NV12 を NV12 へコピーする。
 /// コピーに失敗した場合は `false` を返す。
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn nv12_copy(
     src_y: &[u8],
     src_stride_y: i32,
@@ -339,7 +339,7 @@ pub fn nv12_copy(
 
 /// `libyuv::ABGRToI420` を呼び出して、ABGR から I420 へ変換する。
 /// 変換に失敗した場合は `false` を返す。
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn abgr_to_i420(
     src_abgr: &[u8],
     src_stride_abgr: i32,
@@ -385,7 +385,7 @@ pub fn abgr_to_i420(
 
 /// `libyuv::NV12ToI420` を呼び出して、NV12 から I420 へ変換する。
 /// 変換に失敗した場合は `false` を返す。
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn nv12_to_i420(
     src_y: &[u8],
     src_stride_y: i32,
@@ -436,7 +436,7 @@ pub fn nv12_to_i420(
 
 /// `libyuv::YUY2ToI420` を呼び出して、YUY2 から I420 へ変換する。
 /// 変換に失敗した場合は `false` を返す。
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn yuy2_to_i420(
     src_yuy2: &[u8],
     src_stride_yuy2: i32,
@@ -492,7 +492,7 @@ pub fn yuy2_to_i420(
 /// 変換に成功した場合 (libyuv が `0` を返した場合) のみ `true` を返す。
 /// それ以外 (libyuv が `-1` または `1` を返した場合、事前検証に失敗した場合) は `false`。
 /// iOS など MJPEG サポートを含まないビルドでは常に `false` を返す。
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn mjpg_to_i420(
     sample: &[u8],
     dst_y: &mut [u8],
@@ -538,7 +538,7 @@ pub fn mjpg_to_i420(
 /// MJPEG バイト列を NV12 へ変換する。
 ///
 /// 出力形式以外の、入力、制約、戻り値の仕様は `mjpg_to_i420` と同じ。
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn mjpg_to_nv12(
     sample: &[u8],
     dst_y: &mut [u8],
@@ -602,7 +602,7 @@ pub fn mjpg_size(sample: &[u8]) -> Option<(i32, i32)> {
 /// iOS など MJPEG サポートを含まないビルドでは MJPG fourcc 指定時の変換は常に失敗する
 ///
 /// 変換に成功した場合 (libyuv が `0` を返した場合) のみ `true` を返す。
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn convert_to_i420(
     src_frame: &[u8],
     dst_y: &mut [u8],
