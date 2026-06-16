@@ -2233,6 +2233,429 @@ fn convert_to_i420_returns_false_when_sample_is_too_small() {
     );
 }
 
+// ── I420Rotate 系テスト ──
+
+/// 0° 回転で入出力が一致することを確認する
+#[test]
+fn i420_rotate_rotate_0_preserves_planes() {
+    let width = 4;
+    let height = 4;
+    let chroma_width = (width as usize + 1) / 2;
+    let chroma_height = (height as usize + 1) / 2;
+
+    let mut src_y = vec![0u8; (width * height) as usize];
+    let mut src_u = vec![0u8; chroma_width * chroma_height];
+    let mut src_v = vec![0u8; chroma_width * chroma_height];
+    for (i, p) in src_y.iter_mut().enumerate() {
+        *p = (i as u8).wrapping_mul(7);
+    }
+    for (i, p) in src_u.iter_mut().enumerate() {
+        *p = 0x40u8.wrapping_add(i as u8);
+    }
+    for (i, p) in src_v.iter_mut().enumerate() {
+        *p = 0x80u8.wrapping_add(i as u8);
+    }
+
+    let mut dst_y = vec![0u8; src_y.len()];
+    let mut dst_u = vec![0u8; src_u.len()];
+    let mut dst_v = vec![0u8; src_v.len()];
+    assert!(i420_rotate(
+        &src_y,
+        width,
+        &src_u,
+        width / 2,
+        &src_v,
+        width / 2,
+        &mut dst_y,
+        width,
+        &mut dst_u,
+        width / 2,
+        &mut dst_v,
+        width / 2,
+        width,
+        height,
+        LibyuvRotationMode::Rotate0,
+    ));
+
+    assert_eq!(src_y, dst_y, "Rotate0 で Y plane が一致しません");
+    assert_eq!(src_u, dst_u, "Rotate0 で U plane が一致しません");
+    assert_eq!(src_v, dst_v, "Rotate0 で V plane が一致しません");
+}
+
+/// 90° 回転で width/height が入れ替わることを確認する。
+/// 全要素が異なる値の小さいフレームで round-trip (4 回回転で元に戻る) を検証する。
+#[test]
+fn i420_rotate_rotate_90_swaps_dimensions() {
+    let width = 4;
+    let height = 2;
+    let chroma_width = (width as usize + 1) / 2;
+    let chroma_height = (height as usize + 1) / 2;
+
+    let mut src_y = vec![0u8; (width * height) as usize];
+    let mut src_u = vec![0u8; chroma_width * chroma_height];
+    let mut src_v = vec![0u8; chroma_width * chroma_height];
+    for (i, p) in src_y.iter_mut().enumerate() {
+        *p = (i as u8).wrapping_add(1);
+    }
+    for (i, p) in src_u.iter_mut().enumerate() {
+        *p = 0x40u8.wrapping_add(i as u8);
+    }
+    for (i, p) in src_v.iter_mut().enumerate() {
+        *p = 0x80u8.wrapping_add(i as u8);
+    }
+
+    // 1 回目: 90° → dst は height x width
+    let mut rotated90_y = vec![0u8; (width * height) as usize];
+    let rotated_chroma_width90 = (height as usize + 1) / 2;
+    let rotated_chroma_height90 = (width as usize + 1) / 2;
+    let mut rotated90_u = vec![0u8; rotated_chroma_width90 * rotated_chroma_height90];
+    let mut rotated90_v = vec![0u8; rotated_chroma_width90 * rotated_chroma_height90];
+    assert!(
+        i420_rotate(
+            &src_y,
+            width,
+            &src_u,
+            width / 2,
+            &src_v,
+            width / 2,
+            &mut rotated90_y,
+            height,
+            &mut rotated90_u,
+            height / 2,
+            &mut rotated90_v,
+            height / 2,
+            width,
+            height,
+            LibyuvRotationMode::Rotate90,
+        ),
+        "90° 回転に失敗しました"
+    );
+
+    // 90° 回転が成功し、dst の解像度が height x width になることを確認する。
+    // 丸め込み検証としては、90° → 270° の round-trip を確認する
+    // (元が 4x2 の場合: 90° で 2x4 → 270° で 4x2 に戻る)
+    let mut roundtrip_y = vec![0u8; src_y.len()];
+    let mut roundtrip_u = vec![0u8; src_u.len()];
+    let mut roundtrip_v = vec![0u8; src_v.len()];
+    assert!(
+        i420_rotate(
+            &rotated90_y,
+            height,
+            &rotated90_u,
+            height / 2,
+            &rotated90_v,
+            height / 2,
+            &mut roundtrip_y,
+            width,
+            &mut roundtrip_u,
+            width / 2,
+            &mut roundtrip_v,
+            width / 2,
+            height,
+            width,
+            LibyuvRotationMode::Rotate270,
+        ),
+        "90° → 270° round-trip に失敗しました"
+    );
+    assert_eq!(
+        src_y, roundtrip_y,
+        "90°→270° round-trip で Y plane が一致しません"
+    );
+    assert_eq!(
+        src_u, roundtrip_u,
+        "90°→270° round-trip で U plane が一致しません"
+    );
+    assert_eq!(
+        src_v, roundtrip_v,
+        "90°→270° round-trip で V plane が一致しません"
+    );
+}
+
+/// 180° 回転でピクセル順が反転することを確認する。
+/// 2 回回転で元に戻る round-trip も検証する。
+#[test]
+fn i420_rotate_rotate_180_inverts_pixel_order() {
+    let width = 4;
+    let height = 4;
+    let chroma_width = (width as usize + 1) / 2;
+    let chroma_height = (height as usize + 1) / 2;
+
+    let mut src_y = vec![0u8; (width * height) as usize];
+    let mut src_u = vec![0u8; chroma_width * chroma_height];
+    let mut src_v = vec![0u8; chroma_width * chroma_height];
+    for (i, p) in src_y.iter_mut().enumerate() {
+        *p = (i as u8).wrapping_add(1);
+    }
+    for (i, p) in src_u.iter_mut().enumerate() {
+        *p = 0x40u8.wrapping_add(i as u8);
+    }
+    for (i, p) in src_v.iter_mut().enumerate() {
+        *p = 0x80u8.wrapping_add(i as u8);
+    }
+
+    let mut rotated180_y = vec![0u8; src_y.len()];
+    let mut rotated180_u = vec![0u8; src_u.len()];
+    let mut rotated180_v = vec![0u8; src_v.len()];
+    assert!(
+        i420_rotate(
+            &src_y,
+            width,
+            &src_u,
+            width / 2,
+            &src_v,
+            width / 2,
+            &mut rotated180_y,
+            width,
+            &mut rotated180_u,
+            width / 2,
+            &mut rotated180_v,
+            width / 2,
+            width,
+            height,
+            LibyuvRotationMode::Rotate180,
+        ),
+        "180° 回転に失敗しました"
+    );
+
+    // 180° 回転を 2 回繰り返すと元に戻る
+    let mut roundtrip_y = vec![0u8; src_y.len()];
+    let mut roundtrip_u = vec![0u8; src_u.len()];
+    let mut roundtrip_v = vec![0u8; src_v.len()];
+    assert!(
+        i420_rotate(
+            &rotated180_y,
+            width,
+            &rotated180_u,
+            width / 2,
+            &rotated180_v,
+            width / 2,
+            &mut roundtrip_y,
+            width,
+            &mut roundtrip_u,
+            width / 2,
+            &mut roundtrip_v,
+            width / 2,
+            width,
+            height,
+            LibyuvRotationMode::Rotate180,
+        ),
+        "2 回目の 180° 回転に失敗しました"
+    );
+    assert_eq!(
+        src_y, roundtrip_y,
+        "180° 2 回 round-trip で Y plane が一致しません"
+    );
+    assert_eq!(
+        src_u, roundtrip_u,
+        "180° 2 回 round-trip で U plane が一致しません"
+    );
+    assert_eq!(
+        src_v, roundtrip_v,
+        "180° 2 回 round-trip で V plane が一致しません"
+    );
+}
+
+/// 270° 回転で width/height が入れ替わることを確認する。
+/// 90° → 270° で round-trip も検証する。
+#[test]
+fn i420_rotate_rotate_270_swaps_dimensions() {
+    let width = 4;
+    let height = 2;
+    let chroma_width = (width as usize + 1) / 2;
+    let chroma_height = (height as usize + 1) / 2;
+
+    let mut src_y = vec![0u8; (width * height) as usize];
+    let mut src_u = vec![0u8; chroma_width * chroma_height];
+    let mut src_v = vec![0u8; chroma_width * chroma_height];
+    for (i, p) in src_y.iter_mut().enumerate() {
+        *p = (i as u8).wrapping_add(1);
+    }
+    for (i, p) in src_u.iter_mut().enumerate() {
+        *p = 0x40u8.wrapping_add(i as u8);
+    }
+    for (i, p) in src_v.iter_mut().enumerate() {
+        *p = 0x80u8.wrapping_add(i as u8);
+    }
+
+    // 270° 回転 → dst は height x width
+    let rotated_chroma_width270 = (height as usize + 1) / 2;
+    let rotated_chroma_height270 = (width as usize + 1) / 2;
+    let mut rotated270_y = vec![0u8; (width * height) as usize];
+    let mut rotated270_u = vec![0u8; rotated_chroma_width270 * rotated_chroma_height270];
+    let mut rotated270_v = vec![0u8; rotated_chroma_width270 * rotated_chroma_height270];
+    assert!(
+        i420_rotate(
+            &src_y,
+            width,
+            &src_u,
+            width / 2,
+            &src_v,
+            width / 2,
+            &mut rotated270_y,
+            height,
+            &mut rotated270_u,
+            height / 2,
+            &mut rotated270_v,
+            height / 2,
+            width,
+            height,
+            LibyuvRotationMode::Rotate270,
+        ),
+        "270° 回転に失敗しました"
+    );
+
+    // 90° 回転との round-trip: Rotate90 → Rotate270 で元に戻る
+    let rotated_chroma_w = (height as usize + 1) / 2;
+    let rotated_chroma_h = (width as usize + 1) / 2;
+    let mut after90_y = vec![0u8; (width * height) as usize];
+    let mut after90_u = vec![0u8; rotated_chroma_w * rotated_chroma_h];
+    let mut after90_v = vec![0u8; rotated_chroma_w * rotated_chroma_h];
+    assert!(
+        i420_rotate(
+            &src_y,
+            width,
+            &src_u,
+            width / 2,
+            &src_v,
+            width / 2,
+            &mut after90_y,
+            height,
+            &mut after90_u,
+            height / 2,
+            &mut after90_v,
+            height / 2,
+            width,
+            height,
+            LibyuvRotationMode::Rotate90,
+        ),
+        "90° 回転に失敗しました"
+    );
+
+    let mut roundtrip_y = vec![0u8; src_y.len()];
+    let mut roundtrip_u = vec![0u8; src_u.len()];
+    let mut roundtrip_v = vec![0u8; src_v.len()];
+    assert!(
+        i420_rotate(
+            &after90_y,
+            height,
+            &after90_u,
+            height / 2,
+            &after90_v,
+            height / 2,
+            &mut roundtrip_y,
+            width,
+            &mut roundtrip_u,
+            width / 2,
+            &mut roundtrip_v,
+            width / 2,
+            height,
+            width,
+            LibyuvRotationMode::Rotate270,
+        ),
+        "90° → 270° round-trip に失敗しました"
+    );
+    assert_eq!(
+        src_y, roundtrip_y,
+        "90°→270° round-trip で Y plane が一致しません"
+    );
+    assert_eq!(
+        src_u, roundtrip_u,
+        "90°→270° round-trip で U plane が一致しません"
+    );
+    assert_eq!(
+        src_v, roundtrip_v,
+        "90°→270° round-trip で V plane が一致しません"
+    );
+}
+
+/// 90° 回転時に dst バッファが回転後解像度に対して不足している場合に false が返ることを確認する
+#[test]
+fn i420_rotate_returns_false_when_destination_plane_is_too_short() {
+    let width = 4;
+    let height = 4;
+    let chroma_width = (width as usize + 1) / 2;
+    let chroma_height = (height as usize + 1) / 2;
+
+    let src_y = vec![0u8; (width * height) as usize];
+    let src_u = vec![0u8; chroma_width * chroma_height];
+    let src_v = vec![0u8; chroma_width * chroma_height];
+
+    // Rotate90 では dst の解像度は height x width (= 4x4, この場合は同じ) だが
+    // dst_y を不足させる
+    let mut dst_y = vec![0u8; (width * height - 1) as usize];
+    let mut dst_u = vec![0u8; chroma_width * chroma_height];
+    let mut dst_v = vec![0u8; chroma_width * chroma_height];
+    assert!(
+        !i420_rotate(
+            &src_y,
+            width,
+            &src_u,
+            width / 2,
+            &src_v,
+            width / 2,
+            &mut dst_y,
+            width,
+            &mut dst_u,
+            width / 2,
+            &mut dst_v,
+            width / 2,
+            width,
+            height,
+            LibyuvRotationMode::Rotate90,
+        ),
+        "dst_y が不足しているのに true が返りました"
+    );
+
+    // dst_u が不足している場合も検証
+    let mut dst_y = vec![0u8; (width * height) as usize];
+    let mut dst_u = vec![0u8; chroma_width * chroma_height - 1];
+    let mut dst_v = vec![0u8; chroma_width * chroma_height];
+    assert!(
+        !i420_rotate(
+            &src_y,
+            width,
+            &src_u,
+            width / 2,
+            &src_v,
+            width / 2,
+            &mut dst_y,
+            width,
+            &mut dst_u,
+            width / 2,
+            &mut dst_v,
+            width / 2,
+            width,
+            height,
+            LibyuvRotationMode::Rotate90,
+        ),
+        "dst_u が不足しているのに true が返りました"
+    );
+
+    // dst_v が不足している場合も検証
+    let mut dst_u = vec![0u8; chroma_width * chroma_height];
+    let mut dst_v = vec![0u8; chroma_width * chroma_height - 1];
+    assert!(
+        !i420_rotate(
+            &src_y,
+            width,
+            &src_u,
+            width / 2,
+            &src_v,
+            width / 2,
+            &mut dst_y,
+            width,
+            &mut dst_u,
+            width / 2,
+            &mut dst_v,
+            width / 2,
+            width,
+            height,
+            LibyuvRotationMode::Rotate90,
+        ),
+        "dst_v が不足しているのに true が返りました"
+    );
+}
+
 #[test]
 fn logging_functions_are_callable() {
     // severity は 0 にしておく。実際のログ内容は検証しない。

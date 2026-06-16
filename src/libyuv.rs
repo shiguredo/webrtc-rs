@@ -212,6 +212,85 @@ pub fn i420_copy(
     }
 }
 
+/// `libyuv::I420Rotate` を呼び出して、I420 フレームを回転させる。
+///
+/// `mode` で回転角度を指定する。
+/// Rotate0 / Rotate180 では dst の解像度は src と同じ (dst_width = width, dst_height = height)。
+/// Rotate90 / Rotate270 では dst の解像度は src と逆になる (dst_width = height, dst_height = width)。
+/// 回転に失敗した場合は `false` を返す。
+#[allow(clippy::too_many_arguments)]
+pub fn i420_rotate(
+    src_y: &[u8],
+    src_stride_y: i32,
+    src_u: &[u8],
+    src_stride_u: i32,
+    src_v: &[u8],
+    src_stride_v: i32,
+    dst_y: &mut [u8],
+    dst_stride_y: i32,
+    dst_u: &mut [u8],
+    dst_stride_u: i32,
+    dst_v: &mut [u8],
+    dst_stride_v: i32,
+    width: i32,
+    height: i32,
+    mode: LibyuvRotationMode,
+) -> bool {
+    let Some((chroma_width, chroma_height)) = i420_chroma_size(width, height) else {
+        return false;
+    };
+
+    // 90°/270° 回転では dst の width と height が入れ替わる
+    let (dst_width, dst_height) = match mode {
+        LibyuvRotationMode::Rotate0 | LibyuvRotationMode::Rotate180 => (width, height),
+        LibyuvRotationMode::Rotate90 | LibyuvRotationMode::Rotate270 => (height, width),
+    };
+    let Some((dst_chroma_width, dst_chroma_height)) = i420_chroma_size(dst_width, dst_height)
+    else {
+        return false;
+    };
+
+    if !has_required_len(src_y.len(), src_stride_y, height, width)
+        || !has_required_len(src_u.len(), src_stride_u, chroma_height, chroma_width)
+        || !has_required_len(src_v.len(), src_stride_v, chroma_height, chroma_width)
+        || !has_required_len(dst_y.len(), dst_stride_y, dst_height, dst_width)
+        || !has_required_len(
+            dst_u.len(),
+            dst_stride_u,
+            dst_chroma_height,
+            dst_chroma_width,
+        )
+        || !has_required_len(
+            dst_v.len(),
+            dst_stride_v,
+            dst_chroma_height,
+            dst_chroma_width,
+        )
+    {
+        return false;
+    }
+
+    unsafe {
+        ffi::libyuv_I420Rotate(
+            src_y.as_ptr(),
+            src_stride_y,
+            src_u.as_ptr(),
+            src_stride_u,
+            src_v.as_ptr(),
+            src_stride_v,
+            dst_y.as_mut_ptr(),
+            dst_stride_y,
+            dst_u.as_mut_ptr(),
+            dst_stride_u,
+            dst_v.as_mut_ptr(),
+            dst_stride_v,
+            width,
+            height,
+            mode.as_raw(),
+        ) == 0
+    }
+}
+
 /// `libyuv::NV12Copy` を呼び出して、NV12 を NV12 へコピーする。
 /// コピーに失敗した場合は `false` を返す。
 #[allow(clippy::too_many_arguments)]

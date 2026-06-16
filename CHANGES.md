@@ -11,6 +11,10 @@
 
 ## develop
 
+- [ADD] libyuv の `i420_rotate` API を追加する
+  - C API `libyuv_I420Rotate` は既に公開済み、Rust API `i420_rotate` と `LibyuvRotationMode` enum を追加する
+  - @melpon
+
 ## 0.150.1
 
 **リリース日**: 2026-06-12
