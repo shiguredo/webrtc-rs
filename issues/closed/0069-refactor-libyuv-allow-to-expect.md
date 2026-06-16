@@ -2,7 +2,7 @@
 
 - Priority: Low
 - Created: 2026-06-10
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-06-16
 - Model: Opus 4.7
 - Branch: feature/refactor-libyuv-allow-to-expect
 - Polished: {YYYY-MM-DD}
@@ -54,19 +54,31 @@
 
 ### 1. 置換
 
-`src/libyuv.rs` 内の `#[allow(clippy::too_many_arguments)]` を `#[expect(clippy::too_many_arguments)]` に置換する (Edit ツールの `replace_all` でも一括可能、対象 7 箇所すべて同一文字列)。
+`src/libyuv.rs` 内の `#[allow(clippy::too_many_arguments)]` を `#[expect(clippy::too_many_arguments)]` に一括置換した。issue 作成時点では 7 箇所だったが、issue 作成後に追加された `i420_rotate` / `mjpg_to_i420` / `mjpg_to_nv12` / `convert_to_i420` を含む 11 箇所を対象とした。
+
+置換対象の関数一覧:
+- `convert_from_i420`
+- `i420_to_nv12`
+- `i420_copy`
+- `i420_rotate` (issue 作成後に追加)
+- `nv12_copy`
+- `abgr_to_i420`
+- `nv12_to_i420`
+- `yuy2_to_i420`
+- `mjpg_to_i420` (issue 作成後に追加)
+- `mjpg_to_nv12` (issue 作成後に追加)
+- `convert_to_i420` (issue 作成後に追加)
 
 ### 2. 検証
 
-- `cargo clippy -- -D warnings` を実行し、警告抑制が機能していること (= too_many_arguments lint が実際に発生し、`#[expect]` がそれを補足していること) を確認する
-- `cargo test` で既存テストが通ることを確認する
+- `cargo clippy -- -D warnings`: 通過 (unfulfilled_lint_expectations 警告なし)
+- `cargo test`: 122 passed, 0 failed
 
 ### 3. 変更履歴
 
-`shiguredo-changelog` 規約「機能に直接影響しない変更 (ドキュメント追加、リファクタリング等) は `### misc` サブセクションに記載すること」に従い、`CHANGES.md` の `## develop` の `### misc` 配下に以下を追加する。
-
+`CHANGES.md` の `## develop` → `### misc` に以下を追加:
 ```
 - [UPDATE] `src/libyuv.rs` の `#[allow(clippy::too_many_arguments)]` を `#[expect(clippy::too_many_arguments)]` に揃える
   - `shiguredo-rust` 規約 (`#[allow]` ではなく `#[expect]` を使う) に準拠
-  - @<implementer>
+  - @melpon
 ```
