@@ -11,6 +11,8 @@
 
 ## develop
 
+- [UPDATE] libwebrtc m150 (m150.7871.2.1) に上げる
+  - @voluntas
 - [ADD] libyuv の `i420_rotate` API を追加する
   - @melpon
 
