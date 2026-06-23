@@ -11,6 +11,22 @@
 
 ## develop
 
+## 0.150.2
+
+**リリース日**: 2026-06-23
+
+- [ADD] libyuv の `i420_rotate` API を追加する
+  - @melpon
+- [UPDATE] libwebrtc m150 (m150.7871.2.1) に上げる
+  - @voluntas
+
+### misc
+
+- [UPDATE] `src/libyuv.rs` の `#[allow(clippy::too_many_arguments)]` を `#[expect(clippy::too_many_arguments)]` に揃える
+  - @melpon
+- [UPDATE] `src/tests.rs` の libyuv 関連テストを `tests/test_libyuv.rs` に分離する
+  - @melpon
+
 ## 0.150.1
 
 **リリース日**: 2026-06-12

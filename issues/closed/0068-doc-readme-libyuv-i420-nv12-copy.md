@@ -2,7 +2,7 @@
 
 - Priority: Low
 - Created: 2026-06-10
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-06-16
 - Model: Opus 4.7
 - Branch: feature/refactor-readme-libyuv-i420-nv12-copy
 - Polished: {YYYY-MM-DD}
@@ -49,15 +49,4 @@ README.md の「## 対応 API」セクションの libyuv 変換関数の行に�
 
 ## 解決方法
 
-### 1. README.md の更新
-
-`README.md:382-383` を上記の完了条件の通り書き換える。`i420_copy` は `convert_from_i420` の後、`i420_to_nv12` の前に挿入する。`nv12_copy` は `i420_to_nv12` の後、`nv12_to_i420` の前に挿入する (アルファベット順)。
-
-### 2. 変更履歴
-
-ドキュメント整合性の補修であり機能影響が無いため、`CHANGES.md` の `## develop` 直下ではなく `### misc` サブセクションに以下の UPDATE エントリを追加する (`shiguredo-changelog` 規約「機能に直接影響しない変更 (ドキュメント追加、リファクタリング等) は `### misc` サブセクションに記載すること」)。
-
-```
-- [UPDATE] README.md の対応 API libyuv 行に記載漏れの `i420_copy` / `nv12_copy` を追記する
-  - @<implementer>
-```
+issue 0066 (MJPEG 系ラッパー追加) の実装過程で README.md:382 の libyuv 変換関数行に `i420_copy` / `nv12_copy` が合わせて追記されたため、本 issue の実装は不要と判断し close する。CHANGES.md への追記も issue 0066 の変更履歴エントリに包含されているため不要。
