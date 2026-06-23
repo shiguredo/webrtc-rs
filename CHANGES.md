@@ -11,6 +11,10 @@
 
 ## develop
 
+## 0.150.2
+
+**リリース日**: 2026-06-23
+
 - [UPDATE] libwebrtc m150 (m150.7871.2.1) に上げる
   - @voluntas
 - [ADD] libyuv の `i420_rotate` API を追加する
