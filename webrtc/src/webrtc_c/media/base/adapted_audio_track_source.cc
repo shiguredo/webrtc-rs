@@ -42,16 +42,15 @@ class AdaptedAudioTrackSourceWrapper : public webrtc::AudioSourceInterface {
   }
 
   void RemoveSink(webrtc::AudioTrackSinkInterface* sink) override {
-    sinks_.erase(
-        std::remove(sinks_.begin(), sinks_.end(), sink),
-        sinks_.end());
+    sinks_.erase(std::remove(sinks_.begin(), sinks_.end(), sink), sinks_.end());
   }
 
   void OnData(const int16_t* audio_data, size_t samples_per_channel) {
     for (auto* sink : sinks_) {
       // WebRTC 内部の AudioFrame に基づいて bits_per_sample は 16 固定。
       // number_of_frames は各チャンネルあたりのサンプル数 = samples_per_channel。
-      sink->OnData(audio_data, 16, sample_rate_, channels_, samples_per_channel);
+      sink->OnData(audio_data, 16, sample_rate_, channels_,
+                   samples_per_channel);
     }
   }
 
@@ -67,9 +66,8 @@ WEBRTC_DEFINE_REFCOUNTED(webrtc_AdaptedAudioTrackSource,
 
 WEBRTC_EXPORT struct webrtc_AdaptedAudioTrackSource_refcounted*
 webrtc_AdaptedAudioTrackSource_Create(int sample_rate, size_t channels) {
-  auto src =
-      webrtc::make_ref_counted<AdaptedAudioTrackSourceWrapper>(sample_rate,
-                                                                channels);
+  auto src = webrtc::make_ref_counted<AdaptedAudioTrackSourceWrapper>(
+      sample_rate, channels);
   return reinterpret_cast<struct webrtc_AdaptedAudioTrackSource_refcounted*>(
       src.release());
 }
