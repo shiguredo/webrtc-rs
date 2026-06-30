@@ -49,7 +49,7 @@ class AdaptedAudioTrackSourceWrapper : public webrtc::AudioSourceInterface {
 
   void OnData(const int16_t* audio_data, size_t samples_per_channel) {
     for (auto* sink : sinks_) {
-      // AudioTrackSinkInterface::OnData の bits_per_sample は 16 固定。
+      // WebRTC 内部の AudioFrame に基づいて bits_per_sample は 16 固定。
       // number_of_frames は各チャンネルあたりのサンプル数 = samples_per_channel。
       sink->OnData(audio_data, 16, sample_rate_, channels_, samples_per_channel);
     }
