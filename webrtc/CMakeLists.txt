@@ -391,6 +391,7 @@ add_library(webrtc_c
     src/webrtc_c/modules/video_coding/codecs/interface/common_constants.cc
     src/webrtc_c/modules/video_coding/include/video_codec_interface.cc
     src/webrtc_c/libyuv.cc
+    src/webrtc_c/media/base/adapted_audio_track_source.cc
     src/webrtc_c/media/base/adapted_video_track_source.cc
     src/webrtc_c/media/engine/simulcast_encoder_adapter.cc
     src/webrtc_c/pc/connection_context.cc

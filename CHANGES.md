@@ -11,6 +11,10 @@
 
 ## develop
 
+- [ADD] `AdaptedAudioTrackSource` の C API を追加する
+  - PCM データを注入可能な `AudioSourceInterface` 実装 `AdaptedAudioTrackSource` と C API (`Create` / `OnData` / refcount 管理 / `AudioSourceInterface` への cast) を追加する
+  - @zztkm
+
 ## 0.150.2
 
 **リリース日**: 2026-06-23

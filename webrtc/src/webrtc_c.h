@@ -41,6 +41,7 @@
 #include "webrtc_c/api/video_codecs/video_encoder_factory.h"
 #include "webrtc_c/common.h"
 #include "webrtc_c/libyuv.h"
+#include "webrtc_c/media/base/adapted_audio_track_source.h"
 #include "webrtc_c/media/base/adapted_video_track_source.h"
 #include "webrtc_c/media/engine/simulcast_encoder_adapter.h"
 #include "webrtc_c/modules/video_coding/codecs/interface/common_constants.h"
