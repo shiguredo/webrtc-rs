@@ -98,16 +98,19 @@ CMakeLists.txt では、`WEBRTC_C_TARGET`（例: `ubuntu-24.04_x86_64`）とビ�
 4. `WEBRTC_INCLUDE_DIR` (`CMakeLists.txt:204`) を `${WEBRTC_BUILD_ROOT}/_source/${WEBRTC_C_TARGET}/webrtc/src/` に設定する
 5. `WEBRTC_LIBRARY_DIR` (`CMakeLists.txt:206-208`) を `${WEBRTC_BUILD_ROOT}/_build/${WEBRTC_C_TARGET}/${BUILD_TYPE}/` に設定する。`android_arm64` ターゲットでは、webrtc-build の成果物配置に応じて `arm64-v8a` サブディレクトリが必要かどうかを実装時に確認し、必要に応じてパスを調整する。`BUNDLE_STATIC_LIBS` (`CMakeLists.txt:441`) のパス構築が新しい `WEBRTC_LIBRARY_DIR` で正しく解決されることも確認する
 6. `third_party` 系のインクルードパス (`CMakeLists.txt:421-431`) の解決方法は以下のとおり:
-   - `${WEBRTC_INCLUDE_DIR}/third_party/abseil-cpp` が存在する場合: そのまま使用する
-   - `${WEBRTC_INCLUDE_DIR}/third_party/boringssl/src/include` が存在する場合: そのまま使用する
-   - `${WEBRTC_INCLUDE_DIR}/third_party/libyuv/include` が存在する場合: そのまま使用する
-   - `${WEBRTC_INCLUDE_DIR}/third_party/zlib` が存在する場合: そのまま使用する
-   - `${WEBRTC_INCLUDE_DIR}/sdk/objc` が存在する場合: そのまま使用する
-   - 存在しないパスがある場合: 実装時に webrtc-build の実際のソースツリー構造を調査し、対応するパスを特定した上で個別に追加する。現時点でパスが不明な場合は、当該インクルードを `WEBRTC_BUILD_ROOT` 設定時はスキップし、ヘッダー解決に失敗した場合に CMake のエラーで検出されるようにする
-7. **VERSIONS ファイルの読み取り** (`CMakeLists.txt:212-217`) を `${WEBRTC_BUILD_ROOT}/_source/${WEBRTC_C_TARGET}/webrtc/VERSIONS` から行う。ファイルが存在しない場合は `message(FATAL_ERROR ...)` でビルドをエラー停止する。ユーザーには webrtc-build プロジェクトのビルド完了後に VERSIONS ファイルが生成されることをエラーメッセージで案内する。システムコンパイラへのフォールバックは行わない。理由は以下のとおり:
-   - **ARMv8 クロスコンパイル**では WebRTC の Clang と libc++ に依存しており、システムコンパイラでは成立しない
-   - 全 Unix プラットフォームで `_LIBCPP_ABI_NAMESPACE=Cr` (`CMakeLists.txt:577, 629, 663, 698, 733`) が定義されており、これは Chromium のカスタム libc++ を前提とする。システムの libstdc++ または標準 libc++ ではシンボル解決できずリンクエラーになる
-   - macOS / iOS でも同様に Chromium の ABI 設定が必須であり、システムの libc++ では互換性がない
+    - 以下のパスを存在確認なしで無条件に追加する:
+      - `${WEBRTC_INCLUDE_DIR}/third_party/abseil-cpp`
+      - `${WEBRTC_INCLUDE_DIR}/third_party/boringssl/src/include`
+      - `${WEBRTC_INCLUDE_DIR}/third_party/libyuv/include`
+      - `${WEBRTC_INCLUDE_DIR}/third_party/zlib`
+    - `${WEBRTC_INCLUDE_DIR}/sdk/objc` と `${WEBRTC_INCLUDE_DIR}/sdk/objc/base` は `WEBRTC_BUILD_ROOT` 設定時には追加しない。これらの ObjC 用ヘッダーは webrtc-build のソースツリー内では `src/` 配下ではなく `sdk/` 直下に存在し、`WEBRTC_INCLUDE_DIR`（`src/`）の相対パスでは解決できないため
+7. **LLVM と libc++ の取得**: `WEBRTC_BUILD_ROOT` 設定時は VERSIONS ファイルの読み取り (`CMakeLists.txt:212-217`) と LLVM のダウンロード (`CMakeLists.txt:222-294`) をスキップする。webrtc のソースツリー内に LLVM と libc++ が既に含まれているため、以下のパスを直接利用する。各パスは設定前に存在確認を行い、存在しない場合は `message(FATAL_ERROR ...)` で停止する:
+    - Clang コンパイラ: `${WEBRTC_INCLUDE_DIR}/third_party/llvm-build/Release+Assets/bin/clang` および `clang++`。`CMAKE_C_COMPILER` / `CMAKE_CXX_COMPILER` をこのパスで上書きする
+    - `llvm-ar`: ARMv8 クロスコンパイル用に `${WEBRTC_INCLUDE_DIR}/third_party/llvm-build/Release+Assets/bin/llvm-ar` を使用する。`CMAKE_AR` (`CMakeLists.txt:323`) も同様に上書きする
+    - libc++ ヘッダー: `LIBCXX_INCLUDE_DIR` (`CMakeLists.txt:307`) を `${WEBRTC_INCLUDE_DIR}/third_party/libc++/src/include` に設定する。これにより既存の `target_compile_options` の `-nostdinc++` / `-isystem` ブロック (`CMakeLists.txt:443-453`) が正しいパスを参照する
+    - libc++ の `__config_site` と `__assertion_handler` についても `${WEBRTC_INCLUDE_DIR}/third_party/libc++/src/include/` 内に存在することを確認し、存在しない場合はエラー停止する。既存コード (`CMakeLists.txt:280-289`) のような buildtools からのコピーは不要
+
+    なお、Windows ターゲットでは `WEBRTC_USE_WEBRTC_CLANG` / `WEBRTC_USE_WEBRTC_LIBCXX` は引き続き `FALSE` のままとする（`CMakeLists.txt:164-167` の既存設定を維持）。Windows では MSVC と標準ライブラリを使用する。
 8. **NDEBUG のハードコード削除**: Windows の `WEBRTC_CPP_TARGETS` (`CMakeLists.txt:563`) と `WEBRTC_C_TARGETS` (`CMakeLists.txt:801`) にハードコードされた `NDEBUG` を削除し、`CMAKE_BUILD_TYPE` に委ねる（Release では CMake が自動で `/DNDEBUG` を付与し、Debug では付与しない）。一方 `_ITERATOR_DEBUG_LEVEL=0` (`CMakeLists.txt:565`) は削除・条件付き化の対象とせず、全ビルドタイプで常時維持する。これにより Debug ビルドした libwebrtc（イテレータデバッグ無効・`NDEBUG` なし）と C ラッパーの ABI を一致させる
 
 `WEBRTC_BUILD_ROOT` は Debug/Release の切り替えとは無関係であり、ローカルの Release ビルドを利用する用途にも使える。
@@ -127,7 +130,7 @@ Cargo の `PROFILE` 環境変数には連動させない。ユーザーが明示
 
 `build.rs:1314` の `generate_bindings()` は libclang 経由でヘッダーをパースして Rust バインディングを生成する。libwebrtc のヘッダーが `#ifdef NDEBUG` / `#ifndef NDEBUG` で構造体レイアウトや関数シグネチャを変える場合、`generate_bindings()` に `-DNDEBUG` または `-UNDEBUG` を渡す必要が生じる。`debug-build` feature 有効時は `bindgen::Builder` に `-UNDEBUG` を追加する。無効時（Release ビルド）は新たに `-DNDEBUG` を追加する。
 
-なお、現在の `generate_bindings()` (`build.rs:1314-1363`) は `-DNDEBUG` を明示的に渡していない。
+なお、現在の `generate_bindings()` (`build.rs:1314-1363`) は `-DNDEBUG` を明示的に渡しておらず、prebuilt の `bindings.rs` も `-DNDEBUG` なしで生成されている。そのため `source-build` 単独利用（`debug-build` 無効）時に `-DNDEBUG` を追加することで、prebuilt のバインディングと生成結果に差異が生じる可能性がある。実装時には両者の差分を確認し、構造体レイアウトの不一致がないことを検証すること。
 
 ### `source-build` feature 未指定時のエラー
 
@@ -145,7 +148,7 @@ prebuilt バイナリは Release のみ提供されており、またリモー�
 |---|---|---|---|---|---|
 | 未設定 | 無効 | 無効 | リモート prebuilt | Release |
 | 未設定 | 無効 | 有効 | -- | **エラー** |
-| 未設定 | 有効 | 無効 | ローカル（C ラッパーのみソースビルド） | Release |
+| 未設定 | 有効 | 無効 | ローカル（C ラッパーのみソースビルド、libwebrtc バイナリはリモートダウンロード） | Release |
 | 未設定 | 有効 | 有効 | -- | **エラー** |
 | 設定 | 無効 | -- | -- | **エラー** |
 | 設定 | 有効 | 無効 | ローカル | Release |
@@ -155,10 +158,10 @@ prebuilt バイナリは Release のみ提供されており、またリモー�
 
 - **`local-export` feature との共存**: `local-export` feature（`build.rs:1114-1146`）は CMake ビルド出力先へのシンボリックリンクを作成する。`debug-build` を有効にすると `out_dir/_build/${target}/debug/` と `out_dir/_build/${target}/release/` の両方が生成されうるが、`local-export` は親ディレクトリへのリンクを作成するため、両方のプロファイルがリンク先で参照可能になる。競合は発生せず、追加の対応は不要。
 - **webrtc-build の内部構造への依存**: 本設計は webrtc-build プロジェクトの内部ディレクトリ構造（`_build/${target}/${profile}/`, `_source/${target}/webrtc/src/`）に依存している。webrtc-build 側でこの構造が変更された場合、CMakeLists.txt と build.rs のパス導出ロジックを追従更新する必要がある。
-- **cargo rebuild の検出限界**: `rerun-if-env-changed=WEBRTC_BUILD_ROOT` を追加しても、環境変数の値が変わらないまま webrtc-build の成果物だけが更新された場合、cargo は再ビルドをトリガーしない。ユーザーは成果物更新後に `cargo clean` を実行する必要がある。`cargo clean` は全ビルドキャッシュを破棄するため依存クレートも再ビルドされる点に注意。
-- **Android + WEBRTC_BUILD_ROOT における LLVM パス**: `build_webrtc_c()` は Android ターゲット時に `ANDROID_OVERRIDE_C_COMPILER` / `ANDROID_OVERRIDE_CXX_COMPILER` を CMake へ渡している（`build.rs:918-927`）。これらの値は CMake 出力先（`out_dir/_build/.../`）内のダウンロードされた LLVM Clang を指しており、`WEBRTC_BUILD_ROOT` 設定時でも無条件に渡される。`WEBRTC_BUILD_ROOT` 使用時は VERSIONS ファイルの読み取りに失敗するとエラー停止する（変更項目 7）ため、Android ターゲットで LLVM パスが不正になるケースは発生しない。ただし VERSIONS から正常に LLVM 情報が読み取れた場合、CMakeLists.txt 側が新たにダウンロードした Clang のパスと `build.rs` が渡す `ANDROID_OVERRIDE_C_COMPILER` のパスが一致しない可能性がある。また `webrtc/android.toolchain.cmake` は `ANDROID_OVERRIDE_C_COMPILER` と `ANDROID_OVERRIDE_CXX_COMPILER` を無条件に参照して `CMAKE_C_COMPILER` / `CMAKE_CXX_COMPILER` に設定している。`WEBRTC_BUILD_ROOT` 設定時にこれらの変数を渡さない場合、`cmake.toolchain.cmake` 側でもこれらの変数が未定義のときは CMakeLists.txt で設定されたコンパイラ（WebRTC の Clang）をそのまま使うように修正が必要。
+- **cargo rebuild の検出**: `WEBRTC_BUILD_ROOT` 設定時は `build.rs` の `main()` で `${WEBRTC_BUILD_ROOT}/_build/${WEBRTC_C_TARGET}/${profile}/libwebrtc.a`（Windows の場合は `webrtc.lib`）のパスに対して `cargo::rerun-if-changed` を出力する。これにより、webrtc-build 側で libwebrtc.a が再ビルドされた場合、cargo が変更を検知してビルドスクリプトを再実行し、CMake ビルドとリンクが再実行される。`rerun-if-env-changed=WEBRTC_BUILD_ROOT` だけでは環境変数の値が変わらない限り検出されないため、ファイル単位の依存指定が必須である。
+- **Android + WEBRTC_BUILD_ROOT における LLVM パス**: `build_webrtc_c()` は Android ターゲット時に `ANDROID_OVERRIDE_C_COMPILER` / `ANDROID_OVERRIDE_CXX_COMPILER` を CMake へ渡している（`build.rs:918-927`）。`WEBRTC_BUILD_ROOT` 設定時はこれらの変数を渡さない（変更対象参照）。これに伴い `webrtc/android.toolchain.cmake` に `if(DEFINED ANDROID_OVERRIDE_C_COMPILER)` ガードを追加し、未定義時は CMakeLists.txt で設定されたコンパイラ（WebRTC の Clang）をそのまま使うように修正する。`CMAKE_TOOLCHAIN_FILE` と `ANDROID_OVERRIDE_TOOLCHAIN_FILE` は `WEBRTC_BUILD_ROOT` 設定時も引き続き渡す。
 - **`fs::canonicalize()` のエラーハンドリング**: `WEBRTC_BUILD_ROOT` に指定されたパスが存在しない場合、`fs::canonicalize()` はエラーを返す。この場合、明示的なエラーメッセージ（例: 「WEBRTC_BUILD_ROOT で指定されたパスが存在しないかアクセスできません: <path>」）で panic すること。空文字列が指定された場合も存在しないパスと同様に扱い、エラーとする。
-- **`--release` と `debug-build` の同時指定**: 技術的に可能だが非推奨。利用手順で注意喚起する。
+- **`--release` と `debug-build` の同時指定**: 技術的に可能だが非推奨。C++ 側は Debug（`NDEBUG` なし、最適化なし）、Rust 側は Release（最適化あり）となり、`NDEBUG` 依存のヘッダーで ABI 不整合が発生するリスクがある。`build.rs` でこの組み合わせが検出された場合は標準エラーに警告を出力すること。利用手順でも注意喚起する。
 
 ### 変更対象
 
@@ -166,14 +169,15 @@ prebuilt バイナリは Release のみ提供されており、またリモー�
 - `build.rs`: `main()` の先頭にエラーチェックを追加。以下の 2 つの検査でカバーする（3 つのエラー行を捕捉する）:
   - `WEBRTC_BUILD_ROOT` 設定 + `source-build` 無効 → エラー（組み合わせ表の 設定/無効/-- 行を捕捉）
   - `WEBRTC_BUILD_ROOT` 未設定 + `debug-build` 有効 → エラー（組み合わせ表の 未設定/無効/有効 と 未設定/有効/有効 の両行を捕捉）
-  また `WEBRTC_BUILD_ROOT` が設定されている場合、指定されたパスが存在し、かつ `_source/${WEBRTC_C_TARGET}/webrtc/src/` と `_build/${WEBRTC_C_TARGET}/${profile}/`（`profile` は `"debug"` または `"release"`）が存在することを確認し、存在しない場合は明示的なエラーメッセージで panic する
+  また `WEBRTC_BUILD_ROOT` が設定されている場合、指定されたパスが存在し、かつ `_source/${WEBRTC_C_TARGET}/webrtc/src/` と `_build/${WEBRTC_C_TARGET}/${profile}/`（`profile` は `"debug"` または `"release"`）が存在することを確認し、存在しない場合は明示的なエラーメッセージで panic する。さらに、`_build/${WEBRTC_C_TARGET}/${profile}/libwebrtc.a`（Windows では `webrtc.lib`）のパスに対して `cargo::rerun-if-changed` を出力し、libwebrtc.a の変更を cargo が検知できるようにする。`--release`（`OPT_LEVEL` が `"0"` 以外）かつ `debug-build` feature 有効時は、標準エラーに警告を出力する
 - `build.rs`: `should_use_prebuilt()` に `WEBRTC_BUILD_ROOT` のチェックを追加。設定時は `false` を返す
 - `build.rs`: `build_webrtc_c()` のプロファイル設定を `debug-build` feature の有無で分岐。`profile` 変数、`config.profile()`、`CMAKE_BUILD_TYPE` を条件付きで切り替える
 - `build.rs`: `build_webrtc_c()` から CMake へ `WEBRTC_BUILD_ROOT` を伝達（絶対パスに正規化した上で `-DWEBRTC_BUILD_ROOT=...` として渡す）。Android ターゲットかつ `WEBRTC_BUILD_ROOT` 設定時は `ANDROID_OVERRIDE_C_COMPILER` / `ANDROID_OVERRIDE_CXX_COMPILER` を CMake に渡さない
 - `build.rs`: `generate_bindings()` に `debug-build` feature 有効時は `-UNDEBUG` を、無効時は `-DNDEBUG` を `clang_arg` として追加する
-- `build.rs`: `main()` に `rerun-if-env-changed=WEBRTC_BUILD_ROOT` と `rerun-if-env-changed=CARGO_FEATURE_DEBUG_BUILD` を追加
+- `build.rs`: `main()` に `rerun-if-env-changed=WEBRTC_BUILD_ROOT` と `rerun-if-env-changed=CARGO_FEATURE_DEBUG_BUILD` を追加する
 - `webrtc/CMakeLists.txt`: `WEBRTC_BUILD_ROOT` 定義時の分岐を追加（`### CMakeLists.txt の具体的な変更内容` の全項目を参照）。また `WEBRTC_BUILD_ROOT` が定義されている場合、受け取った値を `get_filename_component(... ABSOLUTE)` で正規化する
 - `webrtc/CMakeLists.txt`: Windows 向けにハードコードされた `NDEBUG` を削除し `CMAKE_BUILD_TYPE` に委ねる。`_ITERATOR_DEBUG_LEVEL=0` は変更せず全ビルドタイプで常時維持する。なお `_ITERATOR_DEBUG_LEVEL=0` は C++ ターゲット（`CMakeLists.txt:565`）にのみ存在し、C ターゲット（`CMakeLists.txt:801`）には存在しない。C ターゲットは MSVC STL イテレータを使用しないため追加不要
+- `webrtc/android.toolchain.cmake`: `ANDROID_OVERRIDE_C_COMPILER` / `ANDROID_OVERRIDE_CXX_COMPILER` が未定義の場合、`CMAKE_C_COMPILER` / `CMAKE_CXX_COMPILER` を上書きしないようガードを追加する（`if(DEFINED ANDROID_OVERRIDE_C_COMPILER)` 等）。未定義時は CMakeLists.txt 側で設定されたコンパイラ（WebRTC の Clang）をそのまま使う
 - `CHANGES.md`: `## develop` に `[ADD] libwebrtc のデバッグビルドに対応する` エントリを追加
 
 ### 利用手順（ユーザー向け）
@@ -215,9 +219,9 @@ cargo build --features debug-build
 4. **デバッグビルドの確認**: `WEBRTC_BUILD_ROOT` 設定 + `source-build` + `debug-build` で CMake ビルドが `CMAKE_BUILD_TYPE=Debug` で実行され、`NDEBUG` が定義されず、`_ITERATOR_DEBUG_LEVEL=0` が維持され、ビルドが成功すること
 5. **ローカル Release ビルドの確認**: `WEBRTC_BUILD_ROOT` 設定 + `source-build` 有効 + `debug-build` 無効で CMake ビルドが `CMAKE_BUILD_TYPE=Release` で実行され、成功すること
 
-テストの前提として、確認する各環境にあらかじめ webrtc-build の成果物（バイナリ・ヘッダー・VERSIONS ファイル）を配置しておく必要がある。`WEBRTC_BUILD_ROOT` には絶対パスを使用することが推奨される。
+テストの前提として、確認する各環境にあらかじめ webrtc-build の成果物（バイナリ・ヘッダー）を配置しておく必要がある。`WEBRTC_BUILD_ROOT` には絶対パスを使用することが推奨される。
 
-加えて、`source-build` + `debug-build` feature 有効時に `cargo test --features source-build,debug-build` を実行し、`NDEBUG` の有無で影響を受ける可能性のある既存テスト（`src/tests.rs`、`tests/test_libyuv.rs` 等）がデバッグビルドでもパスすることを確認する。`NDEBUG` 有無により構造体レイアウトやマクロ展開結果が変わった場合、既存テストが失敗する可能性があるため、実装時に必ず確認すること。
+加えて、`source-build` + `debug-build` feature 有効時に `WEBRTC_BUILD_ROOT` を設定した上で `cargo test --features source-build,debug-build` を実行し、`NDEBUG` の有無で影響を受ける可能性のある既存テスト（`src/tests.rs`、`tests/test_libyuv.rs` 等）がデバッグビルドでもパスすることを確認する。`NDEBUG` 有無により構造体レイアウトやマクロ展開結果が変わった場合、既存テストが失敗する可能性があるため、実装時に必ず確認すること。
 
 ## 完了条件
 
@@ -225,11 +229,11 @@ cargo build --features debug-build
 - `WEBRTC_BUILD_ROOT` 設定済みかつ `source-build` feature 無効時にエラーで停止すること（適切なエラーメッセージ付き）
 - `WEBRTC_BUILD_ROOT` 未設定かつ `debug-build` feature 有効時にエラーで停止すること（適切なエラーメッセージ付き）
 - 環境変数 `WEBRTC_BUILD_ROOT` が設定されているとき、CMakeLists.txt が指定ディレクトリ配下の `_source/${WEBRTC_C_TARGET}/webrtc/src/` をインクルードパス、`_build/${WEBRTC_C_TARGET}/${BUILD_TYPE}/` をライブラリパスとして利用し、ダウンロードをスキップすること
-- `WEBRTC_BUILD_ROOT` 設定時は `_source/${WEBRTC_C_TARGET}/webrtc/VERSIONS` から LLVM 情報を読み取ること。VERSIONS ファイルが存在しない場合はビルドをエラー停止し、webrtc-build のビルド完了を促すエラーメッセージを出力すること
+- `WEBRTC_BUILD_ROOT` 設定時は CMakeLists.txt が VERSIONS ファイルの読み取りと LLVM のダウンロードをスキップし、webrtc ソースツリー内の `${WEBRTC_INCLUDE_DIR}/third_party/llvm-build/Release+Assets/` を Clang コンパイラとして、`${WEBRTC_INCLUDE_DIR}/third_party/libc++/src/include` を libc++ ヘッダーとして利用すること
 - `WEBRTC_BUILD_ROOT` に相対パスが指定された場合、`CARGO_MANIFEST_DIR` を基準に絶対パスへ正規化して CMake へ渡すこと
 - `debug-build` feature 有効時に `CMAKE_BUILD_TYPE=Debug`、無効時に `CMAKE_BUILD_TYPE=Release` でビルドされること
 - Windows 向けにハードコードされた `NDEBUG` 定義を削除し、`CMAKE_BUILD_TYPE=Debug` 時に `NDEBUG` が定義されないこと（Release 時は CMake が自動付与）。`_ITERATOR_DEBUG_LEVEL=0` は全ビルドタイプで維持され、Debug ビルドした libwebrtc と ABI が一致すること
 - `debug-build` feature 有効時は `generate_bindings()` に `-UNDEBUG` を、無効時は `-DNDEBUG` を `clang_arg` として渡し、各ビルドタイプの libwebrtc ヘッダーと一致するバインディングを生成すること
 - `source-build` feature 未指定かつ `WEBRTC_BUILD_ROOT` 未設定かつ `debug-build` 無効の通常ビルドが引き続き成功すること
-- `rerun-if-env-changed=WEBRTC_BUILD_ROOT` と `rerun-if-env-changed=CARGO_FEATURE_DEBUG_BUILD` が `main()` に追加されていること
+- `rerun-if-env-changed=WEBRTC_BUILD_ROOT` と `rerun-if-env-changed=CARGO_FEATURE_DEBUG_BUILD` が `main()` に追加されていること。また `WEBRTC_BUILD_ROOT` 設定時は libwebrtc.a のパスに対して `cargo::rerun-if-changed` が出力され、libwebrtc.a の変更が cargo に検知されること
 - `CHANGES.md` の `## develop` に `[ADD] libwebrtc のデバッグビルドに対応する` エントリが追加されている
