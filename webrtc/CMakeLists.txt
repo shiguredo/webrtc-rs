@@ -610,6 +610,7 @@ if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
         UNICODE
         _UNICODE
         _USE_MATH_DEFINES
+        $<$<NOT:$<CONFIG:Debug>>:NDEBUG>
         RTC_ENABLE_H265
         _ITERATOR_DEBUG_LEVEL=0
     )
@@ -847,6 +848,7 @@ if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
         UNICODE
         _UNICODE
         _USE_MATH_DEFINES
+        $<$<NOT:$<CONFIG:Debug>>:NDEBUG>
         RTC_ENABLE_H265
     )
   endforeach()
