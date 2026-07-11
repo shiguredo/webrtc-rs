@@ -104,6 +104,24 @@ fn main() {
     println!("cargo::rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo::rerun-if-env-changed=ANDROID_NDK_HOME");
     println!("cargo::rerun-if-env-changed=ANDROID_NDK");
+    println!("cargo::rerun-if-env-changed=WEBRTC_BUILD_ROOT");
+    println!("cargo::rerun-if-env-changed=CARGO_FEATURE_DEBUG_BUILD");
+
+    // WEBRTC_BUILD_ROOT が設定されているのに source-build feature が無効な場合はエラー
+    if env::var("WEBRTC_BUILD_ROOT").is_ok() && env::var("CARGO_FEATURE_SOURCE_BUILD").is_err() {
+        panic!(
+            "WEBRTC_BUILD_ROOT が設定されていますが、source-build feature が有効になっていません。\n\
+             --features source-build を指定してください"
+        );
+    }
+
+    // prebuilt バイナリは Release のみのため、WEBRTC_BUILD_ROOT 未設定で debug-build feature が有効な場合はエラー
+    if env::var("WEBRTC_BUILD_ROOT").is_err() && env::var("CARGO_FEATURE_DEBUG_BUILD").is_ok() {
+        panic!(
+            "デバッグビルドの prebuilt バイナリは提供されていません。\n\
+             ローカルの webrtc-build を利用するために WEBRTC_BUILD_ROOT 環境変数を設定してください"
+        );
+    }
 
     let manifest_dir = PathBuf::from(
         env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR の取得に失敗しました"),
@@ -169,6 +187,10 @@ struct PrebuiltPaths {
 fn should_use_prebuilt() -> bool {
     // source-build feature が有効 → ソースビルド
     if env::var("CARGO_FEATURE_SOURCE_BUILD").is_ok() {
+        return false;
+    }
+    // WEBRTC_BUILD_ROOT が設定されている → ローカルの成果物を利用するためソースビルド
+    if env::var("WEBRTC_BUILD_ROOT").is_ok() {
         return false;
     }
     // デフォルトで prebuilt を試みる
@@ -861,11 +883,12 @@ fn build_webrtc_c(
     build_metadata: &BuildMetadata,
 ) -> PathBuf {
     let mut config = shiguredo_cmake::Config::new(webrtc_dir);
-    let profile = "release";
+    let debug_build = env::var("CARGO_FEATURE_DEBUG_BUILD").is_ok();
+    let profile = if debug_build { "debug" } else { "release" };
+    let cmake_build_type = if debug_build { "Debug" } else { "Release" };
     shiguredo_cmake::set_cmake_env();
 
-    // 配布されている libwebrtc は Release 相当のため、ラッパー側も Release で揃える
-    config.profile("Release");
+    config.profile(cmake_build_type);
     config.out_dir(out_dir.join("_build").join(target_platform).join(profile));
 
     // ターゲットプラットフォームを設定
@@ -873,12 +896,32 @@ fn build_webrtc_c(
         .define("WEBRTC_C_TARGET", target_platform)
         .define("WEBRTC_BUILD_VERSION", &build_metadata.webrtc_build_version)
         .define("WEBRTC_BASE_URL", &build_metadata.webrtc_base_url)
-        .define("CMAKE_BUILD_TYPE", "Release")
+        .define("CMAKE_BUILD_TYPE", cmake_build_type)
         .define("CMAKE_EXPORT_COMPILE_COMMANDS", "ON");
 
     // WEBRTC_C_SYSROOT が設定されていれば CMake に渡す
     if let Ok(sysroot) = env::var("WEBRTC_C_SYSROOT") {
         config.define("WEBRTC_C_SYSROOT", &sysroot);
+    }
+
+    // WEBRTC_BUILD_ROOT が設定されていれば CMake に渡す（絶対パスに正規化）
+    if let Ok(webrtc_build_root) = env::var("WEBRTC_BUILD_ROOT") {
+        let root_path = PathBuf::from(&webrtc_build_root);
+        let abs_root = if root_path.is_absolute() {
+            root_path
+        } else {
+            let manifest_dir =
+                env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR の取得に失敗しました");
+            PathBuf::from(&manifest_dir).join(&root_path)
+        };
+        let abs_root =
+            fs::canonicalize(&abs_root).expect("WEBRTC_BUILD_ROOT の正規化に失敗しました");
+        config.define(
+            "WEBRTC_BUILD_ROOT",
+            abs_root
+                .to_str()
+                .expect("WEBRTC_BUILD_ROOT の絶対パスを文字列に変換できませんでした"),
+        );
     }
 
     // iOS クロスコンパイル設定
@@ -1326,6 +1369,11 @@ fn generate_bindings(header: &Path, include_dir: &Path) {
         )
         .clang_arg(format!("-I{}", include_dir.display()))
         .layout_tests(false);
+
+    // debug-build feature 有効時は NDEBUG を未定義にして Debug ビルドのヘッダー定義に合わせる
+    if env::var("CARGO_FEATURE_DEBUG_BUILD").is_ok() {
+        builder = builder.clang_arg("-UNDEBUG");
+    }
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
