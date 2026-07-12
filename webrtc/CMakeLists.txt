@@ -5,17 +5,6 @@ cmake_policy(SET CMP0054 NEW)
 # MSVC runtime library flags are selected by an abstraction.
 cmake_policy(SET CMP0091 NEW)
 
-# WEBRTC_BUILD_VERSION と WEBRTC_BASE_URL は -D オプションで渡される
-# WEBRTC_BUILD_ROOT が設定されている場合はローカル成果物を使用するため不要
-if(NOT DEFINED WEBRTC_BUILD_ROOT)
-  if(NOT DEFINED WEBRTC_BUILD_VERSION)
-    message(FATAL_ERROR "WEBRTC_BUILD_VERSION is required. Set -DWEBRTC_BUILD_VERSION=...")
-  endif()
-  if(NOT DEFINED WEBRTC_BASE_URL)
-    message(FATAL_ERROR "WEBRTC_BASE_URL is required. Set -DWEBRTC_BASE_URL=...")
-  endif()
-endif()
-
 # execute_process の実行結果を共通で検査する
 function(execute_process_checked)
   set(options)
@@ -103,7 +92,6 @@ if(WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_ARMV8 AND NOT DEFINED WEBRTC_C_SYSROOT
 endif()
 
 message(STATUS "WEBRTC_C_TARGET: ${WEBRTC_C_TARGET}")
-message(STATUS "WEBRTC_BUILD_VERSION: ${WEBRTC_BUILD_VERSION}")
 
 set(WEBRTC_TARGETS_UBUNTU
   "ubuntu-24.04_x86_64"
@@ -120,8 +108,90 @@ set(WEBRTC_TARGETS_RASPBERRY_PI
   "raspberry-pi-os_armv8"
 )
 
-# WebRTC パッケージの URL を決定（WEBRTC_BUILD_ROOT 未設定時のみ）
-if(NOT DEFINED WEBRTC_BUILD_ROOT)
+# WebRTC 向けの libc++ ヘッダーのダウンロードと使用（WebRTC との ABI 互換性のため）
+set(WEBRTC_USE_WEBRTC_LIBCXX TRUE)
+# WebRTC の Clang をコンパイラとして使用するかどうか
+# Windows 以外は WebRTC の Clang を使う
+set(WEBRTC_USE_WEBRTC_CLANG TRUE)
+
+if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
+  set(WEBRTC_USE_WEBRTC_LIBCXX FALSE)
+  set(WEBRTC_USE_WEBRTC_CLANG FALSE)
+endif()
+
+# ============================================================================
+# WEBRTC_BUILD_ROOT の有無で大きく 2 ルートに分岐する
+#
+# ルート A: WEBRTC_BUILD_ROOT 定義あり → ローカルの webrtc-build にある成果物とコンパイラを使用する
+# ルート B: WEBRTC_BUILD_ROOT 定義なし → アーカイブをダウンロードして使用する
+#
+# この if/else/endif を抜けた時点で、以下の 6 つの変数が必ず定義されている：
+#   | 変数                     | 用途
+#   | WEBRTC_INCLUDE_DIR       | WebRTC のインクルードディレクトリ
+#   | WEBRTC_LIBRARY_DIR       | libwebrtc.a の格納ディレクトリ
+#   | LLVM_CLANG_DIR           | Clang コンパイラのルートディレクトリ (bin/clang, bin/clang++)
+#   | LLVM_LIBCXX_DIR          | libc++ ヘッダーのルートディレクトリ (include/)
+#   | WEBRTC_USE_WEBRTC_CLANG  | Clang を使うかどうか (TRUE or FALSE)
+#   | WEBRTC_USE_WEBRTC_LIBCXX | libc++ ヘッダーを使うかどうか (TRUE or FALSE)
+# ============================================================================
+if(DEFINED WEBRTC_BUILD_ROOT)
+  # --------------------------------------------------------------------------
+  # ルート A: ローカルの webrtc-build 成果物を使用する
+  #   Clang と libc++ は webrtc-build のソースツリー内のものを直接使用する
+  # --------------------------------------------------------------------------
+
+  # インクルードパス: webrtc-build のソースツリー
+  set(WEBRTC_INCLUDE_DIR "${WEBRTC_BUILD_ROOT}/_source/${WEBRTC_C_TARGET}/webrtc/src")
+
+  # ライブラリパス: webrtc-build のビルド成果物
+  # CMAKE_BUILD_TYPE は "Debug"/"Release" だが、webrtc-build の出力ディレクトリは小文字
+  string(TOLOWER "${CMAKE_BUILD_TYPE}" _BUILD_TYPE)
+  if(WEBRTC_C_TARGET STREQUAL "android_arm64")
+    set(WEBRTC_LIBRARY_DIR "${WEBRTC_BUILD_ROOT}/_build/${WEBRTC_C_TARGET}/${_BUILD_TYPE}/webrtc/lib/arm64-v8a")
+  else()
+    set(WEBRTC_LIBRARY_DIR "${WEBRTC_BUILD_ROOT}/_build/${WEBRTC_C_TARGET}/${_BUILD_TYPE}/webrtc")
+  endif()
+
+  # ローカルの Clang と libc++ のパスを設定し、存在を確認する
+  set(_LOCAL_CLANG_DIR "${WEBRTC_BUILD_ROOT}/_source/${WEBRTC_C_TARGET}/webrtc/src/third_party/llvm-build/Release+Asserts")
+  set(_LOCAL_LIBCXX_DIR "${WEBRTC_BUILD_ROOT}/_source/${WEBRTC_C_TARGET}/webrtc/src/third_party/libc++/src")
+  set(_LOCAL_BUILDTOOLS_DIR "${WEBRTC_BUILD_ROOT}/_source/${WEBRTC_C_TARGET}/webrtc/src/buildtools")
+
+  if(NOT EXISTS "${_LOCAL_CLANG_DIR}/bin/clang++")
+    message(FATAL_ERROR "Local Clang not found: ${_LOCAL_CLANG_DIR}/bin/clang++")
+  endif()
+  if(NOT EXISTS "${_LOCAL_LIBCXX_DIR}/include")
+    message(FATAL_ERROR "Local libc++ not found: ${_LOCAL_LIBCXX_DIR}/include")
+  endif()
+
+  message(STATUS "Using local Clang from ${_LOCAL_CLANG_DIR}")
+  message(STATUS "Using local libc++ from ${_LOCAL_LIBCXX_DIR}")
+
+  set(LLVM_CLANG_DIR "${_LOCAL_CLANG_DIR}")
+  set(LLVM_LIBCXX_DIR "${_LOCAL_LIBCXX_DIR}")
+
+  # __config_site と __assertion_handler をローカルの buildtools からコピーする
+  message(STATUS "Copying libc++ config files from local buildtools...")
+  file(COPY "${_LOCAL_BUILDTOOLS_DIR}/third_party/libc++/__config_site" DESTINATION "${LLVM_LIBCXX_DIR}/include")
+  file(COPY "${_LOCAL_BUILDTOOLS_DIR}/third_party/libc++/__assertion_handler" DESTINATION "${LLVM_LIBCXX_DIR}/include")
+
+else()
+  # --------------------------------------------------------------------------
+  # ルート B: WebRTC アーカイブをダウンロードして使用する
+  #   WEBRTC_BUILD_VERSION と WEBRTC_BASE_URL が必須
+  #   Clang と libc++ は別途 shallow clone / ダウンロードで取得する
+  # --------------------------------------------------------------------------
+
+  if(NOT DEFINED WEBRTC_BUILD_VERSION)
+    message(FATAL_ERROR "WEBRTC_BUILD_VERSION is required. Set -DWEBRTC_BUILD_VERSION=...")
+  endif()
+  if(NOT DEFINED WEBRTC_BASE_URL)
+    message(FATAL_ERROR "WEBRTC_BASE_URL is required. Set -DWEBRTC_BASE_URL=...")
+  endif()
+
+  message(STATUS "WEBRTC_BUILD_VERSION: ${WEBRTC_BUILD_VERSION}")
+
+  # ターゲットに対応する WebRTC アーカイブ名と URL を決定する
   if(WEBRTC_C_TARGET STREQUAL "macos_arm64")
     set(WEBRTC_ARCHIVE_NAME "webrtc.macos_arm64.tar.gz")
   elseif(WEBRTC_C_TARGET STREQUAL "ubuntu-24.04_x86_64")
@@ -143,38 +213,23 @@ if(NOT DEFINED WEBRTC_BUILD_ROOT)
   else()
     message(FATAL_ERROR "Unsupported target: ${WEBRTC_C_TARGET}")
   endif()
-
   set(WEBRTC_URL "${WEBRTC_BASE_URL}/${WEBRTC_BUILD_VERSION}/${WEBRTC_ARCHIVE_NAME}")
-endif()
 
-# 依存関係のダウンロード先
-set(DEPS_DIR "${CMAKE_BINARY_DIR}/_deps")
-set(WEBRTC_DIR "${DEPS_DIR}/webrtc")
-set(LLVM_DIR "${DEPS_DIR}/llvm")
-set(LLVM_CLANG_DIR "${LLVM_DIR}/clang")
-set(LLVM_LIBCXX_DIR "${LLVM_DIR}/libcxx")
-set(LLVM_TOOLS_DIR "${LLVM_DIR}/tools")
-set(LLVM_BUILDTOOLS_DIR "${LLVM_DIR}/buildtools")
+  # 依存関係のダウンロード先
+  set(DEPS_DIR "${CMAKE_BINARY_DIR}/_deps")
+  set(WEBRTC_DIR "${DEPS_DIR}/webrtc")
+  set(LLVM_DIR "${DEPS_DIR}/llvm")
+  set(LLVM_CLANG_DIR "${LLVM_DIR}/clang")
+  set(LLVM_LIBCXX_DIR "${LLVM_DIR}/libcxx")
+  set(LLVM_TOOLS_DIR "${LLVM_DIR}/tools")
+  set(LLVM_BUILDTOOLS_DIR "${LLVM_DIR}/buildtools")
 
-# バージョンファイルでキャッシュ管理
-set(WEBRTC_CACHE_KEY "${WEBRTC_BUILD_VERSION}:${WEBRTC_C_TARGET}")
-set(WEBRTC_VERSION_FILE "${DEPS_DIR}/webrtc.version")
-set(LLVM_VERSION_FILE "${DEPS_DIR}/llvm.version")
-# WebRTC 向けの libc++ ヘッダーのダウンロードと使用（WebRTC との ABI 互換性のため）
-set(WEBRTC_USE_WEBRTC_LIBCXX TRUE)
-# WebRTC の Clang をコンパイラとして使用するかどうか
-# Windows 以外は WebRTC の Clang を使う
-set(WEBRTC_USE_WEBRTC_CLANG TRUE)
+  # バージョンファイルでキャッシュ管理
+  set(WEBRTC_CACHE_KEY "${WEBRTC_BUILD_VERSION}:${WEBRTC_C_TARGET}")
+  set(WEBRTC_VERSION_FILE "${DEPS_DIR}/webrtc.version")
+  set(LLVM_VERSION_FILE "${DEPS_DIR}/llvm.version")
 
-if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
-  set(WEBRTC_USE_WEBRTC_LIBCXX FALSE)
-  set(WEBRTC_USE_WEBRTC_CLANG FALSE)
-endif()
-
-# WebRTC のダウンロード（project() の前に実行）
-# WEBRTC_BUILD_ROOT が設定されている場合はダウンロードをスキップし、
-# ローカルの webrtc-build 成果物を使用する
-if(NOT DEFINED WEBRTC_BUILD_ROOT)
+  # --- WebRTC のダウンロード ---
   set(WEBRTC_NEEDS_DOWNLOAD TRUE)
   if(EXISTS "${WEBRTC_VERSION_FILE}")
     file(READ "${WEBRTC_VERSION_FILE}" WEBRTC_INSTALLED_VERSION)
@@ -198,7 +253,6 @@ if(NOT DEFINED WEBRTC_BUILD_ROOT)
     endif()
 
     message(STATUS "Extracting WebRTC...")
-    # アーカイブ内に webrtc/ ディレクトリが含まれているため、DEPS_DIR に展開する
     file(ARCHIVE_EXTRACT INPUT "${WEBRTC_ARCHIVE}" DESTINATION "${DEPS_DIR}")
     file(REMOVE "${WEBRTC_ARCHIVE}")
     if(NOT EXISTS "${WEBRTC_DIR}/VERSIONS")
@@ -207,47 +261,30 @@ if(NOT DEFINED WEBRTC_BUILD_ROOT)
     file(WRITE "${WEBRTC_VERSION_FILE}" "${WEBRTC_CACHE_KEY}")
     message(STATUS "WebRTC download complete")
   endif()
-endif()
 
-# WebRTC のパスを設定
-if(DEFINED WEBRTC_BUILD_ROOT)
-  set(WEBRTC_INCLUDE_DIR "${WEBRTC_BUILD_ROOT}/_source/${WEBRTC_C_TARGET}/webrtc/src")
-  # CMAKE_BUILD_TYPE は "Debug"/"Release" だが、webrtc-build の出力ディレクトリは小文字
-  string(TOLOWER "${CMAKE_BUILD_TYPE}" _BUILD_TYPE)
-  if(WEBRTC_C_TARGET STREQUAL "android_arm64")
-    set(WEBRTC_LIBRARY_DIR "${WEBRTC_BUILD_ROOT}/_build/${WEBRTC_C_TARGET}/${_BUILD_TYPE}/webrtc/lib/arm64-v8a")
-  else()
-    set(WEBRTC_LIBRARY_DIR "${WEBRTC_BUILD_ROOT}/_build/${WEBRTC_C_TARGET}/${_BUILD_TYPE}/webrtc")
-  endif()
-else()
+  # ダウンロードした成果物のパスを設定
   set(WEBRTC_INCLUDE_DIR "${WEBRTC_DIR}/include")
   if(WEBRTC_C_TARGET STREQUAL "android_arm64")
     set(WEBRTC_LIBRARY_DIR "${WEBRTC_DIR}/lib/arm64-v8a")
   else()
     set(WEBRTC_LIBRARY_DIR "${WEBRTC_DIR}/lib")
   endif()
-endif()
 
-# WebRTC パッケージの VERSIONS ファイルから LLVM 関連の情報を読み込む
-if(NOT DEFINED WEBRTC_BUILD_ROOT)
+  # VERSIONS ファイルから LLVM 関連のコミットハッシュを読み込む
   file(STRINGS "${WEBRTC_DIR}/VERSIONS" VERSIONS_LINES)
   foreach(line IN LISTS VERSIONS_LINES)
     if(line MATCHES "^([A-Z_]+)=(.*)$")
       set(WEBRTC_${CMAKE_MATCH_1} "${CMAKE_MATCH_2}")
     endif()
   endforeach()
-endif()
 
-message(STATUS "LLVM tools commit: ${WEBRTC_WEBRTC_SRC_TOOLS_COMMIT}")
-message(STATUS "LLVM libcxx commit: ${WEBRTC_WEBRTC_SRC_THIRD_PARTY_LIBCXX_SRC_COMMIT}")
+  message(STATUS "LLVM tools commit: ${WEBRTC_WEBRTC_SRC_TOOLS_COMMIT}")
+  message(STATUS "LLVM libcxx commit: ${WEBRTC_WEBRTC_SRC_THIRD_PARTY_LIBCXX_SRC_COMMIT}")
 
-# LLVM バージョン文字列
-set(LLVM_VERSION_STRING "${WEBRTC_WEBRTC_SRC_TOOLS_COMMIT}.${WEBRTC_WEBRTC_SRC_BUILDTOOLS_COMMIT}.${WEBRTC_WEBRTC_SRC_THIRD_PARTY_LIBCXX_SRC_COMMIT}")
-set(LLVM_CACHE_KEY "${LLVM_VERSION_STRING}:${WEBRTC_C_TARGET}")
+  set(LLVM_VERSION_STRING "${WEBRTC_WEBRTC_SRC_TOOLS_COMMIT}.${WEBRTC_WEBRTC_SRC_BUILDTOOLS_COMMIT}.${WEBRTC_WEBRTC_SRC_THIRD_PARTY_LIBCXX_SRC_COMMIT}")
+  set(LLVM_CACHE_KEY "${LLVM_VERSION_STRING}:${WEBRTC_C_TARGET}")
 
-# LLVM のダウンロード（project() の前に実行）
-# ローカルツールチェーンを使用する場合はダウンロードをスキップ
-if(NOT DEFINED WEBRTC_BUILD_ROOT)
+  # --- LLVM のダウンロード ---
   set(LLVM_NEEDS_INSTALL TRUE)
   if(WEBRTC_USE_WEBRTC_LIBCXX AND EXISTS "${LLVM_VERSION_FILE}")
     file(READ "${LLVM_VERSION_FILE}" LLVM_INSTALLED_VERSION)
@@ -265,7 +302,6 @@ if(NOT DEFINED WEBRTC_BUILD_ROOT)
 
     # WebRTC の Clang をダウンロード
     if(WEBRTC_USE_WEBRTC_CLANG)
-      # tools を shallow clone
       message(STATUS "Cloning tools...")
       git_shallow_clone(
         NAME "tools"
@@ -318,31 +354,7 @@ if(NOT DEFINED WEBRTC_BUILD_ROOT)
   endif()
 endif()
 
-if(DEFINED WEBRTC_BUILD_ROOT)
-  # WEBRTC_BUILD_ROOT 設定時は webrtc-build のソースツリーに含まれる
-  # Clang と libc++ を直接使用する
-  set(_LOCAL_CLANG_DIR "${WEBRTC_BUILD_ROOT}/_source/${WEBRTC_C_TARGET}/webrtc/src/third_party/llvm-build/Release+Asserts")
-  set(_LOCAL_LIBCXX_DIR "${WEBRTC_BUILD_ROOT}/_source/${WEBRTC_C_TARGET}/webrtc/src/third_party/libc++/src")
-  set(_LOCAL_BUILDTOOLS_DIR "${WEBRTC_BUILD_ROOT}/_source/${WEBRTC_C_TARGET}/webrtc/src/buildtools")
-  if(NOT EXISTS "${_LOCAL_CLANG_DIR}/bin/clang++")
-    message(FATAL_ERROR "Local Clang not found: ${_LOCAL_CLANG_DIR}/bin/clang++")
-  endif()
-  if(NOT EXISTS "${_LOCAL_LIBCXX_DIR}/include")
-    message(FATAL_ERROR "Local libc++ not found: ${_LOCAL_LIBCXX_DIR}/include")
-  endif()
-  message(STATUS "Using local Clang from ${_LOCAL_CLANG_DIR}")
-  message(STATUS "Using local libc++ from ${_LOCAL_LIBCXX_DIR}")
-  set(LLVM_CLANG_DIR "${_LOCAL_CLANG_DIR}")
-  set(LLVM_LIBCXX_DIR "${_LOCAL_LIBCXX_DIR}")
-  set(WEBRTC_USE_WEBRTC_CLANG TRUE)
-  set(WEBRTC_USE_WEBRTC_LIBCXX TRUE)
-  set(_SKIP_LLVM_DOWNLOAD TRUE)
-  # __config_site と __assertion_handler をコピー
-  message(STATUS "Copying libc++ config files from local buildtools...")
-  file(COPY "${_LOCAL_BUILDTOOLS_DIR}/third_party/libc++/__config_site" DESTINATION "${LLVM_LIBCXX_DIR}/include")
-  file(COPY "${_LOCAL_BUILDTOOLS_DIR}/third_party/libc++/__assertion_handler" DESTINATION "${LLVM_LIBCXX_DIR}/include")
-endif()
-
+# Clang コンパイラの設定
 if(WEBRTC_USE_WEBRTC_CLANG)
   # Prebuilt Clang コンパイラのパスを設定（project() の前）
   set(CMAKE_C_COMPILER "${LLVM_CLANG_DIR}/bin/clang" CACHE FILEPATH "" FORCE)
@@ -353,6 +365,7 @@ else()
   message(STATUS "Using default C/C++ compiler from CMake generator")
 endif()
 
+# libc++ のインクルードディレクトリ
 if(WEBRTC_USE_WEBRTC_LIBCXX)
   set(LIBCXX_INCLUDE_DIR "${LLVM_LIBCXX_DIR}/include")
   message(STATUS "LIBCXX_INCLUDE_DIR: ${LIBCXX_INCLUDE_DIR}")
