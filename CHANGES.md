@@ -11,6 +11,10 @@
 
 ## develop
 
+- [ADD] libwebrtc のデバッグビルドに対応する
+  - `debug-build` feature を追加し、環境変数 `WEBRTC_BUILD_ROOT` でローカルの webrtc-build 成果物を指定できるようにする
+  - @melpon
+
 ## 0.150.2
 
 **リリース日**: 2026-06-23

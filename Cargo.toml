@@ -42,5 +42,6 @@ shiguredo_toml = "2026.2"
 
 [features]
 default = []
+debug-build = []
 local-export = []
 source-build = []
