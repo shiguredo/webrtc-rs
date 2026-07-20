@@ -46,6 +46,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - target: ubuntu-26.04_x86_64
+            os: ubuntu-26.04
+            rust_target: x86_64-unknown-linux-gnu
           - target: ubuntu-24.04_x86_64
             os: ubuntu-24.04
             rust_target: x86_64-unknown-linux-gnu
@@ -196,6 +199,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - target: ubuntu-26.04_armv8
+            os: ubuntu-24.04
+            rust_target: aarch64-unknown-linux-gnu
           - target: ubuntu-24.04_armv8
             os: ubuntu-24.04
             rust_target: aarch64-unknown-linux-gnu

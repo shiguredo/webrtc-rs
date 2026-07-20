@@ -210,6 +210,7 @@ C アプリ側で `webrtc::scoped_refptr` に相互変換できるクラスを�
 
 ### サポートターゲット
 
+- `ubuntu-26.04_x86_64`, `ubuntu-26.04_armv8`
 - `ubuntu-24.04_x86_64`, `ubuntu-24.04_armv8`
 - `ubuntu-22.04_x86_64`, `ubuntu-22.04_armv8`
 - `raspberry-pi-os_armv8`

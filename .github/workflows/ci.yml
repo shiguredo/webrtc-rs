@@ -19,6 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
+          - ubuntu-26.04
           - ubuntu-24.04
           - ubuntu-22.04
           - macos-26
@@ -52,6 +53,7 @@ jobs:
       fail-fast: false
       matrix:
         target:
+          - ubuntu-26.04_armv8
           - ubuntu-24.04_armv8
           - ubuntu-22.04_armv8
           - raspberry-pi-os_armv8
@@ -101,6 +103,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - target: ubuntu-26.04_armv8
+            runner: ubuntu-26.04-arm
           - target: ubuntu-24.04_armv8
             runner: ubuntu-24.04-arm
           - target: ubuntu-22.04_armv8

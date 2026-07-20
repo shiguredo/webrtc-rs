@@ -30,6 +30,8 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 
 ## サポートプラットフォーム
 
+- Ubuntu 26.04 LTS x86_64
+- Ubuntu 26.04 LTS arm64
 - Ubuntu 24.04 LTS x86_64
 - Ubuntu 24.04 LTS arm64
 - Ubuntu 22.04 LTS x86_64
