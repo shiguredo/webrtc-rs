@@ -830,6 +830,7 @@ fn get_target_platform() -> String {
 /// 戻り値:
 /// - `ubuntu-22.04`
 /// - `ubuntu-24.04`
+/// - `ubuntu-26.04`
 /// - `raspberry-pi-os`
 ///
 /// 副作用:
@@ -845,7 +846,7 @@ fn detect_linux_distro() -> String {
             if let Some(version) = line.strip_prefix("VERSION_ID=") {
                 let version = version.trim_matches('"');
                 match version {
-                    "22.04" | "24.04" => return format!("ubuntu-{}", version),
+                    "22.04" | "24.04" | "26.04" => return format!("ubuntu-{}", version),
                     _ => {}
                 }
             }

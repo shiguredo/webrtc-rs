@@ -11,9 +11,13 @@
 
 ## develop
 
+- [ADD] Ubuntu 26.04 LTS (x86_64 / armv8) に対応する
+  - @voluntas
 - [ADD] libwebrtc のデバッグビルドに対応する
   - `debug-build` feature を追加し、環境変数 `WEBRTC_BUILD_ROOT` でローカルの webrtc-build 成果物を指定できるようにする
   - @melpon
+- [UPDATE] libwebrtc m150 (m150.7871.3.1) に上げる
+  - @voluntas
 
 ## 0.150.2
 

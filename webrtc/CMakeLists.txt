@@ -94,12 +94,15 @@ endif()
 message(STATUS "WEBRTC_C_TARGET: ${WEBRTC_C_TARGET}")
 
 set(WEBRTC_TARGETS_UBUNTU
+  "ubuntu-26.04_x86_64"
+  "ubuntu-26.04_armv8"
   "ubuntu-24.04_x86_64"
   "ubuntu-24.04_armv8"
   "ubuntu-22.04_x86_64"
   "ubuntu-22.04_armv8"
 )
 set(WEBRTC_TARGETS_ARMV8
+  "ubuntu-26.04_armv8"
   "ubuntu-24.04_armv8"
   "ubuntu-22.04_armv8"
   "raspberry-pi-os_armv8"
@@ -194,6 +197,10 @@ else()
   # ターゲットに対応する WebRTC アーカイブ名と URL を決定する
   if(WEBRTC_C_TARGET STREQUAL "macos_arm64")
     set(WEBRTC_ARCHIVE_NAME "webrtc.macos_arm64.tar.gz")
+  elseif(WEBRTC_C_TARGET STREQUAL "ubuntu-26.04_x86_64")
+    set(WEBRTC_ARCHIVE_NAME "webrtc.ubuntu-26.04_x86_64.tar.gz")
+  elseif(WEBRTC_C_TARGET STREQUAL "ubuntu-26.04_armv8")
+    set(WEBRTC_ARCHIVE_NAME "webrtc.ubuntu-26.04_armv8.tar.gz")
   elseif(WEBRTC_C_TARGET STREQUAL "ubuntu-24.04_x86_64")
     set(WEBRTC_ARCHIVE_NAME "webrtc.ubuntu-24.04_x86_64.tar.gz")
   elseif(WEBRTC_C_TARGET STREQUAL "ubuntu-24.04_armv8")
