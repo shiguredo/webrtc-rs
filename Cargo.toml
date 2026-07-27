@@ -2,7 +2,7 @@
 name = "shiguredo_webrtc"
 version = "0.150.3"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.93"
 description = "Rust bindings for libwebrtc"
 readme = "README.md"
 homepage = "https://github.com/shiguredo/webrtc-rs"
