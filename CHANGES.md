@@ -11,6 +11,19 @@
 
 ## develop
 
+## 0.151.0
+
+**リリース日**: 2026-08-10
+
+- [CHANGE] MSRV (rust-version) を 1.93 に上げる
+  - @voluntas
+- [UPDATE] libwebrtc m151 (m151.7922.0.0) に上げる
+  - @voluntas
+
+## 0.150.3
+
+**リリース日**: 2026-07-20
+
 - [ADD] Ubuntu 26.04 LTS (x86_64 / armv8) に対応する
   - @voluntas
 - [ADD] libwebrtc のデバッグビルドに対応する

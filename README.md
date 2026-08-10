@@ -412,7 +412,7 @@ impl FactoryHolder {
 
 必要なもの:
 
-- Rust 1.88 以上
+- Rust 1.93 以上
 - `curl` (prebuilt ダウンロードに使用)
 - `tar` (prebuilt 展開に使用)
 - Linux の場合: `libx11-dev` (リンク時に必要)
@@ -448,7 +448,7 @@ cargo build --features source-build
 
 ソースビルドに必要なもの:
 
-- Rust 1.88 以上
+- Rust 1.93 以上
 - Linux の場合:
   - C++ コンパイラ (`build-essential`)
   - `libclang-dev` (bindgen が利用)
@@ -482,8 +482,8 @@ sudo apt-get install build-essential libclang-dev libx11-dev
 Apache License 2.0
 
 ```text
-Copyright 2026-2026, Wandbox LLC (Original Author)
-Copyright 2026-2026, Shiguredo Inc.
+Copyright 2026 Wandbox LLC (Original Author)
+Copyright 2026 Shiguredo Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
