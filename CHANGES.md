@@ -13,6 +13,11 @@
 
 - [CHANGE] MSRV (rust-version) を 1.93 に上げる
   - @voluntas
+
+## 0.150.3
+
+**リリース日**: 2026-07-20
+
 - [ADD] Ubuntu 26.04 LTS (x86_64 / armv8) に対応する
   - @voluntas
 - [ADD] libwebrtc のデバッグビルドに対応する
