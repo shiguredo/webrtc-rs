@@ -121,7 +121,7 @@ pub struct AdaptedVideoTrackSource {
 unsafe impl Send for AdaptedVideoTrackSource {}
 
 // WebRTC 側でスレッドセーフに設計されているため Send/Sync として扱う。
-// ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/media/base/adapted_video_track_source.h;l=33-36;drc=0bdeb7818cb6248017867b5e7d4e1cba33500dfc
+// ref: https://source.chromium.org/chromium/chromium/src/+/main:third_party/webrtc/api/video/adapted_video_track_source.h;l=33-36;drc=0bdeb7818cb6248017867b5e7d4e1cba33500dfc
 unsafe impl Sync for AdaptedVideoTrackSource {}
 
 impl AdaptedVideoTrackSource {

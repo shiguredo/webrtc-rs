@@ -425,6 +425,7 @@ add_library(webrtc_c
     src/webrtc_c/api/audio_codecs/audio_encoder_factory.cc
     src/webrtc_c/api/data_channel_interface.cc
     src/webrtc_c/api/dtls_transport_interface.cc
+    src/webrtc_c/api/frame_transformer_interface.cc
     src/webrtc_c/api/jsep.cc
     src/webrtc_c/api/environment.cc
     src/webrtc_c/api/media_types.cc
@@ -442,12 +443,16 @@ add_library(webrtc_c
     src/webrtc_c/api/rtp_transceiver_direction.cc
     src/webrtc_c/api/rtp_transceiver_interface.cc
     src/webrtc_c/api/stats/rtc_stats_report.cc
+    src/webrtc_c/api/transport/rtp/dependency_descriptor.cc
+    src/webrtc_c/api/video/adapted_video_track_source.cc
     src/webrtc_c/api/video/color_space.cc
     src/webrtc_c/api/video/encoded_image.cc
     src/webrtc_c/api/video/i420_buffer.cc
     src/webrtc_c/api/video/nv12_buffer.cc
+    src/webrtc_c/api/video/video_content_type.cc
     src/webrtc_c/api/video/video_frame.cc
     src/webrtc_c/api/video/video_frame_buffer.cc
+    src/webrtc_c/api/video/video_frame_metadata.cc
     src/webrtc_c/api/video/video_rotation.cc
     src/webrtc_c/api/video/video_sink_interface.cc
     src/webrtc_c/api/video/video_source_interface.cc
@@ -458,10 +463,12 @@ add_library(webrtc_c
     src/webrtc_c/api/video_codecs/sdp_video_format.cc
     src/webrtc_c/api/video_codecs/video_decoder_factory.cc
     src/webrtc_c/api/video_codecs/video_encoder_factory.cc
+    src/webrtc_c/modules/video_coding/codecs/h264/include/h264_globals.cc
     src/webrtc_c/modules/video_coding/codecs/interface/common_constants.cc
+    src/webrtc_c/modules/video_coding/codecs/vp8/include/vp8_globals.cc
+    src/webrtc_c/modules/video_coding/codecs/vp9/include/vp9_globals.cc
     src/webrtc_c/modules/video_coding/include/video_codec_interface.cc
     src/webrtc_c/libyuv.cc
-    src/webrtc_c/media/base/adapted_video_track_source.cc
     src/webrtc_c/media/engine/simulcast_encoder_adapter.cc
     src/webrtc_c/pc/connection_context.cc
     src/webrtc_c/rtc_base/crypto_random.cc

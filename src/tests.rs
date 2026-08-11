@@ -3248,3 +3248,81 @@ fn media_stream_track_round_trip() {
     worker.stop();
     signaling.stop();
 }
+
+#[test]
+fn frame_transformer_create_and_drop() {
+    struct TransformHandler;
+
+    impl FrameTransformerHandler for TransformHandler {
+        fn transform(&mut self, _frame: TransformableVideoFrameRef<'_>) -> bool {
+            true
+        }
+    }
+
+    let transformer = FrameTransformer::new_with_handler(Box::new(TransformHandler));
+    drop(transformer);
+}
+
+#[test]
+fn video_frame_metadata_full_roundtrip() {
+    let mut metadata = VideoFrameMetadata::new();
+
+    metadata.set_rotation(VideoRotation::R90);
+    assert_eq!(metadata.rotation(), VideoRotation::R90);
+    metadata.set_content_type(VideoContentType::Screenshare);
+    assert_eq!(metadata.content_type(), VideoContentType::Screenshare);
+    metadata.set_csrcs(&[1, 2, 3]);
+    assert_eq!(metadata.csrcs(), vec![1, 2, 3]);
+    metadata.set_decode_target_indications(&[
+        DecodeTargetIndication::Required,
+        DecodeTargetIndication::Discardable,
+    ]);
+    assert_eq!(
+        metadata.decode_target_indications(),
+        vec![
+            DecodeTargetIndication::Required,
+            DecodeTargetIndication::Discardable
+        ]
+    );
+
+    let mut vp8 = RTPVideoHeaderVP8::new();
+    vp8.set_picture_id(42);
+    vp8.set_temporal_idx(1);
+    metadata.set_rtp_video_header_codec_specifics(RTPVideoHeaderCodecSpecifics::VP8(vp8));
+    match metadata.rtp_video_header_codec_specifics() {
+        RTPVideoHeaderCodecSpecifics::VP8(v) => {
+            assert_eq!(v.picture_id(), 42);
+            assert_eq!(v.temporal_idx(), 1);
+        }
+        _ => panic!("RTPVideoHeaderCodecSpecifics::VP8 が返る想定でした"),
+    }
+
+    let mut vp9 = RTPVideoHeaderVP9::new();
+    vp9.set_spatial_idx(2);
+    vp9.set_num_spatial_layers(3);
+    metadata.set_rtp_video_header_codec_specifics(RTPVideoHeaderCodecSpecifics::VP9(vp9));
+    match metadata.rtp_video_header_codec_specifics() {
+        RTPVideoHeaderCodecSpecifics::VP9(v) => {
+            assert_eq!(v.spatial_idx(), 2);
+            assert_eq!(v.num_spatial_layers(), 3);
+        }
+        _ => panic!("RTPVideoHeaderCodecSpecifics::VP9 が返る想定でした"),
+    }
+
+    let mut h264 = RTPVideoHeaderH264::new();
+    h264.set_nalu_type(5);
+    h264.set_packetization_type(H264PacketizationType::SingleNalu);
+    h264.set_packetization_mode(H264PacketizationMode::NonInterleaved);
+    metadata.set_rtp_video_header_codec_specifics(RTPVideoHeaderCodecSpecifics::H264(h264));
+    match metadata.rtp_video_header_codec_specifics() {
+        RTPVideoHeaderCodecSpecifics::H264(v) => {
+            assert_eq!(v.nalu_type(), 5);
+            assert_eq!(v.packetization_type(), H264PacketizationType::SingleNalu);
+            assert_eq!(
+                v.packetization_mode(),
+                H264PacketizationMode::NonInterleaved
+            );
+        }
+        _ => panic!("RTPVideoHeaderCodecSpecifics::H264 が返る想定でした"),
+    }
+}

@@ -1271,7 +1271,7 @@ pub enum H264PacketizationMode {
 }
 
 impl H264PacketizationMode {
-    fn from_raw(value: i32) -> Self {
+    pub(crate) fn from_raw(value: i32) -> Self {
         if value == unsafe { ffi::webrtc_H264PacketizationMode_NonInterleaved } {
             Self::NonInterleaved
         } else if value == unsafe { ffi::webrtc_H264PacketizationMode_SingleNalUnit } {
@@ -1281,7 +1281,7 @@ impl H264PacketizationMode {
         }
     }
 
-    fn to_raw(self) -> i32 {
+    pub(crate) fn to_raw(self) -> i32 {
         match self {
             Self::NonInterleaved => unsafe { ffi::webrtc_H264PacketizationMode_NonInterleaved },
             Self::SingleNalUnit => unsafe { ffi::webrtc_H264PacketizationMode_SingleNalUnit },

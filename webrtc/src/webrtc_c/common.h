@@ -48,6 +48,14 @@
       type, _unique_delete)(struct WEBRTC_CONCAT(type, _unique) * p)
 
 // -------------------------
+// std::variant<T0, T1, ...>
+// -------------------------
+
+#define WEBRTC_DECLARE_VARIANT(type) \
+  WEBRTC_DECLARE_UNIQUE(type);       \
+  WEBRTC_EXPORT int WEBRTC_CONCAT(type, _index)(struct type * self)
+
+// -------------------------
 // std::vector<T>
 // -------------------------
 

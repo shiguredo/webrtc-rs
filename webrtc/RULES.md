@@ -54,6 +54,17 @@
 - `webrtc::RTCErrorOr<T>` のような、複数の値を持つ型を返す関数を移植する場合、それぞれの値を受け取るための引数を追加する。
   - `webrtc::RTCErrorOr<webrtc::scoped_refptr<CppType>>` の場合は `struct webrtc_RTCError*` と `struct CppType_refcounted*` を追加してそこに結果を出力する
 - `std::string` を返す関数を移植する場合は `struct std_string_unique*` にして、利用後は C アプリケーション側で `std_string_unique_delete` を呼んで解放する
+- `webrtc::Timestamp` / `webrtc::TimeDelta` は `int64_t` マイクロ秒として渡す
+  - 引数・戻り値ともに値はマイクロ秒単位とし、C++ 側で `Timestamp::Micros(...)` / `TimeDelta::Micros(...)` や `.us()` を使って変換する
+- `std::variant<T0, T1, ..., Tn>` はヒープ確保したコピーを `struct CType_unique*` として返す
+  - `WEBRTC_DECLARE_VARIANT(type)` / `WEBRTC_DEFINE_VARIANT(type, cpptype)` マクロを利用する
+  - 生成関数は `std::make_unique<CppType>(value)` を `_unique` にキャストして返し、破棄は `CType_unique_delete` で行う
+  - アクティブな alternative の index は `CType_index(self)` で取得する (0-origin、variant 宣言順)
+  - 各 alternative の値は `CType_get_<alt>(self)` で取得する
+    - 実装は `std::get_if<CppAlt>(variant)` を使用し、アクティブでない場合は null を返す
+    - 戻り値は variant 内を借用したポインタであり、呼び出し側は delete しない
+    - alternative のフィールドへは `CType_get_field` でアクセスする
+    - `std::monostate` は値を持たないためアクセサを定義しない
 - `*_unique` でない C 関数の移植で C++ 側が戻り値を返す場合、C-API 全体の一貫性を優先して out パラメータ方式で統一することがある
 
 ## ビルドと実行

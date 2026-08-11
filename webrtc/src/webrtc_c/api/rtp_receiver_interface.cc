@@ -18,4 +18,14 @@ webrtc_RtpReceiverInterface_track(struct webrtc_RtpReceiverInterface* self) {
   return reinterpret_cast<struct webrtc_MediaStreamTrackInterface_refcounted*>(
       track.release());
 }
+
+WEBRTC_EXPORT void webrtc_RtpReceiverInterface_SetFrameTransformer(
+    struct webrtc_RtpReceiverInterface* self,
+    struct webrtc_FrameTransformerInterface_refcounted* frame_transformer) {
+  auto receiver = reinterpret_cast<webrtc::RtpReceiverInterface*>(self);
+  auto transformer = reinterpret_cast<webrtc::FrameTransformerInterface*>(
+      webrtc_FrameTransformerInterface_refcounted_get(frame_transformer));
+  receiver->SetFrameTransformer(
+      webrtc::scoped_refptr<webrtc::FrameTransformerInterface>(transformer));
+}
 }

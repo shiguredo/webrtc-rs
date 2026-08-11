@@ -59,6 +59,17 @@
   }
 
 // -------------------------
+// std::variant<T0, T1, ...>
+// -------------------------
+
+#define WEBRTC_DEFINE_VARIANT(type, cpptype)                          \
+  WEBRTC_DEFINE_UNIQUE(type, cpptype)                                 \
+  WEBRTC_EXPORT int WEBRTC_CONCAT(type, _index)(struct type * self) { \
+    auto variant = reinterpret_cast<cpptype*>(self);                  \
+    return static_cast<int>(variant->index());                        \
+  }
+
+// -------------------------
 // std::vector<T>
 // -------------------------
 

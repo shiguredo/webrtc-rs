@@ -11,6 +11,18 @@
 
 ## develop
 
+- [ADD] WebRTC Encoded Transform (フレーム変換) に対応する
+  - `FrameTransformerInterface` / `TransformableFrameInterface` / `TransformableVideoFrameInterface` の C ラッパーと、Rust API として `FrameTransformer` / `FrameTransformerHandler` / `TransformableVideoFrame` / `TransformableVideoFrameRef` / `RtpTimestampInfo` を追加する
+  - `RtpSender::set_frame_transformer` / `RtpReceiver::set_frame_transformer` を追加する
+  - @melpon
+- [ADD] VideoFrameMetadata を完全移植する
+  - `rotation` / `content_type` / `decode_target_indications` / `csrcs` / `rtp_video_header_codec_specifics` の getter / setter を追加する
+  - `RTPVideoHeaderVP8` / `RTPVideoHeaderVP9` / `RTPVideoHeaderH264` と `RTPVideoHeaderCodecSpecifics` (std::variant) の C ラッパーと Rust API を追加する
+  - `VideoContentType` / `DecodeTargetIndication` / `H264PacketizationType` を追加する
+  - @melpon
+- [UPDATE] libwebrtc m152 (m152.7977.0.0) に上げる
+  - @melpon
+
 ## 0.151.0
 
 **リリース日**: 2026-08-10

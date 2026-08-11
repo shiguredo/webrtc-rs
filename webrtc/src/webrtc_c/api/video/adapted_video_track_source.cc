@@ -9,12 +9,12 @@
 #include <api/make_ref_counted.h>
 #include <api/media_stream_interface.h>
 #include <api/scoped_refptr.h>
+#include <api/video/adapted_video_track_source.h>
 #include <api/video/video_frame.h>
-#include <media/base/adapted_video_track_source.h>
 
-#include "../../api/video/video_frame.h"
 #include "../../common.h"
 #include "../../common.impl.h"
+#include "video_frame.h"
 
 // -------------------------
 // webrtc::AdaptedVideoTrackSource

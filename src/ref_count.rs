@@ -329,6 +329,38 @@ impl RefCountedHandle for RtpSenderHandle {
     }
 }
 
+pub(crate) struct FrameTransformerHandle;
+impl RefCountedHandle for FrameTransformerHandle {
+    type Refcounted = ffi::webrtc_FrameTransformerInterface_refcounted;
+    type Raw = ffi::webrtc_FrameTransformerInterface;
+
+    unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
+        unsafe { ffi::webrtc_FrameTransformerInterface_refcounted_get(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *mut Self::Raw) {
+        unsafe { ffi::webrtc_FrameTransformerInterface_AddRef(raw) };
+    }
+    unsafe fn release(raw: *mut Self::Raw) {
+        unsafe { ffi::webrtc_FrameTransformerInterface_Release(raw) };
+    }
+}
+
+pub(crate) struct TransformedFrameCallbackHandle;
+impl RefCountedHandle for TransformedFrameCallbackHandle {
+    type Refcounted = ffi::webrtc_TransformedFrameCallback_refcounted;
+    type Raw = ffi::webrtc_TransformedFrameCallback;
+
+    unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
+        unsafe { ffi::webrtc_TransformedFrameCallback_refcounted_get(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *mut Self::Raw) {
+        unsafe { ffi::webrtc_TransformedFrameCallback_AddRef(raw) };
+    }
+    unsafe fn release(raw: *mut Self::Raw) {
+        unsafe { ffi::webrtc_TransformedFrameCallback_Release(raw) };
+    }
+}
+
 pub(crate) struct PeerConnectionHandle;
 impl RefCountedHandle for PeerConnectionHandle {
     type Refcounted = ffi::webrtc_PeerConnectionInterface_refcounted;
