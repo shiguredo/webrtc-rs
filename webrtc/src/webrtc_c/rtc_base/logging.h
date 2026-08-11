@@ -27,9 +27,9 @@ WEBRTC_EXPORT void webrtc_LogMessage_Print(int severity,
 #define RTC_LOG_VERBOSE(fmt, ...)                                            \
   webrtc_LogMessage_Print(webrtc_LogSeverity_LS_VERBOSE, __FILE__, __LINE__, \
                           fmt, ##__VA_ARGS__)
-#define RTC_LOG_INFO(fmt, ...)                                                 \
-  webrtc_LogMessage_Print(webrtc_LogSeverity_LS_INFO, __FILE__, __LINE__, fmt, \
-                          ##__VA_ARGS__)
+#define RTC_LOG_INFO(fmt, ...)                                            \
+  webrtc_LogMessage_Print(webrtc_LogSeverity_LS_INFO, __FILE__, __LINE__, \
+                          fmt, ##__VA_ARGS__)
 #define RTC_LOG_WARNING(fmt, ...)                                            \
   webrtc_LogMessage_Print(webrtc_LogSeverity_LS_WARNING, __FILE__, __LINE__, \
                           fmt, ##__VA_ARGS__)
