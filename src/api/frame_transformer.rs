@@ -653,14 +653,31 @@ impl VideoFrameMetadata {
         VideoFrameType::from_raw(value)
     }
 
+    /// フレームタイプを設定する。
+    pub fn set_frame_type(&mut self, frame_type: VideoFrameType) {
+        unsafe {
+            ffi::webrtc_VideoFrameMetadata_SetFrameType(self.raw.as_ptr(), frame_type.to_raw())
+        };
+    }
+
     /// 幅を返す。
     pub fn width(&self) -> u16 {
         unsafe { ffi::webrtc_VideoFrameMetadata_GetWidth(self.raw.as_ptr()) }
     }
 
+    /// 幅を設定する。
+    pub fn set_width(&mut self, width: u16) {
+        unsafe { ffi::webrtc_VideoFrameMetadata_SetWidth(self.raw.as_ptr(), width) };
+    }
+
     /// 高さを返す。
     pub fn height(&self) -> u16 {
         unsafe { ffi::webrtc_VideoFrameMetadata_GetHeight(self.raw.as_ptr()) }
+    }
+
+    /// 高さを設定する。
+    pub fn set_height(&mut self, height: u16) {
+        unsafe { ffi::webrtc_VideoFrameMetadata_SetHeight(self.raw.as_ptr(), height) };
     }
 
     /// フレーム ID を返す。
@@ -673,14 +690,38 @@ impl VideoFrameMetadata {
         if has == 0 { None } else { Some(value) }
     }
 
+    /// フレーム ID を設定する。
+    pub fn set_frame_id(&mut self, frame_id: Option<i64>) {
+        match frame_id {
+            Some(v) => unsafe {
+                ffi::webrtc_VideoFrameMetadata_SetFrameId(self.raw.as_ptr(), 1, &v)
+            },
+            None => unsafe {
+                ffi::webrtc_VideoFrameMetadata_SetFrameId(self.raw.as_ptr(), 0, std::ptr::null())
+            },
+        }
+    }
+
     /// 空間レイヤーインデックスを返す。
     pub fn spatial_index(&self) -> i32 {
         unsafe { ffi::webrtc_VideoFrameMetadata_GetSpatialIndex(self.raw.as_ptr()) }
     }
 
+    /// 空間レイヤーインデックスを設定する。
+    pub fn set_spatial_index(&mut self, spatial_index: i32) {
+        unsafe { ffi::webrtc_VideoFrameMetadata_SetSpatialIndex(self.raw.as_ptr(), spatial_index) };
+    }
+
     /// 時間レイヤーインデックスを返す。
     pub fn temporal_index(&self) -> i32 {
         unsafe { ffi::webrtc_VideoFrameMetadata_GetTemporalIndex(self.raw.as_ptr()) }
+    }
+
+    /// 時間レイヤーインデックスを設定する。
+    pub fn set_temporal_index(&mut self, temporal_index: i32) {
+        unsafe {
+            ffi::webrtc_VideoFrameMetadata_SetTemporalIndex(self.raw.as_ptr(), temporal_index)
+        };
     }
 
     /// フレームの依存関係 (参照フレーム ID の一覧) を返す。
@@ -706,14 +747,51 @@ impl VideoFrameMetadata {
         Some(unsafe { std::slice::from_raw_parts(data, len) })
     }
 
+    /// フレームの依存関係 (参照フレーム ID の一覧) を設定する。
+    pub fn set_dependencies(&mut self, dependencies: Option<&[i64]>) {
+        match dependencies {
+            Some(v) => unsafe {
+                ffi::webrtc_VideoFrameMetadata_SetDependencies(
+                    self.raw.as_ptr(),
+                    1,
+                    v.as_ptr(),
+                    v.len(),
+                )
+            },
+            None => unsafe {
+                ffi::webrtc_VideoFrameMetadata_SetDependencies(
+                    self.raw.as_ptr(),
+                    0,
+                    std::ptr::null(),
+                    0,
+                )
+            },
+        }
+    }
+
     /// ピクチャ内で最後のフレームかどうかを返す。
     pub fn is_last_frame_in_picture(&self) -> bool {
         unsafe { ffi::webrtc_VideoFrameMetadata_GetIsLastFrameInPicture(self.raw.as_ptr()) != 0 }
     }
 
+    /// ピクチャ内で最後のフレームかどうかを設定する。
+    pub fn set_is_last_frame_in_picture(&mut self, is_last_frame_in_picture: bool) {
+        unsafe {
+            ffi::webrtc_VideoFrameMetadata_SetIsLastFrameInPicture(
+                self.raw.as_ptr(),
+                if is_last_frame_in_picture { 1 } else { 0 },
+            )
+        };
+    }
+
     /// サイマルキャストレイヤーのインデックスを返す。
     pub fn simulcast_idx(&self) -> u8 {
         unsafe { ffi::webrtc_VideoFrameMetadata_GetSimulcastIdx(self.raw.as_ptr()) }
+    }
+
+    /// サイマルキャストレイヤーのインデックスを設定する。
+    pub fn set_simulcast_idx(&mut self, simulcast_idx: u8) {
+        unsafe { ffi::webrtc_VideoFrameMetadata_SetSimulcastIdx(self.raw.as_ptr(), simulcast_idx) };
     }
 
     /// コーデックを返す。
@@ -722,9 +800,19 @@ impl VideoFrameMetadata {
         VideoCodecType::from_raw(value)
     }
 
+    /// コーデックを設定する。
+    pub fn set_codec(&mut self, codec: VideoCodecType) {
+        unsafe { ffi::webrtc_VideoFrameMetadata_SetCodec(self.raw.as_ptr(), codec.to_raw()) };
+    }
+
     /// SSRC を返す。
     pub fn ssrc(&self) -> u32 {
         unsafe { ffi::webrtc_VideoFrameMetadata_GetSsrc(self.raw.as_ptr()) }
+    }
+
+    /// SSRC を設定する。
+    pub fn set_ssrc(&mut self, ssrc: u32) {
+        unsafe { ffi::webrtc_VideoFrameMetadata_SetSsrc(self.raw.as_ptr(), ssrc) };
     }
 
     /// 回転角度を返す。
