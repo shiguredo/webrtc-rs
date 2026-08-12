@@ -490,7 +490,6 @@ fn nv12_copy_with_odd_size_and_padding() {
     let chroma_width = (width + 1) / 2;
     let chroma_height = (height + 1) / 2;
     let uv_row_bytes = chroma_width * 2;
-
     let src_stride_y = 8;
     let src_stride_uv = 10;
     let mut src_y = vec![0u8; (src_stride_y * height) as usize];
@@ -975,8 +974,8 @@ fn convert_to_i420_returns_false_when_sample_is_too_small() {
 fn i420_rotate_rotate_0_preserves_planes() {
     let width = 4;
     let height = 4;
-    let chroma_width = (width as usize + 1) / 2;
-    let chroma_height = (height as usize + 1) / 2;
+    let chroma_width = (width as usize).div_ceil(2);
+    let chroma_height = (height as usize).div_ceil(2);
 
     let mut src_y = vec![0u8; (width * height) as usize];
     let mut src_u = vec![0u8; chroma_width * chroma_height];
@@ -1023,8 +1022,8 @@ fn i420_rotate_rotate_0_preserves_planes() {
 fn i420_rotate_rotate_90_swaps_dimensions() {
     let width = 4;
     let height = 2;
-    let chroma_width = (width as usize + 1) / 2;
-    let chroma_height = (height as usize + 1) / 2;
+    let chroma_width = (width as usize).div_ceil(2);
+    let chroma_height = (height as usize).div_ceil(2);
 
     let mut src_y = vec![0u8; (width * height) as usize];
     let mut src_u = vec![0u8; chroma_width * chroma_height];
@@ -1041,8 +1040,8 @@ fn i420_rotate_rotate_90_swaps_dimensions() {
 
     // 1 回目: 90° → dst は height x width
     let mut rotated90_y = vec![0u8; (width * height) as usize];
-    let rotated_chroma_width90 = (height as usize + 1) / 2;
-    let rotated_chroma_height90 = (width as usize + 1) / 2;
+    let rotated_chroma_width90 = (height as usize).div_ceil(2);
+    let rotated_chroma_height90 = (width as usize).div_ceil(2);
     let mut rotated90_u = vec![0u8; rotated_chroma_width90 * rotated_chroma_height90];
     let mut rotated90_v = vec![0u8; rotated_chroma_width90 * rotated_chroma_height90];
     assert!(
@@ -1112,8 +1111,8 @@ fn i420_rotate_rotate_90_swaps_dimensions() {
 fn i420_rotate_rotate_180_inverts_pixel_order() {
     let width = 4;
     let height = 4;
-    let chroma_width = (width as usize + 1) / 2;
-    let chroma_height = (height as usize + 1) / 2;
+    let chroma_width = (width as usize).div_ceil(2);
+    let chroma_height = (height as usize).div_ceil(2);
 
     let mut src_y = vec![0u8; (width * height) as usize];
     let mut src_u = vec![0u8; chroma_width * chroma_height];
@@ -1196,8 +1195,8 @@ fn i420_rotate_rotate_180_inverts_pixel_order() {
 fn i420_rotate_rotate_270_swaps_dimensions() {
     let width = 4;
     let height = 2;
-    let chroma_width = (width as usize + 1) / 2;
-    let chroma_height = (height as usize + 1) / 2;
+    let chroma_width = (width as usize).div_ceil(2);
+    let chroma_height = (height as usize).div_ceil(2);
 
     let mut src_y = vec![0u8; (width * height) as usize];
     let mut src_u = vec![0u8; chroma_width * chroma_height];
@@ -1213,8 +1212,8 @@ fn i420_rotate_rotate_270_swaps_dimensions() {
     }
 
     // 270° 回転 → dst は height x width
-    let rotated_chroma_width270 = (height as usize + 1) / 2;
-    let rotated_chroma_height270 = (width as usize + 1) / 2;
+    let rotated_chroma_width270 = (height as usize).div_ceil(2);
+    let rotated_chroma_height270 = (width as usize).div_ceil(2);
     let mut rotated270_y = vec![0u8; (width * height) as usize];
     let mut rotated270_u = vec![0u8; rotated_chroma_width270 * rotated_chroma_height270];
     let mut rotated270_v = vec![0u8; rotated_chroma_width270 * rotated_chroma_height270];
@@ -1240,8 +1239,8 @@ fn i420_rotate_rotate_270_swaps_dimensions() {
     );
 
     // 90° 回転との round-trip: Rotate90 → Rotate270 で元に戻る
-    let rotated_chroma_w = (height as usize + 1) / 2;
-    let rotated_chroma_h = (width as usize + 1) / 2;
+    let rotated_chroma_w = (height as usize).div_ceil(2);
+    let rotated_chroma_h = (width as usize).div_ceil(2);
     let mut after90_y = vec![0u8; (width * height) as usize];
     let mut after90_u = vec![0u8; rotated_chroma_w * rotated_chroma_h];
     let mut after90_v = vec![0u8; rotated_chroma_w * rotated_chroma_h];
@@ -1308,8 +1307,8 @@ fn i420_rotate_rotate_270_swaps_dimensions() {
 fn i420_rotate_returns_false_when_destination_plane_is_too_short() {
     let width = 4;
     let height = 4;
-    let chroma_width = (width as usize + 1) / 2;
-    let chroma_height = (height as usize + 1) / 2;
+    let chroma_width = (width as usize).div_ceil(2);
+    let chroma_height = (height as usize).div_ceil(2);
 
     let src_y = vec![0u8; (width * height) as usize];
     let src_u = vec![0u8; chroma_width * chroma_height];
