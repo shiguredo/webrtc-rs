@@ -12,7 +12,7 @@
 ## develop
 
 - [ADD] WebRTC Encoded Transform (フレーム変換) に対応する
-  - `FrameTransformerInterface` / `TransformableFrameInterface` / `TransformableVideoFrameInterface` の C ラッパーと、Rust API として `FrameTransformer` / `FrameTransformerHandler` / `TransformableVideoFrame` / `TransformableVideoFrameRef` / `RtpTimestampInfo` を追加する
+  - `FrameTransformerInterface` / `TransformableFrameInterface` / `TransformableVideoFrameInterface` の C ラッパーと、Rust API として `FrameTransformer` / `FrameTransformerHandler` / `TransformableFrame` / `TransformableVideoFrame` / `RtpTimestampInfo` を追加する
   - `RtpSender::set_frame_transformer` / `RtpReceiver::set_frame_transformer` を追加する
   - @melpon
 - [ADD] VideoFrameMetadata を完全移植する

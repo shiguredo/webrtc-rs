@@ -5,7 +5,6 @@ use super::video_codec_specifics::{
 use crate::ref_count::{FrameTransformerHandle, TransformedFrameCallbackHandle};
 use crate::{CxxString, Result, ScopedRef, ffi};
 use std::collections::HashMap;
-use std::marker::PhantomData;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 use std::sync::Mutex;
@@ -130,11 +129,11 @@ impl TransformableFrameDirection {
 pub trait FrameTransformerHandler: Send {
     /// エンコード済みフレームを変換する。
     ///
-    /// `frame` のデータは [TransformableVideoFrameRef::get_data] で取得し、
-    /// [TransformableVideoFrameRef::set_data] で書き換える。
-    /// 戻り値が `true` の場合は変換後フレームが送信され、
-    /// `false` の場合はフレームがドロップされる。
-    fn transform(&mut self, frame: TransformableVideoFrameRef<'_>) -> bool;
+    /// `frame` は所有権を持って渡され、データは [TransformableFrame::get_data] で
+    /// 取得し [TransformableFrame::set_data] で書き換える。
+    /// 戻り値が `Some` の場合は変換後フレームが送信され、
+    /// `None` の場合はフレームがドロップされる。
+    fn transform(&mut self, frame: TransformableFrame) -> Option<TransformableFrame>;
 }
 
 /// 登録された TransformedFrameCallback の集合。
@@ -177,33 +176,38 @@ unsafe extern "C" fn frame_transformer_transform(
     // frame の所有権は C++ 側から引き継いでいる (unique_ptr を release 済み)。
     let state = unsafe { &mut *(user_data as *mut FrameTransformerHandlerState) };
     let frame = unsafe {
-        TransformableVideoFrame::from_unique_ptr(NonNull::new(frame).expect("BUG: frame が null"))
+        TransformableFrame::from_unique_ptr(NonNull::new(frame).expect("BUG: frame が null"))
     };
-    let keep = state.handler.transform(frame.as_ref());
-    if keep {
-        // 変換後フレームを ssrc に対応する delegate へ配送する。
-        let ssrc = unsafe { ffi::webrtc_TransformableFrameInterface_GetSsrc(frame.as_ptr()) };
-        let callback = {
-            let guard = state.callbacks.lock().expect("callbacks lock poisoned");
-            guard
-                .sink_callbacks
-                .get(&ssrc)
-                .cloned()
-                .or_else(|| guard.callback.clone())
-        };
-        match callback {
-            Some(callback) => unsafe {
-                ffi::webrtc_TransformedFrameCallback_OnTransformedFrame(
-                    callback.as_ptr(),
-                    frame.into_raw_unique(),
-                )
-            },
-            None => {
-                // 対応する delegate が無い場合は frame が破棄される (Drop)。
-            }
+    if let Some(frame) = state.handler.transform(frame) {
+        deliver_transformed_frame(state, frame);
+    }
+    // None の場合は frame が破棄される (Drop)。
+}
+
+/// 変換後フレームを ssrc に対応する delegate へ配送する。
+///
+/// 対応する delegate が無い場合はフレームが破棄される (Drop)。
+fn deliver_transformed_frame(state: &mut FrameTransformerHandlerState, frame: TransformableFrame) {
+    let ssrc = frame.get_ssrc();
+    let callback = {
+        let guard = state.callbacks.lock().expect("callbacks lock poisoned");
+        guard
+            .sink_callbacks
+            .get(&ssrc)
+            .cloned()
+            .or_else(|| guard.callback.clone())
+    };
+    match callback {
+        Some(callback) => unsafe {
+            ffi::webrtc_TransformedFrameCallback_OnTransformedFrame(
+                callback.as_ptr(),
+                frame.into_raw_unique(),
+            )
+        },
+        None => {
+            // 対応する delegate が無い場合は frame が破棄される (Drop)。
         }
     }
-    // keep == false の場合は frame が破棄される (Drop)。
 }
 
 unsafe extern "C" fn frame_transformer_register_transformed_frame_callback(
@@ -332,18 +336,18 @@ impl FrameTransformer {
     }
 }
 
-/// webrtc::TransformableVideoFrameInterface の所有ラッパー。
+/// webrtc::TransformableFrameInterface の所有ラッパー。
 ///
-/// エンコード済みフレームの所有権 (unique_ptr) を保持する。通常は
-/// [FrameTransformerHandler] へ [TransformableVideoFrameRef] として渡され、
-/// 変換後の配送と破棄は libwebrtc 側で行う。
-pub struct TransformableVideoFrame {
+/// エンコード済みフレームの所有権 (unique_ptr) を保持する。
+/// [FrameTransformerHandler] にはこの型を渡し、変換後の配送と破棄は
+/// libwebrtc 側で行う。
+pub struct TransformableFrame {
     raw_unique: NonNull<ffi::webrtc_TransformableFrameInterface_unique>,
 }
 
-unsafe impl Send for TransformableVideoFrame {}
+unsafe impl Send for TransformableFrame {}
 
-impl TransformableVideoFrame {
+impl TransformableFrame {
     /// # Safety
     /// `raw_unique` は有効な `webrtc_TransformableFrameInterface_unique` を指し、
     /// 呼び出し元が所有権を持っている必要があります。
@@ -357,63 +361,10 @@ impl TransformableVideoFrame {
         unsafe { ffi::webrtc_TransformableFrameInterface_unique_get(self.raw_unique.as_ptr()) }
     }
 
-    fn as_video_ptr(&self) -> *mut ffi::webrtc_TransformableVideoFrameInterface {
-        self.as_ptr() as *mut ffi::webrtc_TransformableVideoFrameInterface
-    }
-
-    /// 借用ラッパーを返す。
-    pub fn as_ref(&self) -> TransformableVideoFrameRef<'_> {
-        unsafe {
-            TransformableVideoFrameRef::from_raw(
-                NonNull::new(self.as_video_ptr()).expect("BUG: frame が null"),
-            )
-        }
-    }
-
     fn into_raw_unique(self) -> *mut ffi::webrtc_TransformableFrameInterface_unique {
         let ptr = self.raw_unique.as_ptr();
         std::mem::forget(self);
         ptr
-    }
-}
-
-impl Drop for TransformableVideoFrame {
-    fn drop(&mut self) {
-        unsafe { ffi::webrtc_TransformableFrameInterface_unique_delete(self.raw_unique.as_ptr()) };
-    }
-}
-
-/// webrtc::TransformableVideoFrameInterface の借用ラッパー。
-///
-/// エンコード済みフレームのデータ取得・書き換えと、SSRC などのメタデータの
-/// 読み取りを提供する。データの取得結果は [set_data] など次の非 const
-/// メソッド呼び出しまで有効で、借用の仕組みによりそれを超えて保持できない。
-pub struct TransformableVideoFrameRef<'a> {
-    raw: NonNull<ffi::webrtc_TransformableVideoFrameInterface>,
-    _marker: PhantomData<&'a ffi::webrtc_TransformableVideoFrameInterface>,
-}
-
-unsafe impl<'a> Send for TransformableVideoFrameRef<'a> {}
-
-impl<'a> TransformableVideoFrameRef<'a> {
-    /// # Safety
-    /// `raw` は有効な `webrtc_TransformableVideoFrameInterface` を指し、
-    /// この参照の利用中は破棄されない必要があります。
-    pub(crate) unsafe fn from_raw(
-        raw: NonNull<ffi::webrtc_TransformableVideoFrameInterface>,
-    ) -> Self {
-        Self {
-            raw,
-            _marker: PhantomData,
-        }
-    }
-
-    fn as_ptr(&self) -> *mut ffi::webrtc_TransformableFrameInterface {
-        self.raw.as_ptr() as *mut ffi::webrtc_TransformableFrameInterface
-    }
-
-    fn as_video_ptr(&self) -> *mut ffi::webrtc_TransformableVideoFrameInterface {
-        self.raw.as_ptr()
     }
 
     /// フレームのペイロードデータを返す。
@@ -590,6 +541,106 @@ impl<'a> TransformableVideoFrameRef<'a> {
         };
         if has == 0 { None } else { Some(delta_us) }
     }
+}
+
+impl Drop for TransformableFrame {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_TransformableFrameInterface_unique_delete(self.raw_unique.as_ptr()) };
+    }
+}
+
+/// webrtc::TransformableVideoFrameInterface の所有ラッパー。
+///
+/// [TransformableFrame] から [TryFrom] で変換する。MIME type が `video/` で
+/// 始まる場合のみ変換でき、それ以外の場合はフレームをそのまま返す。
+pub struct TransformableVideoFrame {
+    base: TransformableFrame,
+}
+
+unsafe impl Send for TransformableVideoFrame {}
+
+impl TransformableVideoFrame {
+    fn as_video_ptr(&self) -> *mut ffi::webrtc_TransformableVideoFrameInterface {
+        self.base.as_ptr() as *mut ffi::webrtc_TransformableVideoFrameInterface
+    }
+
+    /// 基底フレームへ戻す。
+    pub fn into_base(self) -> TransformableFrame {
+        self.base
+    }
+
+    /// フレームのペイロードデータを返す。
+    ///
+    /// 返されたスライスは次の非 const メソッド呼び出しまで有効なため、
+    /// 借用の範囲内でのみ利用すること。
+    pub fn get_data(&self) -> &[u8] {
+        self.base.get_data()
+    }
+
+    /// フレームのペイロードデータを書き換える。
+    pub fn set_data(&mut self, data: &[u8]) {
+        self.base.set_data(data);
+    }
+
+    /// ペイロードタイプを返す。
+    pub fn get_payload_type(&self) -> u8 {
+        self.base.get_payload_type()
+    }
+
+    /// ペイロードタイプを変更できるかどうかを返す。
+    pub fn can_set_payload_type(&self) -> bool {
+        self.base.can_set_payload_type()
+    }
+
+    /// ペイロードタイプを設定する。
+    pub fn set_payload_type(&mut self, payload_type: u8) {
+        self.base.set_payload_type(payload_type);
+    }
+
+    /// このフレームの SSRC を返す。
+    pub fn get_ssrc(&self) -> u32 {
+        self.base.get_ssrc()
+    }
+
+    /// RTP timestamp を返す。
+    pub fn get_rtp_timestamp_info(&self) -> RtpTimestampInfo {
+        self.base.get_rtp_timestamp_info()
+    }
+
+    /// RTP timestamp を設定する。
+    pub fn set_rtp_timestamp(&mut self, rtp_timestamp_with_offset: u32) {
+        self.base.set_rtp_timestamp(rtp_timestamp_with_offset);
+    }
+
+    /// フレームの方向を返す。
+    pub fn get_direction(&self) -> TransformableFrameDirection {
+        self.base.get_direction()
+    }
+
+    /// フレームの MIME type を返す。
+    pub fn get_mime_type(&self) -> Result<String> {
+        self.base.get_mime_type()
+    }
+
+    /// パケットがネットワークで最初に観測されたタイムスタンプ (マイクロ秒) を返す。
+    pub fn receive_time(&self) -> Option<i64> {
+        self.base.receive_time()
+    }
+
+    /// プレゼンテーション用のタイムスタンプ (マイクロ秒) を返す。
+    pub fn get_presentation_timestamp(&self) -> Option<i64> {
+        self.base.get_presentation_timestamp()
+    }
+
+    /// キャプチャシステム内でフレームがキャプチャされた時刻 (マイクロ秒) を返す。
+    pub fn capture_time(&self) -> Option<i64> {
+        self.base.capture_time()
+    }
+
+    /// 送信側システムとキャプチャ側システムのクロックオフセット (マイクロ秒) を返す。
+    pub fn sender_capture_time_offset(&self) -> Option<i64> {
+        self.base.sender_capture_time_offset()
+    }
 
     /// このフレームがキーフレームかどうかを返す。
     pub fn is_key_frame(&self) -> bool {
@@ -626,9 +677,24 @@ impl<'a> TransformableVideoFrameRef<'a> {
     }
 }
 
+impl TryFrom<TransformableFrame> for TransformableVideoFrame {
+    type Error = TransformableFrame;
+
+    fn try_from(frame: TransformableFrame) -> std::result::Result<Self, Self::Error> {
+        let mime = frame
+            .get_mime_type()
+            .expect("BUG: MIME type の取得に失敗しました");
+        if mime.starts_with("video/") {
+            Ok(TransformableVideoFrame { base: frame })
+        } else {
+            Err(frame)
+        }
+    }
+}
+
 /// webrtc::VideoFrameMetadata のラッパー。
 ///
-/// [TransformableVideoFrameRef::metadata] が返す所有型。
+/// [TransformableVideoFrame::metadata] が返す所有型。
 pub struct VideoFrameMetadata {
     raw: NonNull<ffi::webrtc_VideoFrameMetadata>,
 }

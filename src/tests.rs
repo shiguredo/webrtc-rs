@@ -3254,8 +3254,8 @@ fn frame_transformer_create_and_drop() {
     struct TransformHandler;
 
     impl FrameTransformerHandler for TransformHandler {
-        fn transform(&mut self, _frame: TransformableVideoFrameRef<'_>) -> bool {
-            true
+        fn transform(&mut self, frame: TransformableFrame) -> Option<TransformableFrame> {
+            Some(frame)
         }
     }
 
