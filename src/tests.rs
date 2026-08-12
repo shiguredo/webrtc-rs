@@ -3254,7 +3254,7 @@ fn frame_transformer_create_and_drop() {
     struct TransformHandler;
 
     impl FrameTransformerHandler for TransformHandler {
-        fn transform(&mut self, frame: TransformableFrame) -> Option<TransformableFrame> {
+        fn transform(&self, frame: TransformableFrame) -> Option<TransformableFrame> {
             Some(frame)
         }
     }

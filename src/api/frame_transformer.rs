@@ -126,14 +126,20 @@ impl TransformableFrameDirection {
 /// libwebrtc の呼び出しスレッド上で同期実行されるため、
 /// 重い処理は呼び出しスレッド (エンコーダー・ネットワークスレッド) を
 /// ブロックすることに注意する。
-pub trait FrameTransformerHandler: Send {
+///
+/// 同一の [FrameTransformer] を複数の送受信ストリームで共有すると、
+/// libwebrtc は `transform` を並行に呼び得る (送信はエンコーダースレッド、
+/// 受信はネットワークスレッド)。そのためこのトレイトは `Sync` を要求し、
+/// `transform` は `&self` で呼ばれる。共有状態を持つ場合はハンドラ側で
+/// `Mutex` や `Atomic` などにより同期すること。
+pub trait FrameTransformerHandler: Send + Sync {
     /// エンコード済みフレームを変換する。
     ///
     /// `frame` は所有権を持って渡され、データは [TransformableFrame::get_data] で
     /// 取得し [TransformableFrame::set_data] で書き換える。
     /// 戻り値が `Some` の場合は変換後フレームが送信され、
     /// `None` の場合はフレームがドロップされる。
-    fn transform(&mut self, frame: TransformableFrame) -> Option<TransformableFrame>;
+    fn transform(&self, frame: TransformableFrame) -> Option<TransformableFrame>;
 }
 
 /// 登録された TransformedFrameCallback の集合。
@@ -156,14 +162,18 @@ impl FrameTransformerCallbacks {
 struct FrameTransformerHandlerState {
     handler: Box<dyn FrameTransformerHandler>,
     // 送信側では delegate の登録 (Register/Unregister) がセットアップスレッド、
-    // フレームの配送 (Transform) がエンコーダースレッドで実行されるため、
+    // フレームの配送 (Transform) がエンコーダースレッドで実行され、
+    // 同一 transformer を複数ストリームで共有すると並行呼び出しとなり得る。
     // callback の登録状態は Mutex で保護する。
     callbacks: Mutex<FrameTransformerCallbacks>,
 }
 
-// 各コールバックは libwebrtc の呼び出しスレッド上で直列に呼ばれ、
-// callbacks は Mutex で保護されるため Send として扱う。
+// コールバックは共有参照 (&) で state にアクセスし、handler は &self
+// (ハンドラ側で同期を要求)、callbacks は Mutex で保護されるため
+// Send / Sync として扱う。内部の ScopedRef はロック下でのみアクセスされ、
+// webrtc の参照カウントはアトミックでスレッドセーフである。
 unsafe impl Send for FrameTransformerHandlerState {}
+unsafe impl Sync for FrameTransformerHandlerState {}
 
 unsafe extern "C" fn frame_transformer_transform(
     frame: *mut ffi::webrtc_TransformableFrameInterface_unique,
@@ -174,7 +184,7 @@ unsafe extern "C" fn frame_transformer_transform(
         "frame_transformer_transform: user_data is null"
     );
     // frame の所有権は C++ 側から引き継いでいる (unique_ptr を release 済み)。
-    let state = unsafe { &mut *(user_data as *mut FrameTransformerHandlerState) };
+    let state = unsafe { &*(user_data as *const FrameTransformerHandlerState) };
     let frame = unsafe {
         TransformableFrame::from_unique_ptr(NonNull::new(frame).expect("BUG: frame が null"))
     };
@@ -187,7 +197,7 @@ unsafe extern "C" fn frame_transformer_transform(
 /// 変換後フレームを ssrc に対応する delegate へ配送する。
 ///
 /// 対応する delegate が無い場合はフレームが破棄される (Drop)。
-fn deliver_transformed_frame(state: &mut FrameTransformerHandlerState, frame: TransformableFrame) {
+fn deliver_transformed_frame(state: &FrameTransformerHandlerState, frame: TransformableFrame) {
     let ssrc = frame.get_ssrc();
     let callback = {
         let guard = state.callbacks.lock().expect("callbacks lock poisoned");
@@ -218,7 +228,7 @@ unsafe extern "C" fn frame_transformer_register_transformed_frame_callback(
         !user_data.is_null(),
         "frame_transformer_register_transformed_frame_callback: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut FrameTransformerHandlerState) };
+    let state = unsafe { &*(user_data as *const FrameTransformerHandlerState) };
     let callback = NonNull::new(callback).expect("BUG: callback が null");
     let callback = ScopedRef::<TransformedFrameCallbackHandle>::from_raw(callback);
     state
@@ -237,7 +247,7 @@ unsafe extern "C" fn frame_transformer_register_transformed_frame_sink_callback(
         !user_data.is_null(),
         "frame_transformer_register_transformed_frame_sink_callback: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut FrameTransformerHandlerState) };
+    let state = unsafe { &*(user_data as *const FrameTransformerHandlerState) };
     let callback = NonNull::new(callback).expect("BUG: callback が null");
     let callback = ScopedRef::<TransformedFrameCallbackHandle>::from_raw(callback);
     state
@@ -255,7 +265,7 @@ unsafe extern "C" fn frame_transformer_unregister_transformed_frame_callback(
         !user_data.is_null(),
         "frame_transformer_unregister_transformed_frame_callback: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut FrameTransformerHandlerState) };
+    let state = unsafe { &*(user_data as *const FrameTransformerHandlerState) };
     state
         .callbacks
         .lock()
@@ -271,7 +281,7 @@ unsafe extern "C" fn frame_transformer_unregister_transformed_frame_sink_callbac
         !user_data.is_null(),
         "frame_transformer_unregister_transformed_frame_sink_callback: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut FrameTransformerHandlerState) };
+    let state = unsafe { &*(user_data as *const FrameTransformerHandlerState) };
     state
         .callbacks
         .lock()
