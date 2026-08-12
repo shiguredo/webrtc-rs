@@ -2092,8 +2092,9 @@ impl VideoCodec {
 
     pub fn set_number_of_simulcast_streams(&mut self, value: usize) {
         assert!(
-            value <= unsafe { ffi::webrtc_kMaxSimulcastStreams },
-            "value が kMaxSimulcastStreams を超えています: {value}"
+            value <= crate::constants::max_simulcast_streams(),
+            "value が max_simulcast_streams() ({}) を超えています: {value}",
+            crate::constants::max_simulcast_streams()
         );
         let mut codec = self.as_ref();
         codec.set_number_of_simulcast_streams(value);
@@ -2225,8 +2226,9 @@ impl<'a> VideoCodecRef<'a> {
 
     pub fn set_number_of_simulcast_streams(&mut self, value: usize) {
         assert!(
-            value <= unsafe { ffi::webrtc_kMaxSimulcastStreams },
-            "value が kMaxSimulcastStreams を超えています: {value}"
+            value <= crate::constants::max_simulcast_streams(),
+            "value が max_simulcast_streams() ({}) を超えています: {value}",
+            crate::constants::max_simulcast_streams()
         );
         let value = value.min(i32::MAX as usize) as i32;
         unsafe { ffi::webrtc_VideoCodec_set_number_of_simulcast_streams(self.raw.as_ptr(), value) };

@@ -7,22 +7,6 @@ use std::marker::PhantomData;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 
-pub fn no_picture_id() -> i16 {
-    unsafe { ffi::webrtc_kNoPictureId }
-}
-
-pub fn no_tl0_pic_idx() -> i16 {
-    unsafe { ffi::webrtc_kNoTl0PicIdx }
-}
-
-pub fn no_temporal_idx() -> u8 {
-    unsafe { ffi::webrtc_kNoTemporalIdx }
-}
-
-pub fn no_key_idx() -> i32 {
-    unsafe { ffi::webrtc_kNoKeyIdx }
-}
-
 pub struct VideoEncoderFramerateFractionInlinedVectorRef<'a> {
     raw: NonNull<ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector>,
     _marker: PhantomData<&'a ffi::webrtc_VideoEncoder_EncoderInfo>,

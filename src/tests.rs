@@ -133,10 +133,10 @@ fn media_type_constants() {
 
 #[test]
 fn common_constants_values() {
-    assert_eq!(no_picture_id(), -1);
-    assert_eq!(no_tl0_pic_idx(), -1);
-    assert_eq!(no_temporal_idx(), 0xFF);
-    assert_eq!(no_key_idx(), -1);
+    assert_eq!(constants::no_picture_id(), -1);
+    assert_eq!(constants::no_tl0_pic_idx(), -1);
+    assert_eq!(constants::no_temporal_idx(), 0xFF);
+    assert_eq!(constants::no_key_idx(), -1);
 }
 
 #[test]
@@ -423,6 +423,10 @@ fn video_codec_ref_getter_setter_and_simulcast_stream_ref_roundtrip() {
     assert_eq!(codec.max_bitrate_kbps(), 2500);
     assert_eq!(codec.max_framerate(), 60);
     assert_eq!(codec.number_of_simulcast_streams(), 2);
+
+    // 配列サイズの公開メソッドが libwebrtc の定数と一致することを確認する。
+    assert_eq!(constants::max_simulcast_streams(), 3);
+    assert_eq!(constants::max_spatial_layers(), 5);
 
     {
         let mut stream0 = codec
@@ -3505,6 +3509,10 @@ fn rtp_video_header_vp9_full_roundtrip() {
     assert_eq!(header.ref_picture_id(usize::MAX), None);
     assert_eq!(header.width(usize::MAX), None);
     assert_eq!(header.height(usize::MAX), None);
+
+    // 配列サイズの公開メソッドが libwebrtc の定数と一致することを確認する。
+    assert_eq!(constants::max_vp9_ref_pics(), 3);
+    assert_eq!(constants::max_vp9_num_spatial_layers(), 8);
 }
 
 #[test]
@@ -3537,17 +3545,21 @@ fn gof_info_vp9_full_roundtrip() {
     assert_eq!(gof.num_ref_pics(usize::MAX), None);
     assert_eq!(gof.pid_diff(usize::MAX, 0), None);
     assert_eq!(gof.pid_diff(0, usize::MAX), None);
+
+    // 配列サイズの公開メソッドが libwebrtc の定数と一致することを確認する。
+    assert_eq!(constants::max_vp9_frames_in_gof(), 0xFF);
+    assert_eq!(constants::max_vp9_ref_pics(), 3);
 }
 
 #[test]
-#[should_panic(expected = "kMaxVp9FramesInGof")]
+#[should_panic(expected = "MAX_FRAMES_IN_GOF")]
 fn gof_info_vp9_set_num_frames_in_gof_overflow() {
     let mut gof = GofInfoVP9::new();
     gof.set_num_frames_in_gof(300);
 }
 
 #[test]
-#[should_panic(expected = "kMaxVp9FramesInGof")]
+#[should_panic(expected = "MAX_FRAMES_IN_GOF")]
 fn gof_info_vp9_set_temporal_idx_out_of_bounds() {
     let mut gof = GofInfoVP9::new();
     gof.set_temporal_idx(255, 1);
