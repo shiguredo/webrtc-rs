@@ -101,7 +101,7 @@ pub enum RtpTimestampInfo {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransformableFrameDirection {
     /// 方向が不明。
-    Unknown,
+    Unknown(i32),
     /// 受信側のフレーム。
     Receiver,
     /// 送信側のフレーム。
@@ -113,7 +113,7 @@ impl TransformableFrameDirection {
         match value {
             1 => Self::Receiver,
             2 => Self::Sender,
-            _ => Self::Unknown,
+            _ => Self::Unknown(value),
         }
     }
 }
@@ -203,7 +203,7 @@ unsafe extern "C" fn frame_transformer_transform(
 ///
 /// 対応する delegate が無い場合はフレームが破棄される (Drop)。
 fn deliver_transformed_frame(state: &FrameTransformerHandlerState, frame: TransformableFrame) {
-    let ssrc = frame.get_ssrc();
+    let ssrc = frame.ssrc();
     let callback = {
         let guard = state.callbacks.lock().expect("callbacks lock poisoned");
         guard
@@ -390,7 +390,7 @@ impl TransformableFrame {
     ///
     /// 返されたスライスは次の非 const メソッド呼び出しまで有効なため、
     /// 借用の範囲内でのみ利用すること。
-    pub fn get_data(&self) -> &[u8] {
+    pub fn data(&self) -> &[u8] {
         let mut data: *const u8 = std::ptr::null();
         let mut len = 0;
         unsafe {
@@ -416,7 +416,7 @@ impl TransformableFrame {
     }
 
     /// ペイロードタイプを返す。
-    pub fn get_payload_type(&self) -> u8 {
+    pub fn payload_type(&self) -> u8 {
         unsafe { ffi::webrtc_TransformableFrameInterface_GetPayloadType(self.as_ptr()) }
     }
 
@@ -433,7 +433,7 @@ impl TransformableFrame {
     }
 
     /// このフレームの SSRC を返す。
-    pub fn get_ssrc(&self) -> u32 {
+    pub fn ssrc(&self) -> u32 {
         unsafe { ffi::webrtc_TransformableFrameInterface_GetSsrc(self.as_ptr()) }
     }
 
@@ -441,7 +441,7 @@ impl TransformableFrame {
     ///
     /// libwebrtc の `GetTimestamp` は deprecated のため、
     /// オフセットの有無を区別できる `GetRtpTimestampInfo` を使用する。
-    pub fn get_rtp_timestamp_info(&self) -> RtpTimestampInfo {
+    pub fn rtp_timestamp_info(&self) -> RtpTimestampInfo {
         let raw_unique =
             unsafe { ffi::webrtc_TransformableFrameInterface_GetRtpTimestampInfo(self.as_ptr()) };
         let raw_unique = NonNull::new(raw_unique).expect(
@@ -484,7 +484,7 @@ impl TransformableFrame {
     }
 
     /// フレームの方向を返す。
-    pub fn get_direction(&self) -> TransformableFrameDirection {
+    pub fn direction(&self) -> TransformableFrameDirection {
         let value = unsafe { ffi::webrtc_TransformableFrameInterface_GetDirection(self.as_ptr()) };
         TransformableFrameDirection::from_raw(value)
     }
@@ -492,7 +492,7 @@ impl TransformableFrame {
     /// フレームの MIME type を返す。
     ///
     /// 例: `"video/VP8"`。
-    pub fn get_mime_type(&self) -> Result<String> {
+    pub fn mime_type(&self) -> Result<String> {
         let ptr = unsafe { ffi::webrtc_TransformableFrameInterface_GetMimeType(self.as_ptr()) };
         let raw = NonNull::new(ptr)
             .expect("BUG: webrtc_TransformableFrameInterface_GetMimeType が null を返しました");
@@ -518,7 +518,7 @@ impl TransformableFrame {
     /// プレゼンテーション用のタイムスタンプ (マイクロ秒) を返す。
     ///
     /// deprecated の `GetCaptureTimeIdentifier` の後継。
-    pub fn get_presentation_timestamp(&self) -> Option<i64> {
+    pub fn presentation_timestamp(&self) -> Option<i64> {
         let mut has = 0;
         let mut timestamp_us = 0;
         unsafe {
@@ -606,98 +606,13 @@ impl TransformableVideoFrame {
         self.base
     }
 
-    /// フレームのペイロードデータを返す。
-    ///
-    /// 返されたスライスは次の非 const メソッド呼び出しまで有効なため、
-    /// 借用の範囲内でのみ利用すること。
-    pub fn get_data(&self) -> &[u8] {
-        self.base.get_data()
-    }
-
-    /// フレームのペイロードデータを書き換える。
-    pub fn set_data(&mut self, data: &[u8]) {
-        self.base.set_data(data);
-    }
-
-    /// ペイロードタイプを返す。
-    pub fn get_payload_type(&self) -> u8 {
-        self.base.get_payload_type()
-    }
-
-    /// ペイロードタイプを変更できるかどうかを返す。
-    pub fn can_set_payload_type(&self) -> bool {
-        self.base.can_set_payload_type()
-    }
-
-    /// ペイロードタイプを設定する。
-    pub fn set_payload_type(&mut self, payload_type: u8) {
-        self.base.set_payload_type(payload_type);
-    }
-
-    /// このフレームの SSRC を返す。
-    pub fn get_ssrc(&self) -> u32 {
-        self.base.get_ssrc()
-    }
-
-    /// RTP timestamp を返す。
-    pub fn get_rtp_timestamp_info(&self) -> RtpTimestampInfo {
-        self.base.get_rtp_timestamp_info()
-    }
-
-    /// RTP timestamp を設定する。
-    pub fn set_rtp_timestamp(&mut self, rtp_timestamp_with_offset: u32) {
-        self.base.set_rtp_timestamp(rtp_timestamp_with_offset);
-    }
-
-    /// フレームの方向を返す。
-    pub fn get_direction(&self) -> TransformableFrameDirection {
-        self.base.get_direction()
-    }
-
-    /// フレームの MIME type を返す。
-    pub fn get_mime_type(&self) -> Result<String> {
-        self.base.get_mime_type()
-    }
-
-    /// パケットがネットワークで最初に観測されたタイムスタンプ (マイクロ秒) を返す。
-    pub fn receive_time(&self) -> Option<i64> {
-        self.base.receive_time()
-    }
-
-    /// プレゼンテーション用のタイムスタンプ (マイクロ秒) を返す。
-    pub fn get_presentation_timestamp(&self) -> Option<i64> {
-        self.base.get_presentation_timestamp()
-    }
-
-    /// キャプチャシステム内でフレームがキャプチャされた時刻 (マイクロ秒) を返す。
-    pub fn capture_time(&self) -> Option<i64> {
-        self.base.capture_time()
-    }
-
-    /// キャプチャ時間を変更できるかどうかを返す。
-    pub fn can_set_capture_time(&self) -> bool {
-        self.base.can_set_capture_time()
-    }
-
-    /// キャプチャシステム内でフレームがキャプチャされた時刻 (マイクロ秒) を設定する。
-    ///
-    /// `None` を指定するとキャプチャ時間を未設定にする。
-    pub fn set_capture_time(&mut self, capture_time: Option<i64>) {
-        self.base.set_capture_time(capture_time);
-    }
-
-    /// 送信側システムとキャプチャ側システムのクロックオフセット (マイクロ秒) を返す。
-    pub fn sender_capture_time_offset(&self) -> Option<i64> {
-        self.base.sender_capture_time_offset()
-    }
-
     /// このフレームがキーフレームかどうかを返す。
     pub fn is_key_frame(&self) -> bool {
         unsafe { ffi::webrtc_TransformableVideoFrameInterface_IsKeyFrame(self.as_video_ptr()) != 0 }
     }
 
     /// RID (RTP Stream ID) を返す。
-    pub fn rid(&self) -> Option<Result<String>> {
+    pub fn rid(&self) -> Result<Option<String>> {
         let mut has = 0;
         let mut ptr: *mut ffi::std_string_unique = std::ptr::null_mut();
         unsafe {
@@ -708,12 +623,12 @@ impl TransformableVideoFrame {
             )
         };
         if has == 0 {
-            return None;
+            return Ok(None);
         }
         let raw = NonNull::new(ptr).expect(
             "BUG: has が 1 なのに webrtc_TransformableVideoFrameInterface_Rid が null を返しました",
         );
-        Some(CxxString::from_unique(raw).to_string())
+        Ok(Some(CxxString::from_unique(raw).to_string()?))
     }
 
     /// フレームのメタデータを返す。
@@ -739,12 +654,26 @@ impl TransformableVideoFrame {
     }
 }
 
+impl std::ops::Deref for TransformableVideoFrame {
+    type Target = TransformableFrame;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl std::ops::DerefMut for TransformableVideoFrame {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
+}
+
 impl TryFrom<TransformableFrame> for TransformableVideoFrame {
     type Error = TransformableFrame;
 
     fn try_from(frame: TransformableFrame) -> std::result::Result<Self, Self::Error> {
         let mime = frame
-            .get_mime_type()
+            .mime_type()
             .expect("BUG: MIME type の取得に失敗しました");
         if mime.starts_with("video/") {
             Ok(TransformableVideoFrame { base: frame })
