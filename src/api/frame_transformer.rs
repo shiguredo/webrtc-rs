@@ -536,6 +536,24 @@ impl TransformableFrame {
         if has == 0 { None } else { Some(timestamp_us) }
     }
 
+    /// キャプチャ時間を変更できるかどうかを返す。
+    pub fn can_set_capture_time(&self) -> bool {
+        unsafe { ffi::webrtc_TransformableFrameInterface_CanSetCaptureTime(self.as_ptr()) != 0 }
+    }
+
+    /// キャプチャシステム内でフレームがキャプチャされた時刻 (マイクロ秒) を設定する。
+    ///
+    /// `None` を指定するとキャプチャ時間を未設定にする。
+    pub fn set_capture_time(&mut self, capture_time: Option<i64>) {
+        let (has, timestamp_us) = match capture_time {
+            Some(v) => (1, v),
+            None => (0, 0),
+        };
+        unsafe {
+            ffi::webrtc_TransformableFrameInterface_SetCaptureTime(self.as_ptr(), has, timestamp_us)
+        };
+    }
+
     /// 送信側システムとキャプチャ側システムのクロックオフセット (マイクロ秒) を返す。
     ///
     /// absolute capture timestamp ヘッダー拡張が有効な場合のみ利用できる。
@@ -647,6 +665,18 @@ impl TransformableVideoFrame {
         self.base.capture_time()
     }
 
+    /// キャプチャ時間を変更できるかどうかを返す。
+    pub fn can_set_capture_time(&self) -> bool {
+        self.base.can_set_capture_time()
+    }
+
+    /// キャプチャシステム内でフレームがキャプチャされた時刻 (マイクロ秒) を設定する。
+    ///
+    /// `None` を指定するとキャプチャ時間を未設定にする。
+    pub fn set_capture_time(&mut self, capture_time: Option<i64>) {
+        self.base.set_capture_time(capture_time);
+    }
+
     /// 送信側システムとキャプチャ側システムのクロックオフセット (マイクロ秒) を返す。
     pub fn sender_capture_time_offset(&self) -> Option<i64> {
         self.base.sender_capture_time_offset()
@@ -684,6 +714,19 @@ impl TransformableVideoFrame {
         let raw = NonNull::new(raw)
             .expect("BUG: webrtc_TransformableVideoFrameInterface_Metadata が null を返しました");
         VideoFrameMetadata::from_raw(raw)
+    }
+
+    /// フレームのメタデータを設定する。
+    ///
+    /// [VideoFrameMetadata::new] で生成して setter で書き換えたメタデータを
+    /// 反映する。SVC のレイヤー切替などで利用する。
+    pub fn set_metadata(&mut self, metadata: &VideoFrameMetadata) {
+        unsafe {
+            ffi::webrtc_TransformableVideoFrameInterface_SetMetadata(
+                self.as_video_ptr(),
+                metadata.raw.as_ptr(),
+            )
+        };
     }
 }
 
