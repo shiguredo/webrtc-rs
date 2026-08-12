@@ -59,6 +59,7 @@
 - `std::variant<T0, T1, ..., Tn>` はヒープ確保したコピーを `struct CType_unique*` として返す
   - `WEBRTC_DECLARE_VARIANT(type)` / `WEBRTC_DEFINE_VARIANT(type, cpptype)` マクロを利用する
   - 生成関数は `std::make_unique<CppType>(value)` を `_unique` にキャストして返し、破棄は `CType_unique_delete` で行う
+  - 特定の alternative を指定して構築する場合は `std::make_unique<CppType>(std::in_place_type<CppAlt>, value)` を使用する
   - アクティブな alternative の index は `CType_index(self)` で取得する (0-origin、variant 宣言順)
   - 各 alternative の値は `CType_get_<alt>(self)` で取得する
     - 実装は `std::get_if<CppAlt>(variant)` を使用し、アクティブでない場合は null を返す

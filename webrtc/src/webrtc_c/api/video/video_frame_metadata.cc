@@ -111,6 +111,13 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_delete(
   delete metadata;
 }
 
+WEBRTC_EXPORT struct webrtc_VideoFrameMetadata* webrtc_VideoFrameMetadata_copy(
+    const struct webrtc_VideoFrameMetadata* self) {
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
+  auto copy = std::make_unique<webrtc::VideoFrameMetadata>(*metadata);
+  return reinterpret_cast<struct webrtc_VideoFrameMetadata*>(copy.release());
+}
+
 WEBRTC_EXPORT int webrtc_VideoFrameMetadata_GetFrameType(
     struct webrtc_VideoFrameMetadata* self) {
   auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);

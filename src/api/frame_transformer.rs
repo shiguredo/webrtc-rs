@@ -1035,6 +1035,43 @@ impl Default for VideoFrameMetadata {
     }
 }
 
+impl Clone for VideoFrameMetadata {
+    fn clone(&self) -> Self {
+        let raw = NonNull::new(unsafe { ffi::webrtc_VideoFrameMetadata_copy(self.raw.as_ptr()) })
+            .expect("BUG: webrtc_VideoFrameMetadata_copy が null を返しました");
+        Self { raw }
+    }
+}
+
+impl std::fmt::Debug for VideoFrameMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VideoFrameMetadata")
+            .field("frame_type", &self.frame_type())
+            .field("width", &self.width())
+            .field("height", &self.height())
+            .field("frame_id", &self.frame_id())
+            .field("spatial_index", &self.spatial_index())
+            .field("temporal_index", &self.temporal_index())
+            .field("dependencies", &self.dependencies())
+            .field("is_last_frame_in_picture", &self.is_last_frame_in_picture())
+            .field("simulcast_idx", &self.simulcast_idx())
+            .field("codec", &self.codec())
+            .field("ssrc", &self.ssrc())
+            .field("rotation", &self.rotation())
+            .field("content_type", &self.content_type())
+            .field(
+                "decode_target_indications",
+                &self.decode_target_indications(),
+            )
+            .field("csrcs", &self.csrcs())
+            .field(
+                "rtp_video_header_codec_specifics",
+                &self.rtp_video_header_codec_specifics(),
+            )
+            .finish()
+    }
+}
+
 impl Drop for VideoFrameMetadata {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_VideoFrameMetadata_delete(self.raw.as_ptr()) };

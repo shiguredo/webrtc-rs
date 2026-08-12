@@ -130,6 +130,45 @@ impl Default for GofInfoVP9 {
     }
 }
 
+impl std::fmt::Debug for GofInfoVP9 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let num_frames = self.num_frames_in_gof();
+        f.debug_struct("GofInfoVP9")
+            .field("num_frames_in_gof", &num_frames)
+            .field(
+                "temporal_idx",
+                &(0..num_frames)
+                    .map(|i| self.temporal_idx(i))
+                    .collect::<Vec<_>>(),
+            )
+            .field(
+                "temporal_up_switch",
+                &(0..num_frames)
+                    .map(|i| self.temporal_up_switch(i))
+                    .collect::<Vec<_>>(),
+            )
+            .field(
+                "num_ref_pics",
+                &(0..num_frames)
+                    .map(|i| self.num_ref_pics(i))
+                    .collect::<Vec<_>>(),
+            )
+            .field(
+                "pid_diff",
+                &(0..num_frames)
+                    .map(|i| {
+                        let num_ref = self.num_ref_pics(i);
+                        (0..num_ref as usize)
+                            .map(|r| self.pid_diff(i, r))
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>(),
+            )
+            .field("pid_start", &self.pid_start())
+            .finish()
+    }
+}
+
 impl Drop for GofInfoVP9 {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_GofInfoVP9_delete(self.raw.as_ptr()) };
@@ -248,6 +287,21 @@ impl RTPVideoHeaderVP8 {
 impl Default for RTPVideoHeaderVP8 {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl std::fmt::Debug for RTPVideoHeaderVP8 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RTPVideoHeaderVP8")
+            .field("non_reference", &self.non_reference())
+            .field("picture_id", &self.picture_id())
+            .field("tl0_pic_idx", &self.tl0_pic_idx())
+            .field("temporal_idx", &self.temporal_idx())
+            .field("layer_sync", &self.layer_sync())
+            .field("key_idx", &self.key_idx())
+            .field("partition_id", &self.partition_id())
+            .field("beginning_of_partition", &self.beginning_of_partition())
+            .finish()
     }
 }
 
@@ -543,6 +597,65 @@ impl Default for RTPVideoHeaderVP9 {
     }
 }
 
+impl std::fmt::Debug for RTPVideoHeaderVP9 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let num_spatial_layers = self.num_spatial_layers();
+        let num_ref_pics = self.num_ref_pics();
+        f.debug_struct("RTPVideoHeaderVP9")
+            .field("inter_pic_predicted", &self.inter_pic_predicted())
+            .field("flexible_mode", &self.flexible_mode())
+            .field("beginning_of_frame", &self.beginning_of_frame())
+            .field("end_of_frame", &self.end_of_frame())
+            .field("ss_data_available", &self.ss_data_available())
+            .field(
+                "non_ref_for_inter_layer_pred",
+                &self.non_ref_for_inter_layer_pred(),
+            )
+            .field("picture_id", &self.picture_id())
+            .field("max_picture_id", &self.max_picture_id())
+            .field("tl0_pic_idx", &self.tl0_pic_idx())
+            .field("temporal_idx", &self.temporal_idx())
+            .field("spatial_idx", &self.spatial_idx())
+            .field("temporal_up_switch", &self.temporal_up_switch())
+            .field("inter_layer_predicted", &self.inter_layer_predicted())
+            .field("gof_idx", &self.gof_idx())
+            .field("num_ref_pics", &num_ref_pics)
+            .field(
+                "pid_diff",
+                &(0..num_ref_pics as usize)
+                    .map(|i| self.pid_diff(i))
+                    .collect::<Vec<_>>(),
+            )
+            .field(
+                "ref_picture_id",
+                &(0..num_ref_pics as usize)
+                    .map(|i| self.ref_picture_id(i))
+                    .collect::<Vec<_>>(),
+            )
+            .field("num_spatial_layers", &num_spatial_layers)
+            .field("first_active_layer", &self.first_active_layer())
+            .field(
+                "spatial_layer_resolution_present",
+                &self.spatial_layer_resolution_present(),
+            )
+            .field(
+                "width",
+                &(0..num_spatial_layers)
+                    .map(|i| self.width(i))
+                    .collect::<Vec<_>>(),
+            )
+            .field(
+                "height",
+                &(0..num_spatial_layers)
+                    .map(|i| self.height(i))
+                    .collect::<Vec<_>>(),
+            )
+            .field("gof", &self.gof())
+            .field("end_of_picture", &self.end_of_picture())
+            .finish()
+    }
+}
+
 impl Drop for RTPVideoHeaderVP9 {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_delete(self.raw.as_ptr()) };
@@ -609,6 +722,16 @@ impl Default for NaluInfo {
     }
 }
 
+impl std::fmt::Debug for NaluInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NaluInfo")
+            .field("type_", &self.type_())
+            .field("sps_id", &self.sps_id())
+            .field("pps_id", &self.pps_id())
+            .finish()
+    }
+}
+
 impl Drop for NaluInfo {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_NaluInfo_delete(self.raw.as_ptr()) };
@@ -643,6 +766,16 @@ impl<'a> NaluInfoRef<'a> {
 
     pub fn pps_id(&self) -> i32 {
         unsafe { ffi::webrtc_NaluInfo_get_pps_id(self.raw.as_ptr()) }
+    }
+}
+
+impl std::fmt::Debug for NaluInfoRef<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NaluInfoRef")
+            .field("type_", &self.type_())
+            .field("sps_id", &self.sps_id())
+            .field("pps_id", &self.pps_id())
+            .finish()
     }
 }
 
@@ -691,6 +824,18 @@ impl NaluInfoVector {
 impl Drop for NaluInfoVector {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_NaluInfo_vector_delete(self.raw.as_ptr()) };
+    }
+}
+
+impl std::fmt::Debug for NaluInfoVector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut list = f.debug_list();
+        for index in 0..self.len() {
+            if let Some(value) = self.get(index) {
+                list.entry(&value);
+            }
+        }
+        list.finish()
     }
 }
 
@@ -781,6 +926,18 @@ impl Default for RTPVideoHeaderH264 {
     }
 }
 
+impl std::fmt::Debug for RTPVideoHeaderH264 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let nalus = self.nalus();
+        f.debug_struct("RTPVideoHeaderH264")
+            .field("nalu_type", &self.nalu_type())
+            .field("packetization_type", &self.packetization_type())
+            .field("nalus", &nalus)
+            .field("packetization_mode", &self.packetization_mode())
+            .finish()
+    }
+}
+
 impl Drop for RTPVideoHeaderH264 {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_RTPVideoHeaderH264_delete(self.raw.as_ptr()) };
@@ -792,6 +949,7 @@ impl Drop for RTPVideoHeaderH264 {
 /// libwebrtc の `RTPVideoHeaderCodecSpecifics`
 /// (std::variant<std::monostate, RTPVideoHeaderVP8, RTPVideoHeaderVP9,
 /// RTPVideoHeaderH264>) に対応する。
+#[derive(Debug)]
 pub enum RTPVideoHeaderCodecSpecifics {
     /// コーデック固有情報なし (std::monostate)。
     None,

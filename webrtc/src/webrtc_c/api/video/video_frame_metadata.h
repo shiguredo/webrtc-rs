@@ -56,6 +56,9 @@ struct webrtc_VideoFrameMetadata;
 WEBRTC_EXPORT struct webrtc_VideoFrameMetadata* webrtc_VideoFrameMetadata_new();
 WEBRTC_EXPORT void webrtc_VideoFrameMetadata_delete(
     struct webrtc_VideoFrameMetadata* self);
+// ディープコピーを返す。返り値は webrtc_VideoFrameMetadata_delete で破棄する。
+WEBRTC_EXPORT struct webrtc_VideoFrameMetadata* webrtc_VideoFrameMetadata_copy(
+    const struct webrtc_VideoFrameMetadata* self);
 
 WEBRTC_EXPORT int webrtc_VideoFrameMetadata_GetFrameType(
     struct webrtc_VideoFrameMetadata* self);

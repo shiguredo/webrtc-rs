@@ -3337,6 +3337,36 @@ fn video_frame_metadata_full_roundtrip() {
         metadata.rtp_video_header_codec_specifics(),
         RTPVideoHeaderCodecSpecifics::None
     ));
+
+    // Clone がディープコピーされ、元の値と一致することを確認する。
+    metadata.set_width(640);
+    let cloned = metadata.clone();
+    assert_eq!(cloned.frame_type(), metadata.frame_type());
+    assert_eq!(cloned.width(), metadata.width());
+    assert_eq!(cloned.height(), metadata.height());
+    assert_eq!(cloned.frame_id(), metadata.frame_id());
+    assert_eq!(cloned.spatial_index(), metadata.spatial_index());
+    assert_eq!(cloned.temporal_index(), metadata.temporal_index());
+    assert_eq!(cloned.dependencies(), metadata.dependencies());
+    assert_eq!(
+        cloned.is_last_frame_in_picture(),
+        metadata.is_last_frame_in_picture()
+    );
+    assert_eq!(cloned.simulcast_idx(), metadata.simulcast_idx());
+    assert_eq!(cloned.codec(), metadata.codec());
+    assert_eq!(cloned.ssrc(), metadata.ssrc());
+    assert_eq!(cloned.rotation(), metadata.rotation());
+    assert_eq!(cloned.content_type(), metadata.content_type());
+    assert_eq!(
+        cloned.decode_target_indications(),
+        metadata.decode_target_indications()
+    );
+    assert_eq!(cloned.csrcs(), metadata.csrcs());
+    // クローン後の書き換えが元に影響しないことを確認する。
+    let mut cloned = cloned;
+    cloned.set_width(999);
+    assert_eq!(metadata.width(), 640);
+    assert_eq!(cloned.width(), 999);
 }
 
 #[test]
