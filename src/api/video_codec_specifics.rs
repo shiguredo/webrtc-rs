@@ -74,22 +74,42 @@ impl GofInfoVP9 {
     }
 
     pub fn set_num_frames_in_gof(&mut self, value: usize) {
+        assert!(
+            value <= unsafe { ffi::webrtc_kMaxVp9FramesInGof },
+            "value が kMaxVp9FramesInGof を超えています: {value}"
+        );
         unsafe { ffi::webrtc_GofInfoVP9_set_num_frames_in_gof(self.raw.as_ptr(), value) };
     }
 
-    pub fn temporal_idx(&self, index: usize) -> u8 {
-        unsafe { ffi::webrtc_GofInfoVP9_get_temporal_idx(self.raw.as_ptr(), index) }
+    pub fn temporal_idx(&self, index: usize) -> Option<u8> {
+        if index >= unsafe { ffi::webrtc_kMaxVp9FramesInGof } {
+            return None;
+        }
+        Some(unsafe { ffi::webrtc_GofInfoVP9_get_temporal_idx(self.raw.as_ptr(), index) })
     }
 
     pub fn set_temporal_idx(&mut self, index: usize, value: u8) {
+        assert!(
+            index < unsafe { ffi::webrtc_kMaxVp9FramesInGof },
+            "index が kMaxVp9FramesInGof を超えています: {index}"
+        );
         unsafe { ffi::webrtc_GofInfoVP9_set_temporal_idx(self.raw.as_ptr(), index, value) };
     }
 
-    pub fn temporal_up_switch(&self, index: usize) -> bool {
-        unsafe { ffi::webrtc_GofInfoVP9_get_temporal_up_switch(self.raw.as_ptr(), index) != 0 }
+    pub fn temporal_up_switch(&self, index: usize) -> Option<bool> {
+        if index >= unsafe { ffi::webrtc_kMaxVp9FramesInGof } {
+            return None;
+        }
+        Some(
+            unsafe { ffi::webrtc_GofInfoVP9_get_temporal_up_switch(self.raw.as_ptr(), index) } != 0,
+        )
     }
 
     pub fn set_temporal_up_switch(&mut self, index: usize, value: bool) {
+        assert!(
+            index < unsafe { ffi::webrtc_kMaxVp9FramesInGof },
+            "index が kMaxVp9FramesInGof を超えています: {index}"
+        );
         unsafe {
             ffi::webrtc_GofInfoVP9_set_temporal_up_switch(
                 self.raw.as_ptr(),
@@ -99,19 +119,39 @@ impl GofInfoVP9 {
         };
     }
 
-    pub fn num_ref_pics(&self, index: usize) -> u8 {
-        unsafe { ffi::webrtc_GofInfoVP9_get_num_ref_pics(self.raw.as_ptr(), index) }
+    pub fn num_ref_pics(&self, index: usize) -> Option<u8> {
+        if index >= unsafe { ffi::webrtc_kMaxVp9FramesInGof } {
+            return None;
+        }
+        Some(unsafe { ffi::webrtc_GofInfoVP9_get_num_ref_pics(self.raw.as_ptr(), index) })
     }
 
     pub fn set_num_ref_pics(&mut self, index: usize, value: u8) {
+        assert!(
+            index < unsafe { ffi::webrtc_kMaxVp9FramesInGof },
+            "index が kMaxVp9FramesInGof を超えています: {index}"
+        );
         unsafe { ffi::webrtc_GofInfoVP9_set_num_ref_pics(self.raw.as_ptr(), index, value) };
     }
 
-    pub fn pid_diff(&self, index: usize, ref_index: usize) -> u8 {
-        unsafe { ffi::webrtc_GofInfoVP9_get_pid_diff(self.raw.as_ptr(), index, ref_index) }
+    pub fn pid_diff(&self, index: usize, ref_index: usize) -> Option<u8> {
+        if index >= unsafe { ffi::webrtc_kMaxVp9FramesInGof }
+            || ref_index >= unsafe { ffi::webrtc_kMaxVp9RefPics }
+        {
+            return None;
+        }
+        Some(unsafe { ffi::webrtc_GofInfoVP9_get_pid_diff(self.raw.as_ptr(), index, ref_index) })
     }
 
     pub fn set_pid_diff(&mut self, index: usize, ref_index: usize, value: u8) {
+        assert!(
+            index < unsafe { ffi::webrtc_kMaxVp9FramesInGof },
+            "index が kMaxVp9FramesInGof を超えています: {index}"
+        );
+        assert!(
+            ref_index < unsafe { ffi::webrtc_kMaxVp9RefPics },
+            "ref_index が kMaxVp9RefPics を超えています: {ref_index}"
+        );
         unsafe { ffi::webrtc_GofInfoVP9_set_pid_diff(self.raw.as_ptr(), index, ref_index, value) };
     }
 
@@ -157,8 +197,8 @@ impl std::fmt::Debug for GofInfoVP9 {
                 "pid_diff",
                 &(0..num_frames)
                     .map(|i| {
-                        let num_ref = self.num_ref_pics(i);
-                        (0..num_ref as usize)
+                        let num_ref = self.num_ref_pics(i).unwrap_or(0) as usize;
+                        (0..num_ref)
                             .map(|r| self.pid_diff(i, r))
                             .collect::<Vec<_>>()
                     })
@@ -499,22 +539,40 @@ impl RTPVideoHeaderVP9 {
     }
 
     pub fn set_num_ref_pics(&mut self, value: u8) {
+        assert!(
+            value as usize <= unsafe { ffi::webrtc_kMaxVp9RefPics },
+            "value が kMaxVp9RefPics を超えています: {value}"
+        );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_num_ref_pics(self.raw.as_ptr(), value) };
     }
 
-    pub fn pid_diff(&self, index: usize) -> u8 {
-        unsafe { ffi::webrtc_RTPVideoHeaderVP9_get_pid_diff(self.raw.as_ptr(), index) }
+    pub fn pid_diff(&self, index: usize) -> Option<u8> {
+        if index >= unsafe { ffi::webrtc_kMaxVp9RefPics } {
+            return None;
+        }
+        Some(unsafe { ffi::webrtc_RTPVideoHeaderVP9_get_pid_diff(self.raw.as_ptr(), index) })
     }
 
     pub fn set_pid_diff(&mut self, index: usize, value: u8) {
+        assert!(
+            index < unsafe { ffi::webrtc_kMaxVp9RefPics },
+            "index が kMaxVp9RefPics を超えています: {index}"
+        );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_pid_diff(self.raw.as_ptr(), index, value) };
     }
 
-    pub fn ref_picture_id(&self, index: usize) -> i16 {
-        unsafe { ffi::webrtc_RTPVideoHeaderVP9_get_ref_picture_id(self.raw.as_ptr(), index) }
+    pub fn ref_picture_id(&self, index: usize) -> Option<i16> {
+        if index >= unsafe { ffi::webrtc_kMaxVp9RefPics } {
+            return None;
+        }
+        Some(unsafe { ffi::webrtc_RTPVideoHeaderVP9_get_ref_picture_id(self.raw.as_ptr(), index) })
     }
 
     pub fn set_ref_picture_id(&mut self, index: usize, value: i16) {
+        assert!(
+            index < unsafe { ffi::webrtc_kMaxVp9RefPics },
+            "index が kMaxVp9RefPics を超えています: {index}"
+        );
         unsafe {
             ffi::webrtc_RTPVideoHeaderVP9_set_ref_picture_id(self.raw.as_ptr(), index, value)
         };
@@ -525,6 +583,10 @@ impl RTPVideoHeaderVP9 {
     }
 
     pub fn set_num_spatial_layers(&mut self, value: usize) {
+        assert!(
+            value <= unsafe { ffi::webrtc_kMaxVp9NumberOfSpatialLayers },
+            "value が kMaxVp9NumberOfSpatialLayers を超えています: {value}"
+        );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_num_spatial_layers(self.raw.as_ptr(), value) };
     }
 
@@ -552,19 +614,33 @@ impl RTPVideoHeaderVP9 {
         };
     }
 
-    pub fn width(&self, index: usize) -> u16 {
-        unsafe { ffi::webrtc_RTPVideoHeaderVP9_get_width(self.raw.as_ptr(), index) }
+    pub fn width(&self, index: usize) -> Option<u16> {
+        if index >= unsafe { ffi::webrtc_kMaxVp9NumberOfSpatialLayers } {
+            return None;
+        }
+        Some(unsafe { ffi::webrtc_RTPVideoHeaderVP9_get_width(self.raw.as_ptr(), index) })
     }
 
     pub fn set_width(&mut self, index: usize, value: u16) {
+        assert!(
+            index < unsafe { ffi::webrtc_kMaxVp9NumberOfSpatialLayers },
+            "index が kMaxVp9NumberOfSpatialLayers を超えています: {index}"
+        );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_width(self.raw.as_ptr(), index, value) };
     }
 
-    pub fn height(&self, index: usize) -> u16 {
-        unsafe { ffi::webrtc_RTPVideoHeaderVP9_get_height(self.raw.as_ptr(), index) }
+    pub fn height(&self, index: usize) -> Option<u16> {
+        if index >= unsafe { ffi::webrtc_kMaxVp9NumberOfSpatialLayers } {
+            return None;
+        }
+        Some(unsafe { ffi::webrtc_RTPVideoHeaderVP9_get_height(self.raw.as_ptr(), index) })
     }
 
     pub fn set_height(&mut self, index: usize, value: u16) {
+        assert!(
+            index < unsafe { ffi::webrtc_kMaxVp9NumberOfSpatialLayers },
+            "index が kMaxVp9NumberOfSpatialLayers を超えています: {index}"
+        );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_height(self.raw.as_ptr(), index, value) };
     }
 

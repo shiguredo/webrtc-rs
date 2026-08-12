@@ -8,6 +8,12 @@
 #include "../../../../../common.h"
 
 extern "C" {
+WEBRTC_EXPORT const size_t webrtc_kMaxVp9FramesInGof =
+    webrtc::kMaxVp9FramesInGof;
+WEBRTC_EXPORT const size_t webrtc_kMaxVp9RefPics = webrtc::kMaxVp9RefPics;
+WEBRTC_EXPORT const size_t webrtc_kMaxVp9NumberOfSpatialLayers =
+    webrtc::kMaxVp9NumberOfSpatialLayers;
+
 WEBRTC_EXPORT struct webrtc_GofInfoVP9* webrtc_GofInfoVP9_new() {
   auto gof = std::make_unique<webrtc::GofInfoVP9>();
   return reinterpret_cast<struct webrtc_GofInfoVP9*>(gof.release());

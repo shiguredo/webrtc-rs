@@ -13,6 +13,11 @@ extern "C" {
 // webrtc::GofInfoVP9
 // -------------------------
 
+// 固定配列の最大サイズ。libwebrtc の vp9_globals.h の定数をそのまま公開する。
+WEBRTC_EXPORT extern const size_t webrtc_kMaxVp9FramesInGof;
+WEBRTC_EXPORT extern const size_t webrtc_kMaxVp9RefPics;
+WEBRTC_EXPORT extern const size_t webrtc_kMaxVp9NumberOfSpatialLayers;
+
 struct webrtc_GofInfoVP9;
 
 WEBRTC_EXPORT struct webrtc_GofInfoVP9* webrtc_GofInfoVP9_new();

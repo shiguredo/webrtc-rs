@@ -3478,27 +3478,33 @@ fn rtp_video_header_vp9_full_roundtrip() {
     assert!(header.inter_layer_predicted());
     assert_eq!(header.gof_idx(), 2);
     assert_eq!(header.num_ref_pics(), 2);
-    assert_eq!(header.pid_diff(0), 1);
-    assert_eq!(header.pid_diff(1), 2);
-    assert_eq!(header.ref_picture_id(0), 100);
-    assert_eq!(header.ref_picture_id(1), 200);
+    assert_eq!(header.pid_diff(0), Some(1));
+    assert_eq!(header.pid_diff(1), Some(2));
+    assert_eq!(header.ref_picture_id(0), Some(100));
+    assert_eq!(header.ref_picture_id(1), Some(200));
     assert_eq!(header.num_spatial_layers(), 3);
     assert_eq!(header.first_active_layer(), 1);
     assert!(header.spatial_layer_resolution_present());
-    assert_eq!(header.width(0), 640);
-    assert_eq!(header.width(1), 1280);
-    assert_eq!(header.height(0), 480);
-    assert_eq!(header.height(1), 720);
+    assert_eq!(header.width(0), Some(640));
+    assert_eq!(header.width(1), Some(1280));
+    assert_eq!(header.height(0), Some(480));
+    assert_eq!(header.height(1), Some(720));
     assert!(header.end_of_picture());
 
     let got_gof = header.gof();
     assert_eq!(got_gof.num_frames_in_gof(), 2);
-    assert_eq!(got_gof.temporal_idx(0), 0);
-    assert_eq!(got_gof.temporal_idx(1), 1);
-    assert!(got_gof.temporal_up_switch(0));
-    assert_eq!(got_gof.num_ref_pics(0), 1);
-    assert_eq!(got_gof.pid_diff(0, 0), 2);
+    assert_eq!(got_gof.temporal_idx(0), Some(0));
+    assert_eq!(got_gof.temporal_idx(1), Some(1));
+    assert_eq!(got_gof.temporal_up_switch(0), Some(true));
+    assert_eq!(got_gof.num_ref_pics(0), Some(1));
+    assert_eq!(got_gof.pid_diff(0, 0), Some(2));
     assert_eq!(got_gof.pid_start(), 10);
+
+    // 境界を超える index へのアクセスは None を返すことを確認する。
+    assert_eq!(header.pid_diff(usize::MAX), None);
+    assert_eq!(header.ref_picture_id(usize::MAX), None);
+    assert_eq!(header.width(usize::MAX), None);
+    assert_eq!(header.height(usize::MAX), None);
 }
 
 #[test]
@@ -3515,15 +3521,36 @@ fn gof_info_vp9_full_roundtrip() {
     gof.set_pid_diff(0, 1, 1);
     gof.set_pid_start(100);
     assert_eq!(gof.num_frames_in_gof(), 3);
-    assert_eq!(gof.temporal_idx(0), 0);
-    assert_eq!(gof.temporal_idx(1), 2);
-    assert_eq!(gof.temporal_idx(2), 1);
-    assert!(gof.temporal_up_switch(0));
-    assert!(!gof.temporal_up_switch(1));
-    assert_eq!(gof.num_ref_pics(0), 2);
-    assert_eq!(gof.pid_diff(0, 0), 4);
-    assert_eq!(gof.pid_diff(0, 1), 1);
+    assert_eq!(gof.temporal_idx(0), Some(0));
+    assert_eq!(gof.temporal_idx(1), Some(2));
+    assert_eq!(gof.temporal_idx(2), Some(1));
+    assert_eq!(gof.temporal_up_switch(0), Some(true));
+    assert_eq!(gof.temporal_up_switch(1), Some(false));
+    assert_eq!(gof.num_ref_pics(0), Some(2));
+    assert_eq!(gof.pid_diff(0, 0), Some(4));
+    assert_eq!(gof.pid_diff(0, 1), Some(1));
     assert_eq!(gof.pid_start(), 100);
+
+    // 境界を超える index へのアクセスは None を返すことを確認する。
+    assert_eq!(gof.temporal_idx(usize::MAX), None);
+    assert_eq!(gof.temporal_up_switch(usize::MAX), None);
+    assert_eq!(gof.num_ref_pics(usize::MAX), None);
+    assert_eq!(gof.pid_diff(usize::MAX, 0), None);
+    assert_eq!(gof.pid_diff(0, usize::MAX), None);
+}
+
+#[test]
+#[should_panic(expected = "kMaxVp9FramesInGof")]
+fn gof_info_vp9_set_num_frames_in_gof_overflow() {
+    let mut gof = GofInfoVP9::new();
+    gof.set_num_frames_in_gof(300);
+}
+
+#[test]
+#[should_panic(expected = "kMaxVp9FramesInGof")]
+fn gof_info_vp9_set_temporal_idx_out_of_bounds() {
+    let mut gof = GofInfoVP9::new();
+    gof.set_temporal_idx(255, 1);
 }
 
 #[test]
