@@ -2091,12 +2091,20 @@ impl VideoCodec {
     }
 
     pub fn set_number_of_simulcast_streams(&mut self, value: usize) {
+        assert!(
+            value <= unsafe { ffi::webrtc_kMaxSimulcastStreams },
+            "value が kMaxSimulcastStreams を超えています: {value}"
+        );
         let mut codec = self.as_ref();
         codec.set_number_of_simulcast_streams(value);
     }
 
     pub fn simulcast_stream(&mut self, index: usize) -> Option<SimulcastStreamRef<'_>> {
         let index = i32::try_from(index).ok()?;
+        // C 側の `simulcastStream` 配列の範囲外は None を返す。
+        if index < 0 || index as usize >= self.number_of_simulcast_streams() {
+            return None;
+        }
         let raw = NonNull::new(unsafe {
             ffi::webrtc_VideoCodec_simulcast_stream_at(self.raw().as_ptr(), index)
         })?;
@@ -2216,12 +2224,20 @@ impl<'a> VideoCodecRef<'a> {
     }
 
     pub fn set_number_of_simulcast_streams(&mut self, value: usize) {
+        assert!(
+            value <= unsafe { ffi::webrtc_kMaxSimulcastStreams },
+            "value が kMaxSimulcastStreams を超えています: {value}"
+        );
         let value = value.min(i32::MAX as usize) as i32;
         unsafe { ffi::webrtc_VideoCodec_set_number_of_simulcast_streams(self.raw.as_ptr(), value) };
     }
 
     pub fn simulcast_stream(&mut self, index: usize) -> Option<SimulcastStreamRef<'_>> {
         let index = i32::try_from(index).ok()?;
+        // C 側の `simulcastStream` 配列の範囲外は None を返す。
+        if index < 0 || index as usize >= self.number_of_simulcast_streams() {
+            return None;
+        }
         let raw = NonNull::new(unsafe {
             ffi::webrtc_VideoCodec_simulcast_stream_at(self.raw.as_ptr(), index)
         })?;
