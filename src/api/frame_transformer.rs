@@ -644,6 +644,13 @@ impl TransformableVideoFrame {
     ///
     /// [VideoFrameMetadata::new] で生成して setter で書き換えたメタデータを
     /// 反映する。SVC のレイヤー切替などで利用する。
+    ///
+    /// 注意: 受信フレーム ([TransformableFrame::direction] が `Receiver`) では、
+    /// `frame_id` と `dependencies` 以外のフィールドは変更できない。
+    /// libwebrtc の `TransformableVideoReceiverFrame::SetMetadata` が
+    /// 変更されたメタデータを検査し、それ以外の変更はデバッグビルドでは
+    /// abort、リリースビルドでは無視される。
+    /// 送信フレーム (`Sender`) では全フィールドを変更できる。
     pub fn set_metadata(&mut self, metadata: &VideoFrameMetadata) {
         unsafe {
             ffi::webrtc_TransformableVideoFrameInterface_SetMetadata(
