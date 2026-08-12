@@ -132,6 +132,11 @@ impl TransformableFrameDirection {
 /// 受信はネットワークスレッド)。そのためこのトレイトは `Sync` を要求し、
 /// `transform` は `&self` で呼ばれる。共有状態を持つ場合はハンドラ側で
 /// `Mutex` や `Atomic` などにより同期すること。
+///
+/// 1 つの [FrameTransformer] は 1 エンドポイント (1 つの送信 or 受信ストリーム)
+/// にだけ設定すること。複数エンドポイントで共有した場合のフレーム配送は
+/// サポートしない (特に audio と video の delegate を同一 transformer に
+/// 混在登録すると、配送先の型不一致により未定義動作になり得る)。
 pub trait FrameTransformerHandler: Send + Sync {
     /// エンコード済みフレームを変換する。
     ///
@@ -304,6 +309,10 @@ unsafe extern "C" fn frame_transformer_on_destroy(user_data: *mut c_void) {
 /// libwebrtc へ返す。生成したフレーム変換は
 /// [RtpSender::set_frame_transformer] または [RtpReceiver::set_frame_transformer]
 /// で適用する。
+///
+/// 1 つの [FrameTransformer] は 1 エンドポイントにだけ設定すること。
+/// 複数エンドポイントで共有した場合のフレーム配送はサポートしない
+/// ([FrameTransformerHandler] の注意を参照)。
 pub struct FrameTransformer {
     raw_ref: ScopedRef<FrameTransformerHandle>,
 }
