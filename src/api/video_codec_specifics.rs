@@ -1,7 +1,36 @@
-use super::video_encoder::H264PacketizationMode;
 use crate::ffi;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
+
+/// H.264 のパケタイズモードを表す。
+///
+/// libwebrtc の `H264PacketizationMode` に対応する。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum H264PacketizationMode {
+    NonInterleaved,
+    SingleNalUnit,
+    Unknown(i32),
+}
+
+impl H264PacketizationMode {
+    pub(crate) fn from_raw(value: i32) -> Self {
+        if value == unsafe { ffi::webrtc_H264PacketizationMode_NonInterleaved } {
+            Self::NonInterleaved
+        } else if value == unsafe { ffi::webrtc_H264PacketizationMode_SingleNalUnit } {
+            Self::SingleNalUnit
+        } else {
+            Self::Unknown(value)
+        }
+    }
+
+    pub(crate) fn to_raw(self) -> i32 {
+        match self {
+            Self::NonInterleaved => unsafe { ffi::webrtc_H264PacketizationMode_NonInterleaved },
+            Self::SingleNalUnit => unsafe { ffi::webrtc_H264PacketizationMode_SingleNalUnit },
+            Self::Unknown(v) => v,
+        }
+    }
+}
 
 /// H.264 のパケタイズ種別を表す。
 ///
@@ -213,6 +242,12 @@ impl std::fmt::Debug for GofInfoVP9 {
     }
 }
 
+impl Clone for GofInfoVP9 {
+    fn clone(&self) -> Self {
+        unsafe { Self::copy_from_raw(self.raw.as_ptr()) }
+    }
+}
+
 impl Drop for GofInfoVP9 {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_GofInfoVP9_delete(self.raw.as_ptr()) };
@@ -346,6 +381,12 @@ impl std::fmt::Debug for RTPVideoHeaderVP8 {
             .field("partition_id", &self.partition_id())
             .field("beginning_of_partition", &self.beginning_of_partition())
             .finish()
+    }
+}
+
+impl Clone for RTPVideoHeaderVP8 {
+    fn clone(&self) -> Self {
+        unsafe { Self::copy_from_raw(self.raw.as_ptr()) }
     }
 }
 
@@ -742,6 +783,12 @@ impl std::fmt::Debug for RTPVideoHeaderVP9 {
     }
 }
 
+impl Clone for RTPVideoHeaderVP9 {
+    fn clone(&self) -> Self {
+        unsafe { Self::copy_from_raw(self.raw.as_ptr()) }
+    }
+}
+
 impl Drop for RTPVideoHeaderVP9 {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_delete(self.raw.as_ptr()) };
@@ -815,6 +862,12 @@ impl std::fmt::Debug for NaluInfo {
             .field("sps_id", &self.sps_id())
             .field("pps_id", &self.pps_id())
             .finish()
+    }
+}
+
+impl Clone for NaluInfo {
+    fn clone(&self) -> Self {
+        unsafe { Self::copy_from_raw(self.raw.as_ptr()) }
     }
 }
 
@@ -1024,6 +1077,12 @@ impl std::fmt::Debug for RTPVideoHeaderH264 {
     }
 }
 
+impl Clone for RTPVideoHeaderH264 {
+    fn clone(&self) -> Self {
+        unsafe { Self::copy_from_raw(self.raw.as_ptr()) }
+    }
+}
+
 impl Drop for RTPVideoHeaderH264 {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_RTPVideoHeaderH264_delete(self.raw.as_ptr()) };
@@ -1035,7 +1094,7 @@ impl Drop for RTPVideoHeaderH264 {
 /// libwebrtc の `RTPVideoHeaderCodecSpecifics`
 /// (std::variant<std::monostate, RTPVideoHeaderVP8, RTPVideoHeaderVP9,
 /// RTPVideoHeaderH264>) に対応する。
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RTPVideoHeaderCodecSpecifics {
     /// コーデック固有情報なし (std::monostate)。
     None,

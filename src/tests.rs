@@ -3424,6 +3424,16 @@ fn rtp_video_header_vp8_full_roundtrip() {
     assert_eq!(header.key_idx(), 3);
     assert_eq!(header.partition_id(), 7);
     assert!(header.beginning_of_partition());
+
+    // Clone がディープコピーされ、元の値と一致することを確認する。
+    let cloned = header.clone();
+    assert_eq!(cloned.picture_id(), header.picture_id());
+    assert_eq!(cloned.temporal_idx(), header.temporal_idx());
+    assert_eq!(cloned.key_idx(), header.key_idx());
+    assert_eq!(
+        cloned.beginning_of_partition(),
+        header.beginning_of_partition()
+    );
 }
 
 #[test]
@@ -3549,6 +3559,14 @@ fn gof_info_vp9_full_roundtrip() {
     // 配列サイズの公開メソッドが libwebrtc の定数と一致することを確認する。
     assert_eq!(constants::max_vp9_frames_in_gof(), 0xFF);
     assert_eq!(constants::max_vp9_ref_pics(), 3);
+
+    // Clone がディープコピーされ、元の値と一致することを確認する。
+    let cloned = gof.clone();
+    assert_eq!(cloned.num_frames_in_gof(), gof.num_frames_in_gof());
+    assert_eq!(cloned.temporal_idx(0), gof.temporal_idx(0));
+    assert_eq!(cloned.temporal_up_switch(0), gof.temporal_up_switch(0));
+    assert_eq!(cloned.pid_diff(0, 0), gof.pid_diff(0, 0));
+    assert_eq!(cloned.pid_start(), gof.pid_start());
 }
 
 #[test]
@@ -3622,4 +3640,16 @@ fn rtp_video_header_h264_full_roundtrip() {
     assert_eq!(e2.type_(), 1);
     assert_eq!(e2.sps_id(), -1);
     assert_eq!(e2.pps_id(), -1);
+
+    // Clone がディープコピーされ、元の値と一致することを確認する。
+    let cloned = header.clone();
+    assert_eq!(cloned.nalu_type(), header.nalu_type());
+    assert_eq!(cloned.packetization_type(), header.packetization_type());
+    assert_eq!(cloned.packetization_mode(), header.packetization_mode());
+    let cloned_nalus = cloned.nalus();
+    assert_eq!(cloned_nalus.len(), 2);
+    let e1 = cloned_nalus.get(0).expect("要素が存在する想定");
+    assert_eq!(e1.sps_id(), 1);
+    let e2 = cloned_nalus.get(1).expect("要素が存在する想定");
+    assert_eq!(e2.sps_id(), -1);
 }

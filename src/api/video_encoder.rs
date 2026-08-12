@@ -2,6 +2,7 @@ use super::video_codec_common::{
     EncodedImageRef, SdpVideoFormat, SdpVideoFormatRef, VideoCodecRef, VideoCodecStatus,
     VideoCodecType, VideoFrameBufferKind, VideoFrameRef, VideoFrameTypeVectorRef,
 };
+use super::video_codec_specifics::H264PacketizationMode;
 use crate::{CxxString, EnvironmentRef, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -1244,33 +1245,6 @@ impl VideoEncoderEncodedImageCallbackPtr {
             "BUG: webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage が null を返しました",
         );
         unsafe { VideoEncoderEncodedImageCallbackResult::from_raw_unique(raw_unique) }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum H264PacketizationMode {
-    NonInterleaved,
-    SingleNalUnit,
-    Unknown(i32),
-}
-
-impl H264PacketizationMode {
-    pub(crate) fn from_raw(value: i32) -> Self {
-        if value == unsafe { ffi::webrtc_H264PacketizationMode_NonInterleaved } {
-            Self::NonInterleaved
-        } else if value == unsafe { ffi::webrtc_H264PacketizationMode_SingleNalUnit } {
-            Self::SingleNalUnit
-        } else {
-            Self::Unknown(value)
-        }
-    }
-
-    pub(crate) fn to_raw(self) -> i32 {
-        match self {
-            Self::NonInterleaved => unsafe { ffi::webrtc_H264PacketizationMode_NonInterleaved },
-            Self::SingleNalUnit => unsafe { ffi::webrtc_H264PacketizationMode_SingleNalUnit },
-            Self::Unknown(v) => v,
-        }
     }
 }
 

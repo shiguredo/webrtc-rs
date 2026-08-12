@@ -140,7 +140,7 @@ impl TransformableFrameDirection {
 pub trait FrameTransformerHandler: Send + Sync {
     /// エンコード済みフレームを変換する。
     ///
-    /// `frame` は所有権を持って渡され、データは [TransformableFrame::get_data] で
+    /// `frame` は所有権を持って渡され、データは [TransformableFrame::data] で
     /// 取得し [TransformableFrame::set_data] で書き換える。
     /// 戻り値が `Some` の場合は変換後フレームが送信され、
     /// `None` の場合はフレームがドロップされる。
@@ -344,8 +344,14 @@ impl FrameTransformer {
             OnDestroy: Some(frame_transformer_on_destroy),
         };
         let raw = unsafe { ffi::webrtc_FrameTransformerInterface_new(&cbs, user_data) };
-        let raw = NonNull::new(raw)
-            .expect("BUG: webrtc_FrameTransformerInterface_new が null を返しました");
+        let raw = match NonNull::new(raw) {
+            Some(raw) => raw,
+            None => {
+                // null が返った場合は state を回収してから panic する。
+                let _ = unsafe { Box::from_raw(user_data as *mut FrameTransformerHandlerState) };
+                panic!("BUG: webrtc_FrameTransformerInterface_new が null を返しました");
+            }
+        };
         let raw_ref = ScopedRef::<FrameTransformerHandle>::from_raw(raw);
         Self { raw_ref }
     }
