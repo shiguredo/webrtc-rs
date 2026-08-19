@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "common.h"
 
@@ -30,6 +31,16 @@ WEBRTC_EXPORT struct std_string_unique* std_string_new_from_bytes(
 // -------------------------
 
 WEBRTC_DECLARE_VECTOR(std_string);
+
+// -------------------------
+// std::vector<uint32_t>
+// -------------------------
+
+WEBRTC_DECLARE_VECTOR(webrtc_uint32);
+WEBRTC_EXPORT uint32_t webrtc_uint32_value(struct webrtc_uint32* self);
+WEBRTC_EXPORT void webrtc_uint32_vector_push_back_value(
+    struct webrtc_uint32_vector* self,
+    uint32_t value);
 
 // -------------------------
 // std::map<std::string, std::string>

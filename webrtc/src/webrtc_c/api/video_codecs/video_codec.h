@@ -14,6 +14,10 @@ extern "C" {
 // webrtc::VideoEncoder::RateControlParameters
 // -------------------------
 
+// 固定配列の最大サイズ。libwebrtc の video_codec_constants.h の定数を公開する。
+WEBRTC_EXPORT extern const size_t webrtc_kMaxSimulcastStreams;
+WEBRTC_EXPORT extern const size_t webrtc_kMaxSpatialLayers;
+
 struct webrtc_VideoCodec;
 struct webrtc_SimulcastStream;
 struct webrtc_VideoEncoder_Settings;

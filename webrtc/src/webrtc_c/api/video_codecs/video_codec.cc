@@ -5,6 +5,7 @@
 #include <vector>
 
 // WebRTC
+#include <api/video/video_codec_constants.h>
 #include <api/video/video_codec_type.h>
 #include <api/video/video_frame_type.h>
 #include <api/video_codecs/video_codec.h>
@@ -16,6 +17,10 @@
 
 extern "C" {
 WEBRTC_DEFINE_UNIQUE(webrtc_VideoCodec, webrtc::VideoCodec);
+
+WEBRTC_EXPORT const size_t webrtc_kMaxSimulcastStreams =
+    webrtc::kMaxSimulcastStreams;
+WEBRTC_EXPORT const size_t webrtc_kMaxSpatialLayers = webrtc::kMaxSpatialLayers;
 
 WEBRTC_EXPORT struct webrtc_VideoCodec_unique* webrtc_VideoCodec_new() {
   auto codec = std::make_unique<webrtc::VideoCodec>();
@@ -174,26 +179,15 @@ WEBRTC_EXPORT void webrtc_VideoCodec_set_number_of_simulcast_streams(
     struct webrtc_VideoCodec* self,
     int number_of_simulcast_streams) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
-  int value = number_of_simulcast_streams;
-  if (value < 0) {
-    value = 0;
-  }
-  const int max_streams = static_cast<int>(sizeof(codec->simulcastStream) /
-                                           sizeof(codec->simulcastStream[0]));
-  if (value > max_streams) {
-    value = max_streams;
-  }
   codec->numberOfSimulcastStreams =
-      static_cast<decltype(codec->numberOfSimulcastStreams)>(value);
+      static_cast<decltype(codec->numberOfSimulcastStreams)>(
+          number_of_simulcast_streams);
 }
 
 WEBRTC_EXPORT struct webrtc_SimulcastStream*
 webrtc_VideoCodec_simulcast_stream_at(struct webrtc_VideoCodec* self,
                                       int index) {
   auto codec = reinterpret_cast<webrtc::VideoCodec*>(self);
-  if (index < 0 || index >= static_cast<int>(codec->numberOfSimulcastStreams)) {
-    return nullptr;
-  }
   return reinterpret_cast<struct webrtc_SimulcastStream*>(
       &codec->simulcastStream[index]);
 }

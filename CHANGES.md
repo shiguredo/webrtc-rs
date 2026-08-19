@@ -11,6 +11,32 @@
 
 ## develop
 
+- [CHANGE] 定数アクセサを `constants` モジュールに集約する
+  - `no_temporal_idx` 等の特殊値と配列サイズ定数のアクセサを `shiguredo_webrtc::constants::` に移動する
+  - `VideoCodec::max_simulcast_streams` 等の型の関連関数を削除する
+  - 固定配列サイズの定数を C ラッパーからエクスポートし、Rust API として公開する
+  - @melpon
+- [CHANGE] VP9 配列アクセッサの index 境界チェックを追加する
+  - `GofInfoVP9` / `RTPVideoHeaderVP9` の index 付き getter を `Option` を返すように変更し、境界を超える index では `None` を返すようにする
+  - index 付き setter と count 系 setter に `assert!` による境界チェックを追加する
+  - `VideoCodec::set_number_of_simulcast_streams` に境界チェックを追加する
+  - @melpon
+- [ADD] WebRTC Encoded Transform (フレーム変換) に対応する
+  - `FrameTransformerInterface` / `TransformableFrameInterface` / `TransformableVideoFrameInterface` の C ラッパーと、Rust API として `FrameTransformer` / `FrameTransformerHandler` / `TransformableFrame` / `TransformableVideoFrame` / `TransformableFrameDirection` / `RtpTimestampInfo` を追加する
+  - `RtpSender::set_frame_transformer` / `RtpReceiver::set_frame_transformer` を追加する
+  - フレームのメタデータとキャプチャ時間の書き換え (`set_metadata` / `set_capture_time` / `can_set_capture_time`) を追加する
+  - `TransformableVideoFrame` を `Deref` 対応にして base メソッドへの委譲を削減する
+  - @melpon
+- [ADD] VideoFrameMetadata を完全移植する
+  - `rotation` / `content_type` / `decode_target_indications` / `csrcs` / `rtp_video_header_codec_specifics` の getter / setter を追加する
+  - `RTPVideoHeaderVP8` / `RTPVideoHeaderVP9` / `RTPVideoHeaderH264` と `RTPVideoHeaderCodecSpecifics` (std::variant) の C ラッパーと Rust API を追加する
+  - `GofInfoVP9` / `NaluInfo` / `NaluInfoRef` / `NaluInfoVector` を追加する
+  - `VideoContentType` / `DecodeTargetIndication` / `H264PacketizationType` を追加する
+  - `VideoFrameMetadata` と codec specifics 群に `Clone` / `Debug` を追加する
+  - @melpon
+- [UPDATE] libwebrtc m152 (m152.7977.0.0) に上げる
+  - @melpon
+
 ## 0.151.0
 
 **リリース日**: 2026-08-10

@@ -34,6 +34,11 @@
   - 以下の場合は null チェックを許容する:
     - C++ 側が valid に null を返しうる戻り値を C 側の型に変換する際、変換にデリファレンスが必要でクラッシュする場合（C++ → C 方向の null は正しく伝える）
     - C 側の invariant を表明する `assert()`
+- **境界チェック (index / 配列サイズ) は C ラッパーでは行わない**
+  - 配列 index や配列サイズの検証は、Rust 側の公開 API で行う（getter は `Option` を返す、setter は `assert!` で契約違反を検出するなど）
+  - C ラッパーは libwebrtc が保持する固定配列へそのまま委譲し、境界チェックのロジックを持たない
+  - ただし C++ 側が valid に範囲外を防ぐ・不正 index を null で返すなどの仕様を持つ場合は、その仕様をそのまま C にも伝える（追加のチェックを挟まない）
+  - 配列サイズなどの定数は C からエクスポートし、Rust 側のチェックで参照する
 - **Cbs 構造体のコールバック関数ポインタは null 非許容とする**
   - 呼び出し側は Cbs の全関数ポインタを非 null で設定しなければならない
   - Cbs 構築時に `assert(cbs->OnXxx != nullptr)` で契約違反を検出する
@@ -54,6 +59,18 @@
 - `webrtc::RTCErrorOr<T>` のような、複数の値を持つ型を返す関数を移植する場合、それぞれの値を受け取るための引数を追加する。
   - `webrtc::RTCErrorOr<webrtc::scoped_refptr<CppType>>` の場合は `struct webrtc_RTCError*` と `struct CppType_refcounted*` を追加してそこに結果を出力する
 - `std::string` を返す関数を移植する場合は `struct std_string_unique*` にして、利用後は C アプリケーション側で `std_string_unique_delete` を呼んで解放する
+- `webrtc::Timestamp` / `webrtc::TimeDelta` は `int64_t` マイクロ秒として渡す
+  - 引数・戻り値ともに値はマイクロ秒単位とし、C++ 側で `Timestamp::Micros(...)` / `TimeDelta::Micros(...)` や `.us()` を使って変換する
+- `std::variant<T0, T1, ..., Tn>` はヒープ確保したコピーを `struct CType_unique*` として返す
+  - `WEBRTC_DECLARE_VARIANT(type)` / `WEBRTC_DEFINE_VARIANT(type, cpptype)` マクロを利用する
+  - 生成関数は `std::make_unique<CppType>(value)` を `_unique` にキャストして返し、破棄は `CType_unique_delete` で行う
+  - 特定の alternative を指定して構築する場合は `std::make_unique<CppType>(std::in_place_type<CppAlt>, value)` を使用する
+  - アクティブな alternative の index は `CType_index(self)` で取得する (0-origin、variant 宣言順)
+  - 各 alternative の値は `CType_get_<alt>(self)` で取得する
+    - 実装は `std::get_if<CppAlt>(variant)` を使用し、アクティブでない場合は null を返す
+    - 戻り値は variant 内を借用したポインタであり、呼び出し側は delete しない
+    - alternative のフィールドへは `CType_get_field` でアクセスする
+    - `std::monostate` は値を持たないためアクセサを定義しない
 - `*_unique` でない C 関数の移植で C++ 側が戻り値を返す場合、C-API 全体の一貫性を優先して out パラメータ方式で統一することがある
 
 ## ビルドと実行

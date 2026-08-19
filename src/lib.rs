@@ -1,3 +1,4 @@
+pub mod constants;
 pub mod ffi;
 
 /// クレートのバージョンを返す

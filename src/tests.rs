@@ -133,10 +133,10 @@ fn media_type_constants() {
 
 #[test]
 fn common_constants_values() {
-    assert_eq!(no_picture_id(), -1);
-    assert_eq!(no_tl0_pic_idx(), -1);
-    assert_eq!(no_temporal_idx(), 0xFF);
-    assert_eq!(no_key_idx(), -1);
+    assert_eq!(constants::no_picture_id(), -1);
+    assert_eq!(constants::no_tl0_pic_idx(), -1);
+    assert_eq!(constants::no_temporal_idx(), 0xFF);
+    assert_eq!(constants::no_key_idx(), -1);
 }
 
 #[test]
@@ -423,6 +423,10 @@ fn video_codec_ref_getter_setter_and_simulcast_stream_ref_roundtrip() {
     assert_eq!(codec.max_bitrate_kbps(), 2500);
     assert_eq!(codec.max_framerate(), 60);
     assert_eq!(codec.number_of_simulcast_streams(), 2);
+
+    // 配列サイズの公開メソッドが libwebrtc の定数と一致することを確認する。
+    assert_eq!(constants::max_simulcast_streams(), 3);
+    assert_eq!(constants::max_spatial_layers(), 5);
 
     {
         let mut stream0 = codec
@@ -3247,4 +3251,405 @@ fn media_stream_track_round_trip() {
     network.stop();
     worker.stop();
     signaling.stop();
+}
+
+#[test]
+fn frame_transformer_create_and_drop() {
+    struct TransformHandler;
+
+    impl FrameTransformerHandler for TransformHandler {
+        fn transform(&self, frame: TransformableFrame) -> Option<TransformableFrame> {
+            Some(frame)
+        }
+    }
+
+    let transformer = FrameTransformer::new_with_handler(Box::new(TransformHandler));
+    drop(transformer);
+}
+
+#[test]
+fn video_frame_metadata_full_roundtrip() {
+    let mut metadata = VideoFrameMetadata::new();
+
+    metadata.set_rotation(VideoRotation::R90);
+    assert_eq!(metadata.rotation(), VideoRotation::R90);
+    metadata.set_content_type(VideoContentType::Unspecified);
+    assert_eq!(metadata.content_type(), VideoContentType::Unspecified);
+    metadata.set_content_type(VideoContentType::Screenshare);
+    assert_eq!(metadata.content_type(), VideoContentType::Screenshare);
+    metadata.set_csrcs(&[1, 2, 3]);
+    assert_eq!(metadata.csrcs(), vec![1, 2, 3]);
+    metadata.set_decode_target_indications(&[
+        DecodeTargetIndication::NotPresent,
+        DecodeTargetIndication::Discardable,
+        DecodeTargetIndication::Switch,
+        DecodeTargetIndication::Required,
+    ]);
+    assert_eq!(
+        metadata.decode_target_indications(),
+        vec![
+            DecodeTargetIndication::NotPresent,
+            DecodeTargetIndication::Discardable,
+            DecodeTargetIndication::Switch,
+            DecodeTargetIndication::Required,
+        ]
+    );
+
+    let mut vp8 = RTPVideoHeaderVP8::new();
+    vp8.set_picture_id(42);
+    vp8.set_temporal_idx(1);
+    metadata.set_rtp_video_header_codec_specifics(RTPVideoHeaderCodecSpecifics::VP8(vp8));
+    match metadata.rtp_video_header_codec_specifics() {
+        RTPVideoHeaderCodecSpecifics::VP8(v) => {
+            assert_eq!(v.picture_id(), 42);
+            assert_eq!(v.temporal_idx(), 1);
+        }
+        _ => panic!("RTPVideoHeaderCodecSpecifics::VP8 が返る想定でした"),
+    }
+
+    let mut vp9 = RTPVideoHeaderVP9::new();
+    vp9.set_spatial_idx(2);
+    vp9.set_num_spatial_layers(3);
+    metadata.set_rtp_video_header_codec_specifics(RTPVideoHeaderCodecSpecifics::VP9(vp9));
+    match metadata.rtp_video_header_codec_specifics() {
+        RTPVideoHeaderCodecSpecifics::VP9(v) => {
+            assert_eq!(v.spatial_idx(), 2);
+            assert_eq!(v.num_spatial_layers(), 3);
+        }
+        _ => panic!("RTPVideoHeaderCodecSpecifics::VP9 が返る想定でした"),
+    }
+
+    let mut h264 = RTPVideoHeaderH264::new();
+    h264.set_nalu_type(5);
+    h264.set_packetization_type(H264PacketizationType::StapA);
+    h264.set_packetization_mode(H264PacketizationMode::NonInterleaved);
+    metadata.set_rtp_video_header_codec_specifics(RTPVideoHeaderCodecSpecifics::H264(h264));
+    match metadata.rtp_video_header_codec_specifics() {
+        RTPVideoHeaderCodecSpecifics::H264(v) => {
+            assert_eq!(v.nalu_type(), 5);
+            assert_eq!(v.packetization_type(), H264PacketizationType::StapA);
+            assert_eq!(
+                v.packetization_mode(),
+                H264PacketizationMode::NonInterleaved
+            );
+        }
+        _ => panic!("RTPVideoHeaderCodecSpecifics::H264 が返る想定でした"),
+    }
+
+    metadata.set_rtp_video_header_codec_specifics(RTPVideoHeaderCodecSpecifics::None);
+    assert!(matches!(
+        metadata.rtp_video_header_codec_specifics(),
+        RTPVideoHeaderCodecSpecifics::None
+    ));
+
+    // Clone がディープコピーされ、元の値と一致することを確認する。
+    metadata.set_width(640);
+    let cloned = metadata.clone();
+    assert_eq!(cloned.frame_type(), metadata.frame_type());
+    assert_eq!(cloned.width(), metadata.width());
+    assert_eq!(cloned.height(), metadata.height());
+    assert_eq!(cloned.frame_id(), metadata.frame_id());
+    assert_eq!(cloned.spatial_index(), metadata.spatial_index());
+    assert_eq!(cloned.temporal_index(), metadata.temporal_index());
+    assert_eq!(cloned.dependencies(), metadata.dependencies());
+    assert_eq!(
+        cloned.is_last_frame_in_picture(),
+        metadata.is_last_frame_in_picture()
+    );
+    assert_eq!(cloned.simulcast_idx(), metadata.simulcast_idx());
+    assert_eq!(cloned.codec(), metadata.codec());
+    assert_eq!(cloned.ssrc(), metadata.ssrc());
+    assert_eq!(cloned.rotation(), metadata.rotation());
+    assert_eq!(cloned.content_type(), metadata.content_type());
+    assert_eq!(
+        cloned.decode_target_indications(),
+        metadata.decode_target_indications()
+    );
+    assert_eq!(cloned.csrcs(), metadata.csrcs());
+    // クローン後の書き換えが元に影響しないことを確認する。
+    let mut cloned = cloned;
+    cloned.set_width(999);
+    assert_eq!(metadata.width(), 640);
+    assert_eq!(cloned.width(), 999);
+}
+
+#[test]
+fn video_frame_metadata_basic_fields_roundtrip() {
+    let mut metadata = VideoFrameMetadata::new();
+
+    metadata.set_frame_type(VideoFrameType::Key);
+    assert_eq!(metadata.frame_type(), VideoFrameType::Key);
+    metadata.set_width(640);
+    metadata.set_height(480);
+    assert_eq!(metadata.width(), 640);
+    assert_eq!(metadata.height(), 480);
+    metadata.set_frame_id(Some(42));
+    assert_eq!(metadata.frame_id(), Some(42));
+    metadata.set_frame_id(None);
+    assert_eq!(metadata.frame_id(), None);
+    metadata.set_spatial_index(1);
+    metadata.set_temporal_index(2);
+    assert_eq!(metadata.spatial_index(), 1);
+    assert_eq!(metadata.temporal_index(), 2);
+    metadata.set_dependencies(Some(&[10, 20, 30]));
+    assert_eq!(metadata.dependencies(), Some(&[10, 20, 30][..]));
+    metadata.set_dependencies(None);
+    assert_eq!(metadata.dependencies(), None);
+    metadata.set_is_last_frame_in_picture(true);
+    assert!(metadata.is_last_frame_in_picture());
+    metadata.set_simulcast_idx(3);
+    assert_eq!(metadata.simulcast_idx(), 3);
+    metadata.set_codec(VideoCodecType::Vp8);
+    assert_eq!(metadata.codec(), VideoCodecType::Vp8);
+    metadata.set_ssrc(12345);
+    assert_eq!(metadata.ssrc(), 12345);
+}
+
+#[test]
+fn rtp_video_header_vp8_full_roundtrip() {
+    let mut header = RTPVideoHeaderVP8::new();
+    header.set_non_reference(true);
+    header.set_picture_id(1234);
+    header.set_tl0_pic_idx(5);
+    header.set_temporal_idx(2);
+    header.set_layer_sync(true);
+    header.set_key_idx(3);
+    header.set_partition_id(7);
+    header.set_beginning_of_partition(true);
+    assert!(header.non_reference());
+    assert_eq!(header.picture_id(), 1234);
+    assert_eq!(header.tl0_pic_idx(), 5);
+    assert_eq!(header.temporal_idx(), 2);
+    assert!(header.layer_sync());
+    assert_eq!(header.key_idx(), 3);
+    assert_eq!(header.partition_id(), 7);
+    assert!(header.beginning_of_partition());
+
+    // Clone がディープコピーされ、元の値と一致することを確認する。
+    let cloned = header.clone();
+    assert_eq!(cloned.picture_id(), header.picture_id());
+    assert_eq!(cloned.temporal_idx(), header.temporal_idx());
+    assert_eq!(cloned.key_idx(), header.key_idx());
+    assert_eq!(
+        cloned.beginning_of_partition(),
+        header.beginning_of_partition()
+    );
+}
+
+#[test]
+fn rtp_video_header_vp9_full_roundtrip() {
+    let mut header = RTPVideoHeaderVP9::new();
+    header.set_inter_pic_predicted(true);
+    header.set_flexible_mode(true);
+    header.set_beginning_of_frame(true);
+    header.set_end_of_frame(true);
+    header.set_ss_data_available(true);
+    header.set_non_ref_for_inter_layer_pred(true);
+    header.set_picture_id(4321);
+    header.set_max_picture_id(8191);
+    header.set_tl0_pic_idx(9);
+    header.set_temporal_idx(3);
+    header.set_spatial_idx(1);
+    header.set_temporal_up_switch(true);
+    header.set_inter_layer_predicted(true);
+    header.set_gof_idx(2);
+    header.set_num_ref_pics(2);
+    header.set_pid_diff(0, 1);
+    header.set_pid_diff(1, 2);
+    header.set_ref_picture_id(0, 100);
+    header.set_ref_picture_id(1, 200);
+    header.set_num_spatial_layers(3);
+    header.set_first_active_layer(1);
+    header.set_spatial_layer_resolution_present(true);
+    header.set_width(0, 640);
+    header.set_width(1, 1280);
+    header.set_height(0, 480);
+    header.set_height(1, 720);
+    header.set_end_of_picture(true);
+
+    let mut gof = GofInfoVP9::new();
+    gof.set_num_frames_in_gof(2);
+    gof.set_temporal_idx(0, 0);
+    gof.set_temporal_idx(1, 1);
+    gof.set_temporal_up_switch(0, true);
+    gof.set_num_ref_pics(0, 1);
+    gof.set_pid_diff(0, 0, 2);
+    gof.set_pid_start(10);
+    header.set_gof(&gof);
+
+    assert!(header.inter_pic_predicted());
+    assert!(header.flexible_mode());
+    assert!(header.beginning_of_frame());
+    assert!(header.end_of_frame());
+    assert!(header.ss_data_available());
+    assert!(header.non_ref_for_inter_layer_pred());
+    assert_eq!(header.picture_id(), 4321);
+    assert_eq!(header.max_picture_id(), 8191);
+    assert_eq!(header.tl0_pic_idx(), 9);
+    assert_eq!(header.temporal_idx(), 3);
+    assert_eq!(header.spatial_idx(), 1);
+    assert!(header.temporal_up_switch());
+    assert!(header.inter_layer_predicted());
+    assert_eq!(header.gof_idx(), 2);
+    assert_eq!(header.num_ref_pics(), 2);
+    assert_eq!(header.pid_diff(0), Some(1));
+    assert_eq!(header.pid_diff(1), Some(2));
+    assert_eq!(header.ref_picture_id(0), Some(100));
+    assert_eq!(header.ref_picture_id(1), Some(200));
+    assert_eq!(header.num_spatial_layers(), 3);
+    assert_eq!(header.first_active_layer(), 1);
+    assert!(header.spatial_layer_resolution_present());
+    assert_eq!(header.width(0), Some(640));
+    assert_eq!(header.width(1), Some(1280));
+    assert_eq!(header.height(0), Some(480));
+    assert_eq!(header.height(1), Some(720));
+    assert!(header.end_of_picture());
+
+    let got_gof = header.gof();
+    assert_eq!(got_gof.num_frames_in_gof(), 2);
+    assert_eq!(got_gof.temporal_idx(0), Some(0));
+    assert_eq!(got_gof.temporal_idx(1), Some(1));
+    assert_eq!(got_gof.temporal_up_switch(0), Some(true));
+    assert_eq!(got_gof.num_ref_pics(0), Some(1));
+    assert_eq!(got_gof.pid_diff(0, 0), Some(2));
+    assert_eq!(got_gof.pid_start(), 10);
+
+    // 境界を超える index へのアクセスは None を返すことを確認する。
+    assert_eq!(header.pid_diff(usize::MAX), None);
+    assert_eq!(header.ref_picture_id(usize::MAX), None);
+    assert_eq!(header.width(usize::MAX), None);
+    assert_eq!(header.height(usize::MAX), None);
+
+    // 配列サイズの公開メソッドが libwebrtc の定数と一致することを確認する。
+    assert_eq!(constants::max_vp9_ref_pics(), 3);
+    assert_eq!(constants::max_vp9_num_spatial_layers(), 8);
+}
+
+#[test]
+fn gof_info_vp9_full_roundtrip() {
+    let mut gof = GofInfoVP9::new();
+    gof.set_num_frames_in_gof(3);
+    gof.set_temporal_idx(0, 0);
+    gof.set_temporal_idx(1, 2);
+    gof.set_temporal_idx(2, 1);
+    gof.set_temporal_up_switch(0, true);
+    gof.set_temporal_up_switch(1, false);
+    gof.set_num_ref_pics(0, 2);
+    gof.set_pid_diff(0, 0, 4);
+    gof.set_pid_diff(0, 1, 1);
+    gof.set_pid_start(100);
+    assert_eq!(gof.num_frames_in_gof(), 3);
+    assert_eq!(gof.temporal_idx(0), Some(0));
+    assert_eq!(gof.temporal_idx(1), Some(2));
+    assert_eq!(gof.temporal_idx(2), Some(1));
+    assert_eq!(gof.temporal_up_switch(0), Some(true));
+    assert_eq!(gof.temporal_up_switch(1), Some(false));
+    assert_eq!(gof.num_ref_pics(0), Some(2));
+    assert_eq!(gof.pid_diff(0, 0), Some(4));
+    assert_eq!(gof.pid_diff(0, 1), Some(1));
+    assert_eq!(gof.pid_start(), 100);
+
+    // 境界を超える index へのアクセスは None を返すことを確認する。
+    assert_eq!(gof.temporal_idx(usize::MAX), None);
+    assert_eq!(gof.temporal_up_switch(usize::MAX), None);
+    assert_eq!(gof.num_ref_pics(usize::MAX), None);
+    assert_eq!(gof.pid_diff(usize::MAX, 0), None);
+    assert_eq!(gof.pid_diff(0, usize::MAX), None);
+
+    // 配列サイズの公開メソッドが libwebrtc の定数と一致することを確認する。
+    assert_eq!(constants::max_vp9_frames_in_gof(), 0xFF);
+    assert_eq!(constants::max_vp9_ref_pics(), 3);
+
+    // Clone がディープコピーされ、元の値と一致することを確認する。
+    let cloned = gof.clone();
+    assert_eq!(cloned.num_frames_in_gof(), gof.num_frames_in_gof());
+    assert_eq!(cloned.temporal_idx(0), gof.temporal_idx(0));
+    assert_eq!(cloned.temporal_up_switch(0), gof.temporal_up_switch(0));
+    assert_eq!(cloned.pid_diff(0, 0), gof.pid_diff(0, 0));
+    assert_eq!(cloned.pid_start(), gof.pid_start());
+}
+
+#[test]
+#[should_panic(expected = "MAX_FRAMES_IN_GOF")]
+fn gof_info_vp9_set_num_frames_in_gof_overflow() {
+    let mut gof = GofInfoVP9::new();
+    gof.set_num_frames_in_gof(300);
+}
+
+#[test]
+#[should_panic(expected = "MAX_FRAMES_IN_GOF")]
+fn gof_info_vp9_set_temporal_idx_out_of_bounds() {
+    let mut gof = GofInfoVP9::new();
+    gof.set_temporal_idx(255, 1);
+}
+
+#[test]
+fn nalu_info_vector_roundtrip() {
+    let mut nalu = NaluInfo::new();
+    nalu.set_type(7);
+    nalu.set_sps_id(3);
+    nalu.set_pps_id(4);
+    assert_eq!(nalu.type_(), 7);
+    assert_eq!(nalu.sps_id(), 3);
+    assert_eq!(nalu.pps_id(), 4);
+
+    let mut vec = NaluInfoVector::new(0);
+    assert!(vec.is_empty());
+    vec.push(&nalu);
+    assert_eq!(vec.len(), 1);
+    let elem = vec.get(0).expect("要素が存在する想定");
+    assert_eq!(elem.type_(), 7);
+    assert_eq!(elem.sps_id(), 3);
+    assert_eq!(elem.pps_id(), 4);
+    assert!(vec.get(1).is_none());
+}
+
+#[test]
+fn rtp_video_header_h264_full_roundtrip() {
+    let mut header = RTPVideoHeaderH264::new();
+    header.set_nalu_type(5);
+    header.set_packetization_type(H264PacketizationType::FuA);
+    header.set_packetization_mode(H264PacketizationMode::SingleNalUnit);
+
+    let mut nalu1 = NaluInfo::new();
+    nalu1.set_type(5);
+    nalu1.set_sps_id(1);
+    nalu1.set_pps_id(2);
+    let mut nalu2 = NaluInfo::new();
+    nalu2.set_type(1);
+    nalu2.set_sps_id(-1);
+    nalu2.set_pps_id(-1);
+    let mut nalus = NaluInfoVector::new(0);
+    nalus.push(&nalu1);
+    nalus.push(&nalu2);
+    header.set_nalus(&nalus);
+
+    assert_eq!(header.nalu_type(), 5);
+    assert_eq!(header.packetization_type(), H264PacketizationType::FuA);
+    assert_eq!(
+        header.packetization_mode(),
+        H264PacketizationMode::SingleNalUnit
+    );
+    let got = header.nalus();
+    assert_eq!(got.len(), 2);
+    let e1 = got.get(0).expect("要素が存在する想定");
+    assert_eq!(e1.type_(), 5);
+    assert_eq!(e1.sps_id(), 1);
+    assert_eq!(e1.pps_id(), 2);
+    let e2 = got.get(1).expect("要素が存在する想定");
+    assert_eq!(e2.type_(), 1);
+    assert_eq!(e2.sps_id(), -1);
+    assert_eq!(e2.pps_id(), -1);
+
+    // Clone がディープコピーされ、元の値と一致することを確認する。
+    let cloned = header.clone();
+    assert_eq!(cloned.nalu_type(), header.nalu_type());
+    assert_eq!(cloned.packetization_type(), header.packetization_type());
+    assert_eq!(cloned.packetization_mode(), header.packetization_mode());
+    let cloned_nalus = cloned.nalus();
+    assert_eq!(cloned_nalus.len(), 2);
+    let e1 = cloned_nalus.get(0).expect("要素が存在する想定");
+    assert_eq!(e1.sps_id(), 1);
+    let e2 = cloned_nalus.get(1).expect("要素が存在する想定");
+    assert_eq!(e2.sps_id(), -1);
 }

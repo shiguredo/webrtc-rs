@@ -56,6 +56,26 @@ WEBRTC_DEFINE_VECTOR(std_string, std::string);
 }
 
 // -------------------------
+// std::vector<uint32_t>
+// -------------------------
+
+extern "C" {
+WEBRTC_DEFINE_VECTOR(webrtc_uint32, uint32_t);
+
+WEBRTC_EXPORT uint32_t webrtc_uint32_value(struct webrtc_uint32* self) {
+  auto value = reinterpret_cast<uint32_t*>(self);
+  return *value;
+}
+
+WEBRTC_EXPORT void webrtc_uint32_vector_push_back_value(
+    struct webrtc_uint32_vector* self,
+    uint32_t value) {
+  auto vec = reinterpret_cast<std::vector<uint32_t>*>(self);
+  vec->push_back(value);
+}
+}
+
+// -------------------------
 // std::map<std::string, std::string>
 // -------------------------
 
