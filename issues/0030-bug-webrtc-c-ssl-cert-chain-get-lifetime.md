@@ -3,6 +3,7 @@
 - Priority: Medium
 - Polished: 2026-08-12
 - Created: 2026-06-05
+- Completed: 2026-08-19
 - Model: Opus 4.8
 
 ## 目的
@@ -72,3 +73,11 @@ Rust ラッパーの `SSLCertificateRef<'a>` / `SSLCertChainRef<'a>` は `Phanto
 - `webrtc/src/webrtc_c/rtc_base/ssl_certificate.cc` の `webrtc_SSLCertChain_Get` 実装にも同様のコメントが追加されている
 - コメントの文言が設計方針に示した文案と一致していること
 - `CHANGES.md` の `## develop` に `### misc` サブセクションを新設し、[UPDATE] エントリが追記されていること
+
+## 解決方法
+
+本 issue は対応しないこととした。理由は以下のとおり:
+
+- webrtc_c は libwebrtc の薄いラッパーであり、C++ の参照を返す部分で返り値の寿命に注意が必要なのは当然の API 設計であるため、わざわざコメントとして明記する必要がない
+- Rust ラッパーは `SSLCertificateRef<'a>` / `SSLCertChainRef<'a>` の `PhantomData<&'a>` と `SSLCertChainRef::get()` のライフタイム結合により、safe Rust の API 経路ではこの未定義動作が到達不能であり、本対応が Rust 側に与える影響もない
+- 上記のため本 issue の変更は価値が低く、対応の必要がないと判断して closed にする
