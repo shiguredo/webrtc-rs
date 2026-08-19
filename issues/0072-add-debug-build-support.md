@@ -2,6 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-07-10
+- Completed: 2026-08-19
 - Model: DeepSeek V4 Pro
 - Branch: feature/add-debug-build-support
 - Polished: 2026-07-10
@@ -237,3 +238,22 @@ cargo build --features debug-build
 - `source-build` feature 未指定かつ `WEBRTC_BUILD_ROOT` 未設定かつ `debug-build` 無効の通常ビルドが引き続き成功すること
 - `rerun-if-env-changed=WEBRTC_BUILD_ROOT` と `rerun-if-env-changed=CARGO_FEATURE_DEBUG_BUILD` が `main()` に追加されていること。また `WEBRTC_BUILD_ROOT` 設定時は libwebrtc.a のパスに対して `cargo::rerun-if-changed` が出力され、libwebrtc.a の変更が cargo に検知されること
 - `CHANGES.md` の `## develop` に `[ADD] libwebrtc のデバッグビルドに対応する` エントリが追加されている
+
+## 解決方法
+
+主要な実装は PR #65 (コミット `54b4096`) で develop へマージ済みであり、`CHANGES.md` の 0.150.3 でリリース済み。
+
+実装内容:
+
+- `Cargo.toml` に `debug-build` feature を追加した
+- `build.rs` の `main()` に `WEBRTC_BUILD_ROOT` 設定 + `source-build` 無効時のエラー、`WEBRTC_BUILD_ROOT` 未設定 + `debug-build` 有効時のエラーを追加した
+- `build.rs` の `should_use_prebuilt()` に `WEBRTC_BUILD_ROOT` チェックを追加し、設定時はソースビルドへ進むようにした
+- `build.rs` の `build_webrtc_c()` で `debug-build` feature の有無により `CMAKE_BUILD_TYPE` を Debug / Release に切り替え、`WEBRTC_BUILD_ROOT` を絶対パスへ正規化して CMake へ渡すようにした
+- `webrtc/CMakeLists.txt` に `WEBRTC_BUILD_ROOT` 定義時の分岐を追加し、ローカルの webrtc-build 成果物（バイナリ・ヘッダー・Clang・libc++）を利用するようにした
+- `webrtc/CMakeLists.txt` の Windows 向けハードコード `NDEBUG` を `$<$<NOT:$<CONFIG:Debug>>:NDEBUG>` に置き換え、`_ITERATOR_DEBUG_LEVEL=0` は全ビルドタイプで維持した
+- `webrtc/android.toolchain.cmake` に `ANDROID_OVERRIDE_C_COMPILER` 未定義時のガードを追加した
+- `build.rs` の `main()` に `rerun-if-env-changed=WEBRTC_BUILD_ROOT` / `CARGO_FEATURE_DEBUG_BUILD` と、libwebrtc.a の `rerun-if-changed` を追加した
+
+上記に加え、完了条件「`debug-build` feature 無効時は `-DNDEBUG` を `clang_arg` として渡す」は、後続のコミット `48d0776` で実装した。
+
+bindgen が使う libclang はデフォルトで `NDEBUG` を定義しないことを調査で確認した。そのため Debug ビルド時は `-UNDEBUG` を（libclang のデフォルトである NDEBUG 未定義を明示的に保証）、Release ビルド時は `-DNDEBUG` を渡し、CMake が Release で自動付与する NDEBUG とバインディング生成を一致させた。
