@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-06-23
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-19
 - Model: DeepSeek V4 Pro
 - Branch: feature/add-dummy-audio-support
 - Polished: 2026-07-01
@@ -125,3 +125,11 @@ C ラッパーに対する結合テスト等は後続 issue とする。本 issu
 - `webrtc/CMakeLists.txt` の `add_library(webrtc_c ...)` にビルド対象として追加されている
 - C ラッパーのビルドがパスすること
 - `CHANGES.md` の `## develop` にエントリが追加されている
+
+## 解決方法
+
+本 issue は実装しない方針とし、closed にする。
+
+webrtc-rs は libwebrtc の薄いラッパーであり、ロジックを含む処理は一切実装しない方針である。`DummyAudioSource` は、受け取った PCM データを内部バッファに保持して sink へ配信するといったロジックを含むため、この方針に反する。
+
+ダミー音声データの注入は webrtc-rs の利用者が各プロジェクトで実装することとし、本 issue はクローズする。
