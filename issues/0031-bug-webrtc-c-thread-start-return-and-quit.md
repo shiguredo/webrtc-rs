@@ -37,18 +37,18 @@ WEBRTC_EXPORT void webrtc_Thread_Start(struct webrtc_Thread* self);
 
 ### Start 戻り値の修正
 
-- `webrtc_Thread_Start` の戻り値型を `void` から `bool` に変更する。
-  `webrtc::Thread::Start()` の戻り値 `bool` に忠実に従う（RULES.md の「元の C++ API のシグネチャ・名前に忠実に移植すること」原則）。
-- 戻り値の移植には RULES.md の例外規定（「C-API 全体の一貫性を優先して out パラメータ方式で統一することがある」）が存在する。issue 0044 は `webrtc_RTCError_unique` を戻り値で返す 2 API を対象に、C-API 単体の一貫性を優先して out パラメータ方式へ統一した判断である。本関数はエラー詳細ではなく起動成否の単純な真偽値を返すものであり、例外規定は「することがある」の裁量規定であるため、RULES.md の忠実移植原則を優先して `bool` 戻り値とする（`bool* out_success` の out パラメータ方式は採用しない）。C-API 全体でも `int` を戻り値で返す API（`libyuv.h` の `libyuv_MJPGSize` 等）が多数存在し、プリミティブ値を戻り値で返す慣行がある。
-- C のヘッダで `bool` を使うため、`webrtc/src/webrtc_c/rtc_base/thread.h` に `#include <stdbool.h>` を追加する（実装側 `.cc` は C++ であり `bool` は組み込み型のため不要）。
+- `webrtc_Thread_Start` の戻り値型を `void` から `int` に変更し、`webrtc::Thread::Start()` の戻り値 `bool` を `int` (0/1) に変換して返す。webrtc_c の C API は真偽値を `bool` ではなく `int` (0/1) で表現するのが全体の慣行であり（`webrtc_AudioDeviceModule_Initialized`、`webrtc_RtpEncodingParameters_get_active` 等）、これに合わせる。
+- 戻り値の移植には RULES.md の例外規定（「C-API 全体の一貫性を優先して out パラメータ方式で統一することがある」）が存在する。issue 0044 は `webrtc_RTCError_unique` を戻り値で返す 2 API を対象に、C-API 単体の一貫性を優先して out パラメータ方式へ統一した判断である。本関数はエラー詳細ではなく起動成否の単純な真偽値を返すものであり、例外規定は「することがある」の裁量規定であるため、戻り値方式を採用する（`int* out_success` の out パラメータ方式は採用しない）。C-API 全体でも真偽値・整数値を戻り値で返す API（`libyuv.h` の `libyuv_MJPGSize` 等）が多数存在し、プリミティブ値を戻り値で返す慣行がある。
+- C のヘッダでは `int` を使うため、`#include <stdbool.h>` の追加は不要（`int` は C の組み込み型）。実装側 `.cc` は C++ であり、`webrtc::Thread::Start()` の `bool` 戻り値を `return p->Start() ? 1 : 0;` のように `int` に変換して返す。
 - 実装とヘッダの両方を更新する。
 - 呼び出し元（`webrtc/src/whip.c` / `webrtc/src/whep.c` の C 側 6 箇所、`src/tests.rs` と
   `examples/whip/src/main.rs` / `examples/whep/src/main.rs` の Rust 側）は戻り値を無視する
-  呼び出しであり、`bool` への変更後もコンパイル・警告ともに問題ない（Rust の `bool` には
+  呼び出しであり、`int` への変更後もコンパイル・警告ともに問題ない（Rust の `bool` には
   `#[must_use]` は付与されていないため）。
 - Rust ラッパー `Thread::start(&mut self)` (`src/rtc_base/thread.rs`) は戻り値型を
-  `bool` に変更し、呼び出し元で成否を確認できるようにする。テストでは `assert!` により
-  成否を検証する（既存の戻り値無視の呼び出し元は変更不要）。
+  `bool` に変更し、FFI の戻り値 `int` を `!= 0` で `bool` に変換する。呼び出し元で成否を
+  確認できるようにし、テストでは `assert!` により成否を検証する（既存の戻り値無視の
+  呼び出し元は変更不要）。
 - 戻り値型の変更は後方互換のない破壊的変更のため、CHANGES.md に `[CHANGE]` として追記する。
 
 ### Quit API の扱い
@@ -64,10 +64,11 @@ WEBRTC_EXPORT void webrtc_Thread_Start(struct webrtc_Thread* self);
 
 ## 完了条件
 
-- `webrtc_Thread_Start` の戻り値型が `bool` になり、`webrtc::Thread::Start()` の戻り値を
+- `webrtc_Thread_Start` の戻り値型が `int` になり、`webrtc::Thread::Start()` の戻り値を
   呼び出し側へ伝達する
 - ヘッダ（`.h`）と実装（`.cc`）の戻り値型が一致している
-- `webrtc/src/webrtc_c/rtc_base/thread.h` に `#include <stdbool.h>` が追加されている
+- C ヘッダーは `int` を使い、`#include <stdbool.h>` の追加が不要であること
+- 実装側で `webrtc::Thread::Start()` の `bool` 戻り値を `int` (0/1) に変換している
 - Rust ラッパー `Thread::start()` が `bool` を返すようになっている
 - C 側のビルドが通ること（`python3 run.py build ubuntu-24.04_x86_64`）
 - Rust 側の関連テストが通過すること（`cargo test thread_blocking_call_runs` と新規テスト）
