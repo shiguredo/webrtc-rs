@@ -1,7 +1,7 @@
 # observer / sink を登録したまま drop した場合の実行時検出機構を追加する
 
 - Created: 2026-08-12
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-20
 - Branch: feature/add-observer-sink-drop-detection
 - Polished: {YYYY-MM-DD}
 
@@ -38,3 +38,16 @@ observer / sink を登録したまま drop すると use-after-free になる契
 - 採用する検出方式を決定して実装する
 - 検出テストを `src/tests.rs` に追加する
 - 検出方式の使い分け (`Debug` ビルドのみで有効にするか等) を `src/lib.rs` の feature 設定と整合させて実装する
+
+## 結論
+
+本 issue は closed にする（実行時検出は実装しない）。
+
+実行時検出には登録状態の追跡が必要だが、以下の設計方針と両立しない:
+
+- `webrtc_c` は薄いラッパーであり、登録状態を保持する独自ロジックを追加できない (`webrtc/RULES.md`)
+- Rust 側の wrapper はオブジェクトのポインタ以外の状態を持たない方針である
+
+登録状態を Rust 側のサイドテーブルで別管理する案も検討したが、真の登録状態は C++ 側 (libwebrtc) が保持しており、Rust 側の追跡は Rust API 経由の登録・解除しか反映できない。C++ 側が内部で登録を解消する経路 (例: `SctpDataChannel` の破棄による observer 登録の解消) は Rust 側から追跡できず、安全な teardown で誤検出 (偽陽性) が発生する。逆に C++ 内部で行われた登録は検出できない。
+
+そのため「登録したまま drop」の実行時検出を信頼できる形で実現することはできない。誤用の防止は `issues/0079-bug-observer-sink-lifetime-contract.md` の Rustdoc による契約明記とレビューで対応する。
