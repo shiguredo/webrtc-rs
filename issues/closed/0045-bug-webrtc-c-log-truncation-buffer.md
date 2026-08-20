@@ -3,7 +3,9 @@
 - Priority: Low
 - Polished: 2026-08-12
 - Created: 2026-06-05
+- Completed: 2026-08-21
 - Model: Opus 4.8
+- Branch: feature/fix-log-truncation-buffer
 
 ## 目的
 
@@ -83,3 +85,12 @@ libwebrtc の C++ 側 (`webrtc::LogMessage`) にはメッセージ長の制限�
 - `vsnprintf` が負の値を返した場合のエラーハンドリングが実装されている
 - テスト戦略に記載の検証が完了している（4096 バイト超・65536 バイト超のメッセージが切り詰められずに出力されること、既存の短いメッセージの出力結果が変わらないこと）
 - `CHANGES.md` の `## develop` セクションに追記されている
+
+## 解決方法
+
+`webrtc/src/webrtc_c/rtc_base/logging.cc` の `webrtc_LogMessage_Print` を、`vsnprintf` の二度呼（`va_copy` で可変長引数を複製して必要サイズを求め、`std::string` を動的確保して整形）に置き換えた。
+
+- 固定スタックバッファと `WEBRTC_LOG_BUFFER_SIZE` マクロを削除した
+- `vsnprintf` が負の値を返した場合は整形失敗としてログ出力を諦めるようにした
+- `src/tests.rs` に、テストバイナリをサブプロセスとして起動して stderr を捕捉し、4096 バイト超・65536 バイト超のメッセージが切り詰められずに出力されることを検証するテストを追加した。短いメッセージについても末尾まで完全に出力されることを確認する
+- `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追記した

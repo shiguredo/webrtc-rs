@@ -39,6 +39,8 @@
   - @melpon
 - [UPDATE] libwebrtc m152 (m152.7977.0.0) に上げる
   - @melpon
+- [FIX] webrtc のログ出力が 4096 文字以上だと切り詰められるのを修正する
+  - @melpon
 
 ### misc
 

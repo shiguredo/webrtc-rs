@@ -1283,6 +1283,61 @@ fn logging_functions_are_callable() {
 }
 
 #[test]
+fn logging_long_message_is_not_truncated() {
+    // webrtc_c のログは C++ 側 (webrtc::LogMessage) が stderr へ直接書き込むため、
+    // Rust テストハーネスの標準的な出力キャプチャでは捕捉できない。
+    // テストバイナリをサブプロセスとして起動して stderr を捕捉し、
+    // 出力内容を照合する方式で検証する。
+    let exe = std::env::current_exe().expect("テストバイナリのパスを取得できませんでした");
+    for len in [16, 4096, 70000] {
+        // 4096 は旧実装の固定バッファサイズ、70000 は 65536 バイトを超える
+        // 長文メッセージの代表。16 は既存の短いメッセージ相当。
+        let output = std::process::Command::new(&exe)
+            .arg("logging_message_helper")
+            .env("WEBRTC_LOG_MESSAGE_LEN", len.to_string())
+            .stderr(std::process::Stdio::piped())
+            .output()
+            .expect("サブプロセスの実行に失敗しました");
+        let stderr = String::from_utf8(output.stderr)
+            .expect("サブプロセスの stderr が UTF-8 ではありません");
+        // stderr にはヘッダー（時刻・スレッド ID など）が付く可能性があるため、
+        // 'A' の総数ではなく「連続する 'A' の最大長」で照合する。
+        // 切り詰められていれば連続長は len 未満になり、ヘッダーに 'A' が
+        // 含まれていてもメッセージ長の検証に影響しない。
+        let max_a_run = stderr
+            .chars()
+            .fold((0, 0), |(best, current), c| {
+                if c == 'A' {
+                    (best.max(current + 1), current + 1)
+                } else {
+                    (best, 0)
+                }
+            })
+            .0;
+        assert_eq!(
+            max_a_run, len,
+            "len={len} のメッセージが切り詰められずに出力されていません\nstderr:\n{stderr}"
+        );
+    }
+}
+
+#[test]
+fn logging_message_helper() {
+    // 検証用ヘルパー。ログ (webrtc::LogMessage) は stderr へ直接書き込まれるため、
+    // logging_long_message_is_not_truncated からサブプロセスとして実行される。
+    log::log_to_debug(log::Severity::Info);
+    // 環境変数でメッセージ長を指定する（指定なしの場合は短いメッセージ）。
+    let len = std::env::var("WEBRTC_LOG_MESSAGE_LEN")
+        .map(|v| {
+            v.parse::<usize>()
+                .expect("WEBRTC_LOG_MESSAGE_LEN は数値で指定してください")
+        })
+        .unwrap_or(16);
+    let message = "A".repeat(len);
+    log::print(log::Severity::Info, "webrtc-c", 0, &message);
+}
+
+#[test]
 fn thread_blocking_call_runs() {
     let mut thread = Thread::new();
     assert!(thread.start());
