@@ -276,6 +276,10 @@ impl VideoTrack {
         MediaStreamTrack::from_scoped_ref(ScopedRef::<MediaStreamTrackHandle>::from_raw(raw_ref))
     }
 
+    /// VideoSink を登録または更新する。
+    ///
+    /// この VideoTrack に登録した `sink` は、`remove_sink` で登録を解除するまで
+    /// drop してはならない。
     pub fn add_or_update_sink(&mut self, sink: &VideoSink, wants: &VideoSinkWants) {
         unsafe {
             ffi::webrtc_VideoTrackInterface_AddOrUpdateSink(
@@ -286,6 +290,7 @@ impl VideoTrack {
         }
     }
 
+    /// VideoSink の登録を解除する。
     pub fn remove_sink(&mut self, sink: &VideoSink) {
         unsafe { ffi::webrtc_VideoTrackInterface_RemoveSink(self.raw_ref.as_ptr(), sink.as_ptr()) };
     }

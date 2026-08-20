@@ -53,6 +53,9 @@ impl DtlsTransport {
     }
 
     /// Observer を登録する。
+    ///
+    /// この DtlsTransport に登録した `observer` は、`unregister_observer` で登録を解除する
+    /// まで drop してはならない。
     pub fn register_observer(&self, observer: &DtlsTransportObserver) {
         unsafe {
             ffi::webrtc_DtlsTransportInterface_RegisterObserver(

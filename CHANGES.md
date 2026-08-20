@@ -37,6 +37,12 @@
 - [UPDATE] libwebrtc m152 (m152.7977.0.0) に上げる
   - @melpon
 
+### misc
+
+- [UPDATE] observer / sink を登録したまま drop してはならない仕様を各 API の Rustdoc に明記する
+  - `DataChannel` / `DtlsTransport` の `register_observer` / `unregister_observer`、`VideoTrack` の `add_or_update_sink` / `remove_sink`、`AudioTrack` の `add_sink` / `remove_sink`、`PeerConnection::create` に drop 順序とスレッド制約を記載する
+  - @melpon
+
 ## 0.151.0
 
 **リリース日**: 2026-08-10

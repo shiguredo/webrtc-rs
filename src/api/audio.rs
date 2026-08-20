@@ -109,6 +109,9 @@ impl AudioTrack {
     }
 
     /// AudioTrack に AudioTrackSink を登録する。
+    ///
+    /// この AudioTrack に登録した `sink` は、`remove_sink` で登録を解除するまで
+    /// drop してはならない。
     pub fn add_sink(&mut self, sink: &AudioTrackSink) {
         unsafe {
             ffi::webrtc_AudioTrackInterface_AddSink(self.raw_ref.as_ptr(), sink.as_ptr());
