@@ -1,7 +1,7 @@
 # CreateModularPeerConnectionFactoryWithContext が薄いラッパーでない理由をコメントに明記する
 
 - Created: 2026-08-03
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-21
 - Polished: 2026-08-12
 
 ## 目的
@@ -40,3 +40,9 @@ libwebrtc 本体の `webrtc::CreateModularPeerConnectionFactory`（`api/create_m
 - `CreateModularPeerConnectionFactoryWithContext`（および必要なら `PeerConnectionFactoryWithContext`）に、薄いラッパーではない理由と signaling_thread の設定契約が日本語コメントで明記されていること
 - コードの挙動が変更されていないこと
 - `CHANGES.md` の `## develop` に `### misc` サブセクションを新設し、[UPDATE] エントリが追記されていること
+
+## 解決方法
+
+- `webrtc/src/webrtc_c/api/peer_connection_interface.cc` の `PeerConnectionFactoryWithContext` に、`ConnectionContext` を返すインターフェースを持つクラスである旨の日本語コメントを追加した
+- `webrtc/src/webrtc_c/api/peer_connection_interface.h` の `webrtc_CreateModularPeerConnectionFactoryWithContext` に、薄いラッパーではない理由（libwebrtc 本体は `ConnectionContext` を返すインターフェースを持たないため）を日本語コメントで明記した
+- コードの挙動は変更していない
