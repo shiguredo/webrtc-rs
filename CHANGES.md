@@ -11,6 +11,9 @@
 
 ## develop
 
+- [CHANGE] Rust API の `Thread::start()` を `bool` を返すように変更する
+  - C API の戻り値型を `void` から `int` (0/1) に変更し、`webrtc::Thread::Start()` の成否を Rust API 側へ伝達する
+  - @melpon
 - [CHANGE] 定数アクセサを `constants` モジュールに集約する
   - `no_temporal_idx` 等の特殊値と配列サイズ定数のアクセサを `shiguredo_webrtc::constants::` に移動する
   - `VideoCodec::max_simulcast_streams` 等の型の関連関数を削除する
