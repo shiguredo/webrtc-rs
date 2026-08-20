@@ -4,7 +4,7 @@ use std::ptr::NonNull;
 
 unsafe extern "C" fn thread_trampoline<F, R>(data: *mut c_void)
 where
-    F: FnOnce() -> R,
+    F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
     let func: Box<F> = unsafe { Box::from_raw(data as *mut F) };
@@ -13,7 +13,7 @@ where
 
 unsafe extern "C" fn thread_trampoline_r<F, R>(data: *mut c_void) -> *mut c_void
 where
-    F: FnOnce() -> R,
+    F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
     let func: Box<F> = unsafe { Box::from_raw(data as *mut F) };
@@ -64,9 +64,46 @@ impl Thread {
     }
 
     /// スレッド内で関数を実行し、結果を待つ。
+    ///
+    /// `f` は `self` のスレッドで実行される。基本的に呼び出し元と異なるスレッドで
+    /// 実行されるため `F: Send` が必要である。また、`f` は `Box::into_raw` で
+    /// C++ 側のタスクとして渡され、FFI 越しに消費されるため `F: 'static` を要求する。
+    ///
+    /// ```
+    /// use shiguredo_webrtc::Thread;
+    ///
+    /// let mut thread = Thread::new();
+    /// assert!(thread.start());
+    /// let result = thread.blocking_call(|| 42);
+    /// assert_eq!(result, 42);
+    /// thread.stop();
+    /// ```
+    ///
+    /// 非 Send な値をキャプチャしたクロージャは `F: Send` によりコンパイルエラーになる。
+    ///
+    /// ```compile_fail,E0277
+    /// use std::rc::Rc;
+    /// use shiguredo_webrtc::Thread;
+    ///
+    /// let mut thread = Thread::new();
+    /// let value = Rc::new(42);
+    /// thread.blocking_call(move || *value);
+    /// ```
+    ///
+    /// ローカル変数を借用するクロージャは `F: 'static` によりコンパイルエラーになる。
+    /// 借用ではなく所有する場合は `move` を使用すること。
+    ///
+    /// ```compile_fail,E0373
+    /// use shiguredo_webrtc::Thread;
+    ///
+    /// let mut thread = Thread::new();
+    /// let value = 42;
+    /// thread.blocking_call(|| value);
+    /// ```
     pub fn blocking_call<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce() -> R,
+        F: Send + 'static,
         R: Send + 'static,
     {
         // R が () の場合は BlockingCall、そうでない場合は BlockingCall_r を使う。
