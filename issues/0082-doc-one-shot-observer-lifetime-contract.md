@@ -1,7 +1,7 @@
 # 1 回限り observer のライフタイム契約を文書化する
 
 - Created: 2026-08-12
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-20
 - Branch: feature/fix-one-shot-observer-lifetime-contract
 - Polished: {YYYY-MM-DD}
 
@@ -37,3 +37,11 @@
 
 - 各 API の Rustdoc に「コールバック発火後に drop してよい」旨を日本語で記載する (既存の `# Safety` セクション形式には合わせず、`# ライフタイム` セクションを新設する)
 - 参照カウントにより drop しても安全である旨 (コールバックは必ず発火する) も併記する
+
+## 結論
+
+本 issue は closed にする（文書化は実施しない）。
+
+1 回限り observer は `make_ref_counted` で生成され、`create_offer` / `create_answer` / `set_local_description` / `set_remote_description` の各 API が C++ 側で `scoped_refptr` として強参照を保持する（`pc/sdp_offer_answer.cc` の `CreateOffer` / `CreateAnswer` は受け取った直後に `scoped_refptr` に変換し、`pc/peer_connection.cc` の `ReportFailure` は失敗時にもコールバックを必ず呼ぶ）。コールバック発火後に C++ 側が `Release` して実体が破棄されるため、**Rust ラッパーはいつ drop しても安全**であり、drop 順序の制約は存在しない。
+
+そのため「drop してよいタイミングを文書化する」という本 issue の前提は成立しない。「コールバック発火後に drop してよい」という表現は、それ以前の drop を禁止しているように読めて誤解を招くため、文書化しない方が良い。文書化する価値があるのは「ラッパーはいつ drop してもよい（C++ 側が参照を保持するためコールバックは必ず 1 回発火する）」という内容だが、これは drop 順序の罠が無いことの確認であり、`issues/0079-bug-observer-sink-lifetime-contract.md` の「対象外」の説明で既に触れられている。
