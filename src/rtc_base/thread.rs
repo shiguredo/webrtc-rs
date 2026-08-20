@@ -49,9 +49,12 @@ impl Thread {
     }
 
     /// スレッドを開始する。
-    pub fn start(&mut self) {
+    ///
+    /// 起動に成功した場合は `true` を返す。
+    pub fn start(&mut self) -> bool {
         let raw = self.raw();
-        unsafe { ffi::webrtc_Thread_Start(raw.as_ptr()) };
+        let result = unsafe { ffi::webrtc_Thread_Start(raw.as_ptr()) };
+        result != 0
     }
 
     /// スレッドを停止し join する。

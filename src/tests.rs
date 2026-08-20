@@ -1285,12 +1285,21 @@ fn logging_functions_are_callable() {
 #[test]
 fn thread_blocking_call_runs() {
     let mut thread = Thread::new();
-    thread.start();
+    assert!(thread.start());
     let result = thread.blocking_call(|| 42);
     assert_eq!(result, 42);
 
     // () 戻り値のパスも通す
     thread.blocking_call(|| {});
+    thread.stop();
+}
+
+#[test]
+fn thread_start_returns_true() {
+    // スレッド起動が成功すれば true を返すことを検証する。
+    // false になる再現経路は libwebrtc 実装依存のため、正常系のみ確認する。
+    let mut thread = Thread::new();
+    assert!(thread.start());
     thread.stop();
 }
 
