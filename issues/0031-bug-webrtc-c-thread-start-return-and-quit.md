@@ -3,6 +3,7 @@
 - Priority: Medium
 - Polished: 2026-08-12
 - Created: 2026-06-05
+- Completed: 2026-08-20
 - Model: Opus 4.8
 - Branch: feature/change-webrtc-c-thread-start-return
 
@@ -73,4 +74,15 @@ WEBRTC_EXPORT void webrtc_Thread_Start(struct webrtc_Thread* self);
 - C 側のビルドが通ること（`python3 run.py build ubuntu-24.04_x86_64`）
 - Rust 側の関連テストが通過すること（`cargo test thread_blocking_call_runs` と新規テスト）
 - CHANGES.md の `## develop` セクションに `[CHANGE]` エントリが追加されている
+
+## 解決方法
+
+- `webrtc/src/webrtc_c/rtc_base/thread.h` と `webrtc/src/webrtc_c/rtc_base/thread.cc` の
+  `webrtc_Thread_Start` の戻り値型を `void` から `int` に変更し、
+  `webrtc::Thread::Start()` の成否を `p->Start() ? 1 : 0` で返すようにした
+- `src/rtc_base/thread.rs` の `Thread::start()` を `bool` を返すように変更し、
+  FFI の戻り値 `int` を `!= 0` で `bool` に変換するようにした
+- `src/tests.rs` に `thread_start_returns_true` テストを追加し、
+  正常系で `start()` が `true` を返すことを `assert!` で検証するようにした
+- `CHANGES.md` の `## develop` セクションに `[CHANGE]` エントリを追記した
 - Quit の C API 追加と `webrtc_Thread_SleepMs` の戻り値修正は本 issue の対象外とする
