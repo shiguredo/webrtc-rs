@@ -645,8 +645,20 @@ if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
 elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
   enable_language(OBJCXX)
 
+  target_sources(webrtc_c
+    PRIVATE
+      src/webrtc_c/objc.mm
+  )
+
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_options(${target} PRIVATE -fconstant-string-class=NSConstantString)
+    target_compile_options(${target}
+      PRIVATE
+        -fconstant-string-class=NSConstantString
+        # .mm を ARC でコンパイルし、CFBridgingRetain / CFBridgingRelease の
+        # リテイン収支を ARC の規則に一致させる
+        # 非 Apple ターゲットでは .mm が CXX としてコンパイルされるため、OBJCXX 言語にのみ適用する
+        "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>"
+    )
     target_compile_definitions(${target}
       PRIVATE
         WEBRTC_POSIX
@@ -696,7 +708,14 @@ elseif (WEBRTC_C_TARGET STREQUAL "ios_arm64")
   )
 
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_options(${target} PRIVATE -fconstant-string-class=NSConstantString)
+    target_compile_options(${target}
+      PRIVATE
+        -fconstant-string-class=NSConstantString
+        # .mm を ARC でコンパイルし、CFBridgingRetain / CFBridgingRelease の
+        # リテイン収支を ARC の規則に一致させる
+        # 非 Apple ターゲットでは .mm が CXX としてコンパイルされるため、OBJCXX 言語にのみ適用する
+        "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>"
+    )
     target_compile_definitions(${target}
       PRIVATE
         WEBRTC_POSIX
