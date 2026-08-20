@@ -1,7 +1,7 @@
 # observer / sink を登録したまま drop した場合の use-after-free の契約を文書化する
 
 - Created: 2026-08-03
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-20
 - Branch: feature/fix-observer-sink-lifetime-contract
 - Polished: 2026-08-12
 
