@@ -11,6 +11,9 @@
 
 ## develop
 
+- [CHANGE] `Thread::blocking_call` に `F: Send + 'static` 境界を追加する
+  - クロージャが別スレッドで実行され得るため `Send` を、FFI 越しに消費されるため `'static` を要求する
+  - @melpon
 - [CHANGE] Rust API の `Thread::start()` を `bool` を返すように変更する
   - C API の戻り値型を `void` から `int` (0/1) に変更し、`webrtc::Thread::Start()` の成否を Rust API 側へ伝達する
   - @melpon

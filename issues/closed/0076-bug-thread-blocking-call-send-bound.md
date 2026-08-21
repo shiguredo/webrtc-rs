@@ -1,8 +1,8 @@
 # Thread::blocking_call に F: Send + 'static 境界がない
 
 - Created: 2026-08-03
-- Completed: {YYYY-MM-DD}
-- Branch: feature/fix-thread-blocking-call-send-bound
+- Completed: 2026-08-21
+- Branch: feature/change-thread-blocking-call-send-bound
 - Polished: 2026-08-12
 
 ## 目的
@@ -37,14 +37,16 @@ where
 ## 完了条件
 
 - `Thread::blocking_call` に `F: Send + 'static` 境界が追加されていること。`thread_trampoline` / `thread_trampoline_r` にも同様の境界が追加されていること
-- 非 Send なクロージャ (`Rc` キャプチャ等) を渡すコードがコンパイルエラーになること（`compile_fail,E0277` doctest を `blocking_call` の doc コメントに追加して検証する。借用クロージャを渡す `compile_fail,E0521` doctest も追加し、`F: 'static` 違反も検証する。trybuild は compile_fail doctest で十分検証できるため新規導入しない）
+- 非 Send なクロージャ (`Rc` キャプチャ等) を渡すコードがコンパイルエラーになること（`compile_fail,E0277` doctest を `blocking_call` の doc コメントに追加して検証する。借用クロージャを渡す `compile_fail,E0373` doctest も追加し、`F: 'static` 違反も検証する。trybuild は compile_fail doctest で十分検証できるため新規導入しない）
 - `blocking_call` の doc コメントに `F: Send + 'static` が必要な理由（他スレッドで実行され得る・FFI 越しに消費されるため）が追記されていること
 - 既存の `blocking_call` 利用箇所 (`src/tests.rs` の `thread_blocking_call_runs` 内の 2 箇所) がコンパイル・実行可能であること
 - `CHANGES.md` の `## develop` セクションに `[CHANGE]` エントリが追加されていること（公開 API の境界追加による後方互換のない変更のため）
 
 ## 解決方法
 
-- `Thread::blocking_call` の `where` 句に `F: Send + 'static` を追加する
-- `thread_trampoline` / `thread_trampoline_r` の `where` 句にも同様の境界を追加する（`blocking_call` 側の境界により常に満たされるが、unsafe 関数の契約明示として防御的に追加する）
-- `blocking_call` の doc コメントに `compile_fail` doctest と境界の理由説明を追記する
-- `CHANGES.md` の `## develop` セクションに `[CHANGE]` エントリを追記する
+- `Thread::blocking_call` の `where` 句に `F: Send + 'static` を追加した
+- `thread_trampoline` / `thread_trampoline_r` の `where` 句にも同様の境界を追加した（`blocking_call` 側の境界により常に満たされるが、unsafe 関数の契約明示として防御的に追加）
+- `blocking_call` の doc コメントに、境界が必要な理由の説明と positive doctest、`compile_fail,E0277` doctest（非 Send）、`compile_fail,E0373` doctest（借用クロージャ）を追記した
+  - 借用クロージャのエラーコードは実測により `E0373` と判明したため、完了条件に記載していた `E0521` を `E0373` に修正した
+- `CHANGES.md` の `## develop` セクションに `[CHANGE]` エントリを追記した
+- `cargo test --workspace --features source-build` で全テストと doctest が通過することを確認した
