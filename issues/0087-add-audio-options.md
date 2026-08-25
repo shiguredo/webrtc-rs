@@ -1,7 +1,7 @@
 # AudioOptions による音声処理設定の API を追加する
 
 - Created: 2026-08-25
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-26
 - Branch: feature/add-audio-options
 - Polished: {YYYY-MM-DD}
 
@@ -52,8 +52,20 @@ libwebrtc は WebRtcVoiceEngine がこれらの処理をデフォルトで有効
 
 ## 解決方法
 
-- 上記の設計方針に従い、webrtc_c の C API と Rust API を追加する
-- `src/tests.rs` に次のテストを追加する
-  - `AudioOptions` を生成して各 setter を呼び、drop できること
-  - `create_audio_source` に設定付き `AudioOptions` を渡して生成できること
-  - 既存の引数なし `create_audio_source` と同じ文脈で、未設定 `AudioOptions` を渡して従来と同じように生成できること
+- webrtc_c に `webrtc_AudioOptions` 型を `webrtc/src/webrtc_c/api/audio/audio_options.h` / `audio_options.cc` に新規追加した
+  - `webrtc_AudioOptions_new` / `webrtc_AudioOptions_delete` に加え、各フィールドの getter / setter を提供する
+  - `std::optional` は既存様式 (`webrtc_c::OptionalGetAs` / `OptionalSetAs`) に則り、has (値の有無) と value を分けた C API で表現する
+  - 公開するフィールド (deprecated / 将来 remove 予定を除く 8 件)
+    - `echo_cancellation` / `auto_gain_control` / `noise_suppression` / `highpass_filter` / `stereo_swapping` / `audio_jitter_buffer_fast_accelerate` (`std::optional<bool>`)
+    - `audio_jitter_buffer_max_packets` / `audio_jitter_buffer_min_delay_ms` (`std::optional<int>`)
+- `webrtc_PeerConnectionFactoryInterface_CreateAudioSource` に `struct webrtc_AudioOptions* options` 引数を追加し、options をデリファレンスして渡すようにした
+  - C ラッパーの null チェックは行わず (`webrtc/RULES.md`)、assert で契約違反を検出する
+- `webrtc/src/webrtc_c.h` に `audio_options.h` の include を追加し、`webrtc/CMakeLists.txt` の `webrtc_c` ソースリストに `audio_options.cc` を追加した
+- Rust API
+  - `src/api/audio.rs` に `AudioOptions` (new / 各フィールドの getter / setter / as_ptr / Default / Drop) を追加した
+  - `src/api/peer_connection.rs` の `create_audio_source` に `options: &AudioOptions` 引数を追加した
+- `src/tests.rs` に次のテストを追加した
+  - `audio_options_set_and_get_options`: 未設定時の getter が全て None、設定した値が getter で取得できること、None で未設定に戻せること
+  - `create_audio_source_with_audio_options`: 設定付き `AudioOptions` で AudioSource を生成できること
+  - `create_audio_source_with_default_audio_options`: 未設定 `AudioOptions` で従来と同じように AudioSource を生成できること
+- `CHANGES.md` の develop セクションに変更履歴を追記した
