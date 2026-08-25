@@ -11,6 +11,12 @@
 
 ## develop
 
+- [CHANGE] ログ初期化 API を `webrtc::LoggingConfig` の C ラッパー経由に変更する
+  - C API の `webrtc_LogMessage_InitializeLogging` を `int severity` 引数から `struct webrtc_LoggingConfig*` 引数に変更し、`webrtc_LoggingConfig` 型 (new / delete / setter / getter) を追加する
+  - `webrtc_LogMessage_LogTimestamps` / `webrtc_LogMessage_LogThreads` を削除し、`log_timestamp` / `log_thread` フィールドに統合する
+  - Rust API の `log::initialize_logging` を `log::Severity` 引数から `log::LoggingConfig` 引数に変更し、`log::enable_timestamps` / `log::enable_threads` を削除する
+  - @melpon
+
 ## 0.152.0
 
 **リリース日**: 2026-08-25

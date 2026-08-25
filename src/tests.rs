@@ -1278,9 +1278,22 @@ fn logging_functions_are_callable() {
     // severity は Info にしておく。実際のログ内容は検証しない。
     // initialize_logging は最初のログ出力前に呼ぶ必要があるが、テストの実行順序は
     // 保証されないため戻り値の検証は行わない。
-    log::initialize_logging(log::Severity::Info);
-    log::enable_timestamps();
-    log::enable_threads();
+    let mut config = log::LoggingConfig::new();
+    config.set_min_severity(log::Severity::Info);
+    config.set_debug_severity(log::Severity::Info);
+    config.set_log_timestamp(true);
+    config.set_log_thread(true);
+    config.set_log_queue_name(true);
+    config.set_log_to_stderr(true);
+    config.set_log_prefix("prefix");
+    assert_eq!(config.min_severity(), log::Severity::Info);
+    assert_eq!(config.debug_severity(), log::Severity::Info);
+    assert!(config.log_timestamp());
+    assert!(config.log_thread());
+    assert!(config.log_queue_name());
+    assert!(config.log_to_stderr());
+    assert_eq!(config.log_prefix().unwrap(), "prefix");
+    log::initialize_logging(config);
     log::print(log::Severity::Info, "webrtc-c", 0, "log test");
 }
 
@@ -1327,7 +1340,8 @@ fn logging_long_message_is_not_truncated() {
 fn logging_message_helper() {
     // 検証用ヘルパー。ログ (webrtc::LogMessage) は stderr へ直接書き込まれるため、
     // logging_long_message_is_not_truncated からサブプロセスとして実行される。
-    log::initialize_logging(log::Severity::Info);
+    let config = log::LoggingConfig::new();
+    log::initialize_logging(config);
     // 環境変数でメッセージ長を指定する（指定なしの場合は短いメッセージ）。
     let len = std::env::var("WEBRTC_LOG_MESSAGE_LEN")
         .map(|v| {
