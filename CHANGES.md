@@ -31,6 +31,10 @@
   - index 付き setter と count 系 setter に `assert!` による境界チェックを追加する
   - `VideoCodec::set_number_of_simulcast_streams` に境界チェックを追加する
   - @melpon
+- [CHANGE] `DegradationPreference::Disabled` を `MaintainFramerateAndResolution` に変名する
+  - libwebrtc の `webrtc::DegradationPreference` は `MAINTAIN_FRAMERATE_AND_RESOLUTION` が本名で `DISABLED` は削除予定の互換エイリアスであるため、命名を本流に揃える
+  - C ラッパーの定数を `webrtc_DegradationPreference_MAINTAIN_FRAMERATE_AND_RESOLUTION` に改名する
+  - @melpon
 - [ADD] WebRTC Encoded Transform (フレーム変換) に対応する
   - `FrameTransformerInterface` / `TransformableFrameInterface` / `TransformableVideoFrameInterface` の C ラッパーと、Rust API として `FrameTransformer` / `FrameTransformerHandler` / `TransformableFrame` / `TransformableVideoFrame` / `TransformableFrameDirection` / `RtpTimestampInfo` を追加する
   - `RtpSender::set_frame_transformer` / `RtpReceiver::set_frame_transformer` を追加する

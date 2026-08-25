@@ -1885,6 +1885,11 @@ fn rtp_parameters_round_trip() {
         params.degradation_preference(),
         Some(DegradationPreference::Balanced)
     );
+    params.set_degradation_preference(Some(DegradationPreference::MaintainFramerateAndResolution));
+    assert_eq!(
+        params.degradation_preference(),
+        Some(DegradationPreference::MaintainFramerateAndResolution)
+    );
     params.set_degradation_preference(None);
     assert_eq!(params.degradation_preference(), None);
 }
