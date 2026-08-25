@@ -1,7 +1,7 @@
 # ScopedRef 系の内部機構の公開を pub(crate) 化する
 
 - Created: 2026-08-03
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-26
 - Branch: feature/fix-scoped-ref-from-raw-safety
 - Polished: 2026-08-12
 
@@ -67,3 +67,14 @@ pub fn from_raw(raw_ref: NonNull<H::Refcounted>) -> Self {
 - クレート内の全使用箇所がコンパイル・テストに通ること（`cargo build` / `cargo test`）
 - 外部から `ScopedRef` / `RefCountedHandle` / `from_raw` にアクセスできないこと（`cargo doc` の公開 API に現れないこと）
 - `CHANGES.md` の `## develop` セクションに `[CHANGE]` エントリ（担当者行を含む）が追加されていること
+
+## 解決方法
+
+`ScopedRef` / `RefCountedHandle` と `RTCStatsReport::from_refcounted_ptr` を `pub(crate)` 化して、参照カウント管理の内部機構を外部公開 API から外すことで soundness ホールを塞いだ。
+
+- `src/ref_count.rs`: `RefCountedHandle` トレイトと `ScopedRef` 構造体を `pub(crate)` にする
+- `src/lib.rs`: `pub use ref_count::{RefCountedHandle, ScopedRef};` を `use ref_count::ScopedRef;`（private 再エクスポート）に変更し、公開 API から外す
+- `src/api/stats.rs`: `RTCStatsReport::from_refcounted_ptr` を `pub(crate)` にする
+- `CHANGES.md` の `## develop` に `[CHANGE]` エントリを追加する
+
+全イシュー（`cargo build` / `cargo test` / `cargo doc` / `cargo clippy`）の検証を通過した。`cargo doc` の公開 API に `ScopedRef` / `RefCountedHandle` は現れないことを確認した。
