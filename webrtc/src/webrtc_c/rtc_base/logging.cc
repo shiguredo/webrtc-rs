@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string>
+#include <utility>
 
 // WebRTC
 #include <rtc_base/logging.h>
@@ -26,9 +27,14 @@ WEBRTC_EXPORT const int webrtc_LogSeverity_LS_ERROR =
 WEBRTC_EXPORT const int webrtc_LogSeverity_LS_NONE =
     static_cast<int>(webrtc::LoggingSeverity::LS_NONE);
 
-WEBRTC_EXPORT void webrtc_LogMessage_LogToDebug(int severity) {
-  webrtc::LogMessage::LogToDebug(
-      static_cast<webrtc::LoggingSeverity>(severity));
+// LogMessage::LogToDebug は LoggingConfig の debug_severity に反映されないため、
+// 現在の libwebrtc ではログレベルを変更する手段として機能しない。
+// そのため InitializeLogging で min_severity と debug_severity を設定して初期化する。
+WEBRTC_EXPORT bool webrtc_LogMessage_InitializeLogging(int severity) {
+  webrtc::LoggingConfig config;
+  config.set_min_severity(static_cast<webrtc::LoggingSeverity>(severity));
+  config.set_debug_severity(static_cast<webrtc::LoggingSeverity>(severity));
+  return webrtc::InitializeLogging(std::move(config));
 }
 WEBRTC_EXPORT void webrtc_LogMessage_LogTimestamps() {
   webrtc::LogMessage::LogTimestamps();

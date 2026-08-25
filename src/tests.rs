@@ -1275,8 +1275,10 @@ fn video_frame_buffer_as_i420_and_as_nv12_return_none_for_native() {
 
 #[test]
 fn logging_functions_are_callable() {
-    // severity は 0 にしておく。実際のログ内容は検証しない。
-    log::log_to_debug(log::Severity::Info);
+    // severity は Info にしておく。実際のログ内容は検証しない。
+    // initialize_logging は最初のログ出力前に呼ぶ必要があるが、テストの実行順序は
+    // 保証されないため戻り値の検証は行わない。
+    log::initialize_logging(log::Severity::Info);
     log::enable_timestamps();
     log::enable_threads();
     log::print(log::Severity::Info, "webrtc-c", 0, "log test");
@@ -1325,7 +1327,7 @@ fn logging_long_message_is_not_truncated() {
 fn logging_message_helper() {
     // 検証用ヘルパー。ログ (webrtc::LogMessage) は stderr へ直接書き込まれるため、
     // logging_long_message_is_not_truncated からサブプロセスとして実行される。
-    log::log_to_debug(log::Severity::Info);
+    log::initialize_logging(log::Severity::Info);
     // 環境変数でメッセージ長を指定する（指定なしの場合は短いメッセージ）。
     let len = std::env::var("WEBRTC_LOG_MESSAGE_LEN")
         .map(|v| {

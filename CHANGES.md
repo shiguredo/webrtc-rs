@@ -44,6 +44,10 @@
   - @melpon
 - [FIX] webrtc のログ出力が 4096 文字以上だと切り詰められるのを修正する
   - @melpon
+- [FIX] ログレベルの設定が無効になっている問題を修正する
+  - `webrtc_LogMessage_LogToDebug` を削除し、`webrtc_LogMessage_InitializeLogging` で `LoggingConfig` を設定する libwebrtc の新 API に移行する
+  - `log::log_to_debug` を `log::initialize_logging` に置き換える
+  - @voluntas
 
 ### misc
 

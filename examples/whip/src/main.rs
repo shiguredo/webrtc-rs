@@ -952,7 +952,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    log::log_to_debug(log::Severity::Info);
+    log::initialize_logging(log::Severity::Info);
     log::enable_timestamps();
     log::enable_threads();
 
