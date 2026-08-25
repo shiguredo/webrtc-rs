@@ -26,7 +26,7 @@ pub use libyuv::{
     i420_rotate, i420_to_nv12, mjpg_size, mjpg_to_i420, mjpg_to_nv12, nv12_copy, nv12_to_i420,
     yuy2_to_i420,
 };
-pub use ref_count::{RefCountedHandle, ScopedRef};
+use ref_count::ScopedRef;
 pub use rtc_base::{
     SSLCertChainRef, SSLCertificateRef, SSLCertificateVerifier, SSLCertificateVerifierHandler,
     SSLIdentity, Thread, TimestampAligner, log, random_bytes, random_string, rtc_log_format_file,
