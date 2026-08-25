@@ -16,6 +16,11 @@
   - `webrtc_LogMessage_LogTimestamps` / `webrtc_LogMessage_LogThreads` を削除し、`log_timestamp` / `log_thread` フィールドに統合する
   - Rust API の `log::initialize_logging` を `log::Severity` 引数から `log::LoggingConfig` 引数に変更し、`log::enable_timestamps` / `log::enable_threads` を削除する
   - @melpon
+- [CHANGE] `create_audio_source` に `AudioOptions` 引数を追加する
+  - C API に `webrtc_AudioOptions` 型 (new / delete / 各 std::optional フィールドの getter / setter) を追加し、`webrtc_PeerConnectionFactoryInterface_CreateAudioSource` に `options` 引数を追加する
+  - エコーキャンセル / 自動ゲインコントロール / ノイズサプレッション / ハイパスフィルタ / ステレオスワップ / 受信側 jitter buffer の設定と取得を可能にする
+  - 未設定のフィールドは従来どおり WebRtcVoiceEngine のデフォルト設定が適用される
+  - @melpon
 
 ## 0.152.0
 

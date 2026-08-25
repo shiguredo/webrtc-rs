@@ -418,6 +418,7 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream(
 
 WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateAudioSource(
     struct webrtc_PeerConnectionFactoryInterface* self,
+    struct webrtc_AudioOptions* options,
     struct webrtc_AudioSourceInterface_refcounted** out_source);
 
 WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateAudioTrack(
