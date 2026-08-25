@@ -11,6 +11,10 @@
 
 ## develop
 
+## 0.152.0
+
+**リリース日**: 2026-08-25
+
 - [CHANGE] `Thread::blocking_call` に `F: Send + 'static` 境界を追加する
   - クロージャが別スレッドで実行され得るため `Send` を、FFI 越しに消費されるため `'static` を要求する
   - @melpon
