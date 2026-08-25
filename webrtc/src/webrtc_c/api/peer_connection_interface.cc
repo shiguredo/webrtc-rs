@@ -185,6 +185,7 @@ class RTCStatsCollectorCallbackImpl : public webrtc::RTCStatsCollectorCallback {
       : cbs_(*cbs), user_data_(user_data) {
     assert(cbs != nullptr);
     assert(cbs->OnStatsDelivered != nullptr);
+    assert(cbs->OnDestroy != nullptr);
   }
 
   void OnStatsDelivered(
@@ -196,6 +197,8 @@ class RTCStatsCollectorCallbackImpl : public webrtc::RTCStatsCollectorCallback {
             report_ref.release()),
         user_data_);
   }
+
+  ~RTCStatsCollectorCallbackImpl() override { cbs_.OnDestroy(user_data_); }
 
  private:
   struct webrtc_RTCStatsCollectorCallback_cbs cbs_{};

@@ -44,7 +44,6 @@
   - Cbs 構築時に `assert(cbs->OnXxx != nullptr)` で契約違反を検出する
   - ディスパッチ時の null チェックは行わず、無条件呼び出しとする
   - この方針は `AudioDeviceModule_cbs` には適用しない（デフォルト実装 + 部分上書き方式のため）
-  - `RTCStatsCollectorCallback_cbs` は OnDestroy を持たないが、それ以外は他と同様に扱う
 
 ## セルフチェック手順
 

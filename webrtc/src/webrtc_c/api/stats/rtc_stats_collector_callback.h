@@ -16,6 +16,7 @@ struct webrtc_RTCStatsCollectorCallback_cbs {
   void (*OnStatsDelivered)(
       const struct webrtc_RTCStatsReport_refcounted* report,
       void* user_data);
+  void (*OnDestroy)(void* user_data);
 };
 
 #if defined(__cplusplus)

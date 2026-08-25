@@ -2080,6 +2080,56 @@ fn peer_connection_lookup_dtls_transport() {
 }
 
 #[test]
+fn get_stats_delivers_report() {
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc);
+    deps_factory.set_audio_decoder_factory(&dec);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
+    let mut pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+        .expect("PeerConnection の生成に失敗しました");
+
+    let (tx, rx) = mpsc::channel::<()>();
+    pc.get_stats(move |_report| {
+        let _ = tx.send(());
+    });
+
+    // 配信はシグナリングスレッドで非同期に行われるため、コールバック発火を待つ。
+    rx.recv_timeout(Duration::from_secs(10))
+        .expect("get_stats のコールバックが呼ばれませんでした");
+
+    drop(pc);
+    drop(pc_deps);
+    drop(factory);
+    drop(deps_factory);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
 fn peer_connection_create_with_proxy_allocator() {
     let dec = AudioDecoderFactory::builtin();
     let enc = AudioEncoderFactory::builtin();
