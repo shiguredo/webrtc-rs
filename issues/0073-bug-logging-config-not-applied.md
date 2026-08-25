@@ -1,7 +1,7 @@
 # ログレベルの設定が無効になっている
 
 - Created: 2026-08-25
-- Completed: {YYYY-MM-DD} (例: 2024-07-01)
+- Completed: 2026-08-25
 - Branch: hotfix/0.150.4
 - Polished: {YYYY-MM-DD} (例: 2024-07-15)
 - Milestone: 0.150.4
@@ -54,4 +54,8 @@
   `webrtc_LogMessage_LogToDebug` を撤去する。
 - `src/rtc_base/logging.rs`: `log::initialize_logging` を追加し、
   `log_to_debug` を削除する。
-- `CHANGES.md`: `FIX` として記載し、バージョンを 0.150.4 に上げる。
+- `src/tests.rs` / `examples/whep/src/main.rs` / `examples/whip/src/main.rs` /
+  `webrtc/src/whip.c`: 呼び出し側を `initialize_logging` に置き換える。
+- `README.md` / `skills/shiguredo_webrtc/SKILL.md`: ログ機能の一覧を更新する。
+- `CHANGES.md`: `FIX` として記載する。hotfix/0.150.4 のバージョンには
+  上げず、develop (0.152.0) に載せる。
