@@ -5,13 +5,13 @@ use crate::ref_count::{
     SetRemoteDescriptionObserverHandle, VideoTrackHandle,
 };
 use crate::{
-    AudioDecoderFactory, AudioDeviceModule, AudioEncoderFactory, AudioProcessingBuilder,
-    AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit, DtlsTransport, Error,
-    IceCandidate, IceCandidateRef, MediaStream, MediaStreamTrack, MediaType, RTCStatsReport,
-    Result, RtcError, RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender, RtpTransceiver,
-    RtpTransceiverInit, SSLCertificateVerifier, SSLIdentity, ScopedRef, SessionDescription,
-    StringVector, Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack, VideoTrackSource,
-    ffi,
+    AudioDecoderFactory, AudioDeviceModule, AudioEncoderFactory, AudioOptions,
+    AudioProcessingBuilder, AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit,
+    DtlsTransport, Error, IceCandidate, IceCandidateRef, MediaStream, MediaStreamTrack, MediaType,
+    RTCStatsReport, Result, RtcError, RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender,
+    RtpTransceiver, RtpTransceiverInit, SSLCertificateVerifier, SSLIdentity, ScopedRef,
+    SessionDescription, StringVector, Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack,
+    VideoTrackSource, ffi,
 };
 use std::marker::PhantomData;
 use std::os::raw::{c_char, c_void};
@@ -307,11 +307,12 @@ impl PeerConnectionFactory {
         Ok(VideoTrack::from_scoped_ref(raw_ref))
     }
 
-    pub fn create_audio_source(&self) -> Result<AudioTrackSource> {
+    pub fn create_audio_source(&self, options: &AudioOptions) -> Result<AudioTrackSource> {
         let mut out = std::ptr::null_mut();
         unsafe {
             ffi::webrtc_PeerConnectionFactoryInterface_CreateAudioSource(
                 self.raw_ref.as_ptr(),
+                options.as_ptr(),
                 &mut out,
             );
         }

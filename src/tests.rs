@@ -3269,8 +3269,9 @@ fn media_stream_track_round_trip() {
     let stream = factory
         .create_local_media_stream("stream-1")
         .expect("CreateLocalMediaStream が失敗しました");
+    let audio_options = AudioOptions::new();
     let audio_source = factory
-        .create_audio_source()
+        .create_audio_source(&audio_options)
         .expect("AudioSource の生成に失敗しました");
     let audio_track = factory
         .create_audio_track(&audio_source, "audio-track-0")
@@ -3328,7 +3329,139 @@ fn media_stream_track_round_trip() {
     drop(video_source);
     drop(audio_track);
     drop(audio_source);
+    drop(audio_options);
     drop(stream);
+    drop(factory);
+    drop(deps_factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
+fn audio_options_set_and_get_options() {
+    // 未設定の AudioOptions はすべての getter が None を返すことを検証する
+    let options = AudioOptions::new();
+    assert_eq!(options.echo_cancellation(), None);
+    assert_eq!(options.auto_gain_control(), None);
+    assert_eq!(options.noise_suppression(), None);
+    assert_eq!(options.highpass_filter(), None);
+    assert_eq!(options.stereo_swapping(), None);
+    assert_eq!(options.audio_jitter_buffer_max_packets(), None);
+    assert_eq!(options.audio_jitter_buffer_fast_accelerate(), None);
+    assert_eq!(options.audio_jitter_buffer_min_delay_ms(), None);
+    drop(options);
+
+    // 全フィールドに設定した値が getter で取得できることを検証する
+    let mut options = AudioOptions::new();
+    options.set_echo_cancellation(Some(false));
+    options.set_auto_gain_control(Some(true));
+    options.set_noise_suppression(Some(false));
+    options.set_highpass_filter(Some(true));
+    options.set_stereo_swapping(Some(false));
+    options.set_audio_jitter_buffer_max_packets(Some(50));
+    options.set_audio_jitter_buffer_fast_accelerate(Some(true));
+    options.set_audio_jitter_buffer_min_delay_ms(Some(100));
+    assert_eq!(options.echo_cancellation(), Some(false));
+    assert_eq!(options.auto_gain_control(), Some(true));
+    assert_eq!(options.noise_suppression(), Some(false));
+    assert_eq!(options.highpass_filter(), Some(true));
+    assert_eq!(options.stereo_swapping(), Some(false));
+    assert_eq!(options.audio_jitter_buffer_max_packets(), Some(50));
+    assert_eq!(options.audio_jitter_buffer_fast_accelerate(), Some(true));
+    assert_eq!(options.audio_jitter_buffer_min_delay_ms(), Some(100));
+
+    // 未設定 (None) に戻せば getter が None に戻ることを検証する
+    options.set_echo_cancellation(None);
+    options.set_audio_jitter_buffer_max_packets(None);
+    assert_eq!(options.echo_cancellation(), None);
+    assert_eq!(options.audio_jitter_buffer_max_packets(), None);
+    drop(options);
+}
+
+#[test]
+fn create_audio_source_with_audio_options() {
+    // 設定付きの AudioOptions を渡して AudioSource を生成できることを検証する
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc);
+    deps_factory.set_audio_decoder_factory(&dec);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    let mut options = AudioOptions::new();
+    options.set_echo_cancellation(Some(false));
+    options.set_auto_gain_control(Some(false));
+    options.set_noise_suppression(Some(false));
+    options.set_highpass_filter(Some(false));
+    let audio_source = factory
+        .create_audio_source(&options)
+        .expect("AudioSource の生成に失敗しました");
+
+    drop(audio_source);
+    drop(options);
+    drop(factory);
+    drop(deps_factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
+fn create_audio_source_with_default_audio_options() {
+    // 何も設定しない AudioOptions を渡しても、従来と同じように AudioSource を生成できることを検証する
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc);
+    deps_factory.set_audio_decoder_factory(&dec);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    let options = AudioOptions::new();
+    let audio_source = factory
+        .create_audio_source(&options)
+        .expect("AudioSource の生成に失敗しました");
+
+    drop(audio_source);
+    drop(options);
     drop(factory);
     drop(deps_factory);
     drop(adm);

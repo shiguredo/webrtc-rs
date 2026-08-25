@@ -420,6 +420,7 @@ add_library(webrtc_c
   STATIC
     src/webrtc_c/api/audio/audio_device.cc
     src/webrtc_c/api/audio/audio_device_defines.cc
+    src/webrtc_c/api/audio/audio_options.cc
     src/webrtc_c/api/audio/audio_processing.cc
     src/webrtc_c/api/audio_codecs/audio_decoder_factory.cc
     src/webrtc_c/api/audio_codecs/audio_encoder_factory.cc
