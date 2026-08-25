@@ -1523,7 +1523,7 @@ void SignalingWhip_Disconnect(struct SignalingWhip* self) {
 }
 
 int main() {
-  webrtc_LogMessage_LogToDebug(webrtc_LogSeverity_LS_INFO);
+  webrtc_LogMessage_InitializeLogging(webrtc_LogSeverity_LS_INFO);
   webrtc_LogMessage_LogTimestamps();
   webrtc_LogMessage_LogThreads();
 

@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <cassert>
+#include <cstring>
 #include <string>
 
 // WebRTC
@@ -25,9 +26,10 @@ WEBRTC_EXPORT void webrtc_RTCError_message(struct webrtc_RTCError* self,
                                            const char** out_message,
                                            size_t* out_len) {
   auto err = reinterpret_cast<webrtc::RTCError*>(self);
+  const char* message = err->message();
   assert(out_message != nullptr);
-  *out_message = err->message();
+  *out_message = message;
   assert(out_len != nullptr);
-  *out_len = std::string(err->message()).size();
+  *out_len = std::strlen(message);
 }
 }

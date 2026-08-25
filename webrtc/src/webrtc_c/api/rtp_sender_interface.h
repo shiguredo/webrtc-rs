@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../common.h"
+#include "frame_transformer_interface.h"
 #include "rtc_error.h"
 #include "rtp_parameters.h"
 
@@ -23,6 +24,9 @@ WEBRTC_EXPORT void webrtc_RtpSenderInterface_SetParameters(
 WEBRTC_EXPORT int webrtc_RtpSenderInterface_SetTrack(
     struct webrtc_RtpSenderInterface* self,
     struct webrtc_MediaStreamTrackInterface* track);
+WEBRTC_EXPORT void webrtc_RtpSenderInterface_SetFrameTransformer(
+    struct webrtc_RtpSenderInterface* self,
+    struct webrtc_FrameTransformerInterface_refcounted* frame_transformer);
 
 #if defined(__cplusplus)
 }

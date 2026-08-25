@@ -1678,6 +1678,9 @@ unsafe impl Send for PeerConnection {}
 unsafe impl Sync for PeerConnection {}
 
 impl PeerConnection {
+    /// PeerConnection を生成する。
+    ///
+    /// `deps` に渡した observer は、`PeerConnection::close` を呼ぶまで drop してはならない。
     pub fn create(
         factory: &PeerConnectionFactory,
         config: &mut PeerConnectionRtcConfiguration,

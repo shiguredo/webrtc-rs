@@ -74,7 +74,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 | C++ 標準型ラッパー (`cxxstd`) | `CxxString`, `CxxStringRef`, `MapStringString`, `MapStringStringIter`, `StringVector`, `StringVectorRef` |
 | libyuv | `LibyuvFourcc`, `LibyuvRotationMode`, `abgr_to_i420()`, `convert_from_i420()`, `convert_to_i420()`, `i420_copy()`, `i420_to_nv12()`, `mjpg_size()`, `mjpg_to_i420()`, `mjpg_to_nv12()`, `nv12_copy()`, `nv12_to_i420()`, `yuy2_to_i420()` |
 | 参照カウント | `RefCountedHandle`, `ScopedRef` |
-| rtc_base | `Thread`, `TimestampAligner`, `SSLCertChainRef`, `SSLCertificateRef`, `SSLCertificateVerifier`, `SSLCertificateVerifierHandler`, `SSLIdentity`, `log` (モジュール: `Severity`, `log_to_debug`, `enable_timestamps`, `enable_threads`, `print`), `random_bytes()`, `random_string()`, `rtc_log_format_file()`, `time_millis()` |
+| rtc_base | `Thread`, `TimestampAligner`, `SSLCertChainRef`, `SSLCertificateRef`, `SSLCertificateVerifier`, `SSLCertificateVerifierHandler`, `SSLIdentity`, `log` (モジュール: `Severity`, `initialize_logging`, `enable_timestamps`, `enable_threads`, `print`), `random_bytes()`, `random_string()`, `rtc_log_format_file()`, `time_millis()` |
 | ログマクロ (`#[macro_export]`) | `rtc_log_verbose!`, `rtc_log_info!`, `rtc_log_warning!`, `rtc_log_error!` |
 | FFI | `ffi` (`bindgen` 生成の raw バインディング。通常は利用者が直接触らない) |
 
@@ -173,7 +173,7 @@ libwebrtc の `scoped_refptr` 相当を Rust 側で安全に扱うための型:
 
 - `log` モジュール (`rtc_base::logging::log`):
   - `Severity` enum (`Verbose`, `Info`, `Warning`, `Error`, `None`, `Raw(i32)`)
-  - `log_to_debug(severity)`, `enable_timestamps()`, `enable_threads()`, `print(severity, file, line, message)`
+  - `initialize_logging(severity)`, `enable_timestamps()`, `enable_threads()`, `print(severity, file, line, message)`
 - ログマクロ: `rtc_log_verbose!`, `rtc_log_info!`, `rtc_log_warning!`, `rtc_log_error!`
   - 内部で `rtc_log_format_file(env!("CARGO_PKG_NAME"), file!())` を呼んで `<crate>::<filename>` 形式に整形する
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdbool.h>
+
 #include "../common.h"
 
 #if defined(__cplusplus)
@@ -15,7 +17,7 @@ WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_INFO;
 WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_WARNING;
 WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_ERROR;
 WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_NONE;
-WEBRTC_EXPORT void webrtc_LogMessage_LogToDebug(int severity);
+WEBRTC_EXPORT bool webrtc_LogMessage_InitializeLogging(int severity);
 WEBRTC_EXPORT void webrtc_LogMessage_LogTimestamps();
 WEBRTC_EXPORT void webrtc_LogMessage_LogThreads();
 WEBRTC_EXPORT void webrtc_LogMessage_Print(int severity,

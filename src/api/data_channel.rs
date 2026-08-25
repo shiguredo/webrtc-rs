@@ -77,11 +77,21 @@ impl DataChannel {
     }
 
     /// DataChannel を閉じる。
+    ///
+    /// 閉じても observer の登録は解除されない。`unregister_observer` で登録を解除する
+    /// まで observer を drop しないこと。
     pub fn close(&self) {
         unsafe { ffi::webrtc_DataChannelInterface_Close(self.raw_ref.as_ptr()) };
     }
 
     /// Observer を登録する。
+    ///
+    /// この DataChannel に登録した `observer` は、`unregister_observer` で登録を解除する
+    /// まで drop してはならない。
+    ///
+    /// 本メソッドと `unregister_observer` は network thread 以外のどのスレッドからでも
+    /// 呼べるが、コールバック内から呼んではならない。コールバックは signaling thread
+    /// で発火する。
     pub fn register_observer(&mut self, observer: &DataChannelObserver) {
         unsafe {
             ffi::webrtc_DataChannelInterface_RegisterObserver(
@@ -92,6 +102,9 @@ impl DataChannel {
     }
 
     /// Observer を解除する。
+    ///
+    /// network thread 以外のどのスレッドからでも呼べるが、network thread からの
+    /// 呼び出しとコールバック内からの呼び出しは不可。
     pub fn unregister_observer(&self) {
         unsafe { ffi::webrtc_DataChannelInterface_UnregisterObserver(self.raw_ref.as_ptr()) };
     }

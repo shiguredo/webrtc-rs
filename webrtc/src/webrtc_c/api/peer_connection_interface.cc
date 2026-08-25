@@ -1059,6 +1059,7 @@ WEBRTC_EXPORT void webrtc_EnableMedia(
 
 namespace {
 
+// webrtc::PeerConnectionFactory に ConnectionContext を返すインターフェースを追加したクラス
 class PeerConnectionFactoryWithContext : public webrtc::PeerConnectionFactory {
  public:
   explicit PeerConnectionFactoryWithContext(

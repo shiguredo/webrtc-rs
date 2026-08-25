@@ -6,6 +6,7 @@
 #include <api/rtc_error.h>
 #include <api/rtp_parameters.h>
 #include <api/rtp_sender_interface.h>
+#include <api/scoped_refptr.h>
 
 #include "../common.h"
 #include "../common.impl.h"
@@ -49,5 +50,15 @@ WEBRTC_EXPORT int webrtc_RtpSenderInterface_SetTrack(
   auto media_track =
       reinterpret_cast<webrtc::MediaStreamTrackInterface*>(track);
   return sender->SetTrack(media_track) ? 1 : 0;
+}
+
+WEBRTC_EXPORT void webrtc_RtpSenderInterface_SetFrameTransformer(
+    struct webrtc_RtpSenderInterface* self,
+    struct webrtc_FrameTransformerInterface_refcounted* frame_transformer) {
+  auto sender = reinterpret_cast<webrtc::RtpSenderInterface*>(self);
+  auto transformer = reinterpret_cast<webrtc::FrameTransformerInterface*>(
+      webrtc_FrameTransformerInterface_refcounted_get(frame_transformer));
+  sender->SetFrameTransformer(
+      webrtc::scoped_refptr<webrtc::FrameTransformerInterface>(transformer));
 }
 }

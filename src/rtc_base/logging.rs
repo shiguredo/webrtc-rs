@@ -25,9 +25,13 @@ pub mod log {
         }
     }
 
-    /// ログ出力先をデバッグに設定する。
-    pub fn log_to_debug(severity: Severity) {
-        unsafe { ffi::webrtc_LogMessage_LogToDebug(severity.to_int()) };
+    /// ログ出力レベルを初期化する。
+    ///
+    /// 最初のログ出力前に 1 回だけ呼ぶこと。すでに初期化済みの場合（明示的な
+    /// 初期化あるいは最初のログ出力による暗黙の初期化を含む）は `false` を
+    /// 返し、設定は反映されない。
+    pub fn initialize_logging(severity: Severity) -> bool {
+        unsafe { ffi::webrtc_LogMessage_InitializeLogging(severity.to_int()) }
     }
 
     /// タイムスタンプ出力を有効化する。

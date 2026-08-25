@@ -1374,6 +1374,10 @@ fn generate_bindings(header: &Path, include_dir: &Path) {
     // debug-build feature 有効時は NDEBUG を未定義にして Debug ビルドのヘッダー定義に合わせる
     if env::var("CARGO_FEATURE_DEBUG_BUILD").is_ok() {
         builder = builder.clang_arg("-UNDEBUG");
+    } else {
+        // debug-build feature 無効時は Release ビルドのヘッダー定義に合わせて NDEBUG を定義する
+        // CMake は Release で自動的に -DNDEBUG を付与するため、bindgen 側も合わせる必要がある
+        builder = builder.clang_arg("-DNDEBUG");
     }
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();

@@ -51,7 +51,7 @@
 #include <api/video_codecs/builtin_video_decoder_factory.h>
 #include <api/video_codecs/builtin_video_encoder_factory.h>
 #include <api/video_codecs/sdp_video_format.h>
-#include <media/base/adapted_video_track_source.h>
+#include <api/video/adapted_video_track_source.h>
 #include <media/base/codec.h>
 #include <media/base/codec_comparators.h>
 #include <pc/media_factory.h>

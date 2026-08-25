@@ -3,8 +3,8 @@ use crate::ref_count::{
     RtpTransceiverHandle, VideoTrackHandle,
 };
 use crate::{
-    AudioTrack, CxxString, CxxStringRef, Error, MapStringString, MediaType, Result, RtcError,
-    ScopedRef, StringVectorRef, VideoTrack, ffi,
+    AudioTrack, CxxString, CxxStringRef, Error, FrameTransformer, MapStringString, MediaType,
+    Result, RtcError, ScopedRef, StringVectorRef, VideoTrack, ffi,
 };
 use std::marker::PhantomData;
 use std::ptr::NonNull;
@@ -1451,6 +1451,19 @@ impl RtpReceiver {
         );
         MediaStreamTrack::from_scoped_ref(raw_ref)
     }
+
+    /// フレーム変換を設定する。
+    ///
+    /// 設定後は受信したエンコード済みフレームが `frame_transformer` で変換され、
+    /// デコーダーへ渡される。
+    pub fn set_frame_transformer(&mut self, frame_transformer: &FrameTransformer) {
+        unsafe {
+            ffi::webrtc_RtpReceiverInterface_SetFrameTransformer(
+                self.raw_ref.as_ptr(),
+                frame_transformer.as_refcounted_ptr(),
+            )
+        };
+    }
 }
 
 // 安全性: libwebrtc 側で参照カウント管理されたポインタのみを保持する。
@@ -1503,6 +1516,19 @@ impl RtpSender {
             return Err(Error::RtcError(rtc));
         }
         Ok(())
+    }
+
+    /// フレーム変換を設定する。
+    ///
+    /// 設定後はエンコード済みフレームが `frame_transformer` で変換されてから
+    /// パケタイザーへ渡される。
+    pub fn set_frame_transformer(&mut self, frame_transformer: &FrameTransformer) {
+        unsafe {
+            ffi::webrtc_RtpSenderInterface_SetFrameTransformer(
+                self.as_ptr(),
+                frame_transformer.as_refcounted_ptr(),
+            )
+        };
     }
 }
 

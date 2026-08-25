@@ -11,7 +11,7 @@ extern "C" {
 // -------------------------
 
 WEBRTC_DECLARE_UNIQUE(webrtc_Thread);
-WEBRTC_EXPORT void webrtc_Thread_Start(struct webrtc_Thread* self);
+WEBRTC_EXPORT int webrtc_Thread_Start(struct webrtc_Thread* self);
 WEBRTC_EXPORT void webrtc_Thread_Stop(struct webrtc_Thread* self);
 WEBRTC_EXPORT struct webrtc_Thread_unique* webrtc_Thread_Create();
 WEBRTC_EXPORT struct webrtc_Thread_unique*

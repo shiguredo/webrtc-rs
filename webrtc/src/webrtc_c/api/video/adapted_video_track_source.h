@@ -2,8 +2,8 @@
 
 #include <stdint.h>
 
-#include "../../api/video/video_frame.h"
 #include "../../common.h"
+#include "video_frame.h"
 
 #if defined(__cplusplus)
 extern "C" {

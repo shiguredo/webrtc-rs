@@ -3,6 +3,7 @@
 - Priority: Low
 - Polished: 2026-06-05
 - Created: 2026-06-05
+- Completed: 2026-08-21
 - Model: Opus 4.8
 
 ## 目的
@@ -46,3 +47,21 @@ WEBRTC_EXPORT void webrtc_RTCError_message(struct webrtc_RTCError* self,
 
 - `webrtc_RTCError_message` における一時 `std::string` の構築が行われなくなっている。
 - `out_message` と `out_len` が現状と同じ値（ポインタと文字列長）を返す。
+
+## 解決方法
+
+`webrtc/src/webrtc_c/api/rtc_error.cc` の `webrtc_RTCError_message` を、`err->message()` の戻り値を一度だけローカル変数 `message` に保持し、`out_message` と `out_len` の両方をそのポインタから導出する実装に変更した。
+
+```cpp
+const char* message = err->message();
+assert(out_message != nullptr);
+*out_message = message;
+assert(out_len != nullptr);
+*out_len = std::strlen(message);
+```
+
+`err->message()` は `const char*`（NUL 終端）を返すため、文字列長は `std::strlen(message)` で求める。これにより以下の点が解消される:
+
+- `err->message()` の呼び出しが 2 回から 1 回になる
+- 長さ算出のための一時 `std::string` の構築がなくなる
+- 既存の引数仕様（`assert` による契約違反検出）は維持する
