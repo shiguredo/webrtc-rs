@@ -967,6 +967,114 @@ fn convert_to_i420_returns_false_when_sample_is_too_small() {
     );
 }
 
+// ── ConvertToI420 の入力長検証テスト (ARGB / BGRA) ──
+
+/// convert_to_i420 の ARGB 入力必要長 (crop オフセット込み) ちょうどで変換が成功することを確認する
+#[test]
+fn convert_to_i420_argb_succeeds_at_exact_required_src_len() {
+    let src_width = 8;
+    let src_height = 8;
+    let crop_x = 2;
+    let crop_y = 2;
+    let crop_width = 4;
+    let crop_height = 4;
+    let chroma_width = (crop_width + 1) / 2;
+    let chroma_height = (crop_height + 1) / 2;
+    // 必要長 = (crop_y + abs(crop_height) - 1) * (src_width * 4) + (crop_x + crop_width) * 4
+    let required = (crop_y + crop_height - 1) * (src_width * 4) + (crop_x + crop_width) * 4;
+    let src = vec![0u8; required as usize];
+    let mut dst_y = vec![0u8; (crop_width * crop_height) as usize];
+    let mut dst_u = vec![0u8; (chroma_width * chroma_height) as usize];
+    let mut dst_v = vec![0u8; (chroma_width * chroma_height) as usize];
+    assert!(convert_to_i420(
+        &src,
+        &mut dst_y,
+        crop_width,
+        &mut dst_u,
+        chroma_width,
+        &mut dst_v,
+        chroma_width,
+        crop_x,
+        crop_y,
+        src_width,
+        src_height,
+        crop_width,
+        crop_height,
+        LibyuvRotationMode::Rotate0,
+        LibyuvFourcc::Argb,
+    ));
+}
+
+/// convert_to_i420 の ARGB 入力が必要長より 1 バイト短い場合に false が返ることを確認する
+#[test]
+fn convert_to_i420_argb_returns_false_when_src_frame_is_too_short() {
+    let src_width = 8;
+    let src_height = 8;
+    let crop_x = 2;
+    let crop_y = 2;
+    let crop_width = 4;
+    let crop_height = 4;
+    let chroma_width = (crop_width + 1) / 2;
+    let chroma_height = (crop_height + 1) / 2;
+    let required = (crop_y + crop_height - 1) * (src_width * 4) + (crop_x + crop_width) * 4;
+    let src = vec![0u8; (required - 1) as usize];
+    let mut dst_y = vec![0u8; (crop_width * crop_height) as usize];
+    let mut dst_u = vec![0u8; (chroma_width * chroma_height) as usize];
+    let mut dst_v = vec![0u8; (chroma_width * chroma_height) as usize];
+    assert!(!convert_to_i420(
+        &src,
+        &mut dst_y,
+        crop_width,
+        &mut dst_u,
+        chroma_width,
+        &mut dst_v,
+        chroma_width,
+        crop_x,
+        crop_y,
+        src_width,
+        src_height,
+        crop_width,
+        crop_height,
+        LibyuvRotationMode::Rotate0,
+        LibyuvFourcc::Argb,
+    ));
+}
+
+/// convert_to_i420 の BGRA 入力が必要長より 1 バイト短い場合に false が返ることを確認する
+#[test]
+fn convert_to_i420_bgra_returns_false_when_src_frame_is_too_short() {
+    let src_width = 8;
+    let src_height = 8;
+    let crop_x = 2;
+    let crop_y = 2;
+    let crop_width = 4;
+    let crop_height = 4;
+    let chroma_width = (crop_width + 1) / 2;
+    let chroma_height = (crop_height + 1) / 2;
+    let required = (crop_y + crop_height - 1) * (src_width * 4) + (crop_x + crop_width) * 4;
+    let src = vec![0u8; (required - 1) as usize];
+    let mut dst_y = vec![0u8; (crop_width * crop_height) as usize];
+    let mut dst_u = vec![0u8; (chroma_width * chroma_height) as usize];
+    let mut dst_v = vec![0u8; (chroma_width * chroma_height) as usize];
+    assert!(!convert_to_i420(
+        &src,
+        &mut dst_y,
+        crop_width,
+        &mut dst_u,
+        chroma_width,
+        &mut dst_v,
+        chroma_width,
+        crop_x,
+        crop_y,
+        src_width,
+        src_height,
+        crop_width,
+        crop_height,
+        LibyuvRotationMode::Rotate0,
+        LibyuvFourcc::Bgra,
+    ));
+}
+
 // ── I420Rotate 系テスト ──
 
 /// 0° 回転で入出力が一致することを確認する

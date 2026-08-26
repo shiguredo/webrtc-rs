@@ -29,6 +29,10 @@
   - C 側の `RTCStatsCollectorCallbackImpl` にデストラクタを追加し、コールバック未発火のまま C++ オブジェクトが破棄される場合に `OnDestroy` を呼ぶようにする
   - Rust 側の回収を `OnDestroy` に一元化し、`OnStatsDelivered` は `&mut` 参照 + `Option::take()` による実行に変更する
   - @melpon
+- [FIX] `convert_to_i420` が ARGB / BGRA 入力の必要長を検証せず libyuv が短いバッファをオーバーリードする問題を修正する
+  - ARGB / BGRA 入力について crop オフセット込みの必要長 (`src_width * 4` の stride で `(crop_y + abs(crop_height))` 行 × `(crop_x + crop_width) * 4` バイト) を検証し、不足時は `false` を返すようにする
+  - MJPG 入力は libyuv 側の検証に委ねるため対象外とする
+  - @melpon
 
 ## 0.152.0
 
