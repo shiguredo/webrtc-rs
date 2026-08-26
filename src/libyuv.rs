@@ -599,9 +599,11 @@ pub fn mjpg_size(sample: &[u8]) -> Option<(i32, i32)> {
 ///
 /// `fourcc` で入力フォーマットを指定する。
 /// MJPEG 入力の場合、src_width/src_height が JPEG ヘッダの値と一致する必要がある。
-/// iOS など MJPEG サポートを含まないビルドでは MJPG fourcc 指定時の変換は常に失敗する
+/// iOS など MJPEG サポートを含まないビルドでは MJPG fourcc 指定時の変換は常に失敗する。
+/// ARGB / BGRA 入力の場合、src_frame は libyuv が読み込むバイト数 (crop オフセット込み) 以上である必要がある。
 ///
 /// 変換に成功した場合 (libyuv が `0` を返した場合) のみ `true` を返す。
+/// それ以外 (事前検証に失敗した場合、libyuv がエラーを返した場合) は `false`。
 #[expect(clippy::too_many_arguments)]
 pub fn convert_to_i420(
     src_frame: &[u8],
@@ -624,7 +626,34 @@ pub fn convert_to_i420(
         return false;
     };
 
-    if !has_required_len(dst_y.len(), dst_stride_y, crop_height, crop_width)
+    let src_ok = match fourcc {
+        // ARGB / BGRA は libyuv が src_width * 4 の stride で (crop_y + abs(crop_height)) 行ぶんと
+        // (crop_x + crop_width) * 4 バイトぶんを読み込む。crop_height の負値は垂直フリップとして
+        // libyuv 側で abs 処理されるため、必要長の計算も abs で行う。
+        LibyuvFourcc::Argb | LibyuvFourcc::Bgra => {
+            let Some(abs_crop_height) = crop_height.checked_abs() else {
+                return false;
+            };
+            let Some(stride) = src_width.checked_mul(4) else {
+                return false;
+            };
+            let Some(rows) = crop_y.checked_add(abs_crop_height) else {
+                return false;
+            };
+            let Some(row_bytes) = crop_x
+                .checked_add(crop_width)
+                .and_then(|v| v.checked_mul(4))
+            else {
+                return false;
+            };
+            has_required_len(src_frame.len(), stride, rows, row_bytes)
+        }
+        // MJPG は sample_size を参照して libyuv が検証するため入力長検証は行わない。
+        LibyuvFourcc::Mjpg => true,
+    };
+
+    if !src_ok
+        || !has_required_len(dst_y.len(), dst_stride_y, crop_height, crop_width)
         || !has_required_len(dst_u.len(), dst_stride_u, chroma_height, chroma_width)
         || !has_required_len(dst_v.len(), dst_stride_v, chroma_height, chroma_width)
     {
