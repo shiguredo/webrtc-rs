@@ -25,6 +25,10 @@ WEBRTC_EXPORT int webrtc_Thread_Start(struct webrtc_Thread* self) {
   auto p = reinterpret_cast<webrtc::Thread*>(self);
   return p->Start() ? 1 : 0;
 }
+WEBRTC_EXPORT void webrtc_Thread_Quit(struct webrtc_Thread* self) {
+  auto p = reinterpret_cast<webrtc::Thread*>(self);
+  p->Quit();
+}
 WEBRTC_EXPORT struct webrtc_Thread_unique* webrtc_Thread_Create() {
   auto p = webrtc::Thread::Create();
   return reinterpret_cast<struct webrtc_Thread_unique*>(p.release());

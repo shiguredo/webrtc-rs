@@ -25,6 +25,10 @@
   - `ScopedRef` / `RefCountedHandle` / `ScopedRef::from_raw` を外部公開 API から外し、参照カウント管理の内部機構として限定する
   - `RTCStatsReport::from_refcounted_ptr` も pub(crate) 化する
   - @melpon
+- [ADD] `webrtc_Thread_Quit` を追加する
+  - C API の `webrtc_Thread_Quit` を追加し、libwebrtc の `webrtc::Thread::Quit()` を公開する
+  - `Thread::quit` を追加し、メッセージループを stop せずに停止できるようにする
+  - @melpon
 - [FIX] `get_stats` のコールバック未発火時に user_data の Box がリークする問題を修正する
   - C 側の `RTCStatsCollectorCallbackImpl` にデストラクタを追加し、コールバック未発火のまま C++ オブジェクトが破棄される場合に `OnDestroy` を呼ぶようにする
   - Rust 側の回収を `OnDestroy` に一元化し、`OnStatsDelivered` は `&mut` 参照 + `Option::take()` による実行に変更する

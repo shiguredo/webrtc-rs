@@ -63,6 +63,16 @@ impl Thread {
         unsafe { ffi::webrtc_Thread_Stop(raw.as_ptr()) };
     }
 
+    /// スレッドのメッセージループを停止させる。
+    ///
+    /// `stop` とは異なり join しない。このスレッドに対する以降の Post / Send
+    /// は失敗する。停止中に実行すると、`()` を返す `blocking_call` は
+    /// クロージャを実行せずに即座に戻る。
+    pub fn quit(&mut self) {
+        let raw = self.raw();
+        unsafe { ffi::webrtc_Thread_Quit(raw.as_ptr()) };
+    }
+
     /// スレッド内で関数を実行し、結果を待つ。
     ///
     /// `f` は `self` のスレッドで実行される。基本的に呼び出し元と異なるスレッドで
