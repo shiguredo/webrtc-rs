@@ -1375,6 +1375,37 @@ fn thread_start_returns_true() {
 }
 
 #[test]
+fn thread_quit_runs() {
+    // quit 後も stop が例外なく実行できることを確認する。
+    // libwebrtc の Stop は Quit + Join のため、quit 済みでも安全に実行できる。
+    let mut thread = Thread::new();
+    assert!(thread.start());
+    thread.quit();
+    thread.stop();
+}
+
+#[test]
+fn thread_blocking_call_after_quit_does_not_run() {
+    // quit 後はメッセージループが停止し、() を返す blocking_call は
+    // クロージャを実行せずに即座に戻ることを確認する。
+    let mut thread = Thread::new();
+    assert!(thread.start());
+    thread.quit();
+
+    let called = Arc::new(AtomicBool::new(false));
+    let called_clone = Arc::clone(&called);
+    // 必ず quit の後に blocking_call を呼び、quit との競合を避ける。
+    thread.blocking_call(move || {
+        called_clone.store(true, Ordering::SeqCst);
+    });
+    assert!(
+        !called.load(Ordering::SeqCst),
+        "quit 後にブロックしたコールバックが実行されました"
+    );
+    thread.stop();
+}
+
+#[test]
 fn thread_sleep_ms_runs() {
     Thread::sleep_ms(1);
 }
