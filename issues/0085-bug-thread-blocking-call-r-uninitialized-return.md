@@ -1,7 +1,7 @@
 # Thread::blocking_call が停止中のスレッドで未初期化ポインタを返す
 
 - Created: 2026-08-20
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-27
 - Branch: feature/fix-thread-blocking-call-r-uninitialized-return
 - Polished: {YYYY-MM-DD}
 
@@ -57,3 +57,12 @@ C++ 側の仕様（「functor が実行されなかったらデフォルト初�
 - 既存の `blocking_call` 利用箇所（`src/tests.rs` の `thread_blocking_call_runs`）がコンパイル・実行可能であること
 - `CHANGES.md` の `## develop` セクションに `[CHANGE]` エントリが追加されていること
 - 未実行時の `Box<F>` のリーク解消は本 issue の対象外とする
+
+## 解決方法
+
+- `webrtc/src/webrtc_c/rtc_base/thread.cc` の `webrtc_Thread_BlockingCall_r` を非 void テンプレから void 版 `BlockingCall` に変更し、`void* result = nullptr;` を初期値にして functor を実行するようにした。functor 未実行時は確定した `nullptr` が返り、C++ の不確定値の穴を正規化した
+- `src/rtc_base/thread.rs` の `Thread::blocking_call` に `R: Default` 境界を追加し、`nullptr`（未実行）時に `R::default()` を返すようにした。実行経路は常に非 null を返すため、`nullptr` は未実行を一意に表す
+- `()` 経路は元々 `()`（= デフォルト）を黙って返すため、`R::default()` に統一して挙動を一致させた
+- `src/tests.rs` に `thread_blocking_call_after_stop_returns_default` を追加し、停止中スレッドで UB にならず `R::default()`（`0`）を返すことを検証した。`blocking_call` の doc コメントにも停止中挙動の doctest を追加した
+- `CHANGES.md` の `## develop` セクションに `[CHANGE]` エントリを追記した
+- 未実行時の `Box<F>` のリークは本 issue の対象外としたままとした
