@@ -1382,6 +1382,22 @@ fn generate_bindings(header: &Path, include_dir: &Path) {
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+
+    // macOS / iOS では objc.h も読み込んで生成する
+    if target_os == "macos" || target_os == "ios" {
+        let objc_header = header
+            .parent()
+            .expect("ヘッダーの親ディレクトリを取得できませんでした")
+            .join("webrtc_c")
+            .join("objc.h");
+        println!("cargo:rerun-if-changed={}", objc_header.display());
+        builder = builder.header(
+            objc_header
+                .to_str()
+                .expect("objc.h パスを文字列に変換できませんでした"),
+        );
+    }
+
     if target_os == "android" {
         let ndk = resolve_android_ndk_from_env().expect(
             "ANDROID_NDK_HOME または ANDROID_NDK には有効な Android NDK パスを指定してください",

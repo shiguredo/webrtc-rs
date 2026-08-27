@@ -2814,6 +2814,46 @@ fn video_decoder_factory_from_objc_default_works() {
     let _formats = factory.get_supported_formats();
 }
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[test]
+fn objc_video_encoder_factory_release_no_retain_leak() {
+    let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoEncoderFactory_new() };
+    assert!(
+        !objc_factory.is_null(),
+        "webrtc_objc_RTCDefaultVideoEncoderFactory_new が null を返しました"
+    );
+
+    // new が +1 のみを返していれば参照カウントは 1、二重リテインがあれば 2 になる
+    let retain_count = unsafe { ffi::objc_NSObject_retainCount(objc_factory.cast()) };
+    assert_eq!(
+        retain_count, 1,
+        "エンコーダーファクトリのリテインリークを検出しました: retain_count={}",
+        retain_count
+    );
+
+    unsafe { ffi::webrtc_objc_RTCVideoEncoderFactory_release(objc_factory) };
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[test]
+fn objc_video_decoder_factory_release_no_retain_leak() {
+    let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoDecoderFactory_new() };
+    assert!(
+        !objc_factory.is_null(),
+        "webrtc_objc_RTCDefaultVideoDecoderFactory_new が null を返しました"
+    );
+
+    // new が +1 のみを返していれば参照カウントは 1、二重リテインがあれば 2 になる
+    let retain_count = unsafe { ffi::objc_NSObject_retainCount(objc_factory.cast()) };
+    assert_eq!(
+        retain_count, 1,
+        "デコーダーファクトリのリテインリークを検出しました: retain_count={}",
+        retain_count
+    );
+
+    unsafe { ffi::webrtc_objc_RTCVideoDecoderFactory_release(objc_factory) };
+}
+
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
 #[test]
 fn objc_video_factory_functions_return_null_on_non_apple() {

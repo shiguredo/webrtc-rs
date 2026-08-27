@@ -38,6 +38,15 @@ WEBRTC_EXPORT struct objc_NSString* objc_NSError_localizedDescription(
 WEBRTC_EXPORT void objc_NSError_release(struct objc_NSError* self);
 
 // -------------------------
+// Foundation/NSObject
+// -------------------------
+
+struct objc_NSObject;
+
+// 指定した ObjC オブジェクトの現在の参照カウントを返す。
+WEBRTC_EXPORT uint64_t objc_NSObject_retainCount(struct objc_NSObject* self);
+
+// -------------------------
 // AVFoundation/AVAudioSession
 // -------------------------
 

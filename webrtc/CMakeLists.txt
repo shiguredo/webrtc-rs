@@ -646,8 +646,17 @@ if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
 elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
   enable_language(OBJCXX)
 
+  target_sources(webrtc_c
+    PRIVATE
+      src/webrtc_c/objc.mm
+  )
+
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_options(${target} PRIVATE -fconstant-string-class=NSConstantString)
+    target_compile_options(${target}
+      PRIVATE
+        -fconstant-string-class=NSConstantString
+        "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>"
+    )
     target_compile_definitions(${target}
       PRIVATE
         WEBRTC_POSIX
@@ -697,7 +706,11 @@ elseif (WEBRTC_C_TARGET STREQUAL "ios_arm64")
   )
 
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_options(${target} PRIVATE -fconstant-string-class=NSConstantString)
+    target_compile_options(${target}
+      PRIVATE
+        -fconstant-string-class=NSConstantString
+        "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>"
+    )
     target_compile_definitions(${target}
       PRIVATE
         WEBRTC_POSIX
