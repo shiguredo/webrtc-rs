@@ -9,6 +9,8 @@ use crate::{
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
+use super::optional::{get_optional, set_optional};
+
 /// webrtc::RtpCapabilities のラッパー。
 pub struct RtpCapabilities {
     raw: NonNull<ffi::webrtc_RtpCapabilities>,
@@ -148,43 +150,27 @@ impl<'a> RtpCodecRef<'a> {
     }
 
     pub fn clock_rate(&self) -> Option<i32> {
-        let mut has = 0;
-        let mut value = 0;
-        unsafe {
-            ffi::webrtc_RtpCodec_get_clock_rate(self.raw.as_ptr(), &mut has, &mut value);
-        }
-        if has == 0 { None } else { Some(value) }
+        get_optional(|has, value| unsafe {
+            ffi::webrtc_RtpCodec_get_clock_rate(self.raw.as_ptr(), has, value)
+        })
     }
 
     pub fn num_channels(&self) -> Option<i32> {
-        let mut has = 0;
-        let mut value = 0;
-        unsafe {
-            ffi::webrtc_RtpCodec_get_num_channels(self.raw.as_ptr(), &mut has, &mut value);
-        }
-        if has == 0 { None } else { Some(value) }
+        get_optional(|has, value| unsafe {
+            ffi::webrtc_RtpCodec_get_num_channels(self.raw.as_ptr(), has, value)
+        })
     }
 
     pub fn set_clock_rate(&mut self, value: Option<i32>) {
-        match value {
-            Some(v) => unsafe {
-                ffi::webrtc_RtpCodec_set_clock_rate(self.raw.as_ptr(), 1, &v);
-            },
-            None => unsafe {
-                ffi::webrtc_RtpCodec_set_clock_rate(self.raw.as_ptr(), 0, std::ptr::null());
-            },
-        }
+        set_optional(value, |has, value_ptr| unsafe {
+            ffi::webrtc_RtpCodec_set_clock_rate(self.raw.as_ptr(), has, value_ptr)
+        });
     }
 
     pub fn set_num_channels(&mut self, value: Option<i32>) {
-        match value {
-            Some(v) => unsafe {
-                ffi::webrtc_RtpCodec_set_num_channels(self.raw.as_ptr(), 1, &v);
-            },
-            None => unsafe {
-                ffi::webrtc_RtpCodec_set_num_channels(self.raw.as_ptr(), 0, std::ptr::null());
-            },
-        }
+        set_optional(value, |has, value_ptr| unsafe {
+            ffi::webrtc_RtpCodec_set_num_channels(self.raw.as_ptr(), has, value_ptr)
+        });
     }
 
     pub fn parameters(&mut self) -> MapStringString<'a> {
@@ -684,139 +670,71 @@ impl<'a> RtpEncodingParametersRef<'a> {
     }
 
     pub fn ssrc(&self) -> Option<u32> {
-        let mut has = 0;
-        let mut value: u32 = 0;
-        unsafe {
-            ffi::webrtc_RtpEncodingParameters_get_ssrc(self.raw.as_ptr(), &mut has, &mut value)
-        };
-        if has == 0 { None } else { Some(value) }
+        get_optional(|has, value| unsafe {
+            ffi::webrtc_RtpEncodingParameters_get_ssrc(self.raw.as_ptr(), has, value)
+        })
     }
 
     pub fn set_ssrc(&mut self, value: Option<u32>) {
-        match value {
-            Some(v) => unsafe {
-                ffi::webrtc_RtpEncodingParameters_set_ssrc(self.raw.as_ptr(), 1, &v);
-            },
-            None => unsafe {
-                ffi::webrtc_RtpEncodingParameters_set_ssrc(self.raw.as_ptr(), 0, std::ptr::null());
-            },
-        }
+        set_optional(value, |has, value_ptr| unsafe {
+            ffi::webrtc_RtpEncodingParameters_set_ssrc(self.raw.as_ptr(), has, value_ptr)
+        });
     }
 
     pub fn max_bitrate_bps(&self) -> Option<i32> {
-        let mut has = 0;
-        let mut value = 0;
-        unsafe {
-            ffi::webrtc_RtpEncodingParameters_get_max_bitrate_bps(
-                self.raw.as_ptr(),
-                &mut has,
-                &mut value,
-            );
-        }
-        if has == 0 { None } else { Some(value) }
+        get_optional(|has, value| unsafe {
+            ffi::webrtc_RtpEncodingParameters_get_max_bitrate_bps(self.raw.as_ptr(), has, value)
+        })
     }
 
     pub fn set_max_bitrate_bps(&mut self, value: Option<i32>) {
-        match value {
-            Some(v) => unsafe {
-                ffi::webrtc_RtpEncodingParameters_set_max_bitrate_bps(self.raw.as_ptr(), 1, &v);
-            },
-            None => unsafe {
-                ffi::webrtc_RtpEncodingParameters_set_max_bitrate_bps(
-                    self.raw.as_ptr(),
-                    0,
-                    std::ptr::null(),
-                );
-            },
-        }
+        set_optional(value, |has, value_ptr| unsafe {
+            ffi::webrtc_RtpEncodingParameters_set_max_bitrate_bps(self.raw.as_ptr(), has, value_ptr)
+        });
     }
 
     pub fn min_bitrate_bps(&self) -> Option<i32> {
-        let mut has = 0;
-        let mut value = 0;
-        unsafe {
-            ffi::webrtc_RtpEncodingParameters_get_min_bitrate_bps(
-                self.raw.as_ptr(),
-                &mut has,
-                &mut value,
-            );
-        }
-        if has == 0 { None } else { Some(value) }
+        get_optional(|has, value| unsafe {
+            ffi::webrtc_RtpEncodingParameters_get_min_bitrate_bps(self.raw.as_ptr(), has, value)
+        })
     }
 
     pub fn set_min_bitrate_bps(&mut self, value: Option<i32>) {
-        match value {
-            Some(v) => unsafe {
-                ffi::webrtc_RtpEncodingParameters_set_min_bitrate_bps(self.raw.as_ptr(), 1, &v);
-            },
-            None => unsafe {
-                ffi::webrtc_RtpEncodingParameters_set_min_bitrate_bps(
-                    self.raw.as_ptr(),
-                    0,
-                    std::ptr::null(),
-                );
-            },
-        }
+        set_optional(value, |has, value_ptr| unsafe {
+            ffi::webrtc_RtpEncodingParameters_set_min_bitrate_bps(self.raw.as_ptr(), has, value_ptr)
+        });
     }
 
     pub fn max_framerate(&self) -> Option<f64> {
-        let mut has = 0;
-        let mut value = 0.0;
-        unsafe {
-            ffi::webrtc_RtpEncodingParameters_get_max_framerate(
-                self.raw.as_ptr(),
-                &mut has,
-                &mut value,
-            );
-        }
-        if has == 0 { None } else { Some(value) }
+        get_optional(|has, value| unsafe {
+            ffi::webrtc_RtpEncodingParameters_get_max_framerate(self.raw.as_ptr(), has, value)
+        })
     }
 
     pub fn set_max_framerate(&mut self, value: Option<f64>) {
-        match value {
-            Some(v) => unsafe {
-                ffi::webrtc_RtpEncodingParameters_set_max_framerate(self.raw.as_ptr(), 1, &v);
-            },
-            None => unsafe {
-                ffi::webrtc_RtpEncodingParameters_set_max_framerate(
-                    self.raw.as_ptr(),
-                    0,
-                    std::ptr::null(),
-                );
-            },
-        }
+        set_optional(value, |has, value_ptr| unsafe {
+            ffi::webrtc_RtpEncodingParameters_set_max_framerate(self.raw.as_ptr(), has, value_ptr)
+        });
     }
 
     pub fn scale_resolution_down_by(&self) -> Option<f64> {
-        let mut has = 0;
-        let mut value = 0.0;
-        unsafe {
+        get_optional(|has, value| unsafe {
             ffi::webrtc_RtpEncodingParameters_get_scale_resolution_down_by(
                 self.raw.as_ptr(),
-                &mut has,
-                &mut value,
-            );
-        }
-        if has == 0 { None } else { Some(value) }
+                has,
+                value,
+            )
+        })
     }
 
     pub fn set_scale_resolution_down_by(&mut self, value: Option<f64>) {
-        match value {
-            Some(v) => unsafe {
-                ffi::webrtc_RtpEncodingParameters_set_scale_resolution_down_by(
-                    self.raw.as_ptr(),
-                    1,
-                    &v,
-                );
-            },
-            None => unsafe {
-                ffi::webrtc_RtpEncodingParameters_set_scale_resolution_down_by(
-                    self.raw.as_ptr(),
-                    0,
-                    std::ptr::null(),
-                );
-            },
-        }
+        set_optional(value, |has, value_ptr| unsafe {
+            ffi::webrtc_RtpEncodingParameters_set_scale_resolution_down_by(
+                self.raw.as_ptr(),
+                has,
+                value_ptr,
+            )
+        });
     }
 
     pub fn scale_resolution_down_to(&self) -> Option<Resolution> {
@@ -984,31 +902,19 @@ impl<'a> RtpEncodingParametersRef<'a> {
     }
 
     pub fn num_temporal_layers(&self) -> Option<i32> {
-        let mut has = 0;
-        let mut value = 0;
-        unsafe {
-            ffi::webrtc_RtpEncodingParameters_get_num_temporal_layers(
-                self.raw.as_ptr(),
-                &mut has,
-                &mut value,
-            );
-        }
-        if has == 0 { None } else { Some(value) }
+        get_optional(|has, value| unsafe {
+            ffi::webrtc_RtpEncodingParameters_get_num_temporal_layers(self.raw.as_ptr(), has, value)
+        })
     }
 
     pub fn set_num_temporal_layers(&mut self, value: Option<i32>) {
-        match value {
-            Some(v) => unsafe {
-                ffi::webrtc_RtpEncodingParameters_set_num_temporal_layers(self.raw.as_ptr(), 1, &v);
-            },
-            None => unsafe {
-                ffi::webrtc_RtpEncodingParameters_set_num_temporal_layers(
-                    self.raw.as_ptr(),
-                    0,
-                    std::ptr::null(),
-                );
-            },
-        }
+        set_optional(value, |has, value_ptr| unsafe {
+            ffi::webrtc_RtpEncodingParameters_set_num_temporal_layers(
+                self.raw.as_ptr(),
+                has,
+                value_ptr,
+            )
+        });
     }
 }
 

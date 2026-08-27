@@ -1872,6 +1872,11 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     );
     assert_eq!(enc_codec.clock_rate(), Some(48_000));
     assert_eq!(enc_codec.num_channels(), Some(2));
+    // clock_rate / num_channels を None に戻せば getter が None に戻ることを検証する
+    codec.set_clock_rate(None);
+    codec.set_num_channels(None);
+    assert_eq!(codec.clock_rate(), None);
+    assert_eq!(codec.num_channels(), None);
     enc.set_scalability_mode(None);
     assert!(enc.scalability_mode().is_none());
     enc.set_codec(None);

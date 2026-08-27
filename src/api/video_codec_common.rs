@@ -10,6 +10,8 @@ use std::ptr::NonNull;
 use std::slice;
 use std::time::Duration;
 
+use super::optional::get_optional;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ScalabilityMode {
     L1T1,
@@ -1595,33 +1597,17 @@ impl<'a> VideoFrameRef<'a> {
     }
 
     pub fn presentation_timestamp(&self) -> Option<Duration> {
-        let mut has = 0;
-        let mut value = 0;
-        unsafe {
-            ffi::webrtc_VideoFrame_presentation_timestamp_us(
-                self.raw.as_ptr(),
-                &mut has,
-                &mut value,
-            );
-        }
-        if has == 0 {
-            None
-        } else {
-            Some(timestamp_us_to_duration(value))
-        }
+        get_optional(|has, value| unsafe {
+            ffi::webrtc_VideoFrame_presentation_timestamp_us(self.raw.as_ptr(), has, value)
+        })
+        .map(timestamp_us_to_duration)
     }
 
     pub fn reference_time(&self) -> Option<Duration> {
-        let mut has = 0;
-        let mut value = 0;
-        unsafe {
-            ffi::webrtc_VideoFrame_reference_time_us(self.raw.as_ptr(), &mut has, &mut value);
-        }
-        if has == 0 {
-            None
-        } else {
-            Some(timestamp_us_to_duration(value))
-        }
+        get_optional(|has, value| unsafe {
+            ffi::webrtc_VideoFrame_reference_time_us(self.raw.as_ptr(), has, value)
+        })
+        .map(timestamp_us_to_duration)
     }
 
     pub fn color_space(&self) -> Option<ColorSpace> {

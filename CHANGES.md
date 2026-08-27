@@ -53,6 +53,12 @@
   - MJPG 入力は libyuv 側の検証に委ねるため対象外とする
   - @melpon
 
+### misc
+
+- [UPDATE] FFI の optional 値 (has / value) 方式を持つ getter/setter のボイラープレートを共通ヘルパーにまとめる
+  - `src/api/optional.rs` に `get_optional` / `get_optional_bool` / `set_optional` / `set_optional_bool` を追加し、`RtpCodec` / `RtpEncodingParameters` / `TransformableFrame` / `VideoFrameMetadata` / `VideoEncoderEncoderInfo` / `VideoFrame` / `AudioOptions` の該当アクセサを置き換えて挙動を維持する
+  - @melpon
+
 ## 0.152.0
 
 **リリース日**: 2026-08-25

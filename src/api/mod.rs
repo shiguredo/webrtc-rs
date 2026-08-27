@@ -7,6 +7,7 @@ mod frame_transformer;
 mod jsep;
 mod media_stream;
 mod media_types;
+mod optional;
 mod peer_connection;
 mod rtc_error;
 mod rtc_event_log;

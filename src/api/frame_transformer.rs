@@ -1,3 +1,4 @@
+use super::optional::{get_optional, set_optional};
 use super::video_codec_common::{VideoCodecType, VideoFrameType, VideoRotation};
 use super::video_codec_specifics::{
     RTPVideoHeaderCodecSpecifics, RTPVideoHeaderH264, RTPVideoHeaderVP8, RTPVideoHeaderVP9,
@@ -509,46 +510,29 @@ impl TransformableFrame {
     ///
     /// 受信フレームでのみ定義される。
     pub fn receive_time(&self) -> Option<i64> {
-        let mut has = 0;
-        let mut timestamp_us = 0;
-        unsafe {
-            ffi::webrtc_TransformableFrameInterface_ReceiveTime(
-                self.as_ptr(),
-                &mut has,
-                &mut timestamp_us,
-            )
-        };
-        if has == 0 { None } else { Some(timestamp_us) }
+        get_optional(|has, timestamp_us| unsafe {
+            ffi::webrtc_TransformableFrameInterface_ReceiveTime(self.as_ptr(), has, timestamp_us)
+        })
     }
 
     /// プレゼンテーション用のタイムスタンプ (マイクロ秒) を返す。
     ///
     /// deprecated の `GetCaptureTimeIdentifier` の後継。
     pub fn presentation_timestamp(&self) -> Option<i64> {
-        let mut has = 0;
-        let mut timestamp_us = 0;
-        unsafe {
+        get_optional(|has, timestamp_us| unsafe {
             ffi::webrtc_TransformableFrameInterface_GetPresentationTimestamp(
                 self.as_ptr(),
-                &mut has,
-                &mut timestamp_us,
+                has,
+                timestamp_us,
             )
-        };
-        if has == 0 { None } else { Some(timestamp_us) }
+        })
     }
 
     /// キャプチャシステム内でフレームがキャプチャされた時刻 (マイクロ秒) を返す。
     pub fn capture_time(&self) -> Option<i64> {
-        let mut has = 0;
-        let mut timestamp_us = 0;
-        unsafe {
-            ffi::webrtc_TransformableFrameInterface_CaptureTime(
-                self.as_ptr(),
-                &mut has,
-                &mut timestamp_us,
-            )
-        };
-        if has == 0 { None } else { Some(timestamp_us) }
+        get_optional(|has, timestamp_us| unsafe {
+            ffi::webrtc_TransformableFrameInterface_CaptureTime(self.as_ptr(), has, timestamp_us)
+        })
     }
 
     /// キャプチャ時間を変更できるかどうかを返す。
@@ -573,16 +557,13 @@ impl TransformableFrame {
     ///
     /// absolute capture timestamp ヘッダー拡張が有効な場合のみ利用できる。
     pub fn sender_capture_time_offset(&self) -> Option<i64> {
-        let mut has = 0;
-        let mut delta_us = 0;
-        unsafe {
+        get_optional(|has, delta_us| unsafe {
             ffi::webrtc_TransformableFrameInterface_SenderCaptureTimeOffset(
                 self.as_ptr(),
-                &mut has,
-                &mut delta_us,
+                has,
+                delta_us,
             )
-        };
-        if has == 0 { None } else { Some(delta_us) }
+        })
     }
 }
 
@@ -752,24 +733,16 @@ impl VideoFrameMetadata {
 
     /// フレーム ID を返す。
     pub fn frame_id(&self) -> Option<i64> {
-        let mut has = 0;
-        let mut value = 0;
-        unsafe {
-            ffi::webrtc_VideoFrameMetadata_GetFrameId(self.raw.as_ptr(), &mut has, &mut value)
-        };
-        if has == 0 { None } else { Some(value) }
+        get_optional(|has, value| unsafe {
+            ffi::webrtc_VideoFrameMetadata_GetFrameId(self.raw.as_ptr(), has, value)
+        })
     }
 
     /// フレーム ID を設定する。
     pub fn set_frame_id(&mut self, frame_id: Option<i64>) {
-        match frame_id {
-            Some(v) => unsafe {
-                ffi::webrtc_VideoFrameMetadata_SetFrameId(self.raw.as_ptr(), 1, &v)
-            },
-            None => unsafe {
-                ffi::webrtc_VideoFrameMetadata_SetFrameId(self.raw.as_ptr(), 0, std::ptr::null())
-            },
-        }
+        set_optional(frame_id, |has, value_ptr| unsafe {
+            ffi::webrtc_VideoFrameMetadata_SetFrameId(self.raw.as_ptr(), has, value_ptr)
+        });
     }
 
     /// 空間レイヤーインデックスを返す。
