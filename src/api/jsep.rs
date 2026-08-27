@@ -1,3 +1,4 @@
+use crate::non_null::expect_non_null;
 use crate::{CxxString, Error, Result, ffi};
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
@@ -41,7 +42,7 @@ impl SdpParseError {
 
     fn raw(&self) -> NonNull<ffi::webrtc_SdpParseError> {
         let raw = unsafe { ffi::webrtc_SdpParseError_unique_get(self.raw_unique.as_ptr()) };
-        NonNull::new(raw).expect("BUG: webrtc_SdpParseError_unique_get が null を返しました")
+        expect_non_null(raw, "webrtc_SdpParseError_unique_get")
     }
 }
 
@@ -140,7 +141,7 @@ impl SessionDescription {
     fn raw(&self) -> NonNull<ffi::webrtc_SessionDescriptionInterface> {
         let raw =
             unsafe { ffi::webrtc_SessionDescriptionInterface_unique_get(self.raw_unique.as_ptr()) };
-        NonNull::new(raw).expect("BUG: SessionDescriptionInterface が null を返しました")
+        expect_non_null(raw, "SessionDescriptionInterface")
     }
 }
 
@@ -174,10 +175,7 @@ impl<'a> IceCandidateRef<'a> {
     pub fn sdp_mid(&self) -> Result<String> {
         let mut out: *mut ffi::std_string_unique = std::ptr::null_mut();
         unsafe { ffi::webrtc_IceCandidate_sdp_mid(self.raw.as_ptr(), &mut out) };
-        CxxString::from_unique(
-            NonNull::new(out).expect("BUG: webrtc_IceCandidate_sdp_mid が null を返しました"),
-        )
-        .to_string()
+        CxxString::from_unique(expect_non_null(out, "webrtc_IceCandidate_sdp_mid")).to_string()
     }
 
     pub fn sdp_mline_index(&self) -> i32 {

@@ -1,3 +1,4 @@
+use crate::non_null::expect_non_null_with_cleanup;
 use crate::ref_count::DtlsTransportHandle;
 use crate::{ScopedRef, ffi};
 use std::os::raw::c_void;
@@ -131,16 +132,14 @@ impl DtlsTransportObserver {
             OnError: Some(dtls_observer_on_error),
             OnDestroy: Some(dtls_observer_on_destroy),
         };
-        let raw = match NonNull::new(unsafe {
-            ffi::webrtc_DtlsTransportObserver_new(&cbs, user_data)
-        }) {
-            Some(raw) => raw,
-            None => {
+        let raw = expect_non_null_with_cleanup(
+            unsafe { ffi::webrtc_DtlsTransportObserver_new(&cbs, user_data) },
+            "webrtc_DtlsTransportObserver_new",
+            || {
                 let _ =
                     unsafe { Box::from_raw(user_data as *mut DtlsTransportObserverHandlerState) };
-                panic!("BUG: webrtc_DtlsTransportObserver_new が null を返しました");
-            }
-        };
+            },
+        );
         Self { raw }
     }
 

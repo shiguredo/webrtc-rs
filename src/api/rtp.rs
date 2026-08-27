@@ -1,3 +1,4 @@
+use crate::non_null::expect_non_null;
 use crate::ref_count::{
     AudioTrackHandle, MediaStreamTrackHandle, RtpReceiverHandle, RtpSenderHandle,
     RtpTransceiverHandle, VideoTrackHandle,
@@ -34,9 +35,10 @@ impl RtpCapabilities {
 
     /// codecs のベクタを借用する。
     pub fn codecs(&self) -> RtpCodecCapabilityVectorRef<'_> {
-        let raw =
-            NonNull::new(unsafe { ffi::webrtc_RtpCapabilities_get_codecs(self.raw.as_ptr()) })
-                .expect("BUG: webrtc_RtpCapabilities_get_codecs が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RtpCapabilities_get_codecs(self.raw.as_ptr()) },
+            "webrtc_RtpCapabilities_get_codecs",
+        );
         RtpCodecCapabilityVectorRef::from_raw(raw)
     }
 }
@@ -58,7 +60,7 @@ impl RtpCodec {
     pub fn new() -> Self {
         let raw = unsafe { ffi::webrtc_RtpCodec_new() };
         Self {
-            raw: NonNull::new(raw).expect("BUG: webrtc_RtpCodec_new が null を返しました"),
+            raw: expect_non_null(raw, "webrtc_RtpCodec_new"),
         }
     }
 
@@ -133,10 +135,7 @@ impl<'a> RtpCodecRef<'a> {
 
     pub fn name(&self) -> Result<String> {
         let ptr = unsafe { ffi::webrtc_RtpCodec_get_name(self.raw.as_ptr()) };
-        CxxStringRef::from_ptr(
-            NonNull::new(ptr).expect("BUG: webrtc_RtpCodec_get_name が null を返しました"),
-        )
-        .to_string()
+        CxxStringRef::from_ptr(expect_non_null(ptr, "webrtc_RtpCodec_get_name")).to_string()
     }
 
     pub fn set_kind(&mut self, media_type: MediaType) {
@@ -175,9 +174,7 @@ impl<'a> RtpCodecRef<'a> {
 
     pub fn parameters(&mut self) -> MapStringString<'a> {
         let raw = unsafe { ffi::webrtc_RtpCodec_get_parameters(self.raw.as_ptr()) };
-        MapStringString::from_raw(
-            NonNull::new(raw).expect("BUG: webrtc_RtpCodec_get_parameters が null を返しました"),
-        )
+        MapStringString::from_raw(expect_non_null(raw, "webrtc_RtpCodec_get_parameters"))
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_RtpCodec {
@@ -196,8 +193,7 @@ impl RtpCodecCapability {
     pub fn new() -> Self {
         let raw = unsafe { ffi::webrtc_RtpCodecCapability_new() };
         Self {
-            raw: NonNull::new(raw)
-                .expect("BUG: webrtc_RtpCodecCapability_new が null を返しました"),
+            raw: expect_non_null(raw, "webrtc_RtpCodecCapability_new"),
         }
     }
 
@@ -275,10 +271,10 @@ impl<'a> RtpCodecCapabilityRef<'a> {
     }
 
     pub fn cast_to_codec(&self) -> RtpCodecRef<'a> {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec(self.raw.as_ptr())
-        })
-        .expect("BUG: webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec(self.raw.as_ptr()) },
+            "webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec",
+        );
         RtpCodecRef::from_raw(raw)
     }
 
@@ -328,8 +324,10 @@ unsafe impl Send for RtpCodecCapabilityVector {}
 
 impl RtpCodecCapabilityVector {
     pub fn new(size: usize) -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_RtpCodecCapability_vector_new(size) })
-            .expect("BUG: webrtc_RtpCodecCapability_vector_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RtpCodecCapability_vector_new(size) },
+            "webrtc_RtpCodecCapability_vector_new",
+        );
         Self { raw }
     }
 
@@ -401,10 +399,10 @@ impl<'a> RtpCodecCapabilityVectorRef<'a> {
         if index >= self.len() {
             return None;
         }
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_RtpCodecCapability_vector_get(self.raw.as_ptr(), index as i32)
-        })
-        .expect("BUG: webrtc_RtpCodecCapability_vector_get が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RtpCodecCapability_vector_get(self.raw.as_ptr(), index as i32) },
+            "webrtc_RtpCodecCapability_vector_get",
+        );
         Some(RtpCodecCapabilityRef::from_raw(raw))
     }
 
@@ -441,8 +439,10 @@ unsafe impl Send for Resolution {}
 
 impl Resolution {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_Resolution_new() })
-            .expect("BUG: webrtc_Resolution_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_Resolution_new() },
+            "webrtc_Resolution_new",
+        );
         Self { raw }
     }
 
@@ -488,8 +488,10 @@ unsafe impl Send for RtpEncodingParameters {}
 
 impl RtpEncodingParameters {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_RtpEncodingParameters_new() })
-            .expect("BUG: webrtc_RtpEncodingParameters_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RtpEncodingParameters_new() },
+            "webrtc_RtpEncodingParameters_new",
+        );
         Self { raw }
     }
 
@@ -652,11 +654,8 @@ impl<'a> RtpEncodingParametersRef<'a> {
 
     pub fn rid(&self) -> Result<String> {
         let ptr = unsafe { ffi::webrtc_RtpEncodingParameters_get_rid(self.raw.as_ptr()) };
-        CxxStringRef::from_ptr(
-            NonNull::new(ptr)
-                .expect("BUG: webrtc_RtpEncodingParameters_get_rid が null を返しました"),
-        )
-        .to_string()
+        CxxStringRef::from_ptr(expect_non_null(ptr, "webrtc_RtpEncodingParameters_get_rid"))
+            .to_string()
     }
 
     pub fn set_rid(&mut self, rid: &str) {
@@ -809,8 +808,9 @@ impl<'a> RtpEncodingParametersRef<'a> {
             return None;
         }
         Some(
-            CxxStringRef::from_ptr(NonNull::new(ptr).expect(
-                "BUG: webrtc_RtpEncodingParameters_get_scalability_mode が null を返しました",
+            CxxStringRef::from_ptr(expect_non_null(
+                ptr,
+                "webrtc_RtpEncodingParameters_get_scalability_mode",
             ))
             .to_string(),
         )
@@ -846,8 +846,9 @@ impl<'a> RtpEncodingParametersRef<'a> {
         if has == 0 {
             None
         } else {
-            Some(RtpCodecRef::from_raw(NonNull::new(ptr).expect(
-                "BUG: webrtc_RtpEncodingParameters_get_codec が null を返しました",
+            Some(RtpCodecRef::from_raw(expect_non_null(
+                ptr,
+                "webrtc_RtpEncodingParameters_get_codec",
             )))
         }
     }
@@ -927,8 +928,10 @@ unsafe impl Send for RtpEncodingParametersVector {}
 
 impl RtpEncodingParametersVector {
     pub fn new(size: usize) -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_RtpEncodingParameters_vector_new(size) })
-            .expect("BUG: webrtc_RtpEncodingParameters_vector_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RtpEncodingParameters_vector_new(size) },
+            "webrtc_RtpEncodingParameters_vector_new",
+        );
         Self { raw }
     }
 
@@ -946,10 +949,12 @@ impl RtpEncodingParametersVector {
             return None;
         }
 
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_RtpEncodingParameters_vector_get(self.raw.as_ptr(), index as i32)
-        })
-        .expect("BUG: webrtc_RtpEncodingParameters_vector_get が null を返しました");
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_RtpEncodingParameters_vector_get(self.raw.as_ptr(), index as i32)
+            },
+            "webrtc_RtpEncodingParameters_vector_get",
+        );
         Some(RtpEncodingParametersRef::from_raw(raw))
     }
 
@@ -978,9 +983,10 @@ impl RtpEncodingParametersVector {
     }
 
     pub fn clone_from_raw(src: NonNull<ffi::webrtc_RtpEncodingParameters_vector>) -> Self {
-        let raw =
-            NonNull::new(unsafe { ffi::webrtc_RtpEncodingParameters_vector_clone(src.as_ptr()) })
-                .expect("webrtc_RtpEncodingParameters_vector_clone が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RtpEncodingParameters_vector_clone(src.as_ptr()) },
+            "webrtc_RtpEncodingParameters_vector_clone",
+        );
         Self { raw }
     }
 
@@ -1104,8 +1110,10 @@ unsafe impl Send for RtpParameters {}
 
 impl RtpParameters {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_RtpParameters_new() })
-            .expect("BUG: webrtc_RtpParameters_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RtpParameters_new() },
+            "webrtc_RtpParameters_new",
+        );
         Self { raw }
     }
 
@@ -1115,10 +1123,10 @@ impl RtpParameters {
 
     pub fn transaction_id(&self) -> Result<String> {
         let ptr = unsafe { ffi::webrtc_RtpParameters_get_transaction_id(self.raw.as_ptr()) };
-        CxxStringRef::from_ptr(
-            NonNull::new(ptr)
-                .expect("BUG: webrtc_RtpParameters_get_transaction_id が null を返しました"),
-        )
+        CxxStringRef::from_ptr(expect_non_null(
+            ptr,
+            "webrtc_RtpParameters_get_transaction_id",
+        ))
         .to_string()
     }
 
@@ -1134,10 +1142,7 @@ impl RtpParameters {
 
     pub fn mid(&self) -> Result<String> {
         let ptr = unsafe { ffi::webrtc_RtpParameters_get_mid(self.raw.as_ptr()) };
-        CxxStringRef::from_ptr(
-            NonNull::new(ptr).expect("BUG: webrtc_RtpParameters_get_mid が null を返しました"),
-        )
-        .to_string()
+        CxxStringRef::from_ptr(expect_non_null(ptr, "webrtc_RtpParameters_get_mid")).to_string()
     }
 
     pub fn set_mid(&mut self, value: &str) {
@@ -1152,7 +1157,7 @@ impl RtpParameters {
 
     pub fn encodings(&self) -> RtpEncodingParametersVector {
         let ptr = unsafe { ffi::webrtc_RtpParameters_get_encodings(self.raw.as_ptr()) };
-        let raw = NonNull::new(ptr).expect("BUG: webrtc_RtpParameters_get_encodings が null");
+        let raw = expect_non_null(ptr, "webrtc_RtpParameters_get_encodings");
         RtpEncodingParametersVector::clone_from_raw(raw)
     }
 
@@ -1254,8 +1259,7 @@ impl RtpTransceiverInit {
     pub fn new() -> Self {
         let raw = unsafe { ffi::webrtc_RtpTransceiverInit_new() };
         Self {
-            raw: NonNull::new(raw)
-                .expect("BUG: webrtc_RtpTransceiverInit_new が null を返しました"),
+            raw: expect_non_null(raw, "webrtc_RtpTransceiverInit_new"),
         }
     }
 
@@ -1267,10 +1271,10 @@ impl RtpTransceiverInit {
 
     pub fn stream_ids(&mut self) -> StringVectorRef<'_> {
         let raw = unsafe { ffi::webrtc_RtpTransceiverInit_get_stream_ids(self.raw.as_ptr()) };
-        StringVectorRef::from_raw(
-            NonNull::new(raw)
-                .expect("BUG: webrtc_RtpTransceiverInit_get_stream_ids が null を返しました"),
-        )
+        StringVectorRef::from_raw(expect_non_null(
+            raw,
+            "webrtc_RtpTransceiverInit_get_stream_ids",
+        ))
     }
 
     pub fn set_send_encodings(&mut self, encodings: &RtpEncodingParametersVector) {
@@ -1317,10 +1321,10 @@ impl RtpTransceiver {
 
     pub fn receiver(&self) -> RtpReceiver {
         let raw = unsafe { ffi::webrtc_RtpTransceiverInterface_receiver(self.raw_ref.as_ptr()) };
-        let raw_ref = ScopedRef::<RtpReceiverHandle>::from_raw(
-            NonNull::new(raw)
-                .expect("BUG: webrtc_RtpTransceiverInterface_receiver が null を返しました"),
-        );
+        let raw_ref = ScopedRef::<RtpReceiverHandle>::from_raw(expect_non_null(
+            raw,
+            "webrtc_RtpTransceiverInterface_receiver",
+        ));
         RtpReceiver::from_scoped_ref(raw_ref)
     }
 
@@ -1334,7 +1338,7 @@ impl RtpTransceiver {
             )
         };
         if !err.is_null() {
-            let rtc = RtcError::from_unique_ptr(NonNull::new(err).expect("BUG: error is null"));
+            let rtc = RtcError::from_unique_ptr(expect_non_null(err, "RTCError"));
             return Err(Error::RtcError(rtc));
         }
         Ok(())
@@ -1356,9 +1360,10 @@ impl RtpReceiver {
 
     pub fn track(&self) -> MediaStreamTrack {
         let raw = unsafe { ffi::webrtc_RtpReceiverInterface_track(self.raw_ref.as_ptr()) };
-        let raw_ref = ScopedRef::<MediaStreamTrackHandle>::from_raw(
-            NonNull::new(raw).expect("BUG: webrtc_RtpReceiverInterface_track が null を返しました"),
-        );
+        let raw_ref = ScopedRef::<MediaStreamTrackHandle>::from_raw(expect_non_null(
+            raw,
+            "webrtc_RtpReceiverInterface_track",
+        ));
         MediaStreamTrack::from_scoped_ref(raw_ref)
     }
 
@@ -1398,9 +1403,10 @@ impl RtpSender {
     }
 
     pub fn get_parameters(&self) -> RtpParameters {
-        let raw =
-            NonNull::new(unsafe { ffi::webrtc_RtpSenderInterface_GetParameters(self.as_ptr()) })
-                .expect("BUG: webrtc_RtpSenderInterface_GetParameters が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RtpSenderInterface_GetParameters(self.as_ptr()) },
+            "webrtc_RtpSenderInterface_GetParameters",
+        );
         RtpParameters::from_raw(raw)
     }
 
@@ -1422,7 +1428,7 @@ impl RtpSender {
             )
         };
         if !err.is_null() {
-            let rtc = RtcError::from_unique_ptr(NonNull::new(err).expect("BUG: error is null"));
+            let rtc = RtcError::from_unique_ptr(expect_non_null(err, "RTCError"));
             return Err(Error::RtcError(rtc));
         }
         Ok(())
@@ -1462,14 +1468,18 @@ impl MediaStreamTrack {
     pub fn kind(&self) -> Result<String> {
         let raw = self.raw_ref.as_ptr();
         let ptr = unsafe { ffi::webrtc_MediaStreamTrackInterface_kind(raw) };
-        let kind = CxxString::from_unique(NonNull::new(ptr).expect("BUG: ptr が null"));
+        let kind = CxxString::from_unique(expect_non_null(
+            ptr,
+            "webrtc_MediaStreamTrackInterface_kind",
+        ));
         kind.to_string()
     }
 
     pub fn id(&self) -> Result<String> {
         let raw = self.raw_ref.as_ptr();
         let ptr = unsafe { ffi::webrtc_MediaStreamTrackInterface_id(raw) };
-        let id = CxxString::from_unique(NonNull::new(ptr).expect("BUG: ptr が null"));
+        let id =
+            CxxString::from_unique(expect_non_null(ptr, "webrtc_MediaStreamTrackInterface_id"));
         id.to_string()
     }
 
@@ -1506,8 +1516,10 @@ impl MediaStreamTrack {
                 self.raw_ref.as_refcounted_ptr(),
             )
         };
-        let raw_ref = NonNull::new(raw_ref)
-            .expect("BUG: MediaStreamTrackInterface から AudioTrackInterface へのキャストが null を返しました");
+        let raw_ref = expect_non_null(
+            raw_ref,
+            "webrtc_MediaStreamTrackInterface_refcounted_cast_to_webrtc_AudioTrackInterface",
+        );
         let raw_ref = ScopedRef::<AudioTrackHandle>::from_raw(raw_ref);
         AudioTrack::from_scoped_ref(raw_ref)
     }

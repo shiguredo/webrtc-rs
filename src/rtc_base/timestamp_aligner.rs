@@ -1,4 +1,5 @@
 use crate::ffi;
+use crate::non_null::expect_non_null;
 use std::ptr::NonNull;
 
 /// webrtc::TimestampAligner の安全ラッパー。
@@ -13,8 +14,7 @@ impl TimestampAligner {
     pub fn new() -> Self {
         let raw = unsafe { ffi::webrtc_TimestampAligner_new() };
         Self {
-            raw_unique: NonNull::new(raw)
-                .expect("BUG: webrtc_TimestampAligner_new が null を返しました"),
+            raw_unique: expect_non_null(raw, "webrtc_TimestampAligner_new"),
         }
     }
 
@@ -28,7 +28,7 @@ impl TimestampAligner {
 
     fn raw(&self) -> NonNull<ffi::webrtc_TimestampAligner> {
         let raw = unsafe { ffi::webrtc_TimestampAligner_unique_get(self.raw_unique.as_ptr()) };
-        NonNull::new(raw).expect("BUG: webrtc_TimestampAligner_unique_get が null を返しました")
+        expect_non_null(raw, "webrtc_TimestampAligner_unique_get")
     }
 }
 

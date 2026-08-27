@@ -1,3 +1,4 @@
+use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
 use crate::{CxxString, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -25,15 +26,18 @@ impl<'a> SSLCertificateRef<'a> {
     }
 
     pub fn to_pem_string(&self) -> Result<String> {
-        let raw =
-            NonNull::new(unsafe { ffi::webrtc_SSLCertificate_ToPEMString(self.raw.as_ptr()) })
-                .expect("BUG: webrtc_SSLCertificate_ToPEMString が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_SSLCertificate_ToPEMString(self.raw.as_ptr()) },
+            "webrtc_SSLCertificate_ToPEMString",
+        );
         CxxString::from_unique(raw).to_string()
     }
 
     pub fn to_der(&self) -> Vec<u8> {
-        let raw = NonNull::new(unsafe { ffi::webrtc_SSLCertificate_ToDER(self.raw.as_ptr()) })
-            .expect("BUG: webrtc_SSLCertificate_ToDER が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_SSLCertificate_ToDER(self.raw.as_ptr()) },
+            "webrtc_SSLCertificate_ToDER",
+        );
         CxxString::from_unique(raw).to_bytes()
     }
 
@@ -76,11 +80,13 @@ impl<'a> SSLCertChainRef<'a> {
         if index >= self.len() {
             return None;
         }
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_SSLCertChain_Get(self.raw.as_ptr(), index as i32)
-                as *mut ffi::webrtc_SSLCertificate
-        })
-        .expect("BUG: webrtc_SSLCertChain_Get が null を返しました");
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_SSLCertChain_Get(self.raw.as_ptr(), index as i32)
+                    as *mut ffi::webrtc_SSLCertificate
+            },
+            "webrtc_SSLCertChain_Get",
+        );
         Some(SSLCertificateRef::from_raw(raw))
     }
 }
@@ -107,8 +113,7 @@ unsafe extern "C" fn ssl_certificate_verifier_verify_chain(
         "ssl_certificate_verifier_verify_chain: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut SSLCertificateVerifierHandlerState) };
-    let chain =
-        NonNull::new(chain as *mut ffi::webrtc_SSLCertChain).expect("BUG: chain が null です");
+    let chain = expect_non_null(chain as *mut ffi::webrtc_SSLCertChain, "SSLCertChain");
     let chain = SSLCertChainRef::from_raw(chain);
     if state.handler.verify_chain(chain) {
         1
@@ -141,14 +146,11 @@ impl SSLCertificateVerifier {
             OnDestroy: Some(ssl_certificate_verifier_on_destroy),
         };
         let raw = unsafe { ffi::webrtc_SSLCertificateVerifier_new(&cbs, user_data) };
-        let raw_unique = match NonNull::new(raw) {
-            Some(raw_unique) => raw_unique,
-            None => {
+        let raw_unique =
+            expect_non_null_with_cleanup(raw, "webrtc_SSLCertificateVerifier_new", || {
                 let _ =
                     unsafe { Box::from_raw(user_data as *mut SSLCertificateVerifierHandlerState) };
-                panic!("BUG: webrtc_SSLCertificateVerifier_new が null を返しました");
-            }
-        };
+            });
         Self { raw_unique }
     }
 

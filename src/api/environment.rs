@@ -1,4 +1,5 @@
 use crate::ffi;
+use crate::non_null::expect_non_null;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -15,7 +16,7 @@ impl Environment {
         let raw = unsafe { ffi::webrtc_CreateEnvironment() };
         // NULL が返されるのはメモリ不足の場合のみ
         Self {
-            raw: NonNull::new(raw).expect("BUG: webrtc_CreateEnvironment が null を返しました"),
+            raw: expect_non_null(raw, "webrtc_CreateEnvironment"),
         }
     }
 

@@ -1,3 +1,4 @@
+use crate::non_null::expect_non_null;
 use crate::ref_count::RTCStatsReportHandle;
 use crate::{CxxString, Result, ScopedRef, ffi};
 use std::ptr::NonNull;
@@ -20,8 +21,7 @@ impl RTCStatsReport {
     pub fn to_json(&self) -> Result<String> {
         let raw = self.raw();
         let json = unsafe { ffi::webrtc_RTCStatsReport_ToJson(raw.as_ptr()) };
-        let json =
-            NonNull::new(json).expect("BUG: webrtc_RTCStatsReport_ToJson が null を返しました");
+        let json = expect_non_null(json, "webrtc_RTCStatsReport_ToJson");
         let json = CxxString::from_unique(json);
         json.to_string()
     }
