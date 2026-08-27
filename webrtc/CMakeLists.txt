@@ -655,9 +655,6 @@ elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
     target_compile_options(${target}
       PRIVATE
         -fconstant-string-class=NSConstantString
-        # .mm を ARC でコンパイルし、CFBridgingRetain / CFBridgingRelease の
-        # リテイン収支を ARC の規則に一致させる
-        # 非 Apple ターゲットでは .mm が CXX としてコンパイルされるため、OBJCXX 言語にのみ適用する
         "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>"
     )
     target_compile_definitions(${target}
@@ -712,9 +709,6 @@ elseif (WEBRTC_C_TARGET STREQUAL "ios_arm64")
     target_compile_options(${target}
       PRIVATE
         -fconstant-string-class=NSConstantString
-        # .mm を ARC でコンパイルし、CFBridgingRetain / CFBridgingRelease の
-        # リテイン収支を ARC の規則に一致させる
-        # 非 Apple ターゲットでは .mm が CXX としてコンパイルされるため、OBJCXX 言語にのみ適用する
         "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>"
     )
     target_compile_definitions(${target}
