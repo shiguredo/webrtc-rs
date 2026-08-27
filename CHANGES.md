@@ -25,6 +25,10 @@
   - `ScopedRef` / `RefCountedHandle` / `ScopedRef::from_raw` を外部公開 API から外し、参照カウント管理の内部機構として限定する
   - `RTCStatsReport::from_refcounted_ptr` も pub(crate) 化する
   - @melpon
+- [CHANGE] `webrtc_Thread_SleepMs` の戻り値型を変更する
+  - C API の `webrtc_Thread_SleepMs` を `void` から `int` (0/1) に変更し、libwebrtc の `webrtc::Thread::SleepMs()` がスリープのシグナル中断で返す `bool` を呼び出し側へ伝達する
+  - Rust API の `Thread::sleep_ms` を `()` から `bool` に変更し、FFI の戻り値 `int` を `!= 0` で `bool` に変換する
+  - @melpon
 - [ADD] `webrtc_Thread_Quit` を追加する
   - C API の `webrtc_Thread_Quit` を追加し、libwebrtc の `webrtc::Thread::Quit()` を公開する
   - `Thread::quit` を追加し、メッセージループを stop せずに停止できるようにする

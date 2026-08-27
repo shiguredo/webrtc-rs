@@ -50,7 +50,7 @@ WEBRTC_EXPORT void* webrtc_Thread_BlockingCall_r(struct webrtc_Thread* self,
   auto p = reinterpret_cast<webrtc::Thread*>(self);
   return p->BlockingCall([func, arg]() { return func(arg); });
 }
-WEBRTC_EXPORT void webrtc_Thread_SleepMs(int millis) {
-  webrtc::Thread::SleepMs(millis);
+WEBRTC_EXPORT int webrtc_Thread_SleepMs(int millis) {
+  return webrtc::Thread::SleepMs(millis) ? 1 : 0;
 }
 }

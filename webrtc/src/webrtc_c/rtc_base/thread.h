@@ -23,7 +23,7 @@ WEBRTC_EXPORT void webrtc_Thread_BlockingCall(struct webrtc_Thread* self,
 WEBRTC_EXPORT void* webrtc_Thread_BlockingCall_r(struct webrtc_Thread* self,
                                                  void* (*func)(void*),
                                                  void* arg);
-WEBRTC_EXPORT void webrtc_Thread_SleepMs(int millis);
+WEBRTC_EXPORT int webrtc_Thread_SleepMs(int millis);
 
 #if defined(__cplusplus)
 }
