@@ -4,6 +4,10 @@
 
 #import <Foundation/Foundation.h>
 
+#if defined(WEBRTC_IOS)
+#import <AVFoundation/AVFoundation.h>
+#endif  // defined(WEBRTC_IOS)
+
 namespace {
 
 NSString* ToNSString(struct objc_NSString* self) {
@@ -89,8 +93,6 @@ WEBRTC_EXPORT uint64_t objc_NSObject_retainCount(struct objc_NSObject* self) {
 // -------------------------
 
 #if defined(WEBRTC_IOS)
-
-#import <AVFoundation/AVFoundation.h>
 
 WEBRTC_EXPORT objc_AVAudioSessionCategory
 objc_AVAudioSessionCategory_Ambient(void) {
