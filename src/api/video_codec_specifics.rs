@@ -1,4 +1,5 @@
 use crate::ffi;
+use crate::non_null::expect_non_null;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -79,8 +80,10 @@ unsafe impl Send for GofInfoVP9 {}
 impl GofInfoVP9 {
     /// 新しく生成する。
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_GofInfoVP9_new() })
-            .expect("BUG: webrtc_GofInfoVP9_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_GofInfoVP9_new() },
+            "webrtc_GofInfoVP9_new",
+        );
         Self { raw }
     }
 
@@ -89,8 +92,10 @@ impl GofInfoVP9 {
     /// # Safety
     /// `raw` は有効な `webrtc_GofInfoVP9` を指している必要があります。
     pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_GofInfoVP9) -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_GofInfoVP9_copy(raw) })
-            .expect("BUG: webrtc_GofInfoVP9_copy が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_GofInfoVP9_copy(raw) },
+            "webrtc_GofInfoVP9_copy",
+        );
         Self { raw }
     }
 
@@ -264,8 +269,10 @@ unsafe impl Send for RTPVideoHeaderVP8 {}
 impl RTPVideoHeaderVP8 {
     /// 新しく生成する。
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_RTPVideoHeaderVP8_new() })
-            .expect("BUG: webrtc_RTPVideoHeaderVP8_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RTPVideoHeaderVP8_new() },
+            "webrtc_RTPVideoHeaderVP8_new",
+        );
         Self { raw }
     }
 
@@ -274,8 +281,10 @@ impl RTPVideoHeaderVP8 {
     /// # Safety
     /// `raw` は有効な `webrtc_RTPVideoHeaderVP8` を指している必要があります。
     pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_RTPVideoHeaderVP8) -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_RTPVideoHeaderVP8_copy(raw) })
-            .expect("BUG: webrtc_RTPVideoHeaderVP8_copy が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RTPVideoHeaderVP8_copy(raw) },
+            "webrtc_RTPVideoHeaderVP8_copy",
+        );
         Self { raw }
     }
 
@@ -406,8 +415,10 @@ unsafe impl Send for RTPVideoHeaderVP9 {}
 impl RTPVideoHeaderVP9 {
     /// 新しく生成する。
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_RTPVideoHeaderVP9_new() })
-            .expect("BUG: webrtc_RTPVideoHeaderVP9_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RTPVideoHeaderVP9_new() },
+            "webrtc_RTPVideoHeaderVP9_new",
+        );
         Self { raw }
     }
 
@@ -416,8 +427,10 @@ impl RTPVideoHeaderVP9 {
     /// # Safety
     /// `raw` は有効な `webrtc_RTPVideoHeaderVP9` を指している必要があります。
     pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_RTPVideoHeaderVP9) -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_RTPVideoHeaderVP9_copy(raw) })
-            .expect("BUG: webrtc_RTPVideoHeaderVP9_copy が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RTPVideoHeaderVP9_copy(raw) },
+            "webrtc_RTPVideoHeaderVP9_copy",
+        );
         Self { raw }
     }
 
@@ -805,8 +818,7 @@ unsafe impl Send for NaluInfo {}
 impl NaluInfo {
     /// 新しく生成する。
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_NaluInfo_new() })
-            .expect("BUG: webrtc_NaluInfo_new が null を返しました");
+        let raw = expect_non_null(unsafe { ffi::webrtc_NaluInfo_new() }, "webrtc_NaluInfo_new");
         Self { raw }
     }
 
@@ -815,8 +827,10 @@ impl NaluInfo {
     /// # Safety
     /// `raw` は有効な `webrtc_NaluInfo` を指している必要があります。
     pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_NaluInfo) -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_NaluInfo_copy(raw) })
-            .expect("BUG: webrtc_NaluInfo_copy が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_NaluInfo_copy(raw) },
+            "webrtc_NaluInfo_copy",
+        );
         Self { raw }
     }
 
@@ -928,8 +942,10 @@ unsafe impl Send for NaluInfoVector {}
 impl NaluInfoVector {
     /// 新しく生成する。
     pub fn new(size: usize) -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_NaluInfo_vector_new(size) })
-            .expect("BUG: webrtc_NaluInfo_vector_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_NaluInfo_vector_new(size) },
+            "webrtc_NaluInfo_vector_new",
+        );
         Self { raw }
     }
 
@@ -988,8 +1004,10 @@ unsafe impl Send for RTPVideoHeaderH264 {}
 impl RTPVideoHeaderH264 {
     /// 新しく生成する。
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_RTPVideoHeaderH264_new() })
-            .expect("BUG: webrtc_RTPVideoHeaderH264_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RTPVideoHeaderH264_new() },
+            "webrtc_RTPVideoHeaderH264_new",
+        );
         Self { raw }
     }
 
@@ -998,8 +1016,10 @@ impl RTPVideoHeaderH264 {
     /// # Safety
     /// `raw` は有効な `webrtc_RTPVideoHeaderH264` を指している必要があります。
     pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_RTPVideoHeaderH264) -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_RTPVideoHeaderH264_copy(raw) })
-            .expect("BUG: webrtc_RTPVideoHeaderH264_copy が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RTPVideoHeaderH264_copy(raw) },
+            "webrtc_RTPVideoHeaderH264_copy",
+        );
         Self { raw }
     }
 
@@ -1029,8 +1049,7 @@ impl RTPVideoHeaderH264 {
 
     pub fn nalus(&self) -> NaluInfoVector {
         let raw = unsafe { ffi::webrtc_RTPVideoHeaderH264_get_nalus(self.raw.as_ptr()) };
-        let raw = NonNull::new(raw)
-            .expect("BUG: webrtc_RTPVideoHeaderH264_get_nalus が null を返しました");
+        let raw = expect_non_null(raw, "webrtc_RTPVideoHeaderH264_get_nalus");
         // 借用ポインタを所有 vector に変換する (要素ごとにコピーする)。
         let mut vec = NaluInfoVector::new(0);
         let len = unsafe { ffi::webrtc_NaluInfo_vector_size(raw.as_ptr()) };

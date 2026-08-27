@@ -1,6 +1,7 @@
 pub mod log {
     use crate::Result;
     use crate::ffi;
+    use crate::non_null::expect_non_null;
     use std::ffi::CString;
     use std::ptr::NonNull;
 
@@ -52,8 +53,10 @@ pub mod log {
 
     impl LoggingConfig {
         pub fn new() -> Self {
-            let raw = NonNull::new(unsafe { ffi::webrtc_LoggingConfig_new() })
-                .expect("BUG: webrtc_LoggingConfig_new が null を返しました");
+            let raw = expect_non_null(
+                unsafe { ffi::webrtc_LoggingConfig_new() },
+                "webrtc_LoggingConfig_new",
+            );
             Self { raw }
         }
 

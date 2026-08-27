@@ -1,4 +1,5 @@
 use crate::ffi;
+use crate::non_null::expect_non_null;
 use std::ptr::NonNull;
 
 /// webrtc::RtcEventLogFactory のラッパー。
@@ -10,8 +11,10 @@ unsafe impl Send for RtcEventLogFactory {}
 
 impl RtcEventLogFactory {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_RtcEventLogFactory_Create() })
-            .expect("webrtc_RtcEventLogFactory_Create が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RtcEventLogFactory_Create() },
+            "webrtc_RtcEventLogFactory_Create",
+        );
         Self { raw_unique: raw }
     }
 

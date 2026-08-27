@@ -10,6 +10,7 @@ mod api;
 mod cxxstd;
 mod error;
 mod libyuv;
+mod non_null;
 mod ref_count;
 mod rtc_base;
 

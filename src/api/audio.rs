@@ -1,3 +1,4 @@
+use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
 use crate::ref_count::{
     AudioDecoderFactoryHandle, AudioEncoderFactoryHandle, AudioTrackHandle, AudioTrackSourceHandle,
     MediaStreamTrackHandle,
@@ -22,8 +23,10 @@ unsafe impl Send for AudioOptions {}
 impl AudioOptions {
     /// 何も設定されていない AudioOptions を生成する。
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_AudioOptions_new() })
-            .expect("BUG: webrtc_AudioOptions_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_AudioOptions_new() },
+            "webrtc_AudioOptions_new",
+        );
         Self { raw }
     }
 
@@ -189,8 +192,10 @@ unsafe impl Send for AudioDecoderFactory {}
 
 impl AudioDecoderFactory {
     pub fn builtin() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_CreateBuiltinAudioDecoderFactory() })
-            .expect("BUG: webrtc_CreateBuiltinAudioDecoderFactory が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_CreateBuiltinAudioDecoderFactory() },
+            "webrtc_CreateBuiltinAudioDecoderFactory",
+        );
         let raw_ref = ScopedRef::<AudioDecoderFactoryHandle>::from_raw(raw);
         Self { raw_ref }
     }
@@ -213,8 +218,10 @@ unsafe impl Send for AudioEncoderFactory {}
 
 impl AudioEncoderFactory {
     pub fn builtin() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_CreateBuiltinAudioEncoderFactory() })
-            .expect("BUG: webrtc_CreateBuiltinAudioEncoderFactory が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_CreateBuiltinAudioEncoderFactory() },
+            "webrtc_CreateBuiltinAudioEncoderFactory",
+        );
         let raw_ref = ScopedRef::<AudioEncoderFactoryHandle>::from_raw(raw);
         Self { raw_ref }
     }
@@ -277,8 +284,10 @@ impl AudioTrack {
                 self.raw_ref.as_refcounted_ptr(),
             )
         };
-        let raw = NonNull::new(raw)
-            .expect("BUG: AudioTrackInterface から MediaStreamTrackInterface へのキャストが null を返しました");
+        let raw = expect_non_null(
+            raw,
+            "webrtc_AudioTrackInterface_refcounted_cast_to_webrtc_MediaStreamTrackInterface",
+        );
         MediaStreamTrack::from_scoped_ref(ScopedRef::<MediaStreamTrackHandle>::from_raw(raw))
     }
 
@@ -366,15 +375,13 @@ impl AudioTrackSink {
             OnData: Some(audio_track_sink_on_data),
             OnDestroy: Some(audio_track_sink_on_destroy),
         };
-        let raw =
-            match NonNull::new(unsafe { ffi::webrtc_AudioTrackSinkInterface_new(&cbs, user_data) })
-            {
-                Some(raw) => raw,
-                None => {
-                    let _ = unsafe { Box::from_raw(user_data as *mut AudioTrackSinkHandlerState) };
-                    panic!("BUG: webrtc_AudioTrackSinkInterface_new が null を返しました");
-                }
-            };
+        let raw = expect_non_null_with_cleanup(
+            unsafe { ffi::webrtc_AudioTrackSinkInterface_new(&cbs, user_data) },
+            "webrtc_AudioTrackSinkInterface_new",
+            || {
+                let _ = unsafe { Box::from_raw(user_data as *mut AudioTrackSinkHandlerState) };
+            },
+        );
         Self { raw }
     }
 
@@ -399,8 +406,10 @@ unsafe impl Send for AudioProcessingBuilder {}
 impl AudioProcessingBuilder {
     /// BuiltinAudioProcessingBuilder を生成する。
     pub fn new_builtin() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_BuiltinAudioProcessingBuilder_Create() })
-            .expect("webrtc_BuiltinAudioProcessingBuilder_Create が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_BuiltinAudioProcessingBuilder_Create() },
+            "webrtc_BuiltinAudioProcessingBuilder_Create",
+        );
         Self { raw_unique: raw }
     }
 

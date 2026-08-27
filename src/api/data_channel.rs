@@ -1,3 +1,4 @@
+use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
 use crate::ref_count::DataChannelHandle;
 use crate::{CxxString, Result, ScopedRef, ffi};
 use std::os::raw::c_void;
@@ -51,9 +52,10 @@ impl DataChannel {
 
     /// DataChannel のラベルを取得する。
     pub fn label(&self) -> Result<String> {
-        let ptr =
-            NonNull::new(unsafe { ffi::webrtc_DataChannelInterface_label(self.raw_ref.as_ptr()) })
-                .expect("BUG: webrtc_DataChannelInterface_label が null を返しました");
+        let ptr = expect_non_null(
+            unsafe { ffi::webrtc_DataChannelInterface_label(self.raw_ref.as_ptr()) },
+            "webrtc_DataChannelInterface_label",
+        );
         CxxString::from_unique(ptr).to_string()
     }
 
@@ -178,15 +180,13 @@ impl DataChannelObserver {
             OnMessage: Some(dc_observer_on_message),
             OnDestroy: Some(dc_observer_on_destroy),
         };
-        let raw = match NonNull::new(unsafe {
-            ffi::webrtc_DataChannelObserver_new(&cbs, user_data)
-        }) {
-            Some(raw) => raw,
-            None => {
+        let raw = expect_non_null_with_cleanup(
+            unsafe { ffi::webrtc_DataChannelObserver_new(&cbs, user_data) },
+            "webrtc_DataChannelObserver_new",
+            || {
                 let _ = unsafe { Box::from_raw(user_data as *mut DataChannelObserverHandlerState) };
-                panic!("BUG: webrtc_DataChannelObserver_new が null を返しました");
-            }
-        };
+            },
+        );
         Self { raw }
     }
 
@@ -214,8 +214,10 @@ unsafe impl Send for DataChannelInit {}
 
 impl DataChannelInit {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_DataChannelInit_new() })
-            .expect("BUG: webrtc_DataChannelInit_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_DataChannelInit_new() },
+            "webrtc_DataChannelInit_new",
+        );
         Self { raw }
     }
 

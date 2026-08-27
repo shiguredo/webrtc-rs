@@ -4,6 +4,7 @@ use super::video_codec_common::{
     VideoCodecType, VideoFrameBufferKind, VideoFrameRef, VideoFrameTypeVectorRef,
 };
 use super::video_codec_specifics::H264PacketizationMode;
+use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
 use crate::{CxxString, EnvironmentRef, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -203,8 +204,10 @@ unsafe impl Send for VideoEncoderQpThresholds {}
 
 impl VideoEncoderQpThresholds {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_VideoEncoder_QpThresholds_new() })
-            .expect("BUG: webrtc_VideoEncoder_QpThresholds_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_VideoEncoder_QpThresholds_new() },
+            "webrtc_VideoEncoder_QpThresholds_new",
+        );
         Self { raw }
     }
 
@@ -318,8 +321,10 @@ unsafe impl Send for VideoEncoderScalingSettings {}
 
 impl VideoEncoderScalingSettings {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_VideoEncoder_ScalingSettings_new() })
-            .expect("BUG: webrtc_VideoEncoder_ScalingSettings_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_VideoEncoder_ScalingSettings_new() },
+            "webrtc_VideoEncoder_ScalingSettings_new",
+        );
         Self { raw }
     }
 
@@ -463,8 +468,7 @@ impl VideoEncoderResolutionBitrateLimits {
                 max_bitrate_bps,
             )
         };
-        let raw = NonNull::new(raw)
-            .expect("BUG: webrtc_VideoEncoder_ResolutionBitrateLimits_new が null を返しました");
+        let raw = expect_non_null(raw, "webrtc_VideoEncoder_ResolutionBitrateLimits_new");
         Self { raw }
     }
 
@@ -629,8 +633,10 @@ unsafe impl Send for VideoEncoderResolution {}
 
 impl VideoEncoderResolution {
     pub fn new(width: i32, height: i32) -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_VideoEncoder_Resolution_new(width, height) })
-            .expect("BUG: webrtc_VideoEncoder_Resolution_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_VideoEncoder_Resolution_new(width, height) },
+            "webrtc_VideoEncoder_Resolution_new",
+        );
         Self { raw }
     }
 
@@ -679,8 +685,10 @@ unsafe impl Send for VideoEncoderEncoderInfo {}
 
 impl VideoEncoderEncoderInfo {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_VideoEncoder_EncoderInfo_new() })
-            .expect("webrtc_VideoEncoder_EncoderInfo_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_VideoEncoder_EncoderInfo_new() },
+            "webrtc_VideoEncoder_EncoderInfo_new",
+        );
         Self { raw_unique: raw }
     }
 
@@ -691,8 +699,10 @@ impl VideoEncoderEncoderInfo {
     pub fn implementation_name(&self) -> Result<String> {
         let raw =
             unsafe { ffi::webrtc_VideoEncoder_EncoderInfo_get_implementation_name(self.as_ptr()) };
-        let raw = NonNull::new(raw)
-            .expect("webrtc_VideoEncoder_EncoderInfo_get_implementation_name が null を返しました");
+        let raw = expect_non_null(
+            raw,
+            "webrtc_VideoEncoder_EncoderInfo_get_implementation_name",
+        );
         CxxString::from_unique(raw).to_string()
     }
 
@@ -709,9 +719,7 @@ impl VideoEncoderEncoderInfo {
     pub fn scaling_settings(&self) -> VideoEncoderScalingSettingsRef<'_> {
         let raw =
             unsafe { ffi::webrtc_VideoEncoder_EncoderInfo_get_scaling_settings(self.as_ptr()) };
-        let raw = NonNull::new(raw).expect(
-            "BUG: webrtc_VideoEncoder_EncoderInfo_get_scaling_settings が null を返しました",
-        );
+        let raw = expect_non_null(raw, "webrtc_VideoEncoder_EncoderInfo_get_scaling_settings");
         unsafe { VideoEncoderScalingSettingsRef::from_raw(raw) }
     }
 
@@ -816,8 +824,9 @@ impl VideoEncoderEncoderInfo {
         let raw = unsafe {
             ffi::webrtc_VideoEncoder_EncoderInfo_get_resolution_bitrate_limits(self.as_ptr())
         };
-        let raw = NonNull::new(raw).expect(
-            "BUG: webrtc_VideoEncoder_EncoderInfo_get_resolution_bitrate_limits が null を返しました",
+        let raw = expect_non_null(
+            raw,
+            "webrtc_VideoEncoder_EncoderInfo_get_resolution_bitrate_limits",
         );
         unsafe { VideoEncoderResolutionBitrateLimitsVectorRef::from_raw(raw) }
     }
@@ -856,8 +865,9 @@ impl VideoEncoderEncoderInfo {
         let raw = unsafe {
             ffi::webrtc_VideoEncoder_EncoderInfo_get_preferred_pixel_formats(self.as_ptr())
         };
-        let raw = NonNull::new(raw).expect(
-            "BUG: webrtc_VideoEncoder_EncoderInfo_get_preferred_pixel_formats が null を返しました",
+        let raw = expect_non_null(
+            raw,
+            "webrtc_VideoEncoder_EncoderInfo_get_preferred_pixel_formats",
         );
         unsafe { VideoFrameBufferKindInlinedVectorRef::from_raw(raw) }
     }
@@ -920,8 +930,7 @@ impl VideoEncoderEncoderInfo {
 
     pub fn to_string(&self) -> Result<String> {
         let raw = unsafe { ffi::webrtc_VideoEncoder_EncoderInfo_ToString(self.as_ptr()) };
-        let raw = NonNull::new(raw)
-            .expect("BUG: webrtc_VideoEncoder_EncoderInfo_ToString が null を返しました");
+        let raw = expect_non_null(raw, "webrtc_VideoEncoder_EncoderInfo_ToString");
         CxxString::from_unique(raw).to_string()
     }
 
@@ -1071,8 +1080,9 @@ impl VideoEncoderEncodedImageCallbackResult {
     pub fn new(error: VideoEncoderEncodedImageCallbackResultError) -> Self {
         let raw_unique =
             unsafe { ffi::webrtc_VideoEncoder_EncodedImageCallback_Result_new(error.to_raw()) };
-        let raw_unique = NonNull::new(raw_unique).expect(
-            "BUG: webrtc_VideoEncoder_EncodedImageCallback_Result_new が null を返しました",
+        let raw_unique = expect_non_null(
+            raw_unique,
+            "webrtc_VideoEncoder_EncodedImageCallback_Result_new",
         );
         Self { raw_unique }
     }
@@ -1087,8 +1097,9 @@ impl VideoEncoderEncodedImageCallbackResult {
                 frame_id,
             )
         };
-        let raw_unique = NonNull::new(raw_unique).expect(
-            "BUG: webrtc_VideoEncoder_EncodedImageCallback_Result_new_with_frame_id が null を返しました",
+        let raw_unique = expect_non_null(
+            raw_unique,
+            "webrtc_VideoEncoder_EncodedImageCallback_Result_new_with_frame_id",
         );
         Self { raw_unique }
     }
@@ -1108,9 +1119,11 @@ impl VideoEncoderEncodedImageCallbackResult {
                 self.raw_unique.as_ptr(),
             )
         };
-        NonNull::new(raw)
-            .expect("BUG: webrtc_VideoEncoder_EncodedImageCallback_Result_unique_get が null を返しました")
-            .as_ptr()
+        expect_non_null(
+            raw,
+            "webrtc_VideoEncoder_EncodedImageCallback_Result_unique_get",
+        )
+        .as_ptr()
     }
 
     fn into_raw_unique(self) -> *mut ffi::webrtc_VideoEncoder_EncodedImageCallback_Result_unique {
@@ -1211,8 +1224,9 @@ impl VideoEncoderEncodedImageCallbackPtr {
                 codec_specific_info,
             )
         };
-        let raw_unique = NonNull::new(raw_unique).expect(
-            "BUG: webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage が null を返しました",
+        let raw_unique = expect_non_null(
+            raw_unique,
+            "webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage",
         );
         unsafe { VideoEncoderEncodedImageCallbackResult::from_raw_unique(raw_unique) }
     }
@@ -1491,8 +1505,10 @@ unsafe impl Send for CodecSpecificInfo {}
 
 impl CodecSpecificInfo {
     pub fn new() -> Self {
-        let raw_unique = NonNull::new(unsafe { ffi::webrtc_CodecSpecificInfo_new() })
-            .expect("BUG: webrtc_CodecSpecificInfo_new が null を返しました");
+        let raw_unique = expect_non_null(
+            unsafe { ffi::webrtc_CodecSpecificInfo_new() },
+            "webrtc_CodecSpecificInfo_new",
+        );
         Self { raw_unique }
     }
 
@@ -1662,7 +1678,7 @@ impl CodecSpecificInfo {
 
     fn raw(&self) -> NonNull<ffi::webrtc_CodecSpecificInfo> {
         let raw = unsafe { ffi::webrtc_CodecSpecificInfo_unique_get(self.raw_unique.as_ptr()) };
-        NonNull::new(raw).expect("BUG: webrtc_CodecSpecificInfo_unique_get が null を返しました")
+        expect_non_null(raw, "webrtc_CodecSpecificInfo_unique_get")
     }
 }
 
@@ -1704,15 +1720,15 @@ impl VideoEncoderEncodedImageCallback {
             OnDestroy: Some(video_encoder_encoded_image_callback_on_destroy),
         };
         let raw = unsafe { ffi::webrtc_VideoEncoder_EncodedImageCallback_new(&cbs, user_data) };
-        let raw = match NonNull::new(raw) {
-            Some(raw) => raw,
-            None => {
+        let raw = expect_non_null_with_cleanup(
+            raw,
+            "webrtc_VideoEncoder_EncodedImageCallback_new",
+            || {
                 let _ = unsafe {
                     Box::from_raw(user_data as *mut VideoEncoderEncodedImageHandlerState)
                 };
-                panic!("BUG: webrtc_VideoEncoder_EncodedImageCallback_new が null を返しました");
-            }
-        };
+            },
+        );
         Self { raw }
     }
 
@@ -1774,8 +1790,9 @@ impl<'a> VideoEncoderEncodedImageCallbackRef<'a> {
                 codec_specific_info,
             )
         };
-        let raw_unique = NonNull::new(raw_unique).expect(
-            "BUG: webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage が null を返しました",
+        let raw_unique = expect_non_null(
+            raw_unique,
+            "webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage",
         );
         unsafe { VideoEncoderEncodedImageCallbackResult::from_raw_unique(raw_unique) }
     }
@@ -1879,8 +1896,10 @@ unsafe extern "C" fn video_encoder_encoded_image_callback_on_encoded_image(
         "video_encoder_encoded_image_callback_on_encoded_image: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut VideoEncoderEncodedImageHandlerState) };
-    let encoded_image = NonNull::new(encoded_image)
-        .expect("video_encoder_encoded_image_callback_on_encoded_image: encoded_image is null");
+    let encoded_image = expect_non_null(
+        encoded_image,
+        "video_encoder_encoded_image_callback_on_encoded_image (encoded_image)",
+    );
     let encoded_image = unsafe { EncodedImageRef::from_raw(encoded_image) };
     let codec_specific_info =
         NonNull::new(codec_specific_info).map(|v| unsafe { CodecSpecificInfoRef::from_raw(v) });
@@ -1901,8 +1920,8 @@ unsafe extern "C" fn video_encoder_init_encode(
     );
     let state = unsafe { &mut *(user_data as *mut VideoEncoderHandlerState) };
     let codec_settings =
-        NonNull::new(codec_settings).expect("video_encoder_init_encode: codec_settings is null");
-    let settings = NonNull::new(settings).expect("video_encoder_init_encode: settings is null");
+        expect_non_null(codec_settings, "video_encoder_init_encode (codec_settings)");
+    let settings = expect_non_null(settings, "video_encoder_init_encode (settings)");
     let codec_settings = unsafe { VideoCodecRef::from_raw(codec_settings) };
     let settings = unsafe { VideoEncoderSettingsRef::from_raw(settings) };
     state.handler.init_encode(codec_settings, settings).to_raw()
@@ -1918,7 +1937,7 @@ unsafe extern "C" fn video_encoder_encode(
         "video_encoder_encode: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut VideoEncoderHandlerState) };
-    let frame = NonNull::new(frame).expect("video_encoder_encode: frame is null");
+    let frame = expect_non_null(frame, "video_encoder_encode (frame)");
     let frame = unsafe { VideoFrameRef::from_raw(frame) };
     let frame_types = NonNull::new(frame_types)
         .map(|frame_types| unsafe { VideoFrameTypeVectorRef::from_raw(frame_types) });
@@ -1960,7 +1979,7 @@ unsafe extern "C" fn video_encoder_set_rates(
         "video_encoder_set_rates: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut VideoEncoderHandlerState) };
-    let parameters = NonNull::new(parameters).expect("video_encoder_set_rates: parameters is null");
+    let parameters = expect_non_null(parameters, "video_encoder_set_rates (parameters)");
     let parameters = unsafe { VideoEncoderRateControlParametersRef::from_raw(parameters) };
     state.handler.set_rates(parameters);
 }
@@ -2014,8 +2033,8 @@ unsafe extern "C" fn video_encoder_factory_create(
         "video_encoder_factory_create: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut VideoEncoderFactoryHandlerState) };
-    let env = NonNull::new(env).expect("video_encoder_factory_create: env is null");
-    let format = NonNull::new(format).expect("video_encoder_factory_create: format is null");
+    let env = expect_non_null(env, "video_encoder_factory_create (env)");
+    let format = expect_non_null(format, "video_encoder_factory_create (format)");
     let env = unsafe { EnvironmentRef::from_raw(env) };
     let format = unsafe { SdpVideoFormatRef::from_raw(format) };
     match state.handler.create(env, format) {
@@ -2045,13 +2064,9 @@ impl VideoEncoder {
             OnDestroy: Some(video_encoder_on_destroy),
         };
         let raw = unsafe { ffi::webrtc_VideoEncoder_new(&cbs, user_data) };
-        let raw_unique = match NonNull::new(raw) {
-            Some(raw_unique) => raw_unique,
-            None => {
-                let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderHandlerState) };
-                panic!("BUG: webrtc_VideoEncoder_new が null を返しました");
-            }
-        };
+        let raw_unique = expect_non_null_with_cleanup(raw, "webrtc_VideoEncoder_new", || {
+            let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderHandlerState) };
+        });
         Self { raw_unique }
     }
 
@@ -2112,8 +2127,7 @@ impl VideoEncoder {
 
     pub fn get_encoder_info(&self) -> VideoEncoderEncoderInfo {
         let raw = unsafe { ffi::webrtc_VideoEncoder_GetEncoderInfo(self.as_ptr()) };
-        let raw_unique =
-            NonNull::new(raw).expect("webrtc_VideoEncoder_GetEncoderInfo が null を返しました");
+        let raw_unique = expect_non_null(raw, "webrtc_VideoEncoder_GetEncoderInfo");
         VideoEncoderEncoderInfo { raw_unique }
     }
 }
@@ -2148,8 +2162,7 @@ impl SimulcastEncoderAdapter {
                 format.as_ptr(),
             )
         };
-        let raw_unique = NonNull::new(raw_unique)
-            .expect("BUG: webrtc_SimulcastEncoderAdapter_new が null を返しました");
+        let raw_unique = expect_non_null(raw_unique, "webrtc_SimulcastEncoderAdapter_new");
         Self { raw_unique }
     }
 
@@ -2158,13 +2171,12 @@ impl SimulcastEncoderAdapter {
     }
 
     pub fn cast_to_video_encoder(self) -> VideoEncoder {
-        let raw = NonNull::new(self.as_ptr())
-            .expect("BUG: webrtc_SimulcastEncoderAdapter_unique_get が null を返しました");
-        let casted = NonNull::new(unsafe {
-            ffi::webrtc_SimulcastEncoderAdapter_cast_to_webrtc_VideoEncoder(raw.as_ptr())
-        })
-        .expect(
-            "BUG: webrtc_SimulcastEncoderAdapter_cast_to_webrtc_VideoEncoder が null を返しました",
+        let raw = expect_non_null(self.as_ptr(), "webrtc_SimulcastEncoderAdapter_unique_get");
+        let casted = expect_non_null(
+            unsafe {
+                ffi::webrtc_SimulcastEncoderAdapter_cast_to_webrtc_VideoEncoder(raw.as_ptr())
+            },
+            "webrtc_SimulcastEncoderAdapter_cast_to_webrtc_VideoEncoder",
         );
         debug_assert_eq!(casted.as_ptr() as usize, raw.as_ptr() as usize);
 
@@ -2173,8 +2185,7 @@ impl SimulcastEncoderAdapter {
             .as_ptr()
             .cast::<ffi::webrtc_VideoEncoder_unique>();
         VideoEncoder {
-            raw_unique: NonNull::new(raw_unique)
-                .expect("BUG: webrtc_SimulcastEncoderAdapter_unique が null です"),
+            raw_unique: expect_non_null(raw_unique, "webrtc_SimulcastEncoderAdapter_unique"),
         }
     }
 }
@@ -2194,8 +2205,10 @@ unsafe impl Send for VideoEncoderFactory {}
 
 impl VideoEncoderFactory {
     pub fn builtin() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_CreateBuiltinVideoEncoderFactory() })
-            .expect("webrtc_CreateBuiltinVideoEncoderFactory が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_CreateBuiltinVideoEncoderFactory() },
+            "webrtc_CreateBuiltinVideoEncoderFactory",
+        );
         Self { raw_unique: raw }
     }
 
@@ -2286,13 +2299,10 @@ impl VideoEncoderFactory {
             OnDestroy: Some(video_encoder_factory_on_destroy),
         };
         let raw = unsafe { ffi::webrtc_VideoEncoderFactory_new(&cbs, user_data) };
-        let raw_unique = match NonNull::new(raw) {
-            Some(raw_unique) => raw_unique,
-            None => {
+        let raw_unique =
+            expect_non_null_with_cleanup(raw, "webrtc_VideoEncoderFactory_new", || {
                 let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderFactoryHandlerState) };
-                panic!("BUG: webrtc_VideoEncoderFactory_new が null を返しました");
-            }
-        };
+            });
         Self { raw_unique }
     }
 
@@ -2319,14 +2329,12 @@ impl VideoEncoderFactory {
 
     pub fn get_supported_formats(&self) -> Vec<SdpVideoFormat> {
         let raw_vec = unsafe { ffi::webrtc_VideoEncoderFactory_GetSupportedFormats(self.as_ptr()) };
-        let raw_vec = NonNull::new(raw_vec)
-            .expect("BUG: webrtc_VideoEncoderFactory_GetSupportedFormats が null を返しました");
+        let raw_vec = expect_non_null(raw_vec, "webrtc_VideoEncoderFactory_GetSupportedFormats");
         let size = unsafe { ffi::webrtc_SdpVideoFormat_vector_size(raw_vec.as_ptr()) };
         let mut formats = Vec::with_capacity(size.max(0) as usize);
         for i in 0..size {
             let raw_format = unsafe { ffi::webrtc_SdpVideoFormat_vector_get(raw_vec.as_ptr(), i) };
-            let raw_format = NonNull::new(raw_format)
-                .expect("BUG: webrtc_SdpVideoFormat_vector_get が null を返しました");
+            let raw_format = expect_non_null(raw_format, "webrtc_SdpVideoFormat_vector_get");
             let format_ref = unsafe { SdpVideoFormatRef::from_raw(raw_format) };
             formats.push(format_ref.to_owned());
         }

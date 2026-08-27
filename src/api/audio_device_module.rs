@@ -1,3 +1,4 @@
+use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
 use crate::ref_count::AudioDeviceModuleHandle;
 use crate::{Environment, Error, Result, ScopedRef, ffi};
 use std::ffi::c_char;
@@ -100,10 +101,10 @@ impl AudioDeviceModule {
         };
         let mut state = Box::new(AudioDeviceModuleHandlerState { handler });
         let user_data_ptr = state.as_mut() as *mut AudioDeviceModuleHandlerState as *mut c_void;
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_CreateAudioDeviceModuleWithCallback(&mut cbs, user_data_ptr)
-        })
-        .expect("BUG: webrtc_CreateAudioDeviceModuleWithCallback が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_CreateAudioDeviceModuleWithCallback(&mut cbs, user_data_ptr) },
+            "webrtc_CreateAudioDeviceModuleWithCallback",
+        );
         let raw_ref = ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw);
         let _ = Box::into_raw(state);
         Self { raw_ref }
@@ -383,13 +384,13 @@ impl AudioTransport {
             PullRenderData: Some(audio_transport_pull_render_data),
             OnDestroy: Some(audio_transport_on_destroy),
         };
-        let raw = match NonNull::new(unsafe { ffi::webrtc_AudioTransport_new(&cbs, user_data) }) {
-            Some(raw) => raw,
-            None => {
+        let raw = expect_non_null_with_cleanup(
+            unsafe { ffi::webrtc_AudioTransport_new(&cbs, user_data) },
+            "webrtc_AudioTransport_new",
+            || {
                 let _ = unsafe { Box::from_raw(user_data as *mut AudioTransportHandlerState) };
-                panic!("BUG: webrtc_AudioTransport_new が null を返しました");
-            }
-        };
+            },
+        );
         Self { raw }
     }
 
@@ -663,10 +664,10 @@ unsafe impl Send for AudioParameters {}
 
 impl AudioParameters {
     pub fn new(sample_rate: i32, channels: usize, frames_per_buffer: usize) -> Self {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_AudioParameters_new(sample_rate, channels, frames_per_buffer)
-        })
-        .expect("AudioParameters::new: webrtc_AudioParameters_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_AudioParameters_new(sample_rate, channels, frames_per_buffer) },
+            "webrtc_AudioParameters_new",
+        );
         Self { raw }
     }
 
@@ -714,17 +715,17 @@ impl AudioDeviceModuleStats {
         total_playout_delay_s: f64,
         total_samples_count: u64,
     ) -> Self {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_AudioDeviceModule_Stats_new(
-                synthesized_samples_duration_s,
-                synthesized_samples_events,
-                total_samples_duration_s,
-                total_playout_delay_s,
-                total_samples_count,
-            )
-        })
-        .expect(
-            "AudioDeviceModuleStats::new: webrtc_AudioDeviceModule_Stats_new が null を返しました",
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_AudioDeviceModule_Stats_new(
+                    synthesized_samples_duration_s,
+                    synthesized_samples_events,
+                    total_samples_duration_s,
+                    total_playout_delay_s,
+                    total_samples_count,
+                )
+            },
+            "webrtc_AudioDeviceModule_Stats_new",
         );
         Self { raw }
     }

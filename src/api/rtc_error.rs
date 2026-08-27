@@ -1,3 +1,4 @@
+use crate::non_null::expect_non_null;
 use crate::{Result, ffi};
 use std::ptr::NonNull;
 use std::slice;
@@ -36,7 +37,7 @@ impl RtcError {
 
     fn raw(&self) -> NonNull<ffi::webrtc_RTCError> {
         let raw = unsafe { ffi::webrtc_RTCError_unique_get(self.raw_unique.as_ptr()) };
-        NonNull::new(raw).expect("BUG: webrtc_RTCError_unique_get が null を返しました")
+        expect_non_null(raw, "webrtc_RTCError_unique_get")
     }
 }
 

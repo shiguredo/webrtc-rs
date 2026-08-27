@@ -58,6 +58,9 @@
 - [UPDATE] FFI の optional 値 (has / value) 方式を持つ getter/setter のボイラープレートを共通ヘルパーにまとめる
   - `src/api/optional.rs` に `get_optional` / `get_optional_bool` / `set_optional` / `set_optional_bool` を追加し、`RtpCodec` / `RtpEncodingParameters` / `TransformableFrame` / `VideoFrameMetadata` / `VideoEncoderEncoderInfo` / `VideoFrame` / `AudioOptions` の該当アクセサを置き換えて挙動を維持する
   - @melpon
+- [UPDATE] C API が返す null チェック済みポインタのコンストラクタを共通ヘルパーにまとめる
+  - `src/non_null.rs` に `expect_non_null` / `expect_non_null_with_cleanup` を追加し、`NonNull::new(...).expect(...)` の定型と match + panic パターンを置き換えて挙動と panic メッセージの意味を維持する
+  - @melpon
 
 ## 0.152.0
 

@@ -1,4 +1,5 @@
 use super::video_codec_common::{VideoFrame, VideoFrameRef};
+use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
 use crate::ref_count::{
     AdaptedVideoTrackSourceHandle, MediaStreamTrackHandle, VideoTrackHandle, VideoTrackSourceHandle,
 };
@@ -22,7 +23,7 @@ unsafe extern "C" fn video_sink_on_frame(
     user_data: *mut c_void,
 ) {
     let state = unsafe { &mut *(user_data as *mut VideoSinkHandlerState) };
-    let frame = NonNull::new(frame as *mut ffi::webrtc_VideoFrame).expect("BUG: frame が null");
+    let frame = expect_non_null(frame as *mut ffi::webrtc_VideoFrame, "VideoFrame");
     let frame = unsafe { VideoFrameRef::from_raw(frame) };
     state.handler.on_frame(frame);
 }
@@ -53,8 +54,10 @@ unsafe impl Send for VideoSinkWants {}
 
 impl VideoSinkWants {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_VideoSinkWants_new() })
-            .expect("BUG: webrtc_VideoSinkWants_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_VideoSinkWants_new() },
+            "webrtc_VideoSinkWants_new",
+        );
         Self { raw }
     }
 
@@ -91,14 +94,13 @@ impl VideoSink {
             OnDiscardedFrame: Some(video_sink_on_discarded_frame),
             OnDestroy: Some(video_sink_on_destroy),
         };
-        let raw = match NonNull::new(unsafe { ffi::webrtc_VideoSinkInterface_new(&cbs, user_data) })
-        {
-            Some(raw) => raw,
-            None => {
+        let raw = expect_non_null_with_cleanup(
+            unsafe { ffi::webrtc_VideoSinkInterface_new(&cbs, user_data) },
+            "webrtc_VideoSinkInterface_new",
+            || {
                 let _ = unsafe { Box::from_raw(user_data as *mut VideoSinkHandlerState) };
-                panic!("BUG: webrtc_VideoSinkInterface_new が null を返しました");
-            }
-        };
+            },
+        );
         Self { raw }
     }
 
@@ -126,8 +128,10 @@ unsafe impl Sync for AdaptedVideoTrackSource {}
 
 impl AdaptedVideoTrackSource {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_AdaptedVideoTrackSource_Create() })
-            .expect("BUG: webrtc_AdaptedVideoTrackSource_Create が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_AdaptedVideoTrackSource_Create() },
+            "webrtc_AdaptedVideoTrackSource_Create",
+        );
         let raw_ref = ScopedRef::<AdaptedVideoTrackSourceHandle>::from_raw(raw);
         Self { raw_ref }
     }
@@ -165,12 +169,14 @@ impl AdaptedVideoTrackSource {
 
     /// VideoTrackSourceInterface へキャストする。
     pub fn cast_to_video_track_source(&self) -> VideoTrackSource {
-        let raw_ref = NonNull::new(unsafe {
-            ffi::webrtc_AdaptedVideoTrackSource_refcounted_cast_to_webrtc_VideoTrackSourceInterface(
-                self.raw_ref.as_refcounted_ptr(),
-            )
-        })
-        .expect("BUG: webrtc_AdaptedVideoTrackSource_refcounted_cast_to_webrtc_VideoTrackSourceInterface が null を返しました");
+        let raw_ref = expect_non_null(
+            unsafe {
+                ffi::webrtc_AdaptedVideoTrackSource_refcounted_cast_to_webrtc_VideoTrackSourceInterface(
+                    self.raw_ref.as_refcounted_ptr(),
+                )
+            },
+            "webrtc_AdaptedVideoTrackSource_refcounted_cast_to_webrtc_VideoTrackSourceInterface",
+        );
         let raw_ref = ScopedRef::<VideoTrackSourceHandle>::from_raw(raw_ref);
         VideoTrackSource { raw_ref }
     }
@@ -267,12 +273,14 @@ impl VideoTrack {
     }
 
     pub fn cast_to_media_stream_track(&self) -> MediaStreamTrack {
-        let raw_ref = NonNull::new(unsafe {
-            ffi::webrtc_VideoTrackInterface_refcounted_cast_to_webrtc_MediaStreamTrackInterface(
-                self.raw_ref.as_refcounted_ptr(),
-            )
-        })
-        .expect("BUG: webrtc_VideoTrackInterface_refcounted_cast_to_webrtc_MediaStreamTrackInterface が null を返しました");
+        let raw_ref = expect_non_null(
+            unsafe {
+                ffi::webrtc_VideoTrackInterface_refcounted_cast_to_webrtc_MediaStreamTrackInterface(
+                    self.raw_ref.as_refcounted_ptr(),
+                )
+            },
+            "webrtc_VideoTrackInterface_refcounted_cast_to_webrtc_MediaStreamTrackInterface",
+        );
         MediaStreamTrack::from_scoped_ref(ScopedRef::<MediaStreamTrackHandle>::from_raw(raw_ref))
     }
 

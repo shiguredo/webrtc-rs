@@ -1,4 +1,5 @@
 use crate::ffi;
+use crate::non_null::expect_non_null;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -50,7 +51,7 @@ impl<H: RefCountedHandle> ScopedRef<H> {
 
     pub(crate) fn raw(&self) -> NonNull<H::Raw> {
         let raw = unsafe { H::get(self.raw_ref.as_ptr()) };
-        NonNull::new(raw).expect("BUG: RefCountedHandle::get が null を返しました")
+        expect_non_null(raw, "RefCountedHandle::get")
     }
 }
 

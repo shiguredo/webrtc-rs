@@ -1,4 +1,5 @@
 use crate::ffi;
+use crate::non_null::expect_non_null;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 
@@ -36,15 +37,19 @@ impl Thread {
 
     /// ソケットサーバーなしでスレッドを生成する。
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_Thread_Create() })
-            .expect("BUG: webrtc_Thread_Create が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_Thread_Create() },
+            "webrtc_Thread_Create",
+        );
         Self { raw_unique: raw }
     }
 
     /// ソケットサーバー付きでスレッドを生成する。
     pub fn new_with_socket_server() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_Thread_CreateWithSocketServer() })
-            .expect("BUG: webrtc_Thread_CreateWithSocketServer が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_Thread_CreateWithSocketServer() },
+            "webrtc_Thread_CreateWithSocketServer",
+        );
         Self { raw_unique: raw }
     }
 
@@ -170,7 +175,7 @@ impl Thread {
 
     pub fn raw(&self) -> NonNull<ffi::webrtc_Thread> {
         let raw = unsafe { ffi::webrtc_Thread_unique_get(self.raw_unique.as_ptr()) };
-        NonNull::new(raw).expect("BUG: webrtc_Thread_unique_get が null を返しました")
+        expect_non_null(raw, "webrtc_Thread_unique_get")
     }
 
     /// スレッドを一定時間スリープさせるヘルパー。

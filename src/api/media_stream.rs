@@ -1,3 +1,4 @@
+use crate::non_null::expect_non_null;
 use crate::ref_count::{AudioTrackHandle, MediaStreamHandle, VideoTrackHandle};
 use crate::{AudioTrack, CxxString, Result, ScopedRef, VideoTrack, ffi};
 use std::ptr::NonNull;
@@ -29,17 +30,15 @@ impl MediaStream {
 
     pub fn id(&self) -> Result<String> {
         let ptr = unsafe { ffi::webrtc_MediaStreamInterface_id(self.raw_ref.as_ptr()) };
-        let id = CxxString::from_unique(
-            NonNull::new(ptr).expect("BUG: webrtc_MediaStreamInterface_id returned null"),
-        );
+        let id = CxxString::from_unique(expect_non_null(ptr, "webrtc_MediaStreamInterface_id"));
         id.to_string()
     }
 
     pub fn audio_tracks(&self) -> Vec<AudioTrack> {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_MediaStreamInterface_GetAudioTracks(self.raw_ref.as_ptr())
-        })
-        .expect("BUG: webrtc_MediaStreamInterface_GetAudioTracks returned null");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_MediaStreamInterface_GetAudioTracks(self.raw_ref.as_ptr()) },
+            "webrtc_MediaStreamInterface_GetAudioTracks",
+        );
         let len = unsafe { ffi::webrtc_AudioTrackInterface_refcounted_vector_size(raw.as_ptr()) }
             .max(0) as usize;
         let mut out = Vec::with_capacity(len);
@@ -57,10 +56,10 @@ impl MediaStream {
     }
 
     pub fn video_tracks(&self) -> Vec<VideoTrack> {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_MediaStreamInterface_GetVideoTracks(self.raw_ref.as_ptr())
-        })
-        .expect("BUG: webrtc_MediaStreamInterface_GetVideoTracks returned null");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_MediaStreamInterface_GetVideoTracks(self.raw_ref.as_ptr()) },
+            "webrtc_MediaStreamInterface_GetVideoTracks",
+        );
         let len = unsafe { ffi::webrtc_VideoTrackInterface_refcounted_vector_size(raw.as_ptr()) }
             .max(0) as usize;
         let mut out = Vec::with_capacity(len);
