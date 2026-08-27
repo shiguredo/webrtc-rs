@@ -216,7 +216,7 @@ unsafe impl Sync for PeerConnectionFactory {}
 
 impl PeerConnectionFactory {
     /// CreateModularPeerConnectionFactory 相当を生成する。
-    pub fn create_modular(deps: &mut PeerConnectionFactoryDependencies) -> Result<Self> {
+    pub fn create_modular(deps: PeerConnectionFactoryDependencies) -> Result<Self> {
         let raw =
             NonNull::new(unsafe { ffi::webrtc_CreateModularPeerConnectionFactory(deps.as_ptr()) })
                 .ok_or(Error::NullPointer(
@@ -228,7 +228,7 @@ impl PeerConnectionFactory {
 
     /// CreateModularPeerConnectionFactory 相当を生成し、ConnectionContext も同時に返す。
     pub fn create_modular_with_context(
-        deps: &mut PeerConnectionFactoryDependencies,
+        deps: PeerConnectionFactoryDependencies,
     ) -> Result<(Self, ConnectionContext)> {
         let mut out_context = std::ptr::null_mut();
         let factory_raw = NonNull::new(unsafe {
@@ -253,7 +253,7 @@ impl PeerConnectionFactory {
         ))
     }
 
-    pub fn set_options(&mut self, options: &PeerConnectionFactoryOptions) {
+    pub fn set_options(&self, options: &PeerConnectionFactoryOptions) {
         unsafe {
             ffi::webrtc_PeerConnectionFactoryInterface_SetOptions(self.as_ptr(), options.as_ptr())
         };
@@ -1693,8 +1693,8 @@ impl PeerConnection {
     /// `deps` に渡した observer は、`PeerConnection::close` を呼ぶまで drop してはならない。
     pub fn create(
         factory: &PeerConnectionFactory,
-        config: &mut PeerConnectionRtcConfiguration,
-        deps: &mut PeerConnectionDependencies,
+        config: &PeerConnectionRtcConfiguration,
+        deps: PeerConnectionDependencies,
     ) -> Result<Self> {
         let mut out_pc: *mut ffi::webrtc_PeerConnectionInterface_refcounted = std::ptr::null_mut();
         let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
@@ -1720,7 +1720,7 @@ impl PeerConnection {
     pub fn create_offer(
         &self,
         observer: &mut CreateSessionDescriptionObserver,
-        options: &mut PeerConnectionOfferAnswerOptions,
+        options: &PeerConnectionOfferAnswerOptions,
     ) {
         unsafe {
             ffi::webrtc_PeerConnectionInterface_CreateOffer(
@@ -1734,7 +1734,7 @@ impl PeerConnection {
     pub fn create_answer(
         &self,
         observer: &mut CreateSessionDescriptionObserver,
-        options: &mut PeerConnectionOfferAnswerOptions,
+        options: &PeerConnectionOfferAnswerOptions,
     ) {
         unsafe {
             ffi::webrtc_PeerConnectionInterface_CreateAnswer(
@@ -1775,7 +1775,7 @@ impl PeerConnection {
         };
     }
 
-    pub fn add_ice_candidate(&mut self, candidate: &IceCandidate) -> Result<()> {
+    pub fn add_ice_candidate(&self, candidate: &IceCandidate) -> Result<()> {
         let ok = unsafe {
             ffi::webrtc_PeerConnectionInterface_AddIceCandidate(
                 self.raw_ref.as_ptr(),
@@ -1788,7 +1788,7 @@ impl PeerConnection {
         Ok(())
     }
 
-    pub fn set_configuration(&mut self, config: &mut PeerConnectionRtcConfiguration) -> Result<()> {
+    pub fn set_configuration(&self, config: &PeerConnectionRtcConfiguration) -> Result<()> {
         let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
         unsafe {
             ffi::webrtc_PeerConnectionInterface_SetConfiguration(
@@ -1804,11 +1804,7 @@ impl PeerConnection {
         Ok(())
     }
 
-    pub fn create_data_channel(
-        &self,
-        label: &str,
-        init: &mut DataChannelInit,
-    ) -> Result<DataChannel> {
+    pub fn create_data_channel(&self, label: &str, init: &DataChannelInit) -> Result<DataChannel> {
         let mut out_dc: *mut ffi::webrtc_DataChannelInterface_refcounted = std::ptr::null_mut();
         let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
         unsafe {
@@ -1833,7 +1829,7 @@ impl PeerConnection {
     pub fn add_transceiver(
         &self,
         media_type: MediaType,
-        init: &mut RtpTransceiverInit,
+        init: &RtpTransceiverInit,
     ) -> Result<RtpTransceiver> {
         let mut out_transceiver: *mut ffi::webrtc_RtpTransceiverInterface_refcounted =
             std::ptr::null_mut();
@@ -1860,7 +1856,7 @@ impl PeerConnection {
     pub fn add_transceiver_with_track(
         &self,
         track: &VideoTrack,
-        init: &mut RtpTransceiverInit,
+        init: &RtpTransceiverInit,
     ) -> Result<RtpTransceiver> {
         let mut out_transceiver: *mut ffi::webrtc_RtpTransceiverInterface_refcounted =
             std::ptr::null_mut();

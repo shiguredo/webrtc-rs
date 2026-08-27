@@ -1610,7 +1610,7 @@ fn audio_device_module_get_stats_none_returns_zero() {
 
 #[test]
 fn adapted_video_track_source() {
-    let mut src = AdaptedVideoTrackSource::new();
+    let src = AdaptedVideoTrackSource::new();
     let adapted = src.adapt_frame(640, 480, 1_000_000);
     // applied が false の場合でもサイズ情報が得られることを確認する。
     assert!(adapted.size.adapted_width >= 0);
@@ -1654,7 +1654,7 @@ fn peer_connection_factory_and_capabilities() {
     deps.enable_media();
 
     // Factory を生成し、オプションと RTP 能力を取得する。
-    let (mut factory, context) = PeerConnectionFactory::create_modular_with_context(&mut deps)
+    let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps)
         .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
     let mut opts = PeerConnectionFactoryOptions::new();
     opts.set_disable_encryption(false);
@@ -1679,7 +1679,6 @@ fn peer_connection_factory_and_capabilities() {
     drop(caps);
     drop(context);
     drop(factory);
-    drop(deps);
     network.stop();
     worker.stop();
     signaling.stop();
@@ -1754,7 +1753,7 @@ fn create_modular_with_context_returns_default_network_objects() {
     deps.set_audio_device_module(&adm);
     deps.enable_media();
 
-    let (factory, context) = PeerConnectionFactory::create_modular_with_context(&mut deps)
+    let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps)
         .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
     let network_manager = context.default_network_manager();
     let socket_factory = context.default_socket_factory();
@@ -1764,7 +1763,6 @@ fn create_modular_with_context_returns_default_network_objects() {
 
     drop(context);
     drop(factory);
-    drop(deps);
     network.stop();
     worker.stop();
     signaling.stop();
@@ -1979,7 +1977,7 @@ fn rtp_sender_get_set_parameters() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     let source = AdaptedVideoTrackSource::new();
@@ -1988,10 +1986,10 @@ fn rtp_sender_get_set_parameters() {
         .create_video_track(&vts, "video-track-1")
         .expect("VideoTrack の生成に失敗しました");
 
-    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let mut pc_deps = PeerConnectionDependencies::new(&observer);
-    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+    let pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("PeerConnection の生成に失敗しました");
 
     let stream_track = track.cast_to_media_stream_track();
@@ -2012,9 +2010,7 @@ fn rtp_sender_get_set_parameters() {
     drop(track);
     drop(vts);
     drop(source);
-    drop(pc_deps);
     drop(factory);
-    drop(deps_factory);
     drop(adm);
     drop(env);
     network.stop();
@@ -2046,23 +2042,21 @@ fn peer_connection_create_and_transceiver() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     // PC 用の構成と observer/dependencies を準備する。
-    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let mut pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc_deps = PeerConnectionDependencies::new(&observer);
 
     // PeerConnection を生成し、取得できることを確認する。
-    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("PeerConnection の生成に失敗しました");
     assert!(!pc.as_ptr().is_null());
 
     drop(pc);
-    drop(pc_deps);
     drop(factory);
-    drop(deps_factory);
     network.stop();
     worker.stop();
     signaling.stop();
@@ -2091,19 +2085,19 @@ fn peer_connection_lookup_dtls_transport() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
-    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let mut pc_deps = PeerConnectionDependencies::new(&observer);
-    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+    let pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("PeerConnection の生成に失敗しました");
 
     let mut transceiver_init = RtpTransceiverInit::new();
     transceiver_init.set_direction(RtpTransceiverDirection::SendRecv);
     let _ = pc
-        .add_transceiver(MediaType::Audio, &mut transceiver_init)
+        .add_transceiver(MediaType::Audio, &transceiver_init)
         .expect("transceiver の追加に失敗しました");
 
     if let Some(dtls_transport) = pc.lookup_dtls_transport_by_mid("0") {
@@ -2114,9 +2108,7 @@ fn peer_connection_lookup_dtls_transport() {
     }
 
     drop(pc);
-    drop(pc_deps);
     drop(factory);
-    drop(deps_factory);
     network.stop();
     worker.stop();
     signaling.stop();
@@ -2145,13 +2137,13 @@ fn get_stats_delivers_report() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
-    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let mut pc_deps = PeerConnectionDependencies::new(&observer);
-    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+    let pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("PeerConnection の生成に失敗しました");
 
     let (tx, rx) = mpsc::channel::<()>();
@@ -2164,9 +2156,7 @@ fn get_stats_delivers_report() {
         .expect("get_stats のコールバックが呼ばれませんでした");
 
     drop(pc);
-    drop(pc_deps);
     drop(factory);
-    drop(deps_factory);
     network.stop();
     worker.stop();
     signaling.stop();
@@ -2195,7 +2185,7 @@ fn peer_connection_create_with_proxy_allocator() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let (factory, context) = PeerConnectionFactory::create_modular_with_context(&mut deps_factory)
+    let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps_factory)
         .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
 
     let network_manager = context.default_network_manager();
@@ -2203,7 +2193,7 @@ fn peer_connection_create_with_proxy_allocator() {
     assert!(!network_manager.as_ptr().is_null());
     assert!(!socket_factory.as_ptr().is_null());
 
-    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
     pc_deps.set_proxy(
@@ -2215,15 +2205,13 @@ fn peer_connection_create_with_proxy_allocator() {
         "pass",
         "shiguredo_webrtc test",
     );
-    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("Proxy 設定付き PeerConnection の生成に失敗しました");
     assert!(!pc.as_ptr().is_null());
 
     drop(pc);
-    drop(pc_deps);
     drop(context);
     drop(factory);
-    drop(deps_factory);
     network.stop();
     worker.stop();
     signaling.stop();
@@ -2257,11 +2245,11 @@ fn video_track_and_transceiver_with_track() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     // VideoTrack を生成する。
-    let mut source = AdaptedVideoTrackSource::new();
+    let source = AdaptedVideoTrackSource::new();
     let vts = source.cast_to_video_track_source();
     let track = factory
         .create_video_track(&vts, "video-track-0")
@@ -2276,15 +2264,15 @@ fn video_track_and_transceiver_with_track() {
     source.on_frame(&frame);
 
     // PeerConnection を作成し、トラック付きで transceiver を追加する。
-    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let mut pc_deps = PeerConnectionDependencies::new(&observer);
-    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+    let pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("PeerConnection の生成に失敗しました");
 
     let mut init = RtpTransceiverInit::new();
     init.set_direction(RtpTransceiverDirection::SendOnly);
-    pc.add_transceiver_with_track(&track, &mut init)
+    pc.add_transceiver_with_track(&track, &init)
         .expect("AddTransceiverWithTrack が失敗しました");
 
     // webrtc オブジェクトを先に解放してからスレッドを停止する。
@@ -2292,9 +2280,7 @@ fn video_track_and_transceiver_with_track() {
     drop(track);
     drop(vts);
     drop(source);
-    drop(pc_deps);
     drop(factory);
-    drop(deps_factory);
     drop(adm);
     drop(env);
     network.stop();
@@ -2369,18 +2355,18 @@ fn always_negotiate_data_channels_adds_data_section() {
 
     fn create_offer_sdp(
         factory: &PeerConnectionFactory,
-        config: &mut PeerConnectionRtcConfiguration,
+        config: &PeerConnectionRtcConfiguration,
     ) -> String {
         let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-        let mut pc_deps = PeerConnectionDependencies::new(&observer);
-        let pc = PeerConnection::create(factory, config, &mut pc_deps)
+        let pc_deps = PeerConnectionDependencies::new(&observer);
+        let pc = PeerConnection::create(factory, config, pc_deps)
             .expect("PeerConnection の生成に失敗しました");
 
-        let mut opts = PeerConnectionOfferAnswerOptions::new();
+        let opts = PeerConnectionOfferAnswerOptions::new();
         let (tx, rx) = mpsc::channel::<Result<String>>();
         let mut obs =
             CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferHandler { tx }));
-        pc.create_offer(&mut obs, &mut opts);
+        pc.create_offer(&mut obs, &opts);
         let sdp = rx
             .recv_timeout(Duration::from_secs(5))
             .expect("createOffer がタイムアウトしました")
@@ -2388,7 +2374,6 @@ fn always_negotiate_data_channels_adds_data_section() {
 
         drop(obs);
         drop(pc);
-        drop(pc_deps);
         sdp
     }
 
@@ -2413,28 +2398,27 @@ fn always_negotiate_data_channels_adds_data_section() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     // always_negotiate_data_channels=true かつ DataChannel 未生成でも m=application が含まれる。
     let mut pc_config_on = PeerConnectionRtcConfiguration::new();
     pc_config_on.set_always_negotiate_data_channels(true);
-    let sdp_on = create_offer_sdp(&factory, &mut pc_config_on);
+    let sdp_on = create_offer_sdp(&factory, &pc_config_on);
     assert!(
         sdp_on.contains("m=application"),
         "always_negotiate_data_channels=true で SDP に m=application が含まれません: {sdp_on}"
     );
 
     // 対照実験: デフォルト (false) で DataChannel 未生成なら m=application は含まれない。
-    let mut pc_config_off = PeerConnectionRtcConfiguration::new();
-    let sdp_off = create_offer_sdp(&factory, &mut pc_config_off);
+    let pc_config_off = PeerConnectionRtcConfiguration::new();
+    let sdp_off = create_offer_sdp(&factory, &pc_config_off);
     assert!(
         !sdp_off.contains("m=application"),
         "always_negotiate_data_channels=false で SDP に m=application が含まれました: {sdp_off}"
     );
 
     drop(factory);
-    drop(deps_factory);
     drop(adm);
     drop(env);
     network.stop();
@@ -3348,7 +3332,7 @@ fn create_local_media_stream_returns_requested_id() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     let stream = factory
@@ -3361,7 +3345,6 @@ fn create_local_media_stream_returns_requested_id() {
 
     drop(stream);
     drop(factory);
-    drop(deps_factory);
     drop(adm);
     drop(env);
     network.stop();
@@ -3396,7 +3379,7 @@ fn media_stream_track_round_trip() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     let stream = factory
@@ -3465,7 +3448,6 @@ fn media_stream_track_round_trip() {
     drop(audio_options);
     drop(stream);
     drop(factory);
-    drop(deps_factory);
     drop(adm);
     drop(env);
     network.stop();
@@ -3538,7 +3520,7 @@ fn create_audio_source_with_audio_options() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     let mut options = AudioOptions::new();
@@ -3553,7 +3535,6 @@ fn create_audio_source_with_audio_options() {
     drop(audio_source);
     drop(options);
     drop(factory);
-    drop(deps_factory);
     drop(adm);
     drop(env);
     network.stop();
@@ -3585,7 +3566,7 @@ fn create_audio_source_with_default_audio_options() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     let options = AudioOptions::new();
@@ -3596,7 +3577,6 @@ fn create_audio_source_with_default_audio_options() {
     drop(audio_source);
     drop(options);
     drop(factory);
-    drop(deps_factory);
     drop(adm);
     drop(env);
     network.stop();
