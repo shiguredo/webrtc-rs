@@ -1,7 +1,7 @@
 # 実体とずれている `&mut` / `&mut self` を `&`・値渡し・`&self` に変更する
 
 - Created: 2026-08-26
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-28
 - Branch: feature/refactor-immutable-borrow-for-readonly-args
 - Polished: {YYYY-MM-DD}
 
@@ -119,5 +119,7 @@ libwebrtc 本体の C++ API 自体が `deps` を値渡しで受け取ってお�
 
 ## 解決方法
 
-- `src/api/` の該当メソッドのシグネチャを修正する
-- 呼び出し側 (`src/tests.rs`、`examples/whip`、`examples/whep` など) の `let mut ...` を `let ...` に、`&mut deps` を `deps` に変更する
+- `src/api/peer_connection.rs` の読み取り専用引数を `&mut T` から `&T` に変更する (`PeerConnection::create` / `set_configuration` / `create_offer` / `create_answer` / `create_data_channel` / `add_transceiver` / `add_transceiver_with_track`)
+- libwebrtc 側で std::move により消費される引数を値渡しに変更する (`PeerConnectionFactory::create_modular` / `create_modular_with_context` / `PeerConnection::create` の `deps`)
+- 共有ハンドル型レシーバを `&mut self` から `&self` に変更する (`PeerConnection::add_ice_candidate` / `set_configuration` / `PeerConnectionFactory::set_options` / `VideoTrack` / `AdaptedVideoTrackSource` / `AudioTrack` / `DataChannel` の該当メソッド)
+- 呼び出し側 (`src/tests.rs` / `examples/whip` / `examples/whep`) の不要になった `let mut` を除去する
