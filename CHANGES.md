@@ -33,6 +33,10 @@
   - C API の `webrtc_Thread_Quit` を追加し、libwebrtc の `webrtc::Thread::Quit()` を公開する
   - `Thread::quit` を追加し、メッセージループを stop せずに停止できるようにする
   - @melpon
+- [CHANGE] `Thread::blocking_call` に `R: Default` 境界を追加する
+  - `webrtc_Thread_BlockingCall_r` を非 void テンプレから void 版 `BlockingCall` に変更し、functor 未実行時に確定した `nullptr` を返すようにする
+  - `nullptr` は未実行を一意に表すため、停止中スレッドでは `R::default()` を返し、未初期化ポインタの `Box::from_raw` による UB を回避する
+  - @melpon
 - [FIX] `get_stats` のコールバック未発火時に user_data の Box がリークする問題を修正する
   - C 側の `RTCStatsCollectorCallbackImpl` にデストラクタを追加し、コールバック未発火のまま C++ オブジェクトが破棄される場合に `OnDestroy` を呼ぶようにする
   - Rust 側の回収を `OnDestroy` に一元化し、`OnStatsDelivered` は `&mut` 参照 + `Option::take()` による実行に変更する

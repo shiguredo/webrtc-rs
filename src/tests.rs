@@ -1406,6 +1406,18 @@ fn thread_blocking_call_after_quit_does_not_run() {
 }
 
 #[test]
+fn thread_blocking_call_after_stop_returns_default() {
+    // stop 後はメッセージループが停止し、非 void の blocking_call は
+    // クロージャを実行せずに R::default() (0) を返すことを確認する。
+    // 未実行時に未初期化ポインタが渡り Box::from_raw で UB になる問題の回帰テスト。
+    let mut thread = Thread::new();
+    assert!(thread.start());
+    thread.stop();
+    let result = thread.blocking_call(|| 42);
+    assert_eq!(result, 0);
+}
+
+#[test]
 fn thread_sleep_ms_runs() {
     assert!(Thread::sleep_ms(1));
 }
