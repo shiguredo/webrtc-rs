@@ -155,8 +155,11 @@ impl Thread {
     }
 
     /// スレッドを一定時間スリープさせるヘルパー。
-    pub fn sleep_ms(millis: i32) {
-        unsafe { ffi::webrtc_Thread_SleepMs(millis) };
+    ///
+    /// スリープがシグナルで中断された場合は `false` を返す（POSIX のみ）。
+    pub fn sleep_ms(millis: i32) -> bool {
+        let result = unsafe { ffi::webrtc_Thread_SleepMs(millis) };
+        result != 0
     }
 }
 

@@ -1407,7 +1407,7 @@ fn thread_blocking_call_after_quit_does_not_run() {
 
 #[test]
 fn thread_sleep_ms_runs() {
-    Thread::sleep_ms(1);
+    assert!(Thread::sleep_ms(1));
 }
 
 #[test]
