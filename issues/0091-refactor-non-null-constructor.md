@@ -1,7 +1,7 @@
 # C API から返る null チェック済みポインタのコンストラクタ `NonNull::new(...).expect(...)` を共通ヘルパー化する
 
 - Created: 2026-08-26
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-28
 - Branch: feature/refactor-non-null-constructor
 - Polished: {YYYY-MM-DD}
 
@@ -57,6 +57,11 @@ let raw = expect_non_null(unsafe { ffi::webrtc_XXX_new() }, "webrtc_XXX_new");
 
 ## 解決方法
 
-- 共通ヘルパー (例: `expect_non_null`) を共有モジュール (例: `src/error.rs` または `src/ffi.rs`) に追加し、対象箇所を置き換える
-- `src/tests.rs` の既存テストで挙動が変わらないことを担保する。null が返る経路を直接テストできない箇所では、対象の panic メッセージの意味を保ったまま置き換える
-- 対象外 (`ok_or` / `map` を意図的に使う箇所) は変更しない
+- `src/non_null.rs` に `expect_non_null` / `expect_non_null_with_cleanup` を追加し、`src/lib.rs` で `mod non_null;` を宣言する
+- 対象の 26 ファイルで、定型的な `NonNull::new(...).expect("BUG: ...")` と、observer 生成時の match + panic (null 時に state を回収してから panic) を共通ヘルパー呼び出しに置き換える
+- panic メッセージは主流の日本語「BUG: {what} が null を返しました」に統一する (`what` には呼び出した関数名を渡す)
+- 英語 `returned null` / 「BUG:」なし / 短縮形 (`ptr が null` など) の表記ゆれを解消する
+- 例外テキスト (`ok != 0 なのに out が null` / `out_pc と out_error が両方 null` / `index が X なのにアクセサが null`) は意味を損なわないよう個別に扱い、置換しない
+- 対象外 (`ok_or` / `?` / `.map()` / `if let Some` / チェック済み `unwrap()`) は変更しない
+- `src/tests.rs` の既存テストとビルドで挙動が変わらないことを検証する
+- `CHANGES.md` の develop に `### misc` エントリを追記する
