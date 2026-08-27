@@ -1,3 +1,4 @@
+use super::optional::{get_optional, get_optional_bool, set_optional, set_optional_bool};
 use super::video_codec_common::{
     EncodedImageRef, SdpVideoFormat, SdpVideoFormatRef, VideoCodecRef, VideoCodecStatus,
     VideoCodecType, VideoFrameBufferKind, VideoFrameRef, VideoFrameTypeVectorRef,
@@ -862,58 +863,27 @@ impl VideoEncoderEncoderInfo {
     }
 
     pub fn is_qp_trusted(&self) -> Option<bool> {
-        let mut has = 0;
-        let mut value = 0;
-        unsafe {
-            ffi::webrtc_VideoEncoder_EncoderInfo_get_is_qp_trusted(
-                self.as_ptr(),
-                &mut has,
-                &mut value,
-            );
-        }
-        if has == 0 { None } else { Some(value != 0) }
+        get_optional_bool(|has, value| unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_get_is_qp_trusted(self.as_ptr(), has, value)
+        })
     }
 
     pub fn set_is_qp_trusted(&mut self, value: Option<bool>) {
-        match value {
-            Some(v) => {
-                let value = if v { 1 } else { 0 };
-                unsafe {
-                    ffi::webrtc_VideoEncoder_EncoderInfo_set_is_qp_trusted(
-                        self.as_ptr(),
-                        1,
-                        &value,
-                    );
-                }
-            }
-            None => unsafe {
-                ffi::webrtc_VideoEncoder_EncoderInfo_set_is_qp_trusted(
-                    self.as_ptr(),
-                    0,
-                    std::ptr::null(),
-                );
-            },
-        }
+        set_optional_bool(value, |has, value_ptr| unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_set_is_qp_trusted(self.as_ptr(), has, value_ptr)
+        });
     }
 
     pub fn min_qp(&self) -> Option<i32> {
-        let mut has = 0;
-        let mut value = 0;
-        unsafe {
-            ffi::webrtc_VideoEncoder_EncoderInfo_get_min_qp(self.as_ptr(), &mut has, &mut value)
-        };
-        if has == 0 { None } else { Some(value) }
+        get_optional(|has, value| unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_get_min_qp(self.as_ptr(), has, value)
+        })
     }
 
     pub fn set_min_qp(&mut self, value: Option<i32>) {
-        match value {
-            Some(v) => unsafe {
-                ffi::webrtc_VideoEncoder_EncoderInfo_set_min_qp(self.as_ptr(), 1, &v);
-            },
-            None => unsafe {
-                ffi::webrtc_VideoEncoder_EncoderInfo_set_min_qp(self.as_ptr(), 0, std::ptr::null());
-            },
-        }
+        set_optional(value, |has, value_ptr| unsafe {
+            ffi::webrtc_VideoEncoder_EncoderInfo_set_min_qp(self.as_ptr(), has, value_ptr)
+        });
     }
 
     pub fn mapped_resolution(&self) -> Option<VideoEncoderResolution> {

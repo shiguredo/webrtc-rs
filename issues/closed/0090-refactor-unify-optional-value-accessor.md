@@ -1,7 +1,7 @@
 # FFI の optional 値 (has/value) を持つ getter/setter のボイラープレートを共通ヘルパー化する
 
 - Created: 2026-08-26
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-28
 - Branch: feature/refactor-optional-value-accessor
 - Polished: {YYYY-MM-DD}
 
@@ -106,6 +106,14 @@ bool のときはさらに `let raw = if v { 1 } else { 0 };` による c_int �
 
 ## 解決方法
 
-- `src/` 配下に共通ヘルパー (例: `get_optional` / `set_optional` 相当) を追加し、上記モジュールの該当アクセサを置き換える
-- `src/tests.rs` に、対象アクセサの挙動が変わらないことを検証するテストを追加する (既存テストが存在するアクセサは既存テストで担保)
-- `AudioOptions` は develop マージ後に、このヘルパーへ追従する
+optional 値を持つ各アクセサをクロージャ形式の共通ヘルパーに置き換えたことによって解決した。
+
+- `src/api/optional.rs` に `get_optional` / `get_optional_bool` / `set_optional` / `set_optional_bool` を追加する
+  - getter は `out_has` / `out_value`、setter は `has` + 値ポインタをそのまま受け渡しするクロージャを引数で受ける
+  - bool の c_int (1 / 0) 変換はヘルパー側に寄せる
+  - C API (`webrtc/`) と FFI 定義は変更しない
+- `rtp.rs` の `RtpCodec` / `RtpEncodingParameters`、`frame_transformer.rs` の `TransformableFrame` / `VideoFrameMetadata`、`video_encoder.rs` の `VideoEncoderEncoderInfo`、`video_codec_common.rs` の `VideoFrame` の該当アクセサを共通ヘルパー呼び出しに置き換える
+- `AudioOptions` は実装着手時点で develop にマージ済みだったため、本対応の対象に含める (`audio.rs` の 8 アクセサ)
+- 挙動が変わらないことを検証するために `RtpCodec` の None リセット検証を `src/tests.rs` に追記する (他のアクセサは既存テストで担保)
+- オブジェクト (`value.as_ptr()`) や値渡し setter の variant は対象外とし、分岐整形のみ揃える
+- `CHANGES.md` の develop に `### misc` エントリを追記する
