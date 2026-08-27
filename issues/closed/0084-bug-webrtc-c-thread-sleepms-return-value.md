@@ -1,7 +1,7 @@
 # webrtc_Thread_SleepMs の戻り値破棄に対処する
 
 - Created: 2026-08-20
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-27
 - Branch: feature/fix-webrtc-c-thread-sleepms-return
 - Polished: {YYYY-MM-DD}
 
@@ -35,3 +35,11 @@ libwebrtc の `webrtc::Thread::SleepMs()` (`rtc_base/thread.h`) は `bool` を�
 - Rust ラッパー `Thread::sleep_ms` が `bool` を返すようになっている
 - `src/tests.rs` の `thread_sleep_ms_runs` が成否検証を行うテストになっている
 - `CHANGES.md` の `## develop` セクションに `[CHANGE]` エントリが追加されている
+
+## 解決方法
+
+- `webrtc/src/webrtc_c/rtc_base/thread.h` と `webrtc/src/webrtc_c/rtc_base/thread.cc` の `webrtc_Thread_SleepMs` の戻り値型を `void` から `int` (0/1) に変更し、`webrtc::Thread::SleepMs()` の成否を `return webrtc::Thread::SleepMs(millis) ? 1 : 0;` で呼び出し側へ伝達するようにした
+- `src/rtc_base/thread.rs` の `Thread::sleep_ms` を `bool` を返すように変更し、FFI の戻り値 `int` を `!= 0` で `bool` に変換するようにした
+- `src/tests.rs` の `thread_sleep_ms_runs` を `assert!(Thread::sleep_ms(1))` で成否検証するようにした
+- `CHANGES.md` の `## develop` セクションに `[CHANGE]` エントリを追記した
+- `--features source-build` で `cargo test thread_sleep_ms_runs` が通過することを確認した（prebuilt 固定の `bindings.rs` ではなくソースビルドでヘッダ変更を反映）

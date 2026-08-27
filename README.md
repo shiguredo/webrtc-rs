@@ -395,8 +395,8 @@ impl FactoryHolder {
   - 時間ユーティリティ
 - `version`
   - クレートのバージョン取得
-- `log` / `log::Severity`
-  - ログ機能 (`log_to_debug`, `enable_timestamps`, `enable_threads`, `print`)
+- `log` / `log::Severity` / `log::LoggingConfig`
+  - ログ機能 (`initialize_logging(LoggingConfig)`, `print`)
 - `rtc_log_format_file`
   - ログ出力用のファイル名整形
 - `rtc_log_verbose!` / `rtc_log_info!` / `rtc_log_warning!` / `rtc_log_error!`

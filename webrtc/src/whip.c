@@ -1523,9 +1523,15 @@ void SignalingWhip_Disconnect(struct SignalingWhip* self) {
 }
 
 int main() {
-  webrtc_LogMessage_LogToDebug(webrtc_LogSeverity_LS_INFO);
-  webrtc_LogMessage_LogTimestamps();
-  webrtc_LogMessage_LogThreads();
+  struct webrtc_LoggingConfig* logging_config = webrtc_LoggingConfig_new();
+  webrtc_LoggingConfig_set_min_severity(logging_config,
+                                        webrtc_LogSeverity_LS_INFO);
+  webrtc_LoggingConfig_set_debug_severity(logging_config,
+                                          webrtc_LogSeverity_LS_INFO);
+  webrtc_LoggingConfig_set_log_timestamp(logging_config, 1);
+  webrtc_LoggingConfig_set_log_thread(logging_config, 1);
+  webrtc_LogMessage_InitializeLogging(logging_config);
+  webrtc_LoggingConfig_delete(logging_config);
 
   struct PeerConnectionFactory* factory = PeerConnectionFactory_Create();
   if (factory == NULL) {

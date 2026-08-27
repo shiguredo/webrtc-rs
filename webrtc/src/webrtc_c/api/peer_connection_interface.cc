@@ -185,6 +185,7 @@ class RTCStatsCollectorCallbackImpl : public webrtc::RTCStatsCollectorCallback {
       : cbs_(*cbs), user_data_(user_data) {
     assert(cbs != nullptr);
     assert(cbs->OnStatsDelivered != nullptr);
+    assert(cbs->OnDestroy != nullptr);
   }
 
   void OnStatsDelivered(
@@ -196,6 +197,8 @@ class RTCStatsCollectorCallbackImpl : public webrtc::RTCStatsCollectorCallback {
             report_ref.release()),
         user_data_);
   }
+
+  ~RTCStatsCollectorCallbackImpl() override { cbs_.OnDestroy(user_data_); }
 
  private:
   struct webrtc_RTCStatsCollectorCallback_cbs cbs_{};
@@ -1059,6 +1062,7 @@ WEBRTC_EXPORT void webrtc_EnableMedia(
 
 namespace {
 
+// webrtc::PeerConnectionFactory に ConnectionContext を返すインターフェースを追加したクラス
 class PeerConnectionFactoryWithContext : public webrtc::PeerConnectionFactory {
  public:
   explicit PeerConnectionFactoryWithContext(
@@ -1287,12 +1291,14 @@ WEBRTC_EXPORT extern const int webrtc_SSL_PROTOCOL_DTLS_12 =
 
 WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateAudioSource(
     struct webrtc_PeerConnectionFactoryInterface* self,
+    struct webrtc_AudioOptions* options,
     struct webrtc_AudioSourceInterface_refcounted** out_source) {
   auto factory =
       reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
   assert(out_source != nullptr);
-  webrtc::AudioOptions options;
-  auto source = factory->CreateAudioSource(options);
+  auto audio_options = reinterpret_cast<webrtc::AudioOptions*>(options);
+  assert(audio_options != nullptr);
+  auto source = factory->CreateAudioSource(*audio_options);
   if (source) {
     *out_source =
         reinterpret_cast<struct webrtc_AudioSourceInterface_refcounted*>(

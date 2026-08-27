@@ -214,7 +214,8 @@ WEBRTC_EXPORT extern const double webrtc_kDefaultBitratePriority;
 // webrtc::DegradationPreference
 // -------------------------
 
-WEBRTC_EXPORT extern const int webrtc_DegradationPreference_DISABLED;
+WEBRTC_EXPORT extern const int
+    webrtc_DegradationPreference_MAINTAIN_FRAMERATE_AND_RESOLUTION;
 WEBRTC_EXPORT extern const int webrtc_DegradationPreference_MAINTAIN_FRAMERATE;
 WEBRTC_EXPORT extern const int webrtc_DegradationPreference_MAINTAIN_RESOLUTION;
 WEBRTC_EXPORT extern const int webrtc_DegradationPreference_BALANCED;

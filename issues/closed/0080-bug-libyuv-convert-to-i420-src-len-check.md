@@ -1,7 +1,7 @@
 # convert_to_i420 が src_frame の必要長を検証していない
 
 - Created: 2026-08-03
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-27
 - Branch: feature/fix-libyuv-convert-to-i420-src-len-check
 - Polished: 2026-08-12
 
@@ -37,6 +37,6 @@ raw フォーマット入力の変換関数群 (`i420_copy` / `nv12_copy` / `yuy
 
 ## 解決方法
 
-- `convert_to_i420` (`src/libyuv.rs`) に ARGB / BGRA の入力長検証を追加する（crop オフセットと 4 バイト/画素の係数を考慮）
-- MJPG の場合は入力長検証をスキップする
-- `tests/test_libyuv.rs` に ARGB / BGRA の短い入力で `false` が返るテストと、有効な入力で `true` が返る正常系テストを追加する
+- `convert_to_i420` (`src/libyuv.rs`) に ARGB / BGRA の入力長検証を追加した（crop オフセット込みで `src_width * 4` の stride・`abs(crop_height)` 行・`(crop_x + crop_width) * 4` バイトぶんを `has_required_len` で検証し、不足時は `false` を返す）。オーバーフローは `checked_*` で検知する
+- MJPG の場合は入力長検証をスキップし、libyuv 側の検証 (`ValidateJpeg`) に委ねる
+- `tests/test_libyuv.rs` に ARGB / BGRA の入力長検証テストを追加した（crop オフセット込みの必要長ちょうどで `true`、必要長より 1 バイト短いと `false`、BGRA でも同じ検証分岐に入ることを確認）

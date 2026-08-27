@@ -1138,7 +1138,7 @@ pub fn default_bitrate_priority() -> f64 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DegradationPreference {
-    Disabled,
+    MaintainFramerateAndResolution,
     MaintainFramerate,
     MaintainResolution,
     Balanced,
@@ -1148,8 +1148,8 @@ pub enum DegradationPreference {
 impl DegradationPreference {
     pub fn to_int(self) -> i32 {
         match self {
-            DegradationPreference::Disabled => unsafe {
-                ffi::webrtc_DegradationPreference_DISABLED
+            DegradationPreference::MaintainFramerateAndResolution => unsafe {
+                ffi::webrtc_DegradationPreference_MAINTAIN_FRAMERATE_AND_RESOLUTION
             },
             DegradationPreference::MaintainFramerate => unsafe {
                 ffi::webrtc_DegradationPreference_MAINTAIN_FRAMERATE
@@ -1166,8 +1166,12 @@ impl DegradationPreference {
 
     pub fn from_int(v: i32) -> Self {
         match v {
-            x if x == unsafe { ffi::webrtc_DegradationPreference_DISABLED } => {
-                DegradationPreference::Disabled
+            x if x
+                == unsafe {
+                    ffi::webrtc_DegradationPreference_MAINTAIN_FRAMERATE_AND_RESOLUTION
+                } =>
+            {
+                DegradationPreference::MaintainFramerateAndResolution
             }
             x if x == unsafe { ffi::webrtc_DegradationPreference_MAINTAIN_FRAMERATE } => {
                 DegradationPreference::MaintainFramerate

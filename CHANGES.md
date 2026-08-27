@@ -11,6 +11,48 @@
 
 ## develop
 
+- [CHANGE] ログ初期化 API を `webrtc::LoggingConfig` の C ラッパー経由に変更する
+  - C API の `webrtc_LogMessage_InitializeLogging` を `int severity` 引数から `struct webrtc_LoggingConfig*` 引数に変更し、`webrtc_LoggingConfig` 型 (new / delete / setter / getter) を追加する
+  - `webrtc_LogMessage_LogTimestamps` / `webrtc_LogMessage_LogThreads` を削除し、`log_timestamp` / `log_thread` フィールドに統合する
+  - Rust API の `log::initialize_logging` を `log::Severity` 引数から `log::LoggingConfig` 引数に変更し、`log::enable_timestamps` / `log::enable_threads` を削除する
+  - @melpon
+- [CHANGE] `create_audio_source` に `AudioOptions` 引数を追加する
+  - C API に `webrtc_AudioOptions` 型 (new / delete / 各 std::optional フィールドの getter / setter) を追加し、`webrtc_PeerConnectionFactoryInterface_CreateAudioSource` に `options` 引数を追加する
+  - エコーキャンセル / 自動ゲインコントロール / ノイズサプレッション / ハイパスフィルタ / ステレオスワップ / 受信側 jitter buffer の設定と取得を可能にする
+  - 未設定のフィールドは従来どおり WebRtcVoiceEngine のデフォルト設定が適用される
+  - @melpon
+- [CHANGE] ScopedRef 系の内部機構を pub(crate) 化する
+  - `ScopedRef` / `RefCountedHandle` / `ScopedRef::from_raw` を外部公開 API から外し、参照カウント管理の内部機構として限定する
+  - `RTCStatsReport::from_refcounted_ptr` も pub(crate) 化する
+  - @melpon
+- [CHANGE] `webrtc_Thread_SleepMs` の戻り値型を変更する
+  - C API の `webrtc_Thread_SleepMs` を `void` から `int` (0/1) に変更し、libwebrtc の `webrtc::Thread::SleepMs()` がスリープのシグナル中断で返す `bool` を呼び出し側へ伝達する
+  - Rust API の `Thread::sleep_ms` を `()` から `bool` に変更し、FFI の戻り値 `int` を `!= 0` で `bool` に変換する
+  - @melpon
+- [ADD] `webrtc_Thread_Quit` を追加する
+  - C API の `webrtc_Thread_Quit` を追加し、libwebrtc の `webrtc::Thread::Quit()` を公開する
+  - `Thread::quit` を追加し、メッセージループを stop せずに停止できるようにする
+  - @melpon
+- [CHANGE] `Thread::blocking_call` に `R: Default` 境界を追加する
+  - `webrtc_Thread_BlockingCall_r` を非 void テンプレから void 版 `BlockingCall` に変更し、functor 未実行時に確定した `nullptr` を返すようにする
+  - `nullptr` は未実行を一意に表すため、停止中スレッドでは `R::default()` を返し、未初期化ポインタの `Box::from_raw` による UB を回避する
+  - @melpon
+- [FIX] `get_stats` のコールバック未発火時に user_data の Box がリークする問題を修正する
+  - C 側の `RTCStatsCollectorCallbackImpl` にデストラクタを追加し、コールバック未発火のまま C++ オブジェクトが破棄される場合に `OnDestroy` を呼ぶようにする
+  - Rust 側の回収を `OnDestroy` に一元化し、`OnStatsDelivered` は `&mut` 参照 + `Option::take()` による実行に変更する
+  - @melpon
+- [FIX] `convert_to_i420` が ARGB / BGRA 入力の必要長を検証せず libyuv が短いバッファをオーバーリードする問題を修正する
+  - ARGB / BGRA 入力について crop オフセット込みの必要長 (`src_width * 4` の stride で `(crop_y + abs(crop_height))` 行 × `(crop_x + crop_width) * 4` バイト) を検証し、不足時は `false` を返すようにする
+  - MJPG 入力は libyuv 側の検証に委ねるため対象外とする
+  - @melpon
+
+## 0.152.0
+
+**リリース日**: 2026-08-25
+
+- [CHANGE] `Thread::blocking_call` に `F: Send + 'static` 境界を追加する
+  - クロージャが別スレッドで実行され得るため `Send` を、FFI 越しに消費されるため `'static` を要求する
+  - @melpon
 - [CHANGE] Rust API の `Thread::start()` を `bool` を返すように変更する
   - C API の戻り値型を `void` から `int` (0/1) に変更し、`webrtc::Thread::Start()` の成否を Rust API 側へ伝達する
   - @melpon
@@ -23,6 +65,10 @@
   - `GofInfoVP9` / `RTPVideoHeaderVP9` の index 付き getter を `Option` を返すように変更し、境界を超える index では `None` を返すようにする
   - index 付き setter と count 系 setter に `assert!` による境界チェックを追加する
   - `VideoCodec::set_number_of_simulcast_streams` に境界チェックを追加する
+  - @melpon
+- [CHANGE] `DegradationPreference::Disabled` を `MaintainFramerateAndResolution` に変名する
+  - libwebrtc の `webrtc::DegradationPreference` は `MAINTAIN_FRAMERATE_AND_RESOLUTION` が本名で `DISABLED` は削除予定の互換エイリアスであるため、命名を本流に揃える
+  - C ラッパーの定数を `webrtc_DegradationPreference_MAINTAIN_FRAMERATE_AND_RESOLUTION` に改名する
   - @melpon
 - [ADD] WebRTC Encoded Transform (フレーム変換) に対応する
   - `FrameTransformerInterface` / `TransformableFrameInterface` / `TransformableVideoFrameInterface` の C ラッパーと、Rust API として `FrameTransformer` / `FrameTransformerHandler` / `TransformableFrame` / `TransformableVideoFrame` / `TransformableFrameDirection` / `RtpTimestampInfo` を追加する
@@ -41,6 +87,10 @@
   - @melpon
 - [FIX] webrtc のログ出力が 4096 文字以上だと切り詰められるのを修正する
   - @melpon
+- [FIX] ログレベルの設定が無効になっている問題を修正する
+  - `webrtc_LogMessage_LogToDebug` を削除し、`webrtc_LogMessage_InitializeLogging` で `LoggingConfig` を設定する libwebrtc の新 API に移行する
+  - `log::log_to_debug` を `log::initialize_logging` に置き換える
+  - @voluntas
 
 ### misc
 

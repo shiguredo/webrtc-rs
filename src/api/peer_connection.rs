@@ -5,13 +5,13 @@ use crate::ref_count::{
     SetRemoteDescriptionObserverHandle, VideoTrackHandle,
 };
 use crate::{
-    AudioDecoderFactory, AudioDeviceModule, AudioEncoderFactory, AudioProcessingBuilder,
-    AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit, DtlsTransport, Error,
-    IceCandidate, IceCandidateRef, MediaStream, MediaStreamTrack, MediaType, RTCStatsReport,
-    Result, RtcError, RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender, RtpTransceiver,
-    RtpTransceiverInit, SSLCertificateVerifier, SSLIdentity, ScopedRef, SessionDescription,
-    StringVector, Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack, VideoTrackSource,
-    ffi,
+    AudioDecoderFactory, AudioDeviceModule, AudioEncoderFactory, AudioOptions,
+    AudioProcessingBuilder, AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit,
+    DtlsTransport, Error, IceCandidate, IceCandidateRef, MediaStream, MediaStreamTrack, MediaType,
+    RTCStatsReport, Result, RtcError, RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender,
+    RtpTransceiver, RtpTransceiverInit, SSLCertificateVerifier, SSLIdentity, ScopedRef,
+    SessionDescription, StringVector, Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack,
+    VideoTrackSource, ffi,
 };
 use std::marker::PhantomData;
 use std::os::raw::{c_char, c_void};
@@ -307,11 +307,12 @@ impl PeerConnectionFactory {
         Ok(VideoTrack::from_scoped_ref(raw_ref))
     }
 
-    pub fn create_audio_source(&self) -> Result<AudioTrackSource> {
+    pub fn create_audio_source(&self, options: &AudioOptions) -> Result<AudioTrackSource> {
         let mut out = std::ptr::null_mut();
         unsafe {
             ffi::webrtc_PeerConnectionFactoryInterface_CreateAudioSource(
                 self.raw_ref.as_ptr(),
+                options.as_ptr(),
                 &mut out,
             );
         }
@@ -1431,7 +1432,7 @@ impl Drop for PeerConnectionDependencies {
 }
 
 struct PeerConnectionStatsCallbackState {
-    on_stats: Box<dyn FnOnce(RTCStatsReport) + Send + 'static>,
+    on_stats: Option<Box<dyn FnOnce(RTCStatsReport) + Send + 'static>>,
 }
 
 unsafe impl Send for PeerConnectionStatsCallbackState {}
@@ -1444,12 +1445,21 @@ unsafe extern "C" fn peer_connection_on_stats(
         !user_data.is_null(),
         "peer_connection_on_stats: user_data is null"
     );
-    let state = unsafe { Box::from_raw(user_data as *mut PeerConnectionStatsCallbackState) };
-    let Some(report) = NonNull::new(report as *mut ffi::webrtc_RTCStatsReport_refcounted) else {
-        return;
-    };
-    let report = RTCStatsReport::from_refcounted_ptr(report);
-    (state.on_stats)(report);
+    let state = unsafe { &mut *(user_data as *mut PeerConnectionStatsCallbackState) };
+    let report = RTCStatsReport::from_refcounted_ptr(
+        NonNull::new(report as *mut ffi::webrtc_RTCStatsReport_refcounted)
+            .expect("BUG: report が null です"),
+    );
+    let on_stats = state.on_stats.take().expect("BUG: on_stats が消費済みです");
+    on_stats(report);
+}
+
+unsafe extern "C" fn peer_connection_on_destroy(user_data: *mut c_void) {
+    assert!(
+        !user_data.is_null(),
+        "peer_connection_on_destroy: user_data is null"
+    );
+    let _ = unsafe { Box::from_raw(user_data as *mut PeerConnectionStatsCallbackState) };
 }
 
 pub trait CreateSessionDescriptionObserverHandler: Send {
@@ -1920,10 +1930,11 @@ impl PeerConnection {
         F: FnOnce(RTCStatsReport) + Send + 'static,
     {
         let state = Box::new(PeerConnectionStatsCallbackState {
-            on_stats: Box::new(on_stats),
+            on_stats: Some(Box::new(on_stats)),
         });
         let mut cbs = ffi::webrtc_RTCStatsCollectorCallback_cbs {
             OnStatsDelivered: Some(peer_connection_on_stats),
+            OnDestroy: Some(peer_connection_on_destroy),
         };
         let user_data = Box::into_raw(state) as *mut c_void;
         unsafe {

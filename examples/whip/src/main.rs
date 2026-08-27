@@ -952,9 +952,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    log::log_to_debug(log::Severity::Info);
-    log::enable_timestamps();
-    log::enable_threads();
+    let mut config = log::LoggingConfig::new();
+    config.set_min_severity(log::Severity::Info);
+    config.set_debug_severity(log::Severity::Info);
+    config.set_log_timestamp(true);
+    config.set_log_thread(true);
+    log::initialize_logging(config);
 
     let factory = FactoryHolder::new().ok_or("factory create failed")?;
 

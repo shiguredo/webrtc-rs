@@ -387,6 +387,12 @@ WEBRTC_EXPORT struct webrtc_PeerConnectionFactoryInterface_refcounted*
 webrtc_CreateModularPeerConnectionFactory(
     struct webrtc_PeerConnectionFactoryDependencies* dependencies);
 WEBRTC_EXPORT struct webrtc_PeerConnectionFactoryInterface_refcounted*
+// webrtc::CreateModularPeerConnectionFactory() を行って、ConnectionContext も同時に返す関数
+//
+// この関数は C ラッパーの方針である「libwebrtc の薄いラッパーに徹する」から逸脱しているが、
+// libwebrtc 本体は ConnectionContext を返すインターフェースを持っておらず、
+// かつ薄いラッパーのみの実装で ConnectionContext を返すために必要な C API を提供するのが難しいため、
+// ここでは複合ロジックを持つことを許容する。
 webrtc_CreateModularPeerConnectionFactoryWithContext(
     struct webrtc_PeerConnectionFactoryDependencies* dependencies,
     struct webrtc_ConnectionContext_refcounted** out_context);
@@ -412,6 +418,7 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream(
 
 WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateAudioSource(
     struct webrtc_PeerConnectionFactoryInterface* self,
+    struct webrtc_AudioOptions* options,
     struct webrtc_AudioSourceInterface_refcounted** out_source);
 
 WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateAudioTrack(
