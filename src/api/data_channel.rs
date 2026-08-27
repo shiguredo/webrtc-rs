@@ -92,7 +92,7 @@ impl DataChannel {
     /// 本メソッドと `unregister_observer` は network thread 以外のどのスレッドからでも
     /// 呼べるが、コールバック内から呼んではならない。コールバックは signaling thread
     /// で発火する。
-    pub fn register_observer(&mut self, observer: &DataChannelObserver) {
+    pub fn register_observer(&self, observer: &DataChannelObserver) {
         unsafe {
             ffi::webrtc_DataChannelInterface_RegisterObserver(
                 self.raw_ref.as_ptr(),

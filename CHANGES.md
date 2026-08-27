@@ -11,6 +11,9 @@
 
 ## develop
 
+- [CHANGE] libwebrtc 側で std::move により消費される `deps` を `&mut` から値渡しに変更する
+  - `PeerConnectionFactory::create_modular` / `create_modular_with_context` / `PeerConnection::create` の `deps` 引数を値渡しに変更する
+  - @melpon
 - [CHANGE] ログ初期化 API を `webrtc::LoggingConfig` の C ラッパー経由に変更する
   - C API の `webrtc_LogMessage_InitializeLogging` を `int severity` 引数から `struct webrtc_LoggingConfig*` 引数に変更し、`webrtc_LoggingConfig` 型 (new / delete / setter / getter) を追加する
   - `webrtc_LogMessage_LogTimestamps` / `webrtc_LogMessage_LogThreads` を削除し、`log_timestamp` / `log_thread` フィールドに統合する
@@ -29,13 +32,17 @@
   - C API の `webrtc_Thread_SleepMs` を `void` から `int` (0/1) に変更し、libwebrtc の `webrtc::Thread::SleepMs()` がスリープのシグナル中断で返す `bool` を呼び出し側へ伝達する
   - Rust API の `Thread::sleep_ms` を `()` から `bool` に変更し、FFI の戻り値 `int` を `!= 0` で `bool` に変換する
   - @melpon
+- [CHANGE] `Thread::blocking_call` に `R: Default` 境界を追加する
+  - `webrtc_Thread_BlockingCall_r` を非 void テンプレから void 版 `BlockingCall` に変更し、functor 未実行時に確定した `nullptr` を返すようにする
+  - `nullptr` は未実行を一意に表すため、停止中スレッドでは `R::default()` を返し、未初期化ポインタの `Box::from_raw` による UB を回避する
+  - @melpon
 - [ADD] `webrtc_Thread_Quit` を追加する
   - C API の `webrtc_Thread_Quit` を追加し、libwebrtc の `webrtc::Thread::Quit()` を公開する
   - `Thread::quit` を追加し、メッセージループを stop せずに停止できるようにする
   - @melpon
-- [CHANGE] `Thread::blocking_call` に `R: Default` 境界を追加する
-  - `webrtc_Thread_BlockingCall_r` を非 void テンプレから void 版 `BlockingCall` に変更し、functor 未実行時に確定した `nullptr` を返すようにする
-  - `nullptr` は未実行を一意に表すため、停止中スレッドでは `R::default()` を返し、未初期化ポインタの `Box::from_raw` による UB を回避する
+- [UPDATE] 読み取り専用引数と共有ハンドル型レシーバの borrow を実体に合わせて変更する
+  - 読み取り専用の `config` / `options` / `init` を `&mut` から `&` に変更する (`PeerConnection::create` / `set_configuration` / `create_offer` / `create_answer` / `create_data_channel` / `add_transceiver` / `add_transceiver_with_track`)
+  - 共有ハンドル型レシーバを `&mut self` から `&self` に変更する (`PeerConnection::add_ice_candidate` / `set_configuration` / `PeerConnectionFactory::set_options` / `VideoTrack::add_or_update_sink` / `remove_sink` / `AdaptedVideoTrackSource::adapt_frame` / `on_frame` / `AudioTrack::add_sink` / `remove_sink` / `DataChannel::register_observer`)
   - @melpon
 - [FIX] `get_stats` のコールバック未発火時に user_data の Box がリークする問題を修正する
   - C 側の `RTCStatsCollectorCallbackImpl` にデストラクタを追加し、コールバック未発火のまま C++ オブジェクトが破棄される場合に `OnDestroy` を呼ぶようにする

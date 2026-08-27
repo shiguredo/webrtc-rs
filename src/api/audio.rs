@@ -398,14 +398,14 @@ impl AudioTrack {
     ///
     /// この AudioTrack に登録した `sink` は、`remove_sink` で登録を解除するまで
     /// drop してはならない。
-    pub fn add_sink(&mut self, sink: &AudioTrackSink) {
+    pub fn add_sink(&self, sink: &AudioTrackSink) {
         unsafe {
             ffi::webrtc_AudioTrackInterface_AddSink(self.raw_ref.as_ptr(), sink.as_ptr());
         }
     }
 
     /// AudioTrack から AudioTrackSink を解除する。
-    pub fn remove_sink(&mut self, sink: &AudioTrackSink) {
+    pub fn remove_sink(&self, sink: &AudioTrackSink) {
         unsafe {
             ffi::webrtc_AudioTrackInterface_RemoveSink(self.raw_ref.as_ptr(), sink.as_ptr());
         }

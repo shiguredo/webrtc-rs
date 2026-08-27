@@ -137,7 +137,7 @@ impl FactoryHolder {
         deps.set_audio_processing_builder(apb);
         deps.enable_media();
 
-        let factory = PeerConnectionFactory::create_modular(&mut deps).ok()?;
+        let factory = PeerConnectionFactory::create_modular(deps).ok()?;
         #[allow(clippy::arc_with_non_send_sync)]
         Some(Arc::new(Self {
             factory,
@@ -517,11 +517,11 @@ impl SignalingWhip {
                 observer_state,
             }));
         // Keep observer alive for the lifetime of the PeerConnection.
-        let mut deps = PeerConnectionDependencies::new(&observer);
+        let deps = PeerConnectionDependencies::new(&observer);
         // Store observer so it lives as long as SignalingWhip.
         self.pc_observer = Some(observer);
-        let mut config = PeerConnectionRtcConfiguration::new();
-        let pc = PeerConnection::create(pc_factory, &mut config, &mut deps)
+        let config = PeerConnectionRtcConfiguration::new();
+        let pc = PeerConnection::create(pc_factory, &config, deps)
             .map_err(|e| format!("pc create failed: {e}"))?;
         self.pc = Some(pc);
 
@@ -536,7 +536,7 @@ impl SignalingWhip {
         let mut init = RtpTransceiverInit::new();
         init.set_direction(RtpTransceiverDirection::SendOnly);
         let mut transceiver = pc
-            .add_transceiver(MediaType::Audio, &mut init)
+            .add_transceiver(MediaType::Audio, &init)
             .map_err(|e| format!("add audio transceiver failed: {e}"))?;
 
         let caps = self
@@ -585,7 +585,7 @@ impl SignalingWhip {
             .create_video_track(&source, &track_id)
             .map_err(|_| "create video track failed".to_string())?;
         let mut transceiver = pc
-            .add_transceiver_with_track(&track, &mut init)
+            .add_transceiver_with_track(&track, &init)
             .map_err(|e| format!("add video transceiver failed: {e}"))?;
         let caps = self
             .config
@@ -633,8 +633,8 @@ impl SignalingWhip {
         Ok(())
     }
 
-    fn create_offer_and_exchange(&mut self) -> Result<(), String> {
-        let pc = self.pc.as_mut().ok_or("pc not available")?;
+    fn create_offer_and_exchange(&self) -> Result<(), String> {
+        let pc = self.pc.as_ref().ok_or("pc not available")?;
         let mut opts = PeerConnectionOfferAnswerOptions::new();
         opts.set_offer_to_receive_audio(0);
         opts.set_offer_to_receive_video(0);
@@ -643,7 +643,7 @@ impl SignalingWhip {
         let mut offer_obs = CreateSessionDescriptionObserver::new_with_handler(Box::new(
             CreateOfferObserverHandler { tx: offer_tx },
         ));
-        pc.create_offer(&mut offer_obs, &mut opts);
+        pc.create_offer(&mut offer_obs, &opts);
         let offer_sdp = offer_rx
             .recv_timeout(Duration::from_secs(5))
             .map_err(|_| "offer timeout".to_string())?
@@ -666,7 +666,7 @@ impl SignalingWhip {
         }
         config.servers().push(&server);
         config.set_type(IceTransportsType::Relay);
-        pc.set_configuration(&mut config)
+        pc.set_configuration(&config)
             .map_err(|e| format!("set config failed: {e}"))?;
 
         let offer_desc = SessionDescription::new(SdpType::Offer, &offer_sdp)

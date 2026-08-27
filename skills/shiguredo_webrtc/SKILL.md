@@ -135,7 +135,7 @@ deps.set_audio_processing_builder(AudioProcessingBuilder::new_builtin());
 deps.enable_media();
 
 let (factory, context) =
-    PeerConnectionFactory::create_modular_with_context(&mut deps)?;
+    PeerConnectionFactory::create_modular_with_context(deps)?;
 ```
 
 ### Thread の扱い

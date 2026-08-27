@@ -129,7 +129,7 @@ impl FactoryHolder {
         deps.enable_media();
 
         let (factory, connection_context) =
-            PeerConnectionFactory::create_modular_with_context(&mut deps).ok()?;
+            PeerConnectionFactory::create_modular_with_context(deps).ok()?;
         Some(Arc::new(Self {
             factory,
             connection_context,

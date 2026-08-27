@@ -133,7 +133,7 @@ impl AdaptedVideoTrackSource {
     }
 
     /// フレームをアダプトし、適用の有無と結果を返す。
-    pub fn adapt_frame(&mut self, width: i32, height: i32, timestamp_us: i64) -> AdaptFrameResult {
+    pub fn adapt_frame(&self, width: i32, height: i32, timestamp_us: i64) -> AdaptFrameResult {
         let raw = self.raw();
         let mut out = AdaptedSize::default();
         let ok = unsafe {
@@ -157,7 +157,7 @@ impl AdaptedVideoTrackSource {
     }
 
     /// フレームをソースに投入する。
-    pub fn on_frame(&mut self, frame: &VideoFrame) {
+    pub fn on_frame(&self, frame: &VideoFrame) {
         let raw = self.raw();
         let frame_raw = frame.raw();
         unsafe { ffi::webrtc_AdaptedVideoTrackSource_OnFrame(raw.as_ptr(), frame_raw.as_ptr()) };
@@ -280,7 +280,7 @@ impl VideoTrack {
     ///
     /// この VideoTrack に登録した `sink` は、`remove_sink` で登録を解除するまで
     /// drop してはならない。
-    pub fn add_or_update_sink(&mut self, sink: &VideoSink, wants: &VideoSinkWants) {
+    pub fn add_or_update_sink(&self, sink: &VideoSink, wants: &VideoSinkWants) {
         unsafe {
             ffi::webrtc_VideoTrackInterface_AddOrUpdateSink(
                 self.raw_ref.as_ptr(),
@@ -291,7 +291,7 @@ impl VideoTrack {
     }
 
     /// VideoSink の登録を解除する。
-    pub fn remove_sink(&mut self, sink: &VideoSink) {
+    pub fn remove_sink(&self, sink: &VideoSink) {
         unsafe { ffi::webrtc_VideoTrackInterface_RemoveSink(self.raw_ref.as_ptr(), sink.as_ptr()) };
     }
 }
