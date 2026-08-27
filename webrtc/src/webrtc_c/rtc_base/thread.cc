@@ -48,7 +48,14 @@ WEBRTC_EXPORT void* webrtc_Thread_BlockingCall_r(struct webrtc_Thread* self,
                                                  void* (*func)(void*),
                                                  void* arg) {
   auto p = reinterpret_cast<webrtc::Thread*>(self);
-  return p->BlockingCall([func, arg]() { return func(arg); });
+  // 非 void テンプレートの BlockingCall はデフォルト初期化値を返すため、停止中
+  // スレッドでは未初期化ポインタ（void*）が返り得る。ここでは nullptr を
+  // 初期値にし、void 版 BlockingCall で functor を実行する。
+  // こうすることで functor が実行されない場合は nullptr が返ることになる
+  // （C++ の不確定値の穴を正規化する）。
+  void* result = nullptr;
+  p->BlockingCall([func, arg, &result]() { result = func(arg); });
+  return result;
 }
 WEBRTC_EXPORT int webrtc_Thread_SleepMs(int millis) {
   return webrtc::Thread::SleepMs(millis) ? 1 : 0;
