@@ -1354,6 +1354,94 @@ fn logging_message_helper() {
 }
 
 #[test]
+fn logging_sink_drop_releases_handler() {
+    struct TestSinkHandler {
+        destroyed: Arc<AtomicBool>,
+    }
+
+    impl log::LogSinkHandler for TestSinkHandler {}
+
+    impl Drop for TestSinkHandler {
+        fn drop(&mut self) {
+            self.destroyed.store(true, Ordering::SeqCst);
+        }
+    }
+
+    // LogSink 単体の drop で OnDestroy が呼ばれ、handler が解放されることと、
+    // 二重解放でないことを検証する。
+    let destroyed = Arc::new(AtomicBool::new(false));
+    let sink = log::LogSink::new_with_handler(Box::new(TestSinkHandler {
+        destroyed: destroyed.clone(),
+    }));
+    drop(sink);
+    assert!(
+        destroyed.load(Ordering::SeqCst),
+        "log::LogSinkHandler が解放されていません"
+    );
+}
+
+#[test]
+fn logging_sink_receives_log_line_ref() {
+    let exe = std::env::current_exe().expect("テストバイナリのパスを取得できませんでした");
+    let expected = "log sink test message";
+    // log::print はグローバルの LoggingConfig へ sink を登録するため、
+    // initialize_logging の競合を避けるべくサブプロセスとして実行する。
+    let output = std::process::Command::new(&exe)
+        .arg("logging_sink_helper")
+        .env("WEBRTC_LOG_SINK_EXPECT", expected)
+        .output()
+        .expect("サブプロセスの実行に失敗しました");
+    assert!(
+        output.status.success(),
+        "sink がメッセージと重大度を受け取れていません\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn logging_sink_helper() {
+    // 検証用ヘルパー。logging_sink_receives_log_line_ref からサブプロセスとして
+    // 実行され、sink がメッセージと重大度を受け取れることを検証する。
+    struct TestSinkHandler {
+        expected: String,
+        seen: Arc<Mutex<bool>>,
+    }
+
+    impl log::LogSinkHandler for TestSinkHandler {
+        fn on_log_message(&mut self, line: log::LogLineRef<'_>) {
+            if line.message().contains(&self.expected) && line.severity() == log::Severity::Info {
+                *self.seen.lock().unwrap() = true;
+            }
+        }
+    }
+
+    let expected = std::env::var("WEBRTC_LOG_SINK_EXPECT").unwrap_or_default();
+    // このヘルパーは logging_sink_receives_log_line_ref からのみサブプロセスと
+    // して実行される。テスト本体として直接実行された場合（グローバルの
+    // LoggingConfig が別のテストで既に初期化済みで、検証が意味を持たない場合）
+    // は何もせず成功とする。
+    if expected.is_empty() {
+        return;
+    }
+    let seen = Arc::new(Mutex::new(false));
+    let mut config = log::LoggingConfig::new();
+    config.set_min_severity(log::Severity::Info);
+    config.set_debug_severity(log::Severity::Info);
+    config.add_sink(log::LogSink::new_with_handler(Box::new(TestSinkHandler {
+        expected: expected.clone(),
+        seen: seen.clone(),
+    })));
+    if !log::initialize_logging(config) {
+        panic!("logging_sink_helper: initialize_logging が失敗しました");
+    }
+    log::print(log::Severity::Info, "webrtc-c", 0, &expected);
+    assert!(
+        *seen.lock().unwrap(),
+        "sink がメッセージを受け取っていません"
+    );
+}
+
+#[test]
 fn thread_blocking_call_runs() {
     let mut thread = Thread::new();
     assert!(thread.start());

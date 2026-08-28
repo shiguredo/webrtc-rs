@@ -3,6 +3,7 @@
 #include <stdbool.h>
 
 #include "../common.h"
+#include "../std.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -17,6 +18,55 @@ WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_INFO;
 WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_WARNING;
 WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_ERROR;
 WEBRTC_EXPORT extern const int webrtc_LogSeverity_LS_NONE;
+
+// -------------------------
+// webrtc::LogSink
+// -------------------------
+
+WEBRTC_DECLARE_UNIQUE(webrtc_LogSink);
+// 全コールバックは必須（null 非許容）。
+// 呼び出し側は全関数ポインタを非 null で設定しなければならない。
+struct webrtc_LogSink_cbs {
+  // OnLogMessage(const LogLineRef& line)
+  void (*OnLogMessage_log_line_ref)(const struct webrtc_LogLineRef* line,
+                                    void* user_data);
+  void (*OnDestroy)(void* user_data);
+};
+WEBRTC_EXPORT struct webrtc_LogSink_unique* webrtc_LogSink_new(
+    const struct webrtc_LogSink_cbs* cbs,
+    void* user_data);
+
+// -------------------------
+// webrtc::LogLineRef
+// -------------------------
+
+struct webrtc_LogLineRef;
+WEBRTC_EXPORT void webrtc_LogLineRef_message(
+    const struct webrtc_LogLineRef* self,
+    const char** out_message,
+    size_t* out_message_len);
+WEBRTC_EXPORT struct std_string_unique* webrtc_LogLineRef_DefaultLogLine(
+    const struct webrtc_LogLineRef* self);
+WEBRTC_EXPORT void webrtc_LogLineRef_filename(
+    const struct webrtc_LogLineRef* self,
+    const char** out_filename,
+    size_t* out_filename_len);
+WEBRTC_EXPORT int webrtc_LogLineRef_line(const struct webrtc_LogLineRef* self);
+WEBRTC_EXPORT void webrtc_LogLineRef_thread_id(
+    const struct webrtc_LogLineRef* self,
+    int* out_has,
+    int64_t* out_thread_id);
+WEBRTC_EXPORT int64_t
+webrtc_LogLineRef_timestamp(const struct webrtc_LogLineRef* self);
+WEBRTC_EXPORT void webrtc_LogLineRef_tag(const struct webrtc_LogLineRef* self,
+                                         const char** out_tag,
+                                         size_t* out_tag_len);
+WEBRTC_EXPORT int webrtc_LogLineRef_severity(
+    const struct webrtc_LogLineRef* self);
+WEBRTC_EXPORT void webrtc_LogLineRef_queue_name(
+    const struct webrtc_LogLineRef* self,
+    const char** out_queue_name,
+    size_t* out_queue_name_len);
 
 // -------------------------
 // webrtc::LoggingConfig
@@ -64,6 +114,9 @@ WEBRTC_EXPORT void webrtc_LoggingConfig_set_log_prefix(
     struct webrtc_LoggingConfig* self,
     const char* prefix,
     size_t prefix_len);
+WEBRTC_EXPORT void webrtc_LoggingConfig_AddSink(
+    struct webrtc_LoggingConfig* self,
+    struct webrtc_LogSink_unique* sink);
 
 WEBRTC_EXPORT bool webrtc_LogMessage_InitializeLogging(
     struct webrtc_LoggingConfig* config);

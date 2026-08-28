@@ -1,7 +1,7 @@
 # カスタム LogSink を設定可能にする
 
 - Created: 2026-08-26
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-28
 - Branch: feature/add-custom-log-sink
 - Polished: {YYYY-MM-DD}
 
@@ -37,7 +37,14 @@
 
 ## 解決方法
 
-- 上記の設計方針に従い、C API (`webrtc/src/webrtc_c/rtc_base/logging.{h,cc}`) と Rust API (`src/rtc_base/logging.rs`) を追加する
-- `src/tests.rs` に次のテストを追加する
-  - `LogSinkHandler` を登録した config で `log::print` を呼び、コールバックでメッセージと重大度が受け取れること
-  - ハンドラの drop 時に `OnDestroy` が呼ばれ、二重解放されないこと
+- C API (`webrtc/src/webrtc_c/rtc_base/logging.h` / `logging.cc`) に次を追加した
+  - `webrtc_LogSink_cbs` は `OnLogMessage_log_line_ref` と `OnDestroy` の 2 つのみ。libwebrtc は `LoggingConfig::AddSink` で登録した sink へ常に `OnLogMessage(const LogLineRef&)` を届けるため、`std::string` / `absl::string_view` / severity / tag の各オーバーロード (互換のための残存) は Cbs に公開しない
+  - `webrtc::LogLineRef` をエクスポートし、`message` / `default_log_line` / `filename` / `line` / `thread_id` / `timestamp` / `tag` / `severity` / `queue_name` をアクセサとして提供した。`timestamp` はマイクロ秒 (`int64_t`)、`thread_id` は `has` + `int64_t` (RULES.md 準拠)
+  - `webrtc_LogSink_new` / `webrtc_LoggingConfig_AddSink` を追加した。`AddSink` は所有権を `LoggingConfig::AddSink` へ移す (呼び出し側は `unique_delete` しない)
+- Rust API (`src/rtc_base/logging.rs`) に次を追加した
+  - `log::LogLineRef` (上記 C アクセサのラッパー)
+  - `log::LogSinkHandler` trait は `on_log_message(line: LogLineRef<'_>)` の 1 メソッドのみ。C++ インターフェース寄りの細分化 (string / string_view / severity / tag) は Rust では扱いにいくため廃し、`LogLineRef` に集約した。`on_destroy` は trait に公開せず、ハンドラの破棄は内部の `log_sink_on_destroy` (`Box::from_raw`) が行う
+  - `log::LogSink` / `log::LoggingConfig::add_sink`
+- テスト (`src/tests.rs`) を追加した
+  - `logging_sink_drop_releases_handler`: `drop(sink)` でハンドラが二重解放なく解放されることを検証
+  - `logging_sink_receives_log_line_ref` (+ サブプロセス用 `logging_sink_helper`): `log::print` を呼び、sink がメッセージと重大度を受け取ることを検証
