@@ -5,6 +5,8 @@
 
 #include "../common.h"
 #include "../common.impl.h"
+#include "api/frame_transformer_interface.h"
+#include "frame_transformer_interface.h"
 #include "media_stream_interface.h"
 
 extern "C" {

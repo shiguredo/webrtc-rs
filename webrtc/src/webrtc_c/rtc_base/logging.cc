@@ -3,11 +3,14 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <cassert>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
 
 // WebRTC
+#include <absl/strings/string_view.h>
 #include <rtc_base/logging.h>
 
 #include "../common.h"

@@ -1,5 +1,7 @@
 #include "common_constants.h"
 
+#include <cstdint>
+
 // WebRTC
 #include <modules/video_coding/codecs/interface/common_constants.h>
 

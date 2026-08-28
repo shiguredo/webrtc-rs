@@ -4,7 +4,6 @@
 #include <stddef.h>
 #include <cassert>
 #include <cstring>
-#include <string>
 
 // WebRTC
 #include <api/rtc_error.h>

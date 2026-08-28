@@ -4,6 +4,7 @@
 #include <api/audio_options.h>
 
 // WebRTC C
+#include "../../common.h"
 #include "../../std.impl.h"
 
 WEBRTC_EXPORT struct webrtc_AudioOptions* webrtc_AudioOptions_new() {

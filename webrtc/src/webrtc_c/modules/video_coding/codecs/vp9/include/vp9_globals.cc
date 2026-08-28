@@ -1,8 +1,11 @@
 #include "vp9_globals.h"
 
 #include <assert.h>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 
+// WebRTC
 #include <modules/video_coding/codecs/vp9/include/vp9_globals.h>
 
 #include "../../../../../common.h"

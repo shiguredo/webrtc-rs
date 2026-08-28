@@ -1,9 +1,11 @@
 #include "h264_globals.h"
 
 #include <assert.h>
+#include <cstdint>
 #include <memory>
 #include <vector>  // IWYU pragma: keep
 
+// WebRTC
 #include <modules/video_coding/codecs/h264/include/h264_globals.h>
 
 #include "../../../../../common.h"

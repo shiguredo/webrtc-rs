@@ -1,5 +1,6 @@
 #include "crypto_random.h"
 
+#include <cstddef>
 #include <memory>
 #include <string>
 

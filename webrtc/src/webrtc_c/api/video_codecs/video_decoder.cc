@@ -11,7 +11,6 @@
 #include <api/video/encoded_image.h>
 #include <api/video/video_frame.h>
 #include <api/video_codecs/video_decoder.h>
-#include <modules/video_coding/include/video_error_codes.h>
 
 #include "../../common.h"
 #include "../../common.impl.h"

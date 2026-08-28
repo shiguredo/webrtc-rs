@@ -9,9 +9,7 @@
 
 // WebRTC
 #include <absl/container/inlined_vector.h>
-#include <api/units/data_rate.h>
 #include <api/video/encoded_image.h>
-#include <api/video/video_bitrate_allocation.h>
 #include <api/video/video_codec_constants.h>
 #include <api/video/video_frame.h>
 #include <api/video/video_frame_buffer.h>
@@ -19,7 +17,6 @@
 #include <api/video_codecs/video_codec.h>
 #include <api/video_codecs/video_encoder.h>
 #include <modules/video_coding/include/video_codec_interface.h>
-#include <modules/video_coding/include/video_error_codes.h>
 
 #include "../../common.h"
 #include "../../common.impl.h"

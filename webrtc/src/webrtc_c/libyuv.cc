@@ -7,7 +7,6 @@
 // libyuv
 #include <libyuv/convert.h>
 #include <libyuv/convert_from.h>
-#include <libyuv/mjpeg_decoder.h>
 #include <libyuv/planar_functions.h>
 #include <libyuv/rotate.h>
 #include <libyuv/video_common.h>

@@ -15,6 +15,7 @@
 #include "../common.h"
 #include "../common.impl.h"
 #include "../std.h"
+#include "rtc_error.h"
 #include "rtp_parameters.h"
 #include "rtp_receiver_interface.h"
 
