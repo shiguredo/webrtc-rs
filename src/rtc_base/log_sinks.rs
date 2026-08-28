@@ -56,7 +56,7 @@ impl FileRotatingLogSink {
     }
 
     /// 基盤のストリームのバッファリングを無効化する。
-    pub fn disable_buffering(&self) -> bool {
+    pub fn disable_buffering(&mut self) -> bool {
         unsafe { ffi::webrtc_FileRotatingLogSink_DisableBuffering(self.raw_unique.as_ptr()) }
     }
 
@@ -129,7 +129,7 @@ impl CallSessionFileRotatingLogSink {
     }
 
     /// 基盤のストリームのバッファリングを無効化する。
-    pub fn disable_buffering(&self) -> bool {
+    pub fn disable_buffering(&mut self) -> bool {
         unsafe {
             ffi::webrtc_CallSessionFileRotatingLogSink_DisableBuffering(self.raw_unique.as_ptr())
         }

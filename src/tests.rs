@@ -1514,14 +1514,14 @@ fn logging_file_rotating_sink_helper() {
     let file_dir = std::env::var("WEBRTC_LOG_FILE_DIR").expect("WEBRTC_LOG_FILE_DIR がありません");
     let call_dir = std::env::var("WEBRTC_LOG_CALL_DIR").expect("WEBRTC_LOG_CALL_DIR がありません");
 
-    let file_sink = log::FileRotatingLogSink::new(&file_dir, "rtc", 1024 * 1024, 2)
+    let mut file_sink = log::FileRotatingLogSink::new(&file_dir, "rtc", 1024 * 1024, 2)
         .expect("FileRotatingLogSink::new が失敗しました");
     assert!(
         file_sink.disable_buffering(),
         "FileRotatingLogSink::disable_buffering が失敗しました"
     );
 
-    let call_sink = log::CallSessionFileRotatingLogSink::new(&call_dir, 1024 * 1024)
+    let mut call_sink = log::CallSessionFileRotatingLogSink::new(&call_dir, 1024 * 1024)
         .expect("CallSessionFileRotatingLogSink::new が失敗しました");
     assert!(
         call_sink.disable_buffering(),
