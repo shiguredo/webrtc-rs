@@ -1442,6 +1442,104 @@ fn logging_sink_helper() {
 }
 
 #[test]
+fn logging_file_rotating_sink_writes_to_file() {
+    // グローバルの LoggingConfig 競合を避けるべくサブプロセスとして実行する。
+    let exe = std::env::current_exe().expect("テストバイナリのパスを取得できませんでした");
+    let root = std::env::temp_dir().join(format!("webrtc_rs_test_{}", std::process::id()));
+    let file_dir = root.join("file_rotating");
+    let call_dir = root.join("call_session");
+    std::fs::create_dir_all(&file_dir).expect("file_dir の作成に失敗しました");
+    std::fs::create_dir_all(&call_dir).expect("call_dir の作成に失敗しました");
+    let message = "file rotating sink test message";
+
+    let output = std::process::Command::new(&exe)
+        .arg("logging_file_rotating_sink_helper")
+        .env("WEBRTC_LOG_FILE_DIR", &file_dir)
+        .env("WEBRTC_LOG_CALL_DIR", &call_dir)
+        .env("WEBRTC_LOG_MESSAGE", message)
+        .output()
+        .expect("サブプロセスの実行に失敗しました");
+    assert!(
+        output.status.success(),
+        "sink がメッセージをファイルへ出力できていません\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        dir_contains_message(&file_dir, message),
+        "FileRotatingLogSink がファイルへメッセージを出力していません: {}",
+        file_dir.display()
+    );
+    assert!(
+        dir_contains_message(&call_dir, message),
+        "CallSessionFileRotatingLogSink がファイルへメッセージを出力していません: {}",
+        call_dir.display()
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// ディレクトリ配下（再帰）のいずれかのファイルが `message` のバイト列を含むか。
+fn dir_contains_message(dir: &std::path::Path, message: &str) -> bool {
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(path) = stack.pop() {
+        let entries = match std::fs::read_dir(&path) {
+            Ok(entries) => entries,
+            Err(_) => continue,
+        };
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+            if entry_path.is_dir() {
+                stack.push(entry_path);
+            } else if let Ok(content) = std::fs::read(&entry_path) {
+                if content
+                    .windows(message.len())
+                    .any(|w| w == message.as_bytes())
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn logging_file_rotating_sink_helper() {
+    // 検証用ヘルパー。logging_file_rotating_sink_writes_to_file からサブプロセスと
+    // して実行される。グローバルの LoggingConfig が別のテストで既に初期化済みで
+    // 検証が意味を持たない場合は（メッセージ未指定時に）何もせず成功とする。
+    let message = std::env::var("WEBRTC_LOG_MESSAGE").unwrap_or_default();
+    if message.is_empty() {
+        return;
+    }
+    let file_dir = std::env::var("WEBRTC_LOG_FILE_DIR").expect("WEBRTC_LOG_FILE_DIR がありません");
+    let call_dir = std::env::var("WEBRTC_LOG_CALL_DIR").expect("WEBRTC_LOG_CALL_DIR がありません");
+
+    let file_sink = log::FileRotatingLogSink::new(&file_dir, "rtc", 1024 * 1024, 2)
+        .expect("FileRotatingLogSink::new が失敗しました");
+    assert!(
+        file_sink.disable_buffering(),
+        "FileRotatingLogSink::disable_buffering が失敗しました"
+    );
+
+    let call_sink = log::CallSessionFileRotatingLogSink::new(&call_dir, 1024 * 1024)
+        .expect("CallSessionFileRotatingLogSink::new が失敗しました");
+    assert!(
+        call_sink.disable_buffering(),
+        "CallSessionFileRotatingLogSink::disable_buffering が失敗しました"
+    );
+
+    let mut config = log::LoggingConfig::new();
+    config.set_min_severity(log::Severity::Info);
+    config.set_debug_severity(log::Severity::Info);
+    config.add_sink(file_sink.into_base());
+    config.add_sink(call_sink.into_base());
+    if !log::initialize_logging(config) {
+        panic!("logging_file_rotating_sink_helper: initialize_logging が失敗しました");
+    }
+    log::print(log::Severity::Info, "webrtc-c", 0, &message);
+}
+
+#[test]
 fn thread_blocking_call_runs() {
     let mut thread = Thread::new();
     assert!(thread.start());

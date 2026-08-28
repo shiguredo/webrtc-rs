@@ -55,6 +55,7 @@
 #include "webrtc_c/modules/video_coding/include/video_codec_interface.h"
 #include "webrtc_c/pc/connection_context.h"
 #include "webrtc_c/rtc_base/crypto_random.h"
+#include "webrtc_c/rtc_base/log_sinks.h"
 #include "webrtc_c/rtc_base/logging.h"
 #include "webrtc_c/rtc_base/ssl_adapter.h"
 #include "webrtc_c/rtc_base/ssl_certificate.h"

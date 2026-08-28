@@ -473,6 +473,7 @@ add_library(webrtc_c
     src/webrtc_c/media/engine/simulcast_encoder_adapter.cc
     src/webrtc_c/pc/connection_context.cc
     src/webrtc_c/rtc_base/crypto_random.cc
+    src/webrtc_c/rtc_base/log_sinks.cc
     src/webrtc_c/rtc_base/logging.cc
     src/webrtc_c/rtc_base/ssl_adapter.cc
     src/webrtc_c/rtc_base/ssl_certificate.cc

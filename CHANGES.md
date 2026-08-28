@@ -40,6 +40,10 @@
   - C API の `webrtc_Thread_Quit` を追加し、libwebrtc の `webrtc::Thread::Quit()` を公開する
   - `Thread::quit` を追加し、メッセージループを stop せずに停止できるようにする
   - @melpon
+- [ADD] ファイルへローテーション出力する `FileRotatingLogSink` / `CallSessionFileRotatingLogSink` を利用可能にする
+  - C API に `webrtc_FileRotatingLogSink_*` と `webrtc_CallSessionFileRotatingLogSink_*` を追加し、派生型のハンドルから基底 `webrtc::LogSink` へ変換して `webrtc_LoggingConfig_AddSink` に渡せるようにする
+  - Rust API に `log::FileRotatingLogSink` / `log::CallSessionFileRotatingLogSink` を追加し、`new` と `into_base` で `log::LogSink` へ変換して `log::LoggingConfig::add_sink` に渡せるようにする
+  - @melpon
 - [UPDATE] 読み取り専用引数と共有ハンドル型レシーバの borrow を実体に合わせて変更する
   - 読み取り専用の `config` / `options` / `init` を `&mut` から `&` に変更する (`PeerConnection::create` / `set_configuration` / `create_offer` / `create_answer` / `create_data_channel` / `add_transceiver` / `add_transceiver_with_track`)
   - 共有ハンドル型レシーバを `&mut self` から `&self` に変更する (`PeerConnection::add_ice_candidate` / `set_configuration` / `PeerConnectionFactory::set_options` / `VideoTrack::add_or_update_sink` / `remove_sink` / `AdaptedVideoTrackSource::adapt_frame` / `on_frame` / `AudioTrack::add_sink` / `remove_sink` / `DataChannel::register_observer`)

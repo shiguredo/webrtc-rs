@@ -14,6 +14,7 @@ pub enum Error {
     InvalidIceCandidate,
     InvalidVideoCodecType(String),
     OutOfIndex(usize),
+    FileRotatingLogSinkInit(String),
 }
 
 impl fmt::Display for Error {
@@ -47,6 +48,10 @@ impl fmt::Display for Error {
                 write!(f, "不正な VideoCodecType です: {}", codec_type)
             }
             Error::OutOfIndex(index) => write!(f, "インデックス {} が範囲外です", index),
+            Error::FileRotatingLogSinkInit(log_dir_path) => write!(
+                f,
+                "ファイルローテーションログ sink の初期化に失敗しました: {log_dir_path}"
+            ),
         }
     }
 }

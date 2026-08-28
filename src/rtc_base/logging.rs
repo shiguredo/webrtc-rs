@@ -350,6 +350,11 @@ pub mod log {
         pub fn into_raw(self) -> *mut ffi::webrtc_LogSink_unique {
             std::mem::ManuallyDrop::new(self).raw_unique.as_ptr()
         }
+
+        /// C 側が返した `webrtc_LogSink_unique` のポインタから包む。
+        pub(crate) fn from_raw_unique(raw_unique: NonNull<ffi::webrtc_LogSink_unique>) -> Self {
+            Self { raw_unique }
+        }
     }
 
     impl Drop for LogSink {
@@ -393,6 +398,8 @@ pub mod log {
         let line = expect_non_null(line as *mut ffi::webrtc_LogLineRef, "webrtc_LogLineRef");
         state.handler.on_log_message(LogLineRef::from_raw(line));
     }
+
+    pub use crate::rtc_base::log_sinks::*;
 }
 
 #[doc(hidden)]

@@ -1,4 +1,5 @@
 mod crypto_random;
+mod log_sinks;
 mod logging;
 mod ssl_certificate;
 mod ssl_identity;
