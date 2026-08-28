@@ -5,6 +5,13 @@
 - Branch: feature/add-file-rotating-log-sink
 - Polished: {YYYY-MM-DD}
 
+## pending の理由
+
+- libwebrtc の `LoggingConfig` に登録した sink へのディスパッチ (`rtc_base/logging.cc` の `LogMessage::LogMessage` デストラクタ内の `LoggingConfig::sinks()` ループ) はロックを取らずに実行される
+- 対象の 2 クラスは基盤の `FileRotatingStream` (`rtc_base/file_rotating_stream.cc` の `Write` / `RotateFiles`) を内部同期なしで扱うため、複数スレッドから並行して `log::print` するとデータ競合が起きる
+- libwebrtc のログ出力 (`RTC_LOG` 経由の `LogMessage`) はシグナリング・worker・network など複数スレッドから呼ばれることが前提の構造であり、アプリケーション側でログ出力だけを単一スレッドに強制する手段はない。Rust バインディングからも sink 内部へロックを挟む余地がない
+- そのため `FileRotatingLogSink` / `CallSessionFileRotatingLogSink` を safe な Rust API として公開できない。libwebrtc 側で sink がスレッド安全 (内部同期) を備えたら再実装する
+
 ## 目的
 
 - 0088 で追加した LogSink 設定機能 (`log::LoggingConfig::add_sink`) は、コールバック型のカスタム sink を前提としており、実際に add_sink へ渡せる具象の LogSink が存在しない
