@@ -1,3 +1,4 @@
+use crate::api::out_param::{call_with_out, call_with_return_and_error};
 use crate::non_null::expect_non_null;
 use crate::{CxxString, Error, Result, ffi};
 use std::marker::PhantomData;
@@ -106,9 +107,8 @@ impl SessionDescription {
                 sdp.len(),
             )
         };
-        let raw_unique = NonNull::new(raw).ok_or(Error::NullPointer(
-            "webrtc_CreateSessionDescription が null を返しました",
-        ))?;
+        let raw_unique =
+            NonNull::new(raw).ok_or(Error::NullPointer("webrtc_CreateSessionDescription"))?;
         Ok(Self { raw_unique })
     }
 
@@ -173,9 +173,10 @@ impl<'a> IceCandidateRef<'a> {
     }
 
     pub fn sdp_mid(&self) -> Result<String> {
-        let mut out: *mut ffi::std_string_unique = std::ptr::null_mut();
-        unsafe { ffi::webrtc_IceCandidate_sdp_mid(self.raw.as_ptr(), &mut out) };
-        CxxString::from_unique(expect_non_null(out, "webrtc_IceCandidate_sdp_mid")).to_string()
+        let out = call_with_out("webrtc_IceCandidate_sdp_mid", |out| unsafe {
+            ffi::webrtc_IceCandidate_sdp_mid(self.raw.as_ptr(), out)
+        })?;
+        CxxString::from_unique(out).to_string()
     }
 
     pub fn sdp_mline_index(&self) -> i32 {
@@ -203,28 +204,21 @@ unsafe impl Send for IceCandidate {}
 impl IceCandidate {
     /// SDP 文字列から IceCandidate を生成する。
     pub fn new(sdp_mid: &str, sdp_mline_index: i32, candidate: &str) -> Result<Self> {
-        let mut out_error: *mut ffi::webrtc_SdpParseError_unique = std::ptr::null_mut();
-        let raw = unsafe {
-            ffi::webrtc_CreateIceCandidate(
-                sdp_mid.as_ptr() as *const _,
-                sdp_mid.len(),
-                sdp_mline_index,
-                candidate.as_ptr() as *const _,
-                candidate.len(),
-                &mut out_error,
-            )
-        };
-        if !out_error.is_null() {
-            let err = SdpParseError::from_unique_ptr(NonNull::new(out_error).unwrap());
-            return Err(Error::SdpParseError(err));
-        }
-        assert!(
-            !raw.is_null(),
-            "BUG: out_error == null なのに webrtc_CreateIceCandidate が null を返しました"
-        );
-        Ok(Self {
-            raw: NonNull::new(raw).unwrap(),
-        })
+        let raw = call_with_return_and_error(
+            "webrtc_CreateIceCandidate",
+            |out_error| unsafe {
+                ffi::webrtc_CreateIceCandidate(
+                    sdp_mid.as_ptr() as *const _,
+                    sdp_mid.len(),
+                    sdp_mline_index,
+                    candidate.as_ptr() as *const _,
+                    candidate.len(),
+                    out_error,
+                )
+            },
+            |err| Error::SdpParseError(SdpParseError::from_unique_ptr(err)),
+        )?;
+        Ok(Self { raw })
     }
 
     pub fn as_ref(&self) -> IceCandidateRef<'_> {

@@ -1,7 +1,7 @@
 # out 引数 + out_error の FFI ボイラープレートを共通ヘルパー化する
 
 - Created: 2026-08-28
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-29
 - Branch: feature/refactor-out-param-error-helper
 - Polished: {YYYY-MM-DD}
 
@@ -64,3 +64,11 @@ Ok(Xxx::from_scoped_ref(raw_ref))
 - 挙動がリファクタ前と同一である (テストで担保する)
 - ビルドと全テストが通る
 - `CHANGES.md` の develop に `### misc` エントリを追記する
+
+## 解決方法
+
+- `src/api/out_param.rs` に `call_with_out` / `call_with_out_and_error` / `call_with_return_and_error` を追加し、クロージャ方式で out 引数の null 検査と `out_error` のエラー検査を共通化する
+- `PeerConnectionFactory` / `PeerConnection` / `SessionDescriptionInterface` / `IceCandidate` / `SdpParseError` の該当メソッドをヘルパー経由に置き換え、`Error::NullPointer` の表記ゆれ (`returned null`) を解消する
+- Shape D (`create_modular_with_context`) は factory が戻り値・context が out 引数であるため単一ヘルパーに適用できず、元の形を維持する。Shape G (`AdaptedVideoTrackSource::adapt_frame`) は複数 out 引数のため対象外とする
+- C API (`webrtc/src/webrtc_c/`) と bindgen 生成の FFI 定義は変更しない
+- `cargo test` で挙動の同一性を担保し、全テストを通過することを確認する

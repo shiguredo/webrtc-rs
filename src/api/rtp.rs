@@ -1,11 +1,12 @@
+use crate::api::out_param::call_with_void_and_error;
 use crate::non_null::expect_non_null;
 use crate::ref_count::{
     AudioTrackHandle, MediaStreamTrackHandle, RtpReceiverHandle, RtpSenderHandle,
     RtpTransceiverHandle, VideoTrackHandle,
 };
 use crate::{
-    AudioTrack, CxxString, CxxStringRef, Error, FrameTransformer, MapStringString, MediaType,
-    Result, RtcError, ScopedRef, StringVectorRef, VideoTrack, ffi,
+    AudioTrack, CxxString, CxxStringRef, FrameTransformer, MapStringString, MediaType, Result,
+    RtcError, ScopedRef, StringVectorRef, VideoTrack, ffi,
 };
 use std::marker::PhantomData;
 use std::ptr::NonNull;
@@ -1329,19 +1330,16 @@ impl RtpTransceiver {
     }
 
     pub fn set_codec_preferences(&mut self, codecs: &RtpCodecCapabilityVector) -> Result<()> {
-        let mut err: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_RtpTransceiverInterface_SetCodecPreferences(
-                self.raw_ref.as_ptr(),
-                codecs.as_ptr(),
-                &mut err,
-            )
-        };
-        if !err.is_null() {
-            let rtc = RtcError::from_unique_ptr(expect_non_null(err, "RTCError"));
-            return Err(Error::RtcError(rtc));
-        }
-        Ok(())
+        call_with_void_and_error(
+            |out_error| unsafe {
+                ffi::webrtc_RtpTransceiverInterface_SetCodecPreferences(
+                    self.raw_ref.as_ptr(),
+                    codecs.as_ptr(),
+                    out_error,
+                )
+            },
+            |err| RtcError::from_unique_ptr(err).into(),
+        )
     }
 }
 
@@ -1419,19 +1417,16 @@ impl RtpSender {
     }
 
     pub fn set_parameters(&mut self, parameters: &RtpParameters) -> Result<()> {
-        let mut err: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_RtpSenderInterface_SetParameters(
-                self.as_ptr(),
-                parameters.as_ptr(),
-                &mut err,
-            )
-        };
-        if !err.is_null() {
-            let rtc = RtcError::from_unique_ptr(expect_non_null(err, "RTCError"));
-            return Err(Error::RtcError(rtc));
-        }
-        Ok(())
+        call_with_void_and_error(
+            |out_error| unsafe {
+                ffi::webrtc_RtpSenderInterface_SetParameters(
+                    self.as_ptr(),
+                    parameters.as_ptr(),
+                    out_error,
+                )
+            },
+            |err| RtcError::from_unique_ptr(err).into(),
+        )
     }
 
     /// フレーム変換を設定する。
