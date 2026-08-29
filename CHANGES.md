@@ -55,6 +55,9 @@
 
 ### misc
 
+- [UPDATE] 内部向けの共通ヘルパー実装を `src/helper/` に集約する
+  - `src/non_null.rs` / `src/handler.rs` / `src/ref_count.rs` と `src/api/optional.rs` / `src/api/out_param.rs` を `src/helper/` 配下へ移動し、内部向けヘルパーの所在を揃える (挙動は変更しない)
+  - @melpon
 - [UPDATE] observer / callback の登録・破棄の骨格を共通ヘルパーにまとめる
   - `src/handler.rs` に `HandlerState` / `create_with_handler` / `destroy_handler` を追加し、コールバック型ハンドラ 19 型の登録・破棄と stats コールバックの破棄を置き換えて挙動を維持する
   - @melpon

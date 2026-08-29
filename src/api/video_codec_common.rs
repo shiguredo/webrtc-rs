@@ -1,6 +1,7 @@
-use crate::handler::{create_with_handler, destroy_handler};
-use crate::non_null::expect_non_null;
-use crate::ref_count::{
+use crate::helper::handler::{create_with_handler, destroy_handler};
+use crate::helper::non_null::expect_non_null;
+use crate::helper::optional::get_optional;
+use crate::helper::ref_count::{
     EncodedImageBufferHandle, I420BufferHandle, NV12BufferHandle, VideoFrameBufferHandle,
 };
 use crate::{CxxString, CxxStringRef, Error, MapStringString, Result, ScopedRef, ffi};
@@ -11,8 +12,6 @@ use std::os::raw::c_void;
 use std::ptr::NonNull;
 use std::slice;
 use std::time::Duration;
-
-use super::optional::get_optional;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ScalabilityMode {

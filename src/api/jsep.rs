@@ -1,5 +1,5 @@
-use crate::api::out_param::{call_with_out, call_with_return_and_error};
-use crate::non_null::expect_non_null;
+use crate::helper::non_null::expect_non_null;
+use crate::helper::out_param::{call_with_out, call_with_return_and_error};
 use crate::{CxxString, Error, Result, ffi};
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;

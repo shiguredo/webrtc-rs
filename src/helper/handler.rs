@@ -1,9 +1,8 @@
 //! コールバック型ハンドラの状態骨格と、登録・破棄の共通ヘルパー。
 
+use crate::helper::non_null::expect_non_null_with_cleanup;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
-
-use crate::non_null::expect_non_null_with_cleanup;
 
 /// `Box<H>` を保持する、コールバック型ハンドラの状態の共通骨格。
 pub(crate) struct HandlerState<H: ?Sized> {

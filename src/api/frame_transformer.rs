@@ -1,11 +1,11 @@
-use super::optional::{get_optional, set_optional};
 use super::video_codec_common::{VideoCodecType, VideoFrameType, VideoRotation};
 use super::video_codec_specifics::{
     RTPVideoHeaderCodecSpecifics, RTPVideoHeaderH264, RTPVideoHeaderVP8, RTPVideoHeaderVP9,
 };
-use crate::handler::{create_with_handler, destroy_handler};
-use crate::non_null::expect_non_null;
-use crate::ref_count::{FrameTransformerHandle, TransformedFrameCallbackHandle};
+use crate::helper::handler::{create_with_handler, destroy_handler};
+use crate::helper::non_null::expect_non_null;
+use crate::helper::optional::{get_optional, set_optional};
+use crate::helper::ref_count::{FrameTransformerHandle, TransformedFrameCallbackHandle};
 use crate::{CxxString, Result, ScopedRef, ffi};
 use std::collections::HashMap;
 use std::os::raw::c_void;

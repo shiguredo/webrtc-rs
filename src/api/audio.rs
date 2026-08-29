@@ -1,14 +1,13 @@
-use crate::handler::{HandlerState, create_with_handler, destroy_handler};
-use crate::non_null::expect_non_null;
-use crate::ref_count::{
+use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::helper::non_null::expect_non_null;
+use crate::helper::optional::{get_optional, get_optional_bool, set_optional, set_optional_bool};
+use crate::helper::ref_count::{
     AudioDecoderFactoryHandle, AudioEncoderFactoryHandle, AudioTrackHandle, AudioTrackSourceHandle,
     MediaStreamTrackHandle,
 };
 use crate::{MediaStreamTrack, ScopedRef, ffi};
 use std::os::raw::c_void;
 use std::ptr::NonNull;
-
-use super::optional::{get_optional, get_optional_bool, set_optional, set_optional_bool};
 
 /// webrtc::AudioOptions のラッパー。
 ///

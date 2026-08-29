@@ -1,5 +1,5 @@
 use crate::ffi;
-use crate::non_null::expect_non_null;
+use crate::helper::non_null::expect_non_null;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 

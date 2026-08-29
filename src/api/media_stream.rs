@@ -1,5 +1,5 @@
-use crate::non_null::expect_non_null;
-use crate::ref_count::{AudioTrackHandle, MediaStreamHandle, VideoTrackHandle};
+use crate::helper::non_null::expect_non_null;
+use crate::helper::ref_count::{AudioTrackHandle, MediaStreamHandle, VideoTrackHandle};
 use crate::{AudioTrack, CxxString, Result, ScopedRef, VideoTrack, ffi};
 use std::ptr::NonNull;
 

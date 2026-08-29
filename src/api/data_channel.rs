@@ -1,6 +1,6 @@
-use crate::handler::{HandlerState, create_with_handler, destroy_handler};
-use crate::non_null::expect_non_null;
-use crate::ref_count::DataChannelHandle;
+use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::helper::non_null::expect_non_null;
+use crate::helper::ref_count::DataChannelHandle;
 use crate::{CxxString, Result, ScopedRef, ffi};
 use std::os::raw::c_void;
 use std::ptr::NonNull;

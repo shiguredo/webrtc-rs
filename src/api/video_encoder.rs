@@ -1,11 +1,11 @@
-use super::optional::{get_optional, get_optional_bool, set_optional, set_optional_bool};
 use super::video_codec_common::{
     EncodedImageRef, SdpVideoFormat, SdpVideoFormatRef, VideoCodecRef, VideoCodecStatus,
     VideoCodecType, VideoFrameBufferKind, VideoFrameRef, VideoFrameTypeVectorRef,
 };
 use super::video_codec_specifics::H264PacketizationMode;
-use crate::handler::{HandlerState, create_with_handler, destroy_handler};
-use crate::non_null::expect_non_null;
+use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::helper::non_null::expect_non_null;
+use crate::helper::optional::{get_optional, get_optional_bool, set_optional, set_optional_bool};
 use crate::{CxxString, EnvironmentRef, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;

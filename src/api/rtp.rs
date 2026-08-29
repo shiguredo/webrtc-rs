@@ -1,6 +1,7 @@
-use crate::api::out_param::call_with_void_and_error;
-use crate::non_null::expect_non_null;
-use crate::ref_count::{
+use crate::helper::non_null::expect_non_null;
+use crate::helper::optional::{get_optional, set_optional};
+use crate::helper::out_param::call_with_void_and_error;
+use crate::helper::ref_count::{
     AudioTrackHandle, MediaStreamTrackHandle, RtpReceiverHandle, RtpSenderHandle,
     RtpTransceiverHandle, VideoTrackHandle,
 };
@@ -10,8 +11,6 @@ use crate::{
 };
 use std::marker::PhantomData;
 use std::ptr::NonNull;
-
-use super::optional::{get_optional, set_optional};
 
 /// webrtc::RtpCapabilities のラッパー。
 pub struct RtpCapabilities {

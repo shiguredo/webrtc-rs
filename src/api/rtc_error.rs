@@ -1,4 +1,4 @@
-use crate::non_null::expect_non_null;
+use crate::helper::non_null::expect_non_null;
 use crate::{Result, ffi};
 use std::ptr::NonNull;
 use std::slice;

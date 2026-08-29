@@ -1,5 +1,5 @@
-use crate::non_null::expect_non_null;
-use crate::ref_count::RTCStatsReportHandle;
+use crate::helper::non_null::expect_non_null;
+use crate::helper::ref_count::RTCStatsReportHandle;
 use crate::{CxxString, Result, ScopedRef, ffi};
 use std::ptr::NonNull;
 

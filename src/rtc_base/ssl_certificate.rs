@@ -1,5 +1,5 @@
-use crate::handler::{HandlerState, create_with_handler, destroy_handler};
-use crate::non_null::expect_non_null;
+use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::helper::non_null::expect_non_null;
 use crate::{CxxString, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;

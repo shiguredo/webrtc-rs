@@ -1,5 +1,5 @@
 use crate::ffi;
-use crate::non_null::expect_non_null;
+use crate::helper::non_null::expect_non_null;
 use std::ptr::NonNull;
 
 /// webrtc::TimestampAligner の安全ラッパー。

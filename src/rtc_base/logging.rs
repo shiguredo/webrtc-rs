@@ -1,8 +1,8 @@
 pub mod log {
     use crate::Result;
     use crate::ffi;
-    use crate::handler::{HandlerState, create_with_handler, destroy_handler};
-    use crate::non_null::expect_non_null;
+    use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
+    use crate::helper::non_null::expect_non_null;
     use std::ffi::CString;
     use std::marker::PhantomData;
     use std::os::raw::{c_char, c_void};

@@ -1,6 +1,6 @@
 use crate::CxxString;
 use crate::ffi;
-use crate::non_null::expect_non_null;
+use crate::helper::non_null::expect_non_null;
 
 /// webrtc_CreateRandomString の安全ラッパー。
 pub fn random_string(len: usize) -> String {

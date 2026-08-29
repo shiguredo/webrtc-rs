@@ -15,7 +15,7 @@
 //! - `out_error` を持ち戻り値の無い API (`call_with_void_and_error`): 検査すべき
 //!   オブジェクトが無いため `out_error` の検査のみ行う
 
-use crate::non_null::expect_non_null;
+use crate::helper::non_null::expect_non_null;
 use crate::{Error, Result};
 use std::ptr::NonNull;
 

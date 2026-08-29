@@ -1,7 +1,7 @@
 use super::video_codec_common::{VideoFrame, VideoFrameRef};
-use crate::handler::{HandlerState, create_with_handler, destroy_handler};
-use crate::non_null::expect_non_null;
-use crate::ref_count::{
+use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::helper::non_null::expect_non_null;
+use crate::helper::ref_count::{
     AdaptedVideoTrackSourceHandle, MediaStreamTrackHandle, VideoTrackHandle, VideoTrackSourceHandle,
 };
 use crate::{MediaStreamTrack, ScopedRef, ffi};

@@ -1,5 +1,5 @@
-use crate::handler::{HandlerState, create_with_handler, destroy_handler};
-use crate::ref_count::DtlsTransportHandle;
+use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::helper::ref_count::DtlsTransportHandle;
 use crate::{ScopedRef, ffi};
 use std::os::raw::c_void;
 use std::ptr::NonNull;
