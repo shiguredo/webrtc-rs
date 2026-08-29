@@ -3,7 +3,8 @@ use super::video_codec_common::{VideoCodecType, VideoFrameType, VideoRotation};
 use super::video_codec_specifics::{
     RTPVideoHeaderCodecSpecifics, RTPVideoHeaderH264, RTPVideoHeaderVP8, RTPVideoHeaderVP9,
 };
-use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
+use crate::handler::{create_with_handler, destroy_handler};
+use crate::non_null::expect_non_null;
 use crate::ref_count::{FrameTransformerHandle, TransformedFrameCallbackHandle};
 use crate::{CxxString, Result, ScopedRef, ffi};
 use std::collections::HashMap;
@@ -296,11 +297,9 @@ unsafe extern "C" fn frame_transformer_unregister_transformed_frame_sink_callbac
 }
 
 unsafe extern "C" fn frame_transformer_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "frame_transformer_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut FrameTransformerHandlerState) };
+    unsafe {
+        destroy_handler::<FrameTransformerHandlerState>("frame_transformer_on_destroy", user_data)
+    };
 }
 
 /// webrtc::FrameTransformerInterface のラッパー。
@@ -322,11 +321,10 @@ unsafe impl Send for FrameTransformer {}
 impl FrameTransformer {
     /// [FrameTransformerHandler] を実行する FrameTransformer を生成する。
     pub fn new_with_handler(handler: Box<dyn FrameTransformerHandler>) -> Self {
-        let state = Box::new(FrameTransformerHandlerState {
+        let user_data = Box::into_raw(Box::new(FrameTransformerHandlerState {
             handler,
             callbacks: Mutex::new(FrameTransformerCallbacks::new()),
-        });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        })) as *mut c_void;
         let cbs = ffi::webrtc_FrameTransformerInterface_cbs {
             Transform: Some(frame_transformer_transform),
             RegisterTransformedFrameCallback: Some(
@@ -343,11 +341,13 @@ impl FrameTransformer {
             ),
             OnDestroy: Some(frame_transformer_on_destroy),
         };
-        let raw = unsafe { ffi::webrtc_FrameTransformerInterface_new(&cbs, user_data) };
-        let raw = expect_non_null_with_cleanup(raw, "webrtc_FrameTransformerInterface_new", || {
-            // null が返った場合は state を回収してから panic する。
-            let _ = unsafe { Box::from_raw(user_data as *mut FrameTransformerHandlerState) };
-        });
+        let raw = unsafe {
+            create_with_handler::<FrameTransformerHandlerState, _>(
+                "webrtc_FrameTransformerInterface_new",
+                user_data,
+                |user_data| ffi::webrtc_FrameTransformerInterface_new(&cbs, user_data),
+            )
+        };
         let raw_ref = ScopedRef::<FrameTransformerHandle>::from_raw(raw);
         Self { raw_ref }
     }

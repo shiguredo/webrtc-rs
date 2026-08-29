@@ -1,4 +1,5 @@
-use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
+use crate::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::non_null::expect_non_null;
 use crate::ref_count::{
     AudioDecoderFactoryHandle, AudioEncoderFactoryHandle, AudioTrackHandle, AudioTrackSourceHandle,
     MediaStreamTrackHandle,
@@ -322,11 +323,7 @@ pub trait AudioTrackSinkHandler: Send {
     );
 }
 
-struct AudioTrackSinkHandlerState {
-    handler: Box<dyn AudioTrackSinkHandler>,
-}
-
-unsafe impl Send for AudioTrackSinkHandlerState {}
+type AudioTrackSinkHandlerState = HandlerState<dyn AudioTrackSinkHandler>;
 
 unsafe extern "C" fn audio_track_sink_on_data(
     audio_data: *const c_void,
@@ -353,11 +350,9 @@ unsafe extern "C" fn audio_track_sink_on_data(
 }
 
 unsafe extern "C" fn audio_track_sink_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "audio_track_sink_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut AudioTrackSinkHandlerState) };
+    unsafe {
+        destroy_handler::<AudioTrackSinkHandlerState>("audio_track_sink_on_destroy", user_data)
+    };
 }
 
 /// webrtc::AudioTrackSinkInterface のラッパー。
@@ -369,19 +364,18 @@ unsafe impl Send for AudioTrackSink {}
 
 impl AudioTrackSink {
     pub fn new_with_handler(handler: Box<dyn AudioTrackSinkHandler>) -> Self {
-        let state = Box::new(AudioTrackSinkHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_AudioTrackSinkInterface_cbs {
             OnData: Some(audio_track_sink_on_data),
             OnDestroy: Some(audio_track_sink_on_destroy),
         };
-        let raw = expect_non_null_with_cleanup(
-            unsafe { ffi::webrtc_AudioTrackSinkInterface_new(&cbs, user_data) },
-            "webrtc_AudioTrackSinkInterface_new",
-            || {
-                let _ = unsafe { Box::from_raw(user_data as *mut AudioTrackSinkHandlerState) };
-            },
-        );
+        let raw = unsafe {
+            create_with_handler::<AudioTrackSinkHandlerState, _>(
+                "webrtc_AudioTrackSinkInterface_new",
+                user_data,
+                |user_data| ffi::webrtc_AudioTrackSinkInterface_new(&cbs, user_data),
+            )
+        };
         Self { raw }
     }
 

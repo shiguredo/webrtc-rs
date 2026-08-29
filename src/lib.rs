@@ -9,6 +9,7 @@ pub fn version() -> &'static str {
 mod api;
 mod cxxstd;
 mod error;
+mod handler;
 mod libyuv;
 mod non_null;
 mod ref_count;

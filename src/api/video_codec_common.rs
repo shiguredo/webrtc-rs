@@ -1,4 +1,5 @@
-use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
+use crate::handler::{create_with_handler, destroy_handler};
+use crate::non_null::expect_non_null;
 use crate::ref_count::{
     EncodedImageBufferHandle, I420BufferHandle, NV12BufferHandle, VideoFrameBufferHandle,
 };
@@ -948,11 +949,9 @@ unsafe extern "C" fn video_frame_buffer_crop_and_scale(
 }
 
 unsafe extern "C" fn video_frame_buffer_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "video_frame_buffer_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoFrameBufferHandlerState) };
+    unsafe {
+        destroy_handler::<VideoFrameBufferHandlerState>("video_frame_buffer_on_destroy", user_data)
+    };
 }
 
 /// webrtc::VideoFrameBuffer のラッパー。
@@ -964,12 +963,11 @@ unsafe impl Send for VideoFrameBuffer {}
 
 impl VideoFrameBuffer {
     pub fn new_with_handler(handler: Box<dyn VideoFrameBufferHandler>) -> Self {
-        let state = Box::new(VideoFrameBufferHandlerState {
+        let user_data = Box::into_raw(Box::new(VideoFrameBufferHandlerState {
             handler,
             #[cfg(debug_assertions)]
             callback_thread: None,
-        });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        })) as *mut c_void;
         let cbs = ffi::webrtc_VideoFrameBuffer_cbs {
             type_: Some(video_frame_buffer_type),
             width: Some(video_frame_buffer_width),
@@ -978,13 +976,13 @@ impl VideoFrameBuffer {
             CropAndScale: Some(video_frame_buffer_crop_and_scale),
             OnDestroy: Some(video_frame_buffer_on_destroy),
         };
-        let raw_ref = expect_non_null_with_cleanup(
-            unsafe { ffi::webrtc_VideoFrameBuffer_make_ref_counted(&cbs, user_data) },
-            "webrtc_VideoFrameBuffer_make_ref_counted",
-            || {
-                let _ = unsafe { Box::from_raw(user_data as *mut VideoFrameBufferHandlerState) };
-            },
-        );
+        let raw_ref = unsafe {
+            create_with_handler::<VideoFrameBufferHandlerState, _>(
+                "webrtc_VideoFrameBuffer_make_ref_counted",
+                user_data,
+                |user_data| ffi::webrtc_VideoFrameBuffer_make_ref_counted(&cbs, user_data),
+            )
+        };
         let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(raw_ref);
         Self { raw_ref }
     }

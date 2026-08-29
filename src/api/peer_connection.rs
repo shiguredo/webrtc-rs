@@ -1,5 +1,6 @@
 use crate::api::out_param::{call_with_out, call_with_out_and_error, call_with_void_and_error};
-use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
+use crate::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::non_null::expect_non_null;
 use crate::ref_count::{
     AudioTrackHandle, AudioTrackSourceHandle, ConnectionContextHandle, DataChannelHandle,
     DtlsTransportHandle, MediaStreamHandle, PeerConnectionFactoryHandle, PeerConnectionHandle,
@@ -1190,11 +1191,7 @@ pub trait PeerConnectionObserverHandler: Send {
     fn on_data_channel(&mut self, data_channel: DataChannel) {}
 }
 
-struct PeerConnectionObserverHandlerState {
-    handler: Box<dyn PeerConnectionObserverHandler>,
-}
-
-unsafe impl Send for PeerConnectionObserverHandlerState {}
+type PeerConnectionObserverHandlerState = HandlerState<dyn PeerConnectionObserverHandler>;
 
 unsafe extern "C" fn observer_on_connection_change(new_state: i32, user_data: *mut c_void) {
     assert!(!user_data.is_null());
@@ -1313,11 +1310,9 @@ unsafe extern "C" fn observer_on_data_channel(
 }
 
 unsafe extern "C" fn observer_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "observer_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut PeerConnectionObserverHandlerState) };
+    unsafe {
+        destroy_handler::<PeerConnectionObserverHandlerState>("observer_on_destroy", user_data)
+    };
 }
 
 /// PeerConnectionObserver のラッパー。
@@ -1329,8 +1324,7 @@ unsafe impl Send for PeerConnectionObserver {}
 
 impl PeerConnectionObserver {
     pub fn new_with_handler(handler: Box<dyn PeerConnectionObserverHandler>) -> Self {
-        let state = Box::new(PeerConnectionObserverHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_PeerConnectionObserver_cbs {
             OnStandardizedIceConnectionChange: Some(observer_on_standardized_ice_connection_change),
             OnConnectionChange: Some(observer_on_connection_change),
@@ -1342,14 +1336,13 @@ impl PeerConnectionObserver {
             OnDestroy: Some(observer_on_destroy),
             OnIceGatheringChange: Some(observer_on_ice_gathering_change),
         };
-        let raw = expect_non_null_with_cleanup(
-            unsafe { ffi::webrtc_PeerConnectionObserver_new(&cbs, user_data) },
-            "webrtc_PeerConnectionObserver_new",
-            || {
-                let _ =
-                    unsafe { Box::from_raw(user_data as *mut PeerConnectionObserverHandlerState) };
-            },
-        );
+        let raw = unsafe {
+            create_with_handler::<PeerConnectionObserverHandlerState, _>(
+                "webrtc_PeerConnectionObserver_new",
+                user_data,
+                |user_data| ffi::webrtc_PeerConnectionObserver_new(&cbs, user_data),
+            )
+        };
         Self { raw }
     }
 
@@ -1451,11 +1444,9 @@ unsafe extern "C" fn peer_connection_on_stats(
 }
 
 unsafe extern "C" fn peer_connection_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "peer_connection_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut PeerConnectionStatsCallbackState) };
+    unsafe {
+        destroy_handler::<PeerConnectionStatsCallbackState>("peer_connection_on_destroy", user_data)
+    };
 }
 
 pub trait CreateSessionDescriptionObserverHandler: Send {
@@ -1465,11 +1456,8 @@ pub trait CreateSessionDescriptionObserverHandler: Send {
     fn on_failure(&mut self, error: RtcError) {}
 }
 
-struct CreateSessionDescriptionObserverHandlerState {
-    handler: Box<dyn CreateSessionDescriptionObserverHandler>,
-}
-
-unsafe impl Send for CreateSessionDescriptionObserverHandlerState {}
+type CreateSessionDescriptionObserverHandlerState =
+    HandlerState<dyn CreateSessionDescriptionObserverHandler>;
 
 unsafe extern "C" fn csd_on_success(
     desc: *mut ffi::webrtc_SessionDescriptionInterface_unique,
@@ -1490,9 +1478,9 @@ unsafe extern "C" fn csd_on_failure(
 }
 
 unsafe extern "C" fn csd_on_destroy(user_data: *mut c_void) {
-    assert!(!user_data.is_null(), "csd_on_destroy: user_data is null");
-    let _ =
-        unsafe { Box::from_raw(user_data as *mut CreateSessionDescriptionObserverHandlerState) };
+    unsafe {
+        destroy_handler::<CreateSessionDescriptionObserverHandlerState>("csd_on_destroy", user_data)
+    };
 }
 
 /// CreateSessionDescriptionObserver のラッパー。
@@ -1504,24 +1492,21 @@ unsafe impl Send for CreateSessionDescriptionObserver {}
 
 impl CreateSessionDescriptionObserver {
     pub fn new_with_handler(handler: Box<dyn CreateSessionDescriptionObserverHandler>) -> Self {
-        let state = Box::new(CreateSessionDescriptionObserverHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_CreateSessionDescriptionObserver_cbs {
             OnSuccess: Some(csd_on_success),
             OnFailure: Some(csd_on_failure),
             OnDestroy: Some(csd_on_destroy),
         };
-        let raw = expect_non_null_with_cleanup(
-            unsafe {
-                ffi::webrtc_CreateSessionDescriptionObserver_make_ref_counted(&cbs, user_data)
-            },
-            "webrtc_CreateSessionDescriptionObserver_make_ref_counted",
-            || {
-                let _ = unsafe {
-                    Box::from_raw(user_data as *mut CreateSessionDescriptionObserverHandlerState)
-                };
-            },
-        );
+        let raw = unsafe {
+            create_with_handler::<CreateSessionDescriptionObserverHandlerState, _>(
+                "webrtc_CreateSessionDescriptionObserver_make_ref_counted",
+                user_data,
+                |user_data| {
+                    ffi::webrtc_CreateSessionDescriptionObserver_make_ref_counted(&cbs, user_data)
+                },
+            )
+        };
         Self { raw }
     }
 
@@ -1541,11 +1526,7 @@ pub trait SetLocalDescriptionObserverHandler: Send {
     fn on_set_local_description_complete(&mut self, error: RtcError) {}
 }
 
-struct SetLocalDescriptionObserverHandlerState {
-    handler: Box<dyn SetLocalDescriptionObserverHandler>,
-}
-
-unsafe impl Send for SetLocalDescriptionObserverHandlerState {}
+type SetLocalDescriptionObserverHandlerState = HandlerState<dyn SetLocalDescriptionObserverHandler>;
 
 unsafe extern "C" fn sld_on_complete(
     error: *mut ffi::webrtc_RTCError_unique,
@@ -1557,8 +1538,9 @@ unsafe extern "C" fn sld_on_complete(
 }
 
 unsafe extern "C" fn sld_on_destroy(user_data: *mut c_void) {
-    assert!(!user_data.is_null(), "sld_on_destroy: user_data is null");
-    let _ = unsafe { Box::from_raw(user_data as *mut SetLocalDescriptionObserverHandlerState) };
+    unsafe {
+        destroy_handler::<SetLocalDescriptionObserverHandlerState>("sld_on_destroy", user_data)
+    };
 }
 
 /// SetLocalDescriptionObserverInterface のラッパー。
@@ -1570,23 +1552,22 @@ unsafe impl Send for SetLocalDescriptionObserver {}
 
 impl SetLocalDescriptionObserver {
     pub fn new_with_handler(handler: Box<dyn SetLocalDescriptionObserverHandler>) -> Self {
-        let state = Box::new(SetLocalDescriptionObserverHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_SetLocalDescriptionObserverInterface_cbs {
             OnSetLocalDescriptionComplete: Some(sld_on_complete),
             OnDestroy: Some(sld_on_destroy),
         };
-        let raw = expect_non_null_with_cleanup(
-            unsafe {
-                ffi::webrtc_SetLocalDescriptionObserverInterface_make_ref_counted(&cbs, user_data)
-            },
-            "webrtc_SetLocalDescriptionObserverInterface_make_ref_counted",
-            || {
-                let _ = unsafe {
-                    Box::from_raw(user_data as *mut SetLocalDescriptionObserverHandlerState)
-                };
-            },
-        );
+        let raw = unsafe {
+            create_with_handler::<SetLocalDescriptionObserverHandlerState, _>(
+                "webrtc_SetLocalDescriptionObserverInterface_make_ref_counted",
+                user_data,
+                |user_data| {
+                    ffi::webrtc_SetLocalDescriptionObserverInterface_make_ref_counted(
+                        &cbs, user_data,
+                    )
+                },
+            )
+        };
         let raw_ref = ScopedRef::<SetLocalDescriptionObserverHandle>::from_raw(raw);
         Self { raw_ref }
     }
@@ -1607,11 +1588,8 @@ pub trait SetRemoteDescriptionObserverHandler: Send {
     fn on_set_remote_description_complete(&mut self, error: RtcError) {}
 }
 
-struct SetRemoteDescriptionObserverHandlerState {
-    handler: Box<dyn SetRemoteDescriptionObserverHandler>,
-}
-
-unsafe impl Send for SetRemoteDescriptionObserverHandlerState {}
+type SetRemoteDescriptionObserverHandlerState =
+    HandlerState<dyn SetRemoteDescriptionObserverHandler>;
 
 unsafe extern "C" fn srd_on_complete(
     error: *mut ffi::webrtc_RTCError_unique,
@@ -1623,8 +1601,9 @@ unsafe extern "C" fn srd_on_complete(
 }
 
 unsafe extern "C" fn srd_on_destroy(user_data: *mut c_void) {
-    assert!(!user_data.is_null(), "srd_on_destroy: user_data is null");
-    let _ = unsafe { Box::from_raw(user_data as *mut SetRemoteDescriptionObserverHandlerState) };
+    unsafe {
+        destroy_handler::<SetRemoteDescriptionObserverHandlerState>("srd_on_destroy", user_data)
+    };
 }
 
 /// SetRemoteDescriptionObserverInterface のラッパー。
@@ -1636,23 +1615,22 @@ unsafe impl Send for SetRemoteDescriptionObserver {}
 
 impl SetRemoteDescriptionObserver {
     pub fn new_with_handler(handler: Box<dyn SetRemoteDescriptionObserverHandler>) -> Self {
-        let state = Box::new(SetRemoteDescriptionObserverHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_SetRemoteDescriptionObserverInterface_cbs {
             OnSetRemoteDescriptionComplete: Some(srd_on_complete),
             OnDestroy: Some(srd_on_destroy),
         };
-        let raw = expect_non_null_with_cleanup(
-            unsafe {
-                ffi::webrtc_SetRemoteDescriptionObserverInterface_make_ref_counted(&cbs, user_data)
-            },
-            "webrtc_SetRemoteDescriptionObserverInterface_make_ref_counted",
-            || {
-                let _ = unsafe {
-                    Box::from_raw(user_data as *mut SetRemoteDescriptionObserverHandlerState)
-                };
-            },
-        );
+        let raw = unsafe {
+            create_with_handler::<SetRemoteDescriptionObserverHandlerState, _>(
+                "webrtc_SetRemoteDescriptionObserverInterface_make_ref_counted",
+                user_data,
+                |user_data| {
+                    ffi::webrtc_SetRemoteDescriptionObserverInterface_make_ref_counted(
+                        &cbs, user_data,
+                    )
+                },
+            )
+        };
         let raw_ref = ScopedRef::<SetRemoteDescriptionObserverHandle>::from_raw(raw);
         Self { raw_ref }
     }

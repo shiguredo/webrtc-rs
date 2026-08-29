@@ -2,7 +2,8 @@ use super::video_codec_common::{
     EncodedImageRef, SdpVideoFormat, SdpVideoFormatRef, VideoCodecStatus, VideoCodecType,
     VideoFrameRef,
 };
-use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
+use crate::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::non_null::expect_non_null;
 use crate::{CxxString, EnvironmentRef, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -240,24 +241,11 @@ pub trait VideoDecoderFactoryHandler: Send {
     }
 }
 
-struct VideoDecoderHandlerState {
-    handler: Box<dyn VideoDecoderHandler>,
-}
-
-unsafe impl Send for VideoDecoderHandlerState {}
-
-struct VideoDecoderFactoryHandlerState {
-    handler: Box<dyn VideoDecoderFactoryHandler>,
-}
-
-unsafe impl Send for VideoDecoderFactoryHandlerState {}
+type VideoDecoderHandlerState = HandlerState<dyn VideoDecoderHandler>;
+type VideoDecoderFactoryHandlerState = HandlerState<dyn VideoDecoderFactoryHandler>;
 
 unsafe extern "C" fn video_decoder_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "video_decoder_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoDecoderHandlerState) };
+    unsafe { destroy_handler::<VideoDecoderHandlerState>("video_decoder_on_destroy", user_data) };
 }
 
 unsafe extern "C" fn video_decoder_configure(
@@ -331,11 +319,12 @@ unsafe extern "C" fn video_decoder_get_decoder_info(
 }
 
 unsafe extern "C" fn video_decoder_factory_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "video_decoder_factory_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoDecoderFactoryHandlerState) };
+    unsafe {
+        destroy_handler::<VideoDecoderFactoryHandlerState>(
+            "video_decoder_factory_on_destroy",
+            user_data,
+        )
+    };
 }
 
 unsafe extern "C" fn video_decoder_factory_get_supported_formats(
@@ -387,8 +376,7 @@ unsafe impl Send for VideoDecoder {}
 
 impl VideoDecoder {
     pub fn new_with_handler(handler: Box<dyn VideoDecoderHandler>) -> Self {
-        let state = Box::new(VideoDecoderHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_VideoDecoder_cbs {
             Configure: Some(video_decoder_configure),
             Decode: Some(video_decoder_decode),
@@ -397,10 +385,13 @@ impl VideoDecoder {
             GetDecoderInfo: Some(video_decoder_get_decoder_info),
             OnDestroy: Some(video_decoder_on_destroy),
         };
-        let raw = unsafe { ffi::webrtc_VideoDecoder_new(&cbs, user_data) };
-        let raw_unique = expect_non_null_with_cleanup(raw, "webrtc_VideoDecoder_new", || {
-            let _ = unsafe { Box::from_raw(user_data as *mut VideoDecoderHandlerState) };
-        });
+        let raw_unique = unsafe {
+            create_with_handler::<VideoDecoderHandlerState, _>(
+                "webrtc_VideoDecoder_new",
+                user_data,
+                |user_data| ffi::webrtc_VideoDecoder_new(&cbs, user_data),
+            )
+        };
         Self { raw_unique }
     }
 
@@ -549,18 +540,19 @@ impl VideoDecoderFactory {
     }
 
     pub fn new_with_handler(handler: Box<dyn VideoDecoderFactoryHandler>) -> Self {
-        let state = Box::new(VideoDecoderFactoryHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_VideoDecoderFactory_cbs {
             GetSupportedFormats: Some(video_decoder_factory_get_supported_formats),
             Create: Some(video_decoder_factory_create),
             OnDestroy: Some(video_decoder_factory_on_destroy),
         };
-        let raw = unsafe { ffi::webrtc_VideoDecoderFactory_new(&cbs, user_data) };
-        let raw_unique =
-            expect_non_null_with_cleanup(raw, "webrtc_VideoDecoderFactory_new", || {
-                let _ = unsafe { Box::from_raw(user_data as *mut VideoDecoderFactoryHandlerState) };
-            });
+        let raw_unique = unsafe {
+            create_with_handler::<VideoDecoderFactoryHandlerState, _>(
+                "webrtc_VideoDecoderFactory_new",
+                user_data,
+                |user_data| ffi::webrtc_VideoDecoderFactory_new(&cbs, user_data),
+            )
+        };
         Self { raw_unique }
     }
 
