@@ -1,7 +1,7 @@
 # observer / callback の new_with_handler 登録・on_destroy 破棄の骨格を共通ヘルパー化する
 
 - Created: 2026-08-28
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-30
 - Branch: feature/refactor-observer-registration-helper
 - Polished: {YYYY-MM-DD}
 
@@ -74,3 +74,14 @@ trampoline (extern "C" fn) 本体はコールバックのシグネチャごと�
 - 挙動がリファクタ前と同一である (panic の発生条件が変わらない)
 - ビルドと全テストが通る
 - `CHANGES.md` の develop に `### misc` エントリを追記する
+
+## 解決方法
+
+- `src/handler.rs` を新設し、`HandlerState<H>` (コールバック状態の骨格)・`create_with_handler` (登録)・`destroy_handler` (破棄) を追加した
+- 対象 19 型の登録・破棄と、`PeerConnection::get_stats` の統計コールバック破棄を共通ヘルパーへ移行した
+- 単純な `{ handler: Box<dyn XxxHandler> }` 状態の 17 型は、元の型名で `type XxxHandlerState = HandlerState<dyn XxxHandler>` として型エイリアス化し、trampoline 本体はそのまま維持した
+- 追加フィールドを持つ `VideoFrameBuffer` (`callback_thread`) と `FrameTransformer` (`callbacks`) は専用の状態 struct を維持し、登録・破棄のみ共通ヘルパー経由にした
+- `AudioDeviceModule` の独自登録フロー (`expect_non_null` + 遅延 `Box::into_raw`) を標準の登録ヘルパーへ統一した
+- ラベル引数 `what` を `&'static str` に統一し、パニックメッセージをコンパイル時定数に限定した
+- C API (`webrtc/src/webrtc_c/`) と bindgen 生成の FFI 定義は変更なし。挙動はリファクタ前と同一
+- `CHANGES.md` の develop `### misc` にエントリを追記した
