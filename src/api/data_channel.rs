@@ -1,4 +1,5 @@
-use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
+use crate::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::non_null::expect_non_null;
 use crate::ref_count::DataChannelHandle;
 use crate::{CxxString, Result, ScopedRef, ffi};
 use std::os::raw::c_void;
@@ -126,11 +127,8 @@ pub trait DataChannelObserverHandler: Send {
     fn on_message(&mut self, data: &[u8], is_binary: bool) {}
 }
 
-struct DataChannelObserverHandlerState {
-    handler: Box<dyn DataChannelObserverHandler>,
-}
-
-unsafe impl Send for DataChannelObserverHandlerState {}
+/// DataChannelObserver のコールバック状態の型。
+type DataChannelObserverHandlerState = HandlerState<dyn DataChannelObserverHandler>;
 
 unsafe extern "C" fn dc_observer_on_state_change(user_data: *mut c_void) {
     assert!(
@@ -157,11 +155,9 @@ unsafe extern "C" fn dc_observer_on_message(
 }
 
 unsafe extern "C" fn dc_observer_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "dc_observer_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut DataChannelObserverHandlerState) };
+    unsafe {
+        destroy_handler::<DataChannelObserverHandlerState>("dc_observer_on_destroy", user_data)
+    };
 }
 
 /// DataChannelObserver のラッパー。
@@ -173,20 +169,19 @@ unsafe impl Send for DataChannelObserver {}
 
 impl DataChannelObserver {
     pub fn new_with_handler(handler: Box<dyn DataChannelObserverHandler>) -> Self {
-        let state = Box::new(DataChannelObserverHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_DataChannelObserver_cbs {
             OnStateChange: Some(dc_observer_on_state_change),
             OnMessage: Some(dc_observer_on_message),
             OnDestroy: Some(dc_observer_on_destroy),
         };
-        let raw = expect_non_null_with_cleanup(
-            unsafe { ffi::webrtc_DataChannelObserver_new(&cbs, user_data) },
-            "webrtc_DataChannelObserver_new",
-            || {
-                let _ = unsafe { Box::from_raw(user_data as *mut DataChannelObserverHandlerState) };
-            },
-        );
+        let raw = unsafe {
+            create_with_handler::<DataChannelObserverHandlerState, _>(
+                "webrtc_DataChannelObserver_new",
+                user_data,
+                |user_data| ffi::webrtc_DataChannelObserver_new(&cbs, user_data),
+            )
+        };
         Self { raw }
     }
 

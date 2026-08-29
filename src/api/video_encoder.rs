@@ -4,7 +4,8 @@ use super::video_codec_common::{
     VideoCodecType, VideoFrameBufferKind, VideoFrameRef, VideoFrameTypeVectorRef,
 };
 use super::video_codec_specifics::H264PacketizationMode;
-use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
+use crate::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::non_null::expect_non_null;
 use crate::{CxxString, EnvironmentRef, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -1713,22 +1714,18 @@ unsafe impl Send for VideoEncoderEncodedImageCallback {}
 
 impl VideoEncoderEncodedImageCallback {
     pub fn new_with_handler(handler: Box<dyn VideoEncoderEncodedImageCallbackHandler>) -> Self {
-        let state = Box::new(VideoEncoderEncodedImageHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_VideoEncoder_EncodedImageCallback_cbs {
             OnEncodedImage: Some(video_encoder_encoded_image_callback_on_encoded_image),
             OnDestroy: Some(video_encoder_encoded_image_callback_on_destroy),
         };
-        let raw = unsafe { ffi::webrtc_VideoEncoder_EncodedImageCallback_new(&cbs, user_data) };
-        let raw = expect_non_null_with_cleanup(
-            raw,
-            "webrtc_VideoEncoder_EncodedImageCallback_new",
-            || {
-                let _ = unsafe {
-                    Box::from_raw(user_data as *mut VideoEncoderEncodedImageHandlerState)
-                };
-            },
-        );
+        let raw = unsafe {
+            create_with_handler::<VideoEncoderEncodedImageHandlerState, _>(
+                "webrtc_VideoEncoder_EncodedImageCallback_new",
+                user_data,
+                |user_data| ffi::webrtc_VideoEncoder_EncodedImageCallback_new(&cbs, user_data),
+            )
+        };
         Self { raw }
     }
 
@@ -1852,38 +1849,25 @@ pub trait VideoEncoderFactoryHandler: Send {
     }
 }
 
-struct VideoEncoderHandlerState {
-    handler: Box<dyn VideoEncoderHandler>,
-}
-
-unsafe impl Send for VideoEncoderHandlerState {}
-
-struct VideoEncoderEncodedImageHandlerState {
-    handler: Box<dyn VideoEncoderEncodedImageCallbackHandler>,
-}
-
-unsafe impl Send for VideoEncoderEncodedImageHandlerState {}
-
-struct VideoEncoderFactoryHandlerState {
-    handler: Box<dyn VideoEncoderFactoryHandler>,
-}
-
-unsafe impl Send for VideoEncoderFactoryHandlerState {}
+/// VideoEncoder のコールバック状態の型。
+type VideoEncoderHandlerState = HandlerState<dyn VideoEncoderHandler>;
+/// VideoEncoderEncodedImageCallback のコールバック状態の型。
+type VideoEncoderEncodedImageHandlerState =
+    HandlerState<dyn VideoEncoderEncodedImageCallbackHandler>;
+/// VideoEncoderFactory のコールバック状態の型。
+type VideoEncoderFactoryHandlerState = HandlerState<dyn VideoEncoderFactoryHandler>;
 
 unsafe extern "C" fn video_encoder_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "video_encoder_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderHandlerState) };
+    unsafe { destroy_handler::<VideoEncoderHandlerState>("video_encoder_on_destroy", user_data) };
 }
 
 unsafe extern "C" fn video_encoder_encoded_image_callback_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "video_encoder_encoded_image_callback_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderEncodedImageHandlerState) };
+    unsafe {
+        destroy_handler::<VideoEncoderEncodedImageHandlerState>(
+            "video_encoder_encoded_image_callback_on_destroy",
+            user_data,
+        )
+    };
 }
 
 unsafe extern "C" fn video_encoder_encoded_image_callback_on_encoded_image(
@@ -1996,11 +1980,12 @@ unsafe extern "C" fn video_encoder_get_encoder_info(
 }
 
 unsafe extern "C" fn video_encoder_factory_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "video_encoder_factory_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderFactoryHandlerState) };
+    unsafe {
+        destroy_handler::<VideoEncoderFactoryHandlerState>(
+            "video_encoder_factory_on_destroy",
+            user_data,
+        )
+    };
 }
 
 unsafe extern "C" fn video_encoder_factory_get_supported_formats(
@@ -2052,8 +2037,7 @@ unsafe impl Send for VideoEncoder {}
 
 impl VideoEncoder {
     pub fn new_with_handler(handler: Box<dyn VideoEncoderHandler>) -> Self {
-        let state = Box::new(VideoEncoderHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_VideoEncoder_cbs {
             InitEncode: Some(video_encoder_init_encode),
             Encode: Some(video_encoder_encode),
@@ -2063,10 +2047,13 @@ impl VideoEncoder {
             GetEncoderInfo: Some(video_encoder_get_encoder_info),
             OnDestroy: Some(video_encoder_on_destroy),
         };
-        let raw = unsafe { ffi::webrtc_VideoEncoder_new(&cbs, user_data) };
-        let raw_unique = expect_non_null_with_cleanup(raw, "webrtc_VideoEncoder_new", || {
-            let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderHandlerState) };
-        });
+        let raw_unique = unsafe {
+            create_with_handler::<VideoEncoderHandlerState, _>(
+                "webrtc_VideoEncoder_new",
+                user_data,
+                |user_data| ffi::webrtc_VideoEncoder_new(&cbs, user_data),
+            )
+        };
         Self { raw_unique }
     }
 
@@ -2291,18 +2278,19 @@ impl VideoEncoderFactory {
     }
 
     pub fn new_with_handler(handler: Box<dyn VideoEncoderFactoryHandler>) -> Self {
-        let state = Box::new(VideoEncoderFactoryHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_VideoEncoderFactory_cbs {
             GetSupportedFormats: Some(video_encoder_factory_get_supported_formats),
             Create: Some(video_encoder_factory_create),
             OnDestroy: Some(video_encoder_factory_on_destroy),
         };
-        let raw = unsafe { ffi::webrtc_VideoEncoderFactory_new(&cbs, user_data) };
-        let raw_unique =
-            expect_non_null_with_cleanup(raw, "webrtc_VideoEncoderFactory_new", || {
-                let _ = unsafe { Box::from_raw(user_data as *mut VideoEncoderFactoryHandlerState) };
-            });
+        let raw_unique = unsafe {
+            create_with_handler::<VideoEncoderFactoryHandlerState, _>(
+                "webrtc_VideoEncoderFactory_new",
+                user_data,
+                |user_data| ffi::webrtc_VideoEncoderFactory_new(&cbs, user_data),
+            )
+        };
         Self { raw_unique }
     }
 

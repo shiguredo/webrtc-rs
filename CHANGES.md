@@ -55,6 +55,9 @@
 
 ### misc
 
+- [UPDATE] observer / callback の登録・破棄の骨格を共通ヘルパーにまとめる
+  - `src/handler.rs` に `HandlerState` / `create_with_handler` / `destroy_handler` を追加し、コールバック型ハンドラ 19 型の登録・破棄と stats コールバックの破棄を置き換えて挙動を維持する
+  - @melpon
 - [UPDATE] FFI の optional 値 (has / value) 方式を持つ getter/setter のボイラープレートを共通ヘルパーにまとめる
   - `src/api/optional.rs` に `get_optional` / `get_optional_bool` / `set_optional` / `set_optional_bool` を追加し、`RtpCodec` / `RtpEncodingParameters` / `TransformableFrame` / `VideoFrameMetadata` / `VideoEncoderEncoderInfo` / `VideoFrame` / `AudioOptions` の該当アクセサを置き換えて挙動を維持する
   - @melpon

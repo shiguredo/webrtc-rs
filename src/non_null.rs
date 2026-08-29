@@ -6,7 +6,7 @@ use std::ptr::NonNull;
 ///
 /// null の場合、C API が規約違反を起こした実装バグなので panic する。
 /// `what` には `ptr` を生成した関数名を渡すこと。
-pub(crate) fn expect_non_null<T>(ptr: *mut T, what: &str) -> NonNull<T> {
+pub(crate) fn expect_non_null<T>(ptr: *mut T, what: &'static str) -> NonNull<T> {
     NonNull::new(ptr).unwrap_or_else(|| panic!("BUG: {what} が null を返しました"))
 }
 
@@ -17,7 +17,7 @@ pub(crate) fn expect_non_null<T>(ptr: *mut T, what: &str) -> NonNull<T> {
 /// `what` には `ptr` を生成した関数名を渡すこと。
 pub(crate) fn expect_non_null_with_cleanup<T>(
     ptr: *mut T,
-    what: &str,
+    what: &'static str,
     cleanup: impl FnOnce(),
 ) -> NonNull<T> {
     match NonNull::new(ptr) {

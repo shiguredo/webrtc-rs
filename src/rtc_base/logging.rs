@@ -1,7 +1,8 @@
 pub mod log {
     use crate::Result;
     use crate::ffi;
-    use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
+    use crate::handler::{HandlerState, create_with_handler, destroy_handler};
+    use crate::non_null::expect_non_null;
     use std::ffi::CString;
     use std::marker::PhantomData;
     use std::os::raw::{c_char, c_void};
@@ -317,11 +318,8 @@ pub mod log {
         fn on_log_message(&mut self, line: LogLineRef<'_>) {}
     }
 
-    struct LogSinkHandlerState {
-        handler: Box<dyn LogSinkHandler>,
-    }
-
-    unsafe impl Send for LogSinkHandlerState {}
+    /// LogSink のコールバック状態の型。
+    type LogSinkHandlerState = HandlerState<dyn LogSinkHandler>;
 
     /// `webrtc::LogSink` のラッパー。
     pub struct LogSink {
@@ -333,17 +331,18 @@ pub mod log {
     impl LogSink {
         /// ハンドラを登録した sink を生成する。
         pub fn new_with_handler(handler: Box<dyn LogSinkHandler>) -> Self {
-            let state = Box::new(LogSinkHandlerState { handler });
-            let user_data = Box::into_raw(state) as *mut c_void;
+            let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
             let cbs = ffi::webrtc_LogSink_cbs {
                 OnLogMessage_log_line_ref: Some(log_sink_on_log_line_ref),
                 OnDestroy: Some(log_sink_on_destroy),
             };
-            let raw = unsafe { ffi::webrtc_LogSink_new(&cbs, user_data) };
-            let raw_unique = expect_non_null_with_cleanup(raw, "webrtc_LogSink_new", || {
-                // 生成に失敗した場合は渡したハンドラを回収する。
-                let _ = unsafe { Box::from_raw(user_data as *mut LogSinkHandlerState) };
-            });
+            let raw_unique = unsafe {
+                create_with_handler::<LogSinkHandlerState, _>(
+                    "webrtc_LogSink_new",
+                    user_data,
+                    |user_data| ffi::webrtc_LogSink_new(&cbs, user_data),
+                )
+            };
             Self { raw_unique }
         }
 
@@ -381,8 +380,9 @@ pub mod log {
         unsafe { &mut *(user_data as *mut LogSinkHandlerState) }
     }
 
+    /// on_destroy と同様に、user_data の null 検査後に LogSink の状態を回収する。
     unsafe extern "C" fn log_sink_on_destroy(user_data: *mut c_void) {
-        let _ = unsafe { Box::from_raw(user_data as *mut LogSinkHandlerState) };
+        unsafe { destroy_handler::<LogSinkHandlerState>("log_sink_on_destroy", user_data) };
     }
 
     unsafe extern "C" fn log_sink_on_log_line_ref(

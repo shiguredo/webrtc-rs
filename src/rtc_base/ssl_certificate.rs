@@ -1,4 +1,5 @@
-use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
+use crate::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::non_null::expect_non_null;
 use crate::{CxxString, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -98,11 +99,8 @@ pub trait SSLCertificateVerifierHandler: Send {
     }
 }
 
-struct SSLCertificateVerifierHandlerState {
-    handler: Box<dyn SSLCertificateVerifierHandler>,
-}
-
-unsafe impl Send for SSLCertificateVerifierHandlerState {}
+/// SSLCertificateVerifier のコールバック状態の型。
+type SSLCertificateVerifierHandlerState = HandlerState<dyn SSLCertificateVerifierHandler>;
 
 unsafe extern "C" fn ssl_certificate_verifier_verify_chain(
     chain: *const ffi::webrtc_SSLCertChain,
@@ -123,11 +121,12 @@ unsafe extern "C" fn ssl_certificate_verifier_verify_chain(
 }
 
 unsafe extern "C" fn ssl_certificate_verifier_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "ssl_certificate_verifier_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut SSLCertificateVerifierHandlerState) };
+    unsafe {
+        destroy_handler::<SSLCertificateVerifierHandlerState>(
+            "ssl_certificate_verifier_on_destroy",
+            user_data,
+        )
+    };
 }
 
 /// webrtc::SSLCertificateVerifier のラッパー。
@@ -139,18 +138,18 @@ unsafe impl Send for SSLCertificateVerifier {}
 
 impl SSLCertificateVerifier {
     pub fn new_with_handler(handler: Box<dyn SSLCertificateVerifierHandler>) -> Self {
-        let state = Box::new(SSLCertificateVerifierHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_SSLCertificateVerifier_cbs {
             VerifyChain: Some(ssl_certificate_verifier_verify_chain),
             OnDestroy: Some(ssl_certificate_verifier_on_destroy),
         };
-        let raw = unsafe { ffi::webrtc_SSLCertificateVerifier_new(&cbs, user_data) };
-        let raw_unique =
-            expect_non_null_with_cleanup(raw, "webrtc_SSLCertificateVerifier_new", || {
-                let _ =
-                    unsafe { Box::from_raw(user_data as *mut SSLCertificateVerifierHandlerState) };
-            });
+        let raw_unique = unsafe {
+            create_with_handler::<SSLCertificateVerifierHandlerState, _>(
+                "webrtc_SSLCertificateVerifier_new",
+                user_data,
+                |user_data| ffi::webrtc_SSLCertificateVerifier_new(&cbs, user_data),
+            )
+        };
         Self { raw_unique }
     }
 

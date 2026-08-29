@@ -1,5 +1,6 @@
 use super::video_codec_common::{VideoFrame, VideoFrameRef};
-use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
+use crate::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::non_null::expect_non_null;
 use crate::ref_count::{
     AdaptedVideoTrackSourceHandle, MediaStreamTrackHandle, VideoTrackHandle, VideoTrackSourceHandle,
 };
@@ -12,11 +13,10 @@ pub trait VideoSinkHandler: Send {
     fn on_discarded_frame(&mut self) {}
 }
 
-struct VideoSinkHandlerState {
-    handler: Box<dyn VideoSinkHandler>,
-}
-
-unsafe impl Send for VideoSinkHandlerState {}
+/// VideoSink のコールバック状態の型。
+///
+/// ハンドラを保持し、C API の `user_data` 経由で trampoline から参照される。
+type VideoSinkHandlerState = HandlerState<dyn VideoSinkHandler>;
 
 unsafe extern "C" fn video_sink_on_frame(
     frame: *const ffi::webrtc_VideoFrame,
@@ -38,11 +38,7 @@ unsafe extern "C" fn video_sink_on_discarded_frame(user_data: *mut c_void) {
 }
 
 unsafe extern "C" fn video_sink_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "video_sink_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoSinkHandlerState) };
+    unsafe { destroy_handler::<VideoSinkHandlerState>("video_sink_on_destroy", user_data) };
 }
 
 /// webrtc::VideoSinkWants のラッパー。
@@ -87,20 +83,19 @@ unsafe impl Send for VideoSink {}
 
 impl VideoSink {
     pub fn new_with_handler(handler: Box<dyn VideoSinkHandler>) -> Self {
-        let state = Box::new(VideoSinkHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_VideoSinkInterface_cbs {
             OnFrame: Some(video_sink_on_frame),
             OnDiscardedFrame: Some(video_sink_on_discarded_frame),
             OnDestroy: Some(video_sink_on_destroy),
         };
-        let raw = expect_non_null_with_cleanup(
-            unsafe { ffi::webrtc_VideoSinkInterface_new(&cbs, user_data) },
-            "webrtc_VideoSinkInterface_new",
-            || {
-                let _ = unsafe { Box::from_raw(user_data as *mut VideoSinkHandlerState) };
-            },
-        );
+        let raw = unsafe {
+            create_with_handler::<VideoSinkHandlerState, _>(
+                "webrtc_VideoSinkInterface_new",
+                user_data,
+                |user_data| ffi::webrtc_VideoSinkInterface_new(&cbs, user_data),
+            )
+        };
         Self { raw }
     }
 

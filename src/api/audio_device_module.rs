@@ -1,4 +1,5 @@
-use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
+use crate::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::non_null::expect_non_null;
 use crate::ref_count::AudioDeviceModuleHandle;
 use crate::{Environment, Error, Result, ScopedRef, ffi};
 use std::ffi::c_char;
@@ -28,6 +29,7 @@ impl AudioDeviceModule {
 
     /// Rust 側で拡張可能な AudioDeviceModule を生成する。
     pub fn new_with_handler(handler: Box<dyn AudioDeviceModuleHandler>) -> Self {
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let mut cbs = ffi::webrtc_AudioDeviceModule_cbs {
             ActiveAudioLayer: Some(adm_active_audio_layer),
             RegisterAudioCallback: Some(adm_register_audio_callback),
@@ -97,14 +99,14 @@ impl AudioDeviceModule {
             GetStats: Some(adm_get_stats),
             OnDestroy: Some(adm_on_destroy),
         };
-        let mut state = Box::new(AudioDeviceModuleHandlerState { handler });
-        let user_data_ptr = state.as_mut() as *mut AudioDeviceModuleHandlerState as *mut c_void;
-        let raw = expect_non_null(
-            unsafe { ffi::webrtc_CreateAudioDeviceModuleWithCallback(&mut cbs, user_data_ptr) },
-            "webrtc_CreateAudioDeviceModuleWithCallback",
-        );
+        let raw = unsafe {
+            create_with_handler::<AudioDeviceModuleHandlerState, _>(
+                "webrtc_CreateAudioDeviceModuleWithCallback",
+                user_data,
+                |user_data| ffi::webrtc_CreateAudioDeviceModuleWithCallback(&mut cbs, user_data),
+            )
+        };
         let raw_ref = ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw);
-        let _ = Box::into_raw(state);
         Self { raw_ref }
     }
 
@@ -374,21 +376,20 @@ unsafe impl Send for AudioTransport {}
 
 impl AudioTransport {
     pub fn new_with_handler(handler: Box<dyn AudioTransportHandler>) -> Self {
-        let state = Box::new(AudioTransportHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_AudioTransport_cbs {
             RecordedDataIsAvailable: Some(audio_transport_recorded_data_is_available),
             NeedMorePlayData: Some(audio_transport_need_more_play_data),
             PullRenderData: Some(audio_transport_pull_render_data),
             OnDestroy: Some(audio_transport_on_destroy),
         };
-        let raw = expect_non_null_with_cleanup(
-            unsafe { ffi::webrtc_AudioTransport_new(&cbs, user_data) },
-            "webrtc_AudioTransport_new",
-            || {
-                let _ = unsafe { Box::from_raw(user_data as *mut AudioTransportHandlerState) };
-            },
-        );
+        let raw = unsafe {
+            create_with_handler::<AudioTransportHandlerState, _>(
+                "webrtc_AudioTransport_new",
+                user_data,
+                |user_data| ffi::webrtc_AudioTransport_new(&cbs, user_data),
+            )
+        };
         Self { raw }
     }
 
@@ -542,18 +543,13 @@ pub trait AudioTransportHandler: Send {
     }
 }
 
-struct AudioTransportHandlerState {
-    handler: Box<dyn AudioTransportHandler>,
-}
-
-unsafe impl Send for AudioTransportHandlerState {}
+/// AudioTransport のコールバック状態の型。
+type AudioTransportHandlerState = HandlerState<dyn AudioTransportHandler>;
 
 unsafe extern "C" fn audio_transport_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "audio_transport_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut AudioTransportHandlerState) };
+    unsafe {
+        destroy_handler::<AudioTransportHandlerState>("audio_transport_on_destroy", user_data)
+    };
 }
 
 unsafe extern "C" fn audio_transport_recorded_data_is_available(
@@ -994,11 +990,8 @@ pub trait AudioDeviceModuleHandler: Send + Sync {
     }
 }
 
-struct AudioDeviceModuleHandlerState {
-    handler: Box<dyn AudioDeviceModuleHandler>,
-}
-
-unsafe impl Send for AudioDeviceModuleHandlerState {}
+/// AudioDeviceModule のコールバック状態の型。
+type AudioDeviceModuleHandlerState = HandlerState<dyn AudioDeviceModuleHandler>;
 
 fn bool_to_i32(value: bool) -> i32 {
     if value { 1 } else { 0 }
@@ -1539,8 +1532,5 @@ unsafe extern "C" fn adm_get_stats(
 }
 
 unsafe extern "C" fn adm_on_destroy(user_data: *mut c_void) {
-    assert!(!user_data.is_null(), "adm_on_destroy: user_data is null");
-    unsafe {
-        let _ = Box::from_raw(user_data as *mut AudioDeviceModuleHandlerState);
-    }
+    unsafe { destroy_handler::<AudioDeviceModuleHandlerState>("adm_on_destroy", user_data) };
 }
