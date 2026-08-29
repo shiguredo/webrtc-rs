@@ -61,6 +61,10 @@
 - [UPDATE] C API が返す null チェック済みポインタのコンストラクタを共通ヘルパーにまとめる
   - `src/non_null.rs` に `expect_non_null` / `expect_non_null_with_cleanup` を追加し、`NonNull::new(...).expect(...)` の定型と match + panic パターンを置き換えて挙動と panic メッセージの意味を維持する
   - @melpon
+- [UPDATE] FFI の out 引数と out_error のボイラープレートを共通ヘルパーにまとめる
+  - `src/api/out_param.rs` に `call_with_out` / `call_with_out_and_error` / `call_with_return_and_error` を追加し、`PeerConnectionFactory` / `PeerConnection` / `SessionDescriptionInterface` / `IceCandidate` / `SdpParseError` の該当メソッドを置き換えて挙動を維持する
+  - `Error::NullPointer` のカスタムメッセージと `Error::RtcError` / `Error::SdpParseError` への変換を共通化し、表記ゆれ (`returned null`) を解消する
+  - @melpon
 
 ## 0.152.0
 

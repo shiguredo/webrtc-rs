@@ -8,6 +8,7 @@ mod jsep;
 mod media_stream;
 mod media_types;
 mod optional;
+mod out_param;
 mod peer_connection;
 mod rtc_error;
 mod rtc_event_log;
