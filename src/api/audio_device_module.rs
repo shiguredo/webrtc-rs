@@ -21,9 +21,7 @@ impl AudioDeviceModule {
         let raw = NonNull::new(unsafe {
             ffi::webrtc_CreateAudioDeviceModule(env.as_ptr(), audio_type.to_int())
         })
-        .ok_or(Error::NullPointer(
-            "webrtc_CreateAudioDeviceModule が null を返しました",
-        ))?;
+        .ok_or(Error::NullPointer("webrtc_CreateAudioDeviceModule"))?;
         let raw_ref = ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw);
         Ok(Self { raw_ref })
     }

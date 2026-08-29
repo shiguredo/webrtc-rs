@@ -1,4 +1,4 @@
-use crate::api::out_param::{call_with_out, call_with_out_and_error, call_with_return_and_error};
+use crate::api::out_param::{call_with_out, call_with_out_and_error, call_with_void_and_error};
 use crate::non_null::{expect_non_null, expect_non_null_with_cleanup};
 use crate::ref_count::{
     AudioTrackHandle, AudioTrackSourceHandle, ConnectionContextHandle, DataChannelHandle,
@@ -226,7 +226,7 @@ impl PeerConnectionFactory {
         let raw =
             NonNull::new(unsafe { ffi::webrtc_CreateModularPeerConnectionFactory(deps.as_ptr()) })
                 .ok_or(Error::NullPointer(
-                    "webrtc_CreateModularPeerConnectionFactory が null を返しました",
+                    "webrtc_CreateModularPeerConnectionFactory",
                 ))?;
         let raw_ref = ScopedRef::<PeerConnectionFactoryHandle>::from_raw(raw);
         Ok(Self { raw_ref })
@@ -244,11 +244,11 @@ impl PeerConnectionFactory {
             )
         })
         .ok_or(Error::NullPointer(
-            "webrtc_CreateModularPeerConnectionFactoryWithContext が null を返しました",
+            "webrtc_CreateModularPeerConnectionFactoryWithContext factory",
         ))?;
         let factory_raw_ref = ScopedRef::<PeerConnectionFactoryHandle>::from_raw(factory_raw);
         let context_raw = NonNull::new(out_context).ok_or(Error::NullPointer(
-            "webrtc_CreateModularPeerConnectionFactoryWithContext context が null を返しました",
+            "webrtc_CreateModularPeerConnectionFactoryWithContext context",
         ))?;
         let context_raw_ref = ScopedRef::<ConnectionContextHandle>::from_raw(context_raw);
         Ok((
@@ -1690,6 +1690,7 @@ impl PeerConnection {
         deps: PeerConnectionDependencies,
     ) -> Result<Self> {
         let out = call_with_out_and_error(
+            "webrtc_PeerConnectionFactoryInterface_CreatePeerConnectionOrError",
             |out_pc, out_error| unsafe {
                 ffi::webrtc_PeerConnectionFactoryInterface_CreatePeerConnectionOrError(
                     factory.as_ptr(),
@@ -1699,7 +1700,7 @@ impl PeerConnection {
                     out_error,
                 );
             },
-            |err| Error::RtcError(RtcError::from_unique_ptr(err)),
+            |err| RtcError::from_unique_ptr(err).into(),
         )?;
         let raw_ref = ScopedRef::<PeerConnectionHandle>::from_raw(out);
         Ok(Self { raw_ref })
@@ -1777,7 +1778,7 @@ impl PeerConnection {
     }
 
     pub fn set_configuration(&self, config: &PeerConnectionRtcConfiguration) -> Result<()> {
-        call_with_return_and_error(
+        call_with_void_and_error(
             |out_error| unsafe {
                 ffi::webrtc_PeerConnectionInterface_SetConfiguration(
                     self.raw_ref.as_ptr(),
@@ -1785,12 +1786,13 @@ impl PeerConnection {
                     out_error,
                 );
             },
-            |err| Error::RtcError(RtcError::from_unique_ptr(err)),
+            |err| RtcError::from_unique_ptr(err).into(),
         )
     }
 
     pub fn create_data_channel(&self, label: &str, init: &DataChannelInit) -> Result<DataChannel> {
         let out = call_with_out_and_error(
+            "webrtc_PeerConnectionInterface_CreateDataChannelOrError",
             |out_dc, out_error| unsafe {
                 ffi::webrtc_PeerConnectionInterface_CreateDataChannelOrError(
                     self.raw_ref.as_ptr(),
@@ -1801,7 +1803,7 @@ impl PeerConnection {
                     out_error,
                 );
             },
-            |err| Error::RtcError(RtcError::from_unique_ptr(err)),
+            |err| RtcError::from_unique_ptr(err).into(),
         )?;
         let raw_ref = ScopedRef::<DataChannelHandle>::from_raw(out);
         Ok(DataChannel::from_scoped_ref(raw_ref))
@@ -1813,6 +1815,7 @@ impl PeerConnection {
         init: &RtpTransceiverInit,
     ) -> Result<RtpTransceiver> {
         let out = call_with_out_and_error(
+            "webrtc_PeerConnectionInterface_AddTransceiver",
             |out_transceiver, out_error| unsafe {
                 ffi::webrtc_PeerConnectionInterface_AddTransceiver(
                     self.raw_ref.as_ptr(),
@@ -1822,7 +1825,7 @@ impl PeerConnection {
                     out_error,
                 );
             },
-            |err| Error::RtcError(RtcError::from_unique_ptr(err)),
+            |err| RtcError::from_unique_ptr(err).into(),
         )?;
         let raw_ref = ScopedRef::<RtpTransceiverHandle>::from_raw(out);
         Ok(RtpTransceiver::from_scoped_ref(raw_ref))
@@ -1834,6 +1837,7 @@ impl PeerConnection {
         init: &RtpTransceiverInit,
     ) -> Result<RtpTransceiver> {
         let out = call_with_out_and_error(
+            "webrtc_PeerConnectionInterface_AddTransceiverWithTrack",
             |out_transceiver, out_error| unsafe {
                 ffi::webrtc_PeerConnectionInterface_AddTransceiverWithTrack(
                     self.raw_ref.as_ptr(),
@@ -1843,7 +1847,7 @@ impl PeerConnection {
                     out_error,
                 );
             },
-            |err| Error::RtcError(RtcError::from_unique_ptr(err)),
+            |err| RtcError::from_unique_ptr(err).into(),
         )?;
         let raw_ref = ScopedRef::<RtpTransceiverHandle>::from_raw(out);
         Ok(RtpTransceiver::from_scoped_ref(raw_ref))
@@ -1855,6 +1859,7 @@ impl PeerConnection {
         stream_ids: &StringVector,
     ) -> Result<RtpSender> {
         let out = call_with_out_and_error(
+            "webrtc_PeerConnectionInterface_AddTrack",
             |out_sender, out_error| unsafe {
                 ffi::webrtc_PeerConnectionInterface_AddTrack(
                     self.raw_ref.as_ptr(),
@@ -1864,14 +1869,14 @@ impl PeerConnection {
                     out_error,
                 );
             },
-            |err| Error::RtcError(RtcError::from_unique_ptr(err)),
+            |err| RtcError::from_unique_ptr(err).into(),
         )?;
         let raw_ref = ScopedRef::<RtpSenderHandle>::from_raw(out);
         Ok(RtpSender::from_scoped_ref(raw_ref))
     }
 
     pub fn remove_track(&self, sender: &RtpSender) -> Result<()> {
-        call_with_return_and_error(
+        call_with_void_and_error(
             |out_error| unsafe {
                 ffi::webrtc_PeerConnectionInterface_RemoveTrackOrError(
                     self.raw_ref.as_ptr(),
@@ -1879,7 +1884,7 @@ impl PeerConnection {
                     out_error,
                 );
             },
-            |err| Error::RtcError(RtcError::from_unique_ptr(err)),
+            |err| RtcError::from_unique_ptr(err).into(),
         )
     }
 

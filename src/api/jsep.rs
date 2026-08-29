@@ -107,9 +107,8 @@ impl SessionDescription {
                 sdp.len(),
             )
         };
-        let raw_unique = NonNull::new(raw).ok_or(Error::NullPointer(
-            "webrtc_CreateSessionDescription が null を返しました",
-        ))?;
+        let raw_unique =
+            NonNull::new(raw).ok_or(Error::NullPointer("webrtc_CreateSessionDescription"))?;
         Ok(Self { raw_unique })
     }
 
@@ -206,6 +205,7 @@ impl IceCandidate {
     /// SDP 文字列から IceCandidate を生成する。
     pub fn new(sdp_mid: &str, sdp_mline_index: i32, candidate: &str) -> Result<Self> {
         let raw = call_with_return_and_error(
+            "webrtc_CreateIceCandidate",
             |out_error| unsafe {
                 ffi::webrtc_CreateIceCandidate(
                     sdp_mid.as_ptr() as *const _,
@@ -218,9 +218,7 @@ impl IceCandidate {
             },
             |err| Error::SdpParseError(SdpParseError::from_unique_ptr(err)),
         )?;
-        Ok(Self {
-            raw: NonNull::new(raw).unwrap(),
-        })
+        Ok(Self { raw })
     }
 
     pub fn as_ref(&self) -> IceCandidateRef<'_> {
