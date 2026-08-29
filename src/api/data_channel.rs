@@ -127,7 +127,6 @@ pub trait DataChannelObserverHandler: Send {
     fn on_message(&mut self, data: &[u8], is_binary: bool) {}
 }
 
-/// DataChannelObserver のコールバック状態の型。
 type DataChannelObserverHandlerState = HandlerState<dyn DataChannelObserverHandler>;
 
 unsafe extern "C" fn dc_observer_on_state_change(user_data: *mut c_void) {

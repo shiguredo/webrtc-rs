@@ -318,7 +318,6 @@ pub mod log {
         fn on_log_message(&mut self, line: LogLineRef<'_>) {}
     }
 
-    /// LogSink のコールバック状態の型。
     type LogSinkHandlerState = HandlerState<dyn LogSinkHandler>;
 
     /// `webrtc::LogSink` のラッパー。
@@ -380,7 +379,6 @@ pub mod log {
         unsafe { &mut *(user_data as *mut LogSinkHandlerState) }
     }
 
-    /// on_destroy と同様に、user_data の null 検査後に LogSink の状態を回収する。
     unsafe extern "C" fn log_sink_on_destroy(user_data: *mut c_void) {
         unsafe { destroy_handler::<LogSinkHandlerState>("log_sink_on_destroy", user_data) };
     }

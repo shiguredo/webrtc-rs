@@ -1849,12 +1849,9 @@ pub trait VideoEncoderFactoryHandler: Send {
     }
 }
 
-/// VideoEncoder のコールバック状態の型。
 type VideoEncoderHandlerState = HandlerState<dyn VideoEncoderHandler>;
-/// VideoEncoderEncodedImageCallback のコールバック状態の型。
 type VideoEncoderEncodedImageHandlerState =
     HandlerState<dyn VideoEncoderEncodedImageCallbackHandler>;
-/// VideoEncoderFactory のコールバック状態の型。
 type VideoEncoderFactoryHandlerState = HandlerState<dyn VideoEncoderFactoryHandler>;
 
 unsafe extern "C" fn video_encoder_on_destroy(user_data: *mut c_void) {

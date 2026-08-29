@@ -323,7 +323,6 @@ pub trait AudioTrackSinkHandler: Send {
     );
 }
 
-/// AudioTrackSink のコールバック状態の型。
 type AudioTrackSinkHandlerState = HandlerState<dyn AudioTrackSinkHandler>;
 
 unsafe extern "C" fn audio_track_sink_on_data(

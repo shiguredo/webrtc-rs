@@ -99,7 +99,6 @@ pub trait SSLCertificateVerifierHandler: Send {
     }
 }
 
-/// SSLCertificateVerifier のコールバック状態の型。
 type SSLCertificateVerifierHandlerState = HandlerState<dyn SSLCertificateVerifierHandler>;
 
 unsafe extern "C" fn ssl_certificate_verifier_verify_chain(

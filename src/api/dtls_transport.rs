@@ -82,7 +82,6 @@ pub trait DtlsTransportObserverHandler: Send {
     fn on_error(&mut self) {}
 }
 
-/// DtlsTransportObserver のコールバック状態の型。
 type DtlsTransportObserverHandlerState = HandlerState<dyn DtlsTransportObserverHandler>;
 
 unsafe extern "C" fn dtls_observer_on_state_change(new_state: i32, user_data: *mut c_void) {

@@ -1191,7 +1191,6 @@ pub trait PeerConnectionObserverHandler: Send {
     fn on_data_channel(&mut self, data_channel: DataChannel) {}
 }
 
-/// PeerConnectionObserver のコールバック状態の型。
 type PeerConnectionObserverHandlerState = HandlerState<dyn PeerConnectionObserverHandler>;
 
 unsafe extern "C" fn observer_on_connection_change(new_state: i32, user_data: *mut c_void) {
@@ -1457,7 +1456,6 @@ pub trait CreateSessionDescriptionObserverHandler: Send {
     fn on_failure(&mut self, error: RtcError) {}
 }
 
-/// CreateSessionDescriptionObserver のコールバック状態の型。
 type CreateSessionDescriptionObserverHandlerState =
     HandlerState<dyn CreateSessionDescriptionObserverHandler>;
 
@@ -1528,7 +1526,6 @@ pub trait SetLocalDescriptionObserverHandler: Send {
     fn on_set_local_description_complete(&mut self, error: RtcError) {}
 }
 
-/// SetLocalDescriptionObserver のコールバック状態の型。
 type SetLocalDescriptionObserverHandlerState = HandlerState<dyn SetLocalDescriptionObserverHandler>;
 
 unsafe extern "C" fn sld_on_complete(
@@ -1591,7 +1588,6 @@ pub trait SetRemoteDescriptionObserverHandler: Send {
     fn on_set_remote_description_complete(&mut self, error: RtcError) {}
 }
 
-/// SetRemoteDescriptionObserver のコールバック状態の型。
 type SetRemoteDescriptionObserverHandlerState =
     HandlerState<dyn SetRemoteDescriptionObserverHandler>;
 

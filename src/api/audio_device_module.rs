@@ -543,7 +543,6 @@ pub trait AudioTransportHandler: Send {
     }
 }
 
-/// AudioTransport のコールバック状態の型。
 type AudioTransportHandlerState = HandlerState<dyn AudioTransportHandler>;
 
 unsafe extern "C" fn audio_transport_on_destroy(user_data: *mut c_void) {
@@ -990,7 +989,6 @@ pub trait AudioDeviceModuleHandler: Send + Sync {
     }
 }
 
-/// AudioDeviceModule のコールバック状態の型。
 type AudioDeviceModuleHandlerState = HandlerState<dyn AudioDeviceModuleHandler>;
 
 fn bool_to_i32(value: bool) -> i32 {

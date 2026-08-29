@@ -241,9 +241,7 @@ pub trait VideoDecoderFactoryHandler: Send {
     }
 }
 
-/// VideoDecoder のコールバック状態の型。
 type VideoDecoderHandlerState = HandlerState<dyn VideoDecoderHandler>;
-/// VideoDecoderFactory のコールバック状態の型。
 type VideoDecoderFactoryHandlerState = HandlerState<dyn VideoDecoderFactoryHandler>;
 
 unsafe extern "C" fn video_decoder_on_destroy(user_data: *mut c_void) {

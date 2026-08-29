@@ -13,9 +13,6 @@ pub trait VideoSinkHandler: Send {
     fn on_discarded_frame(&mut self) {}
 }
 
-/// VideoSink のコールバック状態の型。
-///
-/// ハンドラを保持し、C API の `user_data` 経由で trampoline から参照される。
 type VideoSinkHandlerState = HandlerState<dyn VideoSinkHandler>;
 
 unsafe extern "C" fn video_sink_on_frame(
