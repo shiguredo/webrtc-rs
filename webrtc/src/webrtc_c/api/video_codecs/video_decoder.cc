@@ -106,6 +106,8 @@ webrtc_VideoDecoder_DecoderInfo_get_implementation_name(
 WEBRTC_EXPORT void webrtc_VideoDecoder_DecoderInfo_set_implementation_name(
     struct webrtc_VideoDecoder_DecoderInfo* self,
     const struct std_string* name) {
+  assert(self != nullptr);
+  assert(name != nullptr);
   auto info = reinterpret_cast<webrtc::VideoDecoder::DecoderInfo*>(self);
   auto cpp_name = reinterpret_cast<const std::string*>(name);
   info->implementation_name = *cpp_name;

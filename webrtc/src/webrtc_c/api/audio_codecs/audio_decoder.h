@@ -40,9 +40,9 @@ struct webrtc_AudioDecoder_cbs {
                          void* user_data);
   int (*HasDecodePlc)(void* user_data);
   size_t (*DecodePlc)(size_t num_frames, int16_t* decoded, void* user_data);
-  int (*GeneratePlc)(size_t requested_samples_per_channel,
-                     struct webrtc_BufferS16* concealment_audio,
-                     void* user_data);
+  void (*GeneratePlc)(size_t requested_samples_per_channel,
+                      struct webrtc_BufferS16* concealment_audio,
+                      void* user_data);
   void (*Reset)(void* user_data);
   int (*ErrorCode)(void* user_data);
   int (*PacketDuration)(const uint8_t* encoded,

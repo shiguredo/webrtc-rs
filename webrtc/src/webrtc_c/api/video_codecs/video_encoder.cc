@@ -482,6 +482,8 @@ webrtc_VideoEncoder_EncoderInfo_get_implementation_name(
 WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_set_implementation_name(
     struct webrtc_VideoEncoder_EncoderInfo* self,
     const struct std_string* name) {
+  assert(self != nullptr);
+  assert(name != nullptr);
   auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
   auto cpp_name = reinterpret_cast<const std::string*>(name);
   info->implementation_name = *cpp_name;

@@ -461,6 +461,41 @@ impl AudioCodecType {
             Self::Unknown(_) => None,
         }
     }
+
+    /// 生のコーデックタイプ値 (`webrtc::AudioEncoder::CodecType`) から構築する。
+    ///
+    /// 既知の値は対応するバリアントへ、それ以外の値は `Unknown` へマップする。
+    pub fn from_raw(value: i32) -> Self {
+        unsafe {
+            if value == ffi::webrtc_AudioEncoder_CodecType_Opus {
+                Self::Opus
+            } else if value == ffi::webrtc_AudioEncoder_CodecType_Isac {
+                Self::Isac
+            } else if value == ffi::webrtc_AudioEncoder_CodecType_G722 {
+                Self::G722
+            } else if value == ffi::webrtc_AudioEncoder_CodecType_PcmA {
+                Self::PcmA
+            } else if value == ffi::webrtc_AudioEncoder_CodecType_PcmU {
+                Self::PcmU
+            } else {
+                Self::Unknown(value)
+            }
+        }
+    }
+
+    /// 生のコーデックタイプ値 (`webrtc::AudioEncoder::CodecType`) を返す。
+    pub fn to_raw(self) -> i32 {
+        unsafe {
+            match self {
+                Self::Opus => ffi::webrtc_AudioEncoder_CodecType_Opus,
+                Self::Isac => ffi::webrtc_AudioEncoder_CodecType_Isac,
+                Self::G722 => ffi::webrtc_AudioEncoder_CodecType_G722,
+                Self::PcmA => ffi::webrtc_AudioEncoder_CodecType_PcmA,
+                Self::PcmU => ffi::webrtc_AudioEncoder_CodecType_PcmU,
+                Self::Unknown(value) => value,
+            }
+        }
+    }
 }
 
 impl TryFrom<&str> for AudioCodecType {
@@ -619,7 +654,7 @@ impl<'a> SdpAudioFormatRef<'a> {
     }
 
     /// コーデックパラメータへの可変参照を返す。
-    pub fn parameters_mut(&mut self) -> MapStringString<'a> {
+    pub fn parameters_mut(&mut self) -> MapStringString<'_> {
         let ptr = unsafe { ffi::webrtc_SdpAudioFormat_get_parameters(self.raw.as_ptr()) };
         MapStringString::from_raw(expect_non_null(ptr, "webrtc_SdpAudioFormat_get_parameters"))
     }
@@ -646,7 +681,6 @@ unsafe impl Send for AudioCodecInfo {}
 
 impl AudioCodecInfo {
     /// 新しい AudioCodecInfo を生成する。
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         sample_rate_hz: i32,
         num_channels: usize,
@@ -955,8 +989,8 @@ pub trait AudioEncoderHandler: Send {
         rtp_timestamp: u32,
         audio: &[i16],
         encoded: &mut BufferRef<'_>,
-    ) -> Option<AudioEncoderEncodedInfo> {
-        None
+    ) -> AudioEncoderEncodedInfo {
+        AudioEncoderEncodedInfo::new()
     }
 
     /// エンコーダーを初期状態へ戻す。
@@ -1283,10 +1317,10 @@ unsafe extern "C" fn audio_encoder_encode(
     };
     let mut encoded =
         unsafe { BufferRef::from_raw(expect_non_null(encoded, "audio_encoder_encode (encoded)")) };
-    match state.handler.encode(rtp_timestamp, audio, &mut encoded) {
-        Some(info) => info.into_raw(),
-        None => std::ptr::null_mut(),
-    }
+    state
+        .handler
+        .encode(rtp_timestamp, audio, &mut encoded)
+        .into_raw()
 }
 
 unsafe extern "C" fn audio_encoder_reset(user_data: *mut c_void) {
@@ -1709,6 +1743,8 @@ pub enum AudioSpeechType {
     Speech,
     /// 快音。
     ComfortNoise,
+    /// 未知の音声タイプ。
+    Unknown(i32),
 }
 
 impl AudioSpeechType {
@@ -1716,6 +1752,17 @@ impl AudioSpeechType {
         match self {
             Self::Speech => unsafe { ffi::webrtc_AudioDecoder_SpeechType_kSpeech },
             Self::ComfortNoise => unsafe { ffi::webrtc_AudioDecoder_SpeechType_kComfortNoise },
+            Self::Unknown(value) => value,
+        }
+    }
+
+    fn from_raw(raw: i32) -> Self {
+        if raw == unsafe { ffi::webrtc_AudioDecoder_SpeechType_kComfortNoise } {
+            Self::ComfortNoise
+        } else if raw == unsafe { ffi::webrtc_AudioDecoder_SpeechType_kSpeech } {
+            Self::Speech
+        } else {
+            Self::Unknown(raw)
         }
     }
 }
@@ -1757,6 +1804,9 @@ pub trait AudioDecoderHandler: Send {
     }
 
     /// パケットロス隠蔽を生成する。
+    ///
+    /// 生成できた場合は `concealment_audio` へ追記する。生成しなかった場合は
+    /// 追記せず、WebRTC 側が他の手段でロスを隠蔽する。
     #[expect(unused_variables)]
     fn generate_plc(
         &mut self,
@@ -1886,7 +1936,7 @@ unsafe extern "C" fn audio_decoder_generate_plc(
     requested_samples_per_channel: usize,
     concealment_audio: *mut ffi::webrtc_BufferS16,
     user_data: *mut c_void,
-) -> i32 {
+) {
     assert!(
         !user_data.is_null(),
         "audio_decoder_generate_plc: user_data is null"
@@ -1900,7 +1950,6 @@ unsafe extern "C" fn audio_decoder_generate_plc(
     state
         .handler
         .generate_plc(requested_samples_per_channel, &mut concealment_audio);
-    1
 }
 
 unsafe extern "C" fn audio_decoder_reset(user_data: *mut c_void) {
@@ -2054,6 +2103,100 @@ impl AudioDecoder {
     pub fn channels(&self) -> usize {
         unsafe { ffi::webrtc_AudioDecoder_Channels(self.as_ptr()) }
     }
+
+    /// PLC を実装するかどうかを返す。
+    pub fn has_decode_plc(&self) -> bool {
+        unsafe { ffi::webrtc_AudioDecoder_HasDecodePlc(self.as_ptr()) != 0 }
+    }
+
+    /// ペイロードをデコードする。
+    ///
+    /// `decoded` にはデコード結果を書き込み、書き込んだサンプル数と音声タイプを返す。
+    pub fn decode(
+        &mut self,
+        encoded: &[u8],
+        sample_rate_hz: i32,
+        decoded: &mut [i16],
+    ) -> (i32, AudioSpeechType) {
+        let mut speech_type = 0i32;
+        let samples = unsafe {
+            ffi::webrtc_AudioDecoder_Decode(
+                self.as_ptr(),
+                encoded.as_ptr(),
+                encoded.len(),
+                sample_rate_hz,
+                decoded.as_mut_ptr(),
+                std::mem::size_of_val(decoded),
+                &mut speech_type,
+            )
+        };
+        (samples, AudioSpeechType::from_raw(speech_type))
+    }
+
+    /// 冗長ペイロードをデコードする。
+    pub fn decode_redundant(
+        &mut self,
+        encoded: &[u8],
+        sample_rate_hz: i32,
+        decoded: &mut [i16],
+    ) -> (i32, AudioSpeechType) {
+        let mut speech_type = 0i32;
+        let samples = unsafe {
+            ffi::webrtc_AudioDecoder_DecodeRedundant(
+                self.as_ptr(),
+                encoded.as_ptr(),
+                encoded.len(),
+                sample_rate_hz,
+                decoded.as_mut_ptr(),
+                std::mem::size_of_val(decoded),
+                &mut speech_type,
+            )
+        };
+        (samples, AudioSpeechType::from_raw(speech_type))
+    }
+
+    /// パケットロス隠蔽を実行する。
+    pub fn decode_plc(&mut self, num_frames: usize, decoded: &mut [i16]) -> usize {
+        unsafe {
+            ffi::webrtc_AudioDecoder_DecodePlc(self.as_ptr(), num_frames, decoded.as_mut_ptr())
+        }
+    }
+
+    /// デコーダーを初期状態へ戻す。
+    pub fn reset(&mut self) {
+        unsafe { ffi::webrtc_AudioDecoder_Reset(self.as_ptr()) }
+    }
+
+    /// 最後のエラーコードを返す。
+    pub fn error_code(&self) -> i32 {
+        unsafe { ffi::webrtc_AudioDecoder_ErrorCode(self.as_ptr()) }
+    }
+
+    /// ペイロードの継続時間 (サンプル/チャンネル) を返す。
+    pub fn packet_duration(&self, encoded: &[u8]) -> i32 {
+        unsafe {
+            ffi::webrtc_AudioDecoder_PacketDuration(self.as_ptr(), encoded.as_ptr(), encoded.len())
+        }
+    }
+
+    /// 冗長ペイロードの継続時間 (サンプル/チャンネル) を返す。
+    pub fn packet_duration_redundant(&self, encoded: &[u8]) -> i32 {
+        unsafe {
+            ffi::webrtc_AudioDecoder_PacketDurationRedundant(
+                self.as_ptr(),
+                encoded.as_ptr(),
+                encoded.len(),
+            )
+        }
+    }
+
+    /// ペイロードが FEC を含むかどうかを返す。
+    pub fn packet_has_fec(&self, encoded: &[u8]) -> bool {
+        unsafe {
+            ffi::webrtc_AudioDecoder_PacketHasFec(self.as_ptr(), encoded.as_ptr(), encoded.len())
+                != 0
+        }
+    }
 }
 
 impl Drop for AudioDecoder {
@@ -2081,11 +2224,6 @@ impl AudioCodecPairId {
     /// 数値表現を返す。
     pub fn numeric_representation(&self) -> u64 {
         unsafe { ffi::webrtc_AudioCodecPairId_NumericRepresentation(self.raw.as_ptr()) }
-    }
-
-    /// 等しいかどうかを返す。
-    pub fn is_equal(&self, other: &AudioCodecPairId) -> bool {
-        unsafe { ffi::webrtc_AudioCodecPairId_is_equal(self.raw.as_ptr(), other.raw.as_ptr()) != 0 }
     }
 
     fn raw(&self) -> *mut ffi::webrtc_AudioCodecPairId {
@@ -2327,8 +2465,13 @@ impl AudioEncoderFactory {
             Create: Some(audio_encoder_factory_create),
             OnDestroy: Some(audio_encoder_factory_on_destroy),
         };
-        let raw_ref = unsafe { ffi::webrtc_AudioEncoderFactory_make_ref_counted(&cbs, user_data) };
-        let raw_ref = expect_non_null(raw_ref, "webrtc_AudioEncoderFactory_make_ref_counted");
+        let raw_ref = unsafe {
+            create_with_handler::<AudioEncoderFactoryHandlerState, _>(
+                "webrtc_AudioEncoderFactory_make_ref_counted",
+                user_data,
+                |user_data| ffi::webrtc_AudioEncoderFactory_make_ref_counted(&cbs, user_data),
+            )
+        };
         let raw_ref = ScopedRef::<AudioEncoderFactoryHandle>::from_raw(raw_ref);
         Self { raw_ref }
     }
@@ -2353,7 +2496,7 @@ impl AudioEncoderFactory {
     }
 
     /// エンコーダーを生成する。
-    pub fn make_audio_encoder(
+    pub fn create(
         &self,
         env: EnvironmentRef<'_>,
         format: SdpAudioFormatRef<'_>,
@@ -2479,8 +2622,13 @@ impl AudioDecoderFactory {
             Create: Some(audio_decoder_factory_create),
             OnDestroy: Some(audio_decoder_factory_on_destroy),
         };
-        let raw_ref = unsafe { ffi::webrtc_AudioDecoderFactory_make_ref_counted(&cbs, user_data) };
-        let raw_ref = expect_non_null(raw_ref, "webrtc_AudioDecoderFactory_make_ref_counted");
+        let raw_ref = unsafe {
+            create_with_handler::<AudioDecoderFactoryHandlerState, _>(
+                "webrtc_AudioDecoderFactory_make_ref_counted",
+                user_data,
+                |user_data| ffi::webrtc_AudioDecoderFactory_make_ref_counted(&cbs, user_data),
+            )
+        };
         let raw_ref = ScopedRef::<AudioDecoderFactoryHandle>::from_raw(raw_ref);
         Self { raw_ref }
     }
@@ -2512,7 +2660,7 @@ impl AudioDecoderFactory {
     }
 
     /// デコーダーを生成する。
-    pub fn make_audio_decoder(
+    pub fn create(
         &self,
         env: EnvironmentRef<'_>,
         format: SdpAudioFormatRef<'_>,

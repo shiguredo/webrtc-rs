@@ -193,7 +193,8 @@ impl SdpVideoFormat {
     }
 
     pub fn parameters_mut(&mut self) -> MapStringString<'_> {
-        self.as_ref().parameters_mut()
+        let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(self.raw().as_ptr()) };
+        MapStringString::from_raw(expect_non_null(ptr, "webrtc_SdpVideoFormat_get_parameters"))
     }
 
     pub fn is_equal(&self, other: SdpVideoFormatRef<'_>) -> bool {
@@ -258,7 +259,7 @@ impl<'a> SdpVideoFormatRef<'a> {
         CxxStringRef::from_ptr(expect_non_null(ptr, "webrtc_SdpVideoFormat_get_name")).to_string()
     }
 
-    pub fn parameters_mut(&mut self) -> MapStringString<'a> {
+    pub fn parameters_mut(&mut self) -> MapStringString<'_> {
         let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(self.raw.as_ptr()) };
         MapStringString::from_raw(expect_non_null(ptr, "webrtc_SdpVideoFormat_get_parameters"))
     }

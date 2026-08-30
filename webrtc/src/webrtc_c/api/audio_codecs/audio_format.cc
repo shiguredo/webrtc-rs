@@ -73,6 +73,8 @@ WEBRTC_EXPORT struct std_string* webrtc_SdpAudioFormat_get_name(
 WEBRTC_EXPORT void webrtc_SdpAudioFormat_set_name(
     struct webrtc_SdpAudioFormat* self,
     const struct std_string* name) {
+  assert(self != nullptr);
+  assert(name != nullptr);
   auto fmt = reinterpret_cast<webrtc::SdpAudioFormat*>(self);
   auto cpp_name = reinterpret_cast<const std::string*>(name);
   fmt->name = *cpp_name;

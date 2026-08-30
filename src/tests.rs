@@ -4078,6 +4078,29 @@ fn rtp_video_header_h264_full_roundtrip() {
     assert_eq!(e2.sps_id(), -1);
 }
 
+#[test]
+fn audio_codec_type_raw_round_trip() {
+    let cases = [
+        (AudioCodecType::Opus, "opus"),
+        (AudioCodecType::Isac, "ISAC"),
+        (AudioCodecType::G722, "G722"),
+        (AudioCodecType::PcmA, "PCMA"),
+        (AudioCodecType::PcmU, "PCMU"),
+    ];
+    for (codec_type, name) in cases {
+        assert_eq!(
+            codec_type.to_raw(),
+            AudioCodecType::from_raw(codec_type.to_raw()).to_raw()
+        );
+        assert_eq!(AudioCodecType::from_raw(codec_type.to_raw()), codec_type);
+        assert_eq!(codec_type.as_str(), Some(name));
+    }
+    let unknown = AudioCodecType::from_raw(999);
+    assert_eq!(unknown, AudioCodecType::Unknown(999));
+    assert_eq!(unknown.to_raw(), 999);
+    assert_eq!(unknown.as_str(), None);
+}
+
 struct TestAudioEncoderHandler {
     pub(crate) encoded: bool,
 }
@@ -4103,13 +4126,13 @@ impl AudioEncoderHandler for TestAudioEncoderHandler {
         _rtp_timestamp: u32,
         _audio: &[i16],
         encoded: &mut BufferRef<'_>,
-    ) -> Option<AudioEncoderEncodedInfo> {
+    ) -> AudioEncoderEncodedInfo {
         self.encoded = true;
         encoded.append_data(&[0x01, 0x02, 0x03]);
         let mut info = AudioEncoderEncodedInfo::new();
         info.set_encoded_bytes(encoded.size());
         info.set_payload_type(111);
-        Some(info)
+        info
     }
 }
 
@@ -4153,7 +4176,7 @@ fn custom_audio_encoder_factory_roundtrip() {
     let mut options = AudioEncoderFactoryOptions::new();
     options.set_payload_type(111);
     let mut encoder = factory
-        .make_audio_encoder(env.as_ref(), format.as_ref(), &options)
+        .create(env.as_ref(), format.as_ref(), &options)
         .expect("カスタムエンコーダーの作成に失敗しました");
     assert_eq!(encoder.sample_rate_hz(), 48000);
     assert_eq!(encoder.num_channels(), 2);
@@ -4166,10 +4189,39 @@ fn custom_audio_encoder_factory_roundtrip() {
     assert_eq!(info.payload_type(), 111);
     assert!(
         factory
-            .make_audio_encoder(env.as_ref(), format.as_ref(), &options)
+            .create(env.as_ref(), format.as_ref(), &options)
             .is_none(),
-        "2 回目の make_audio_encoder は None を返す想定です"
+        "2 回目の create は None を返す想定です"
     );
+}
+
+#[test]
+fn custom_audio_encoder_no_output() {
+    let mut encoder = AudioEncoder::new_with_handler(Box::new(TestAudioEncoderNoOutputHandler));
+    let mut buffer = Buffer::new();
+    let info = encoder.encode(0, &[0i16; 960], &mut buffer);
+    assert_eq!(buffer.size(), 0);
+    assert_eq!(info.encoded_bytes(), 0);
+}
+
+struct TestAudioEncoderNoOutputHandler;
+
+impl AudioEncoderHandler for TestAudioEncoderNoOutputHandler {
+    fn sample_rate_hz(&mut self) -> i32 {
+        48000
+    }
+    fn num_channels(&mut self) -> usize {
+        2
+    }
+    fn num_10ms_frames_in_next_packet(&mut self) -> usize {
+        1
+    }
+    fn max_10ms_frames_in_a_packet(&mut self) -> usize {
+        4
+    }
+    fn get_target_bitrate(&mut self) -> i32 {
+        32000
+    }
 }
 
 struct TestAudioDecoderHandler;
@@ -4232,15 +4284,21 @@ fn custom_audio_decoder_factory_roundtrip() {
     let env = Environment::new();
     let format = SdpAudioFormat::new("opus", 48000, 2);
     assert!(factory.is_supported_decoder(format.as_ref()));
-    let decoder = factory
-        .make_audio_decoder(env.as_ref(), format.as_ref())
+    let mut decoder = factory
+        .create(env.as_ref(), format.as_ref())
         .expect("カスタムデコーダーの作成に失敗しました");
     assert_eq!(decoder.sample_rate_hz(), 48000);
     assert_eq!(decoder.channels(), 2);
+    let mut decoded = [0i16; 320];
+    let (samples, speech) = decoder.decode(&[0x01, 0x02, 0x03], 48000, &mut decoded);
+    assert_eq!(samples, 160);
+    assert_eq!(speech, AudioSpeechType::Speech);
     assert!(
-        factory
-            .make_audio_decoder(env.as_ref(), format.as_ref())
-            .is_none(),
-        "2 回目の make_audio_decoder は None を返す想定です"
+        decoded[..160].iter().all(|&v| v == 0),
+        "デコード結果が書き込まれていない想定です"
+    );
+    assert!(
+        factory.create(env.as_ref(), format.as_ref()).is_none(),
+        "2 回目の create は None を返す想定です"
     );
 }

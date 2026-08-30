@@ -29,7 +29,7 @@ pub use libyuv::{
     yuy2_to_i420,
 };
 pub use rtc_base::{
-    Buffer, BufferRef, SSLCertChainRef, SSLCertificateRef, SSLCertificateVerifier,
+    Buffer, BufferRef, BufferS16Ref, SSLCertChainRef, SSLCertificateRef, SSLCertificateVerifier,
     SSLCertificateVerifierHandler, SSLIdentity, Thread, TimestampAligner, log, random_bytes,
     random_string, rtc_log_format_file, time_millis,
 };

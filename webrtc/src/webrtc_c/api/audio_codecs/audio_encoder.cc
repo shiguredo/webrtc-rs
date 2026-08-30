@@ -191,9 +191,7 @@ class AudioEncoderImpl : public webrtc::AudioEncoder {
     auto raw = cbs_.Encode(rtp_timestamp, audio.data(), audio.size(),
                            reinterpret_cast<struct webrtc_Buffer*>(encoded),
                            user_data_);
-    if (raw == nullptr) {
-      return webrtc::AudioEncoder::EncodedInfo{};
-    }
+    assert(raw != nullptr);
     auto cpp = reinterpret_cast<webrtc::AudioEncoder::EncodedInfo*>(
         webrtc_AudioEncoder_EncodedInfo_unique_get(raw));
     webrtc::AudioEncoder::EncodedInfo result = *cpp;
@@ -338,6 +336,23 @@ WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_encoder_type(
   auto info = reinterpret_cast<webrtc::AudioEncoder::EncodedInfo*>(self);
   info->encoder_type = static_cast<webrtc::AudioEncoder::CodecType>(value);
 }
+
+// -------------------------
+// webrtc::AudioEncoder::CodecType
+// -------------------------
+
+WEBRTC_EXPORT const int webrtc_AudioEncoder_CodecType_Other =
+    static_cast<int>(webrtc::AudioEncoder::CodecType::kOther);
+WEBRTC_EXPORT const int webrtc_AudioEncoder_CodecType_Opus =
+    static_cast<int>(webrtc::AudioEncoder::CodecType::kOpus);
+WEBRTC_EXPORT const int webrtc_AudioEncoder_CodecType_Isac =
+    static_cast<int>(webrtc::AudioEncoder::CodecType::kIsac);
+WEBRTC_EXPORT const int webrtc_AudioEncoder_CodecType_PcmA =
+    static_cast<int>(webrtc::AudioEncoder::CodecType::kPcmA);
+WEBRTC_EXPORT const int webrtc_AudioEncoder_CodecType_PcmU =
+    static_cast<int>(webrtc::AudioEncoder::CodecType::kPcmU);
+WEBRTC_EXPORT const int webrtc_AudioEncoder_CodecType_G722 =
+    static_cast<int>(webrtc::AudioEncoder::CodecType::kG722);
 
 // -------------------------
 // webrtc::AudioEncoder

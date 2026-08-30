@@ -258,6 +258,17 @@ WEBRTC_EXPORT void webrtc_AudioEncoder_GetBitrateRange(
     int64_t* out_min_bps,
     int64_t* out_max_bps);
 
+// -------------------------
+// webrtc::AudioEncoder::CodecType
+// -------------------------
+
+WEBRTC_EXPORT extern const int webrtc_AudioEncoder_CodecType_Other;
+WEBRTC_EXPORT extern const int webrtc_AudioEncoder_CodecType_Opus;
+WEBRTC_EXPORT extern const int webrtc_AudioEncoder_CodecType_Isac;
+WEBRTC_EXPORT extern const int webrtc_AudioEncoder_CodecType_PcmA;
+WEBRTC_EXPORT extern const int webrtc_AudioEncoder_CodecType_PcmU;
+WEBRTC_EXPORT extern const int webrtc_AudioEncoder_CodecType_G722;
+
 #if defined(__cplusplus)
 }
 #endif

@@ -11,16 +11,18 @@
 
 ## develop
 
+- [CHANGE] libwebrtc 側で std::move により消費される `deps` を `&mut` から値渡しに変更する
+  - `PeerConnectionFactory::create_modular` / `create_modular_with_context` / `PeerConnection::create` の `deps` 引数を値渡しに変更する
+  - @melpon
 - [ADD] 音声コーデックのユーザー実装を注入するための API を追加する
-  - `AudioCodecType` を追加し、SDP コーデック名 (`opus` / `ISAC` / `G722` / `PCMA` / `PCMU`) との相互変換を提供する
+  - `AudioCodecType` を追加し、SDP コーデック名 (`opus` / `ISAC` / `G722` / `PCMA` / `PCMU`) との相互変換と、`webrtc::AudioEncoder::CodecType` の生値 (`from_raw` / `to_raw`) との相互変換を提供する
   - `SdpAudioFormat` / `SdpAudioFormatRef` / `AudioCodecInfo` / `AudioCodecSpec` を追加する
+  - handler の引数・戻り値として表面化する公開型 (`AudioCodecPairId` / `AudioEncoderEncodedInfo` / `AudioEncoderAnaStats` / `AudioSpeechType` / `AudioEncoderFactoryOptions` / `Buffer` / `BufferRef` / `BufferS16Ref`) と、長さ不明バッファ向けの `RawBufferWriter` を追加する
   - `AudioEncoderFactory::new_with_handler` と `AudioEncoderFactoryHandler` (`get_supported_encoders` / `query_audio_encoder` / `create`) を追加する
   - `AudioDecoderFactory::new_with_handler` と `AudioDecoderFactoryHandler` (`get_supported_decoders` / `is_supported_decoder` / `create`) を追加する
   - `AudioEncoder` / `AudioEncoderHandler` を追加し、`webrtc::AudioEncoder` の純仮想・仮想関数 (非推奨を除く) を転送する
   - `AudioDecoder` / `AudioDecoderHandler` を追加し、`webrtc::AudioDecoder` の純仮想・仮想関数 (非推奨を除く) を転送する
-  - `AudioEncoderFactory::get_supported_encoders` / `make_audio_encoder`、`AudioDecoderFactory::get_supported_decoders` / `make_audio_decoder` / `is_supported_decoder` を追加する
-  - @melpon
-  - `PeerConnectionFactory::create_modular` / `create_modular_with_context` / `PeerConnection::create` の `deps` 引数を値渡しに変更する
+  - `AudioEncoderFactory::get_supported_encoders` / `create`、`AudioDecoderFactory::get_supported_decoders` / `create` / `is_supported_decoder` を追加する
   - @melpon
 - [CHANGE] ログ初期化 API を `webrtc::LoggingConfig` の C ラッパー経由に変更する
   - C API の `webrtc_LogMessage_InitializeLogging` を `int severity` 引数から `struct webrtc_LoggingConfig*` 引数に変更し、`webrtc_LoggingConfig` 型 (new / delete / setter / getter) を追加する
@@ -68,6 +70,9 @@
   - @melpon
 - [FIX] C ラッパーが release ビルドでも abort する `RTC_CHECK` を `assert` に変更する
   - `webrtc_PeerConnectionDependencies_set_proxy` の `RTC_CHECK(nm != nullptr)` / `RTC_CHECK(sf != nullptr)` を `assert` に変更し、デバッグビルドのみ契約違反を検出するようにする (release では null をそのまま libwebrtc へ渡す)
+  - @melpon
+- [FIX] `set_implementation_name` が `CxxString` を消費 (move) してしまう所有権バグを修正する
+  - `DecoderInfo` / `EncoderInfo` の `set_implementation_name` が C 側の `std_string_unique` を move 消費していたのを、`const struct std_string*` を受け取ってコピーのみ行うように変更し、呼び出し側の `CxxString` を無効化しないようにする
   - @melpon
 
 ### misc

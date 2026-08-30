@@ -47,12 +47,10 @@ class AudioDecoderImpl : public webrtc::AudioDecoder {
 
   void GeneratePlc(size_t requested_samples_per_channel,
                    webrtc::BufferT<int16_t>* concealment_audio) override {
-    if (cbs_.GeneratePlc(
-            requested_samples_per_channel,
-            reinterpret_cast<struct webrtc_BufferS16*>(concealment_audio),
-            user_data_) == 0) {
-      concealment_audio->Clear();
-    }
+    cbs_.GeneratePlc(
+        requested_samples_per_channel,
+        reinterpret_cast<struct webrtc_BufferS16*>(concealment_audio),
+        user_data_);
   }
 
   void Reset() override { cbs_.Reset(user_data_); }
