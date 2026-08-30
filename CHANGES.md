@@ -52,6 +52,12 @@
   - ARGB / BGRA 入力について crop オフセット込みの必要長 (`src_width * 4` の stride で `(crop_y + abs(crop_height))` 行 × `(crop_x + crop_width) * 4` バイト) を検証し、不足時は `false` を返すようにする
   - MJPG 入力は libyuv 側の検証に委ねるため対象外とする
   - @melpon
+- [FIX] `convert_to_i420` が負の `crop_height` (垂直フリップ) 指定時に常に失敗する問題を修正する
+  - dst 側の行数検証と chroma サイズ計算が負値のままだったため `false` が返っていたのを、`abs(crop_height)` で検証するように修正し、負値でも libyuv の垂直フリップ変換を実行できるようにする
+  - @melpon
+- [FIX] `DataChannelObserver` の `on_message` が空メッセージ受信時に null ポインタを `slice::from_raw_parts` へ渡して UB になる問題を修正する
+  - C++ 側の空 `CopyOnWriteBuffer::data()` は `nullptr` を返し得るため、ポインタが null または長さ 0 の場合は空スライスへ置き換えてからハンドラへ渡すようにする
+  - @melpon
 
 ### misc
 
@@ -70,6 +76,12 @@
 - [UPDATE] FFI の out 引数と out_error のボイラープレートを共通ヘルパーにまとめる
   - `src/api/out_param.rs` に `call_with_out` / `call_with_out_and_error` / `call_with_return_and_error` を追加し、`PeerConnectionFactory` / `PeerConnection` / `SessionDescriptionInterface` / `IceCandidate` / `SdpParseError` の該当メソッドを置き換えて挙動を維持する
   - `Error::NullPointer` のカスタムメッセージと `Error::RtcError` / `Error::SdpParseError` への変換を共通化し、表記ゆれ (`returned null`) を解消する
+  - @melpon
+- [UPDATE] テストの panic / assert メッセージを日本語に統一する
+  - `src/tests.rs` に残っていた英語の `.expect` / `assert!` メッセージを周囲のテストと同じ日本語表記へ揃える (挙動は変更しない)
+  - @melpon
+- [UPDATE] 冗長な `#[allow]` を排除し、必要なものは `#[expect]` へ置き換える
+  - dead_code が発火しない `pub struct` / 使用済み `as_ptr` の `#[allow(dead_code)]` は削除し、それ以外の `#[allow]` は `#[expect]` へ置き換える (挙動は変更しない)
   - @melpon
 
 ## 0.152.0

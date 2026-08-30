@@ -12,7 +12,6 @@ use std::ptr::NonNull;
 ///
 /// ただし全てのオブジェクトが他のスレッドに移動して正しく動作するとは限らないため、
 /// RefCountedHandle を実装する型ごとに Send 可能かどうかを判断する必要がある。
-#[allow(clippy::missing_safety_doc)]
 pub(crate) trait RefCountedHandle {
     type Refcounted;
     type Raw;

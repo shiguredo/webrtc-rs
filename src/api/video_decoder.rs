@@ -127,7 +127,6 @@ impl<'a> VideoDecoderSettingsRef<'a> {
     }
 }
 
-#[allow(dead_code)]
 pub struct VideoDecoderDecodedImageCallbackRef<'a> {
     raw: NonNull<ffi::webrtc_VideoDecoder_DecodedImageCallback>,
     _marker: PhantomData<&'a ffi::webrtc_VideoDecoder_DecodedImageCallback>,
@@ -145,7 +144,7 @@ impl<'a> VideoDecoderDecodedImageCallbackRef<'a> {
         }
     }
 
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoDecoder_DecodedImageCallback {
         self.raw.as_ptr()
     }

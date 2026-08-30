@@ -253,7 +253,7 @@ fn fuzzy_match_sdp_video_format_prefers_more_parameter_matches() {
     );
 
     let mut matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
-        .expect("fuzzy_match_sdp_video_format should return a matched format");
+        .expect("fuzzy_match_sdp_video_format が一致するフォーマットを見つけられませんでした");
     let params = matched
         .parameters_mut()
         .iter()
@@ -288,7 +288,7 @@ fn fuzzy_match_sdp_video_format_keeps_first_candidate_on_tie() {
     let requested = SdpVideoFormat::new("H264");
 
     let mut matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
-        .expect("fuzzy_match_sdp_video_format should return a matched format");
+        .expect("fuzzy_match_sdp_video_format が一致するフォーマットを見つけられませんでした");
     let params = matched
         .parameters_mut()
         .iter()
@@ -1235,7 +1235,7 @@ fn video_frame_buffer_as_i420_and_as_nv12() {
     let i420_frame_buffer = i420.cast_to_video_frame_buffer();
     let i420_view = i420_frame_buffer
         .as_i420()
-        .expect("as_i420 failed on I420 buffer");
+        .expect("I420 buffer の as_i420 に失敗しました");
     assert_eq!(i420_view.width(), 2);
     assert_eq!(i420_view.height(), 2);
     assert!(i420_frame_buffer.as_nv12().is_none());
@@ -1244,7 +1244,7 @@ fn video_frame_buffer_as_i420_and_as_nv12() {
     let nv12_frame_buffer = nv12.cast_to_video_frame_buffer();
     let nv12_view = nv12_frame_buffer
         .as_nv12()
-        .expect("as_nv12 failed on NV12 buffer");
+        .expect("NV12 buffer の as_nv12 に失敗しました");
     assert_eq!(nv12_view.width(), 2);
     assert_eq!(nv12_view.height(), 2);
     assert!(nv12_frame_buffer.as_i420().is_none());
@@ -2809,28 +2809,28 @@ fn objc_video_encoder_factory_bridge_works() {
     let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoEncoderFactory_new() };
     assert!(
         !objc_factory.is_null(),
-        "webrtc_objc_RTCDefaultVideoEncoderFactory_new returned null"
+        "webrtc_objc_RTCDefaultVideoEncoderFactory_new が null を返しました"
     );
 
     let native_unique = unsafe { ffi::webrtc_ObjCToNativeVideoEncoderFactory(objc_factory) };
     assert!(
         !native_unique.is_null(),
-        "webrtc_ObjCToNativeVideoEncoderFactory returned null"
+        "webrtc_ObjCToNativeVideoEncoderFactory が null を返しました"
     );
 
     let native = unsafe { ffi::webrtc_VideoEncoderFactory_unique_get(native_unique) };
     assert!(
         !native.is_null(),
-        "webrtc_VideoEncoderFactory_unique_get returned null"
+        "webrtc_VideoEncoderFactory_unique_get が null を返しました"
     );
 
     let formats = unsafe { ffi::webrtc_VideoEncoderFactory_GetSupportedFormats(native) };
     assert!(
         !formats.is_null(),
-        "webrtc_VideoEncoderFactory_GetSupportedFormats returned null"
+        "webrtc_VideoEncoderFactory_GetSupportedFormats が null を返しました"
     );
     let size = unsafe { ffi::webrtc_SdpVideoFormat_vector_size(formats) };
-    assert!(size >= 0, "invalid format size: {size}");
+    assert!(size >= 0, "フォーマット数が不正です: {size}");
 
     unsafe {
         ffi::webrtc_SdpVideoFormat_vector_delete(formats);
@@ -2845,28 +2845,28 @@ fn objc_video_decoder_factory_bridge_works() {
     let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoDecoderFactory_new() };
     assert!(
         !objc_factory.is_null(),
-        "webrtc_objc_RTCDefaultVideoDecoderFactory_new returned null"
+        "webrtc_objc_RTCDefaultVideoDecoderFactory_new が null を返しました"
     );
 
     let native_unique = unsafe { ffi::webrtc_ObjCToNativeVideoDecoderFactory(objc_factory) };
     assert!(
         !native_unique.is_null(),
-        "webrtc_ObjCToNativeVideoDecoderFactory returned null"
+        "webrtc_ObjCToNativeVideoDecoderFactory が null を返しました"
     );
 
     let native = unsafe { ffi::webrtc_VideoDecoderFactory_unique_get(native_unique) };
     assert!(
         !native.is_null(),
-        "webrtc_VideoDecoderFactory_unique_get returned null"
+        "webrtc_VideoDecoderFactory_unique_get が null を返しました"
     );
 
     let formats = unsafe { ffi::webrtc_VideoDecoderFactory_GetSupportedFormats(native) };
     assert!(
         !formats.is_null(),
-        "webrtc_VideoDecoderFactory_GetSupportedFormats returned null"
+        "webrtc_VideoDecoderFactory_GetSupportedFormats が null を返しました"
     );
     let size = unsafe { ffi::webrtc_SdpVideoFormat_vector_size(formats) };
-    assert!(size >= 0, "invalid format size: {size}");
+    assert!(size >= 0, "フォーマット数が不正です: {size}");
 
     unsafe {
         ffi::webrtc_SdpVideoFormat_vector_delete(formats);
@@ -2937,7 +2937,7 @@ fn objc_video_factory_functions_return_null_on_non_apple() {
     let enc_objc = unsafe { ffi::webrtc_objc_RTCDefaultVideoEncoderFactory_new() };
     assert!(
         enc_objc.is_null(),
-        "encoder objc factory should be null on non-Apple platforms"
+        "非 Apple プラットフォームでは encoder objc factory が null になること"
     );
     let enc_native = unsafe {
         ffi::webrtc_ObjCToNativeVideoEncoderFactory(std::ptr::null_mut::<
@@ -2946,7 +2946,7 @@ fn objc_video_factory_functions_return_null_on_non_apple() {
     };
     assert!(
         enc_native.is_null(),
-        "encoder native factory should be null on non-Apple platforms"
+        "非 Apple プラットフォームでは encoder native factory が null になること"
     );
     unsafe {
         ffi::webrtc_objc_RTCVideoEncoderFactory_release(std::ptr::null_mut::<
@@ -2957,7 +2957,7 @@ fn objc_video_factory_functions_return_null_on_non_apple() {
     let dec_objc = unsafe { ffi::webrtc_objc_RTCDefaultVideoDecoderFactory_new() };
     assert!(
         dec_objc.is_null(),
-        "decoder objc factory should be null on non-Apple platforms"
+        "非 Apple プラットフォームでは decoder objc factory が null になること"
     );
     let dec_native = unsafe {
         ffi::webrtc_ObjCToNativeVideoDecoderFactory(std::ptr::null_mut::<
@@ -2966,7 +2966,7 @@ fn objc_video_factory_functions_return_null_on_non_apple() {
     };
     assert!(
         dec_native.is_null(),
-        "decoder native factory should be null on non-Apple platforms"
+        "非 Apple プラットフォームでは decoder native factory が null になること"
     );
     unsafe {
         ffi::webrtc_objc_RTCVideoDecoderFactory_release(std::ptr::null_mut::<

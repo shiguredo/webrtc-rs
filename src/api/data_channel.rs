@@ -149,8 +149,14 @@ unsafe extern "C" fn dc_observer_on_message(
         "dc_observer_on_message: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut DataChannelObserverHandlerState) };
-    let slice = unsafe { slice::from_raw_parts(data, len) };
-    state.handler.on_message(slice, is_binary != 0);
+    // C++ 側 (CopyOnWriteBuffer::data) は空バッファで null を渡すことがあるが、
+    // from_raw_parts は null では UB なので空スライスで置き換える。
+    let data = if data.is_null() || len == 0 {
+        &[]
+    } else {
+        unsafe { slice::from_raw_parts(data, len) }
+    };
+    state.handler.on_message(data, is_binary != 0);
 }
 
 unsafe extern "C" fn dc_observer_on_destroy(user_data: *mut c_void) {
