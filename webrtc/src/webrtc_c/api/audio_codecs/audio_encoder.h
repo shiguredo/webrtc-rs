@@ -25,9 +25,55 @@ WEBRTC_EXPORT void webrtc_AudioEncoder_unique_vector_delete(
     struct webrtc_AudioEncoder_unique_vector* self);
 WEBRTC_EXPORT size_t webrtc_AudioEncoder_unique_vector_size(
     struct webrtc_AudioEncoder_unique_vector* self);
+// 所有権を呼び出し側へ移す (release)。`index` の要素は vector からは失われる。
+WEBRTC_EXPORT struct webrtc_AudioEncoder_unique*
+webrtc_AudioEncoder_unique_vector_take(
+    struct webrtc_AudioEncoder_unique_vector* self,
+    size_t index);
 WEBRTC_EXPORT void webrtc_AudioEncoder_unique_vector_push_back(
     struct webrtc_AudioEncoder_unique_vector* self,
     struct webrtc_AudioEncoder_unique* value);
+
+// webrtc::AudioEncoder::EncodedInfoLeaf
+WEBRTC_DECLARE_VECTOR(webrtc_AudioEncoder_EncodedInfoLeaf);
+WEBRTC_EXPORT struct webrtc_AudioEncoder_EncodedInfoLeaf*
+webrtc_AudioEncoder_EncodedInfoLeaf_new();
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfoLeaf_delete(
+    struct webrtc_AudioEncoder_EncodedInfoLeaf* self);
+WEBRTC_EXPORT struct webrtc_AudioEncoder_EncodedInfoLeaf*
+webrtc_AudioEncoder_EncodedInfoLeaf_copy(
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf* self);
+WEBRTC_EXPORT size_t webrtc_AudioEncoder_EncodedInfoLeaf_get_encoded_bytes(
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf* self);
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfoLeaf_set_encoded_bytes(
+    struct webrtc_AudioEncoder_EncodedInfoLeaf* self,
+    size_t value);
+WEBRTC_EXPORT uint32_t
+webrtc_AudioEncoder_EncodedInfoLeaf_get_encoded_timestamp(
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf* self);
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfoLeaf_set_encoded_timestamp(
+    struct webrtc_AudioEncoder_EncodedInfoLeaf* self,
+    uint32_t value);
+WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfoLeaf_get_payload_type(
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf* self);
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfoLeaf_set_payload_type(
+    struct webrtc_AudioEncoder_EncodedInfoLeaf* self,
+    int value);
+WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfoLeaf_get_send_even_if_empty(
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf* self);
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfoLeaf_set_send_even_if_empty(
+    struct webrtc_AudioEncoder_EncodedInfoLeaf* self,
+    int value);
+WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfoLeaf_get_speech(
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf* self);
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfoLeaf_set_speech(
+    struct webrtc_AudioEncoder_EncodedInfoLeaf* self,
+    int value);
+WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfoLeaf_get_encoder_type(
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf* self);
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfoLeaf_set_encoder_type(
+    struct webrtc_AudioEncoder_EncodedInfoLeaf* self,
+    int value);
 
 // webrtc::AudioEncoder::EncodedInfo
 WEBRTC_DECLARE_UNIQUE(webrtc_AudioEncoder_EncodedInfo);
@@ -63,6 +109,14 @@ WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfo_get_encoder_type(
 WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_encoder_type(
     struct webrtc_AudioEncoder_EncodedInfo* self,
     int value);
+// redundant は std::vector<webrtc::AudioEncoder::EncodedInfoLeaf>。
+// 取得は EncodedInfo が保持する vector への借用ポインタ、設定はコピーで行う。
+WEBRTC_EXPORT struct webrtc_AudioEncoder_EncodedInfoLeaf_vector*
+webrtc_AudioEncoder_EncodedInfo_get_redundant(
+    struct webrtc_AudioEncoder_EncodedInfo* self);
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_redundant(
+    struct webrtc_AudioEncoder_EncodedInfo* self,
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf_vector* value);
 
 // webrtc::ANAStats (Audio Network Adaptation)
 struct webrtc_AudioEncoder_ANAStats;

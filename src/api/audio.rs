@@ -435,6 +435,8 @@ impl Drop for AudioProcessingBuilder {
 /// 音声コーデックの種類を表す列挙型。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AudioCodecType {
+    /// 未指定のコーデック。
+    Other,
     /// Opus コーデック。
     Opus,
     /// iSAC コーデック。
@@ -450,9 +452,10 @@ pub enum AudioCodecType {
 }
 
 impl AudioCodecType {
-    /// SDP コーデック名を返す。未知の場合は `None` を返す。
+    /// SDP コーデック名を返す。未知または未指定の場合は `None` を返す。
     pub fn as_str(self) -> Option<&'static str> {
         match self {
+            Self::Other => None,
             Self::Opus => Some("opus"),
             Self::Isac => Some("ISAC"),
             Self::G722 => Some("G722"),
@@ -467,7 +470,9 @@ impl AudioCodecType {
     /// 既知の値は対応するバリアントへ、それ以外の値は `Unknown` へマップする。
     pub fn from_raw(value: i32) -> Self {
         unsafe {
-            if value == ffi::webrtc_AudioEncoder_CodecType_Opus {
+            if value == ffi::webrtc_AudioEncoder_CodecType_Other {
+                Self::Other
+            } else if value == ffi::webrtc_AudioEncoder_CodecType_Opus {
                 Self::Opus
             } else if value == ffi::webrtc_AudioEncoder_CodecType_Isac {
                 Self::Isac
@@ -487,6 +492,7 @@ impl AudioCodecType {
     pub fn to_raw(self) -> i32 {
         unsafe {
             match self {
+                Self::Other => ffi::webrtc_AudioEncoder_CodecType_Other,
                 Self::Opus => ffi::webrtc_AudioEncoder_CodecType_Opus,
                 Self::Isac => ffi::webrtc_AudioEncoder_CodecType_Isac,
                 Self::G722 => ffi::webrtc_AudioEncoder_CodecType_G722,
@@ -544,6 +550,27 @@ impl SdpAudioFormat {
         }
     }
 
+    /// パラメータ付きで新しい SDP 音声フォーマットを生成する。
+    pub fn new_with_parameters(
+        name: &str,
+        clockrate_hz: i32,
+        num_channels: usize,
+        parameters: &MapStringString<'_>,
+    ) -> Self {
+        let raw = unsafe {
+            ffi::webrtc_SdpAudioFormat_new_with_parameters(
+                name.as_ptr() as *const _,
+                name.len(),
+                clockrate_hz,
+                num_channels,
+                parameters.raw(),
+            )
+        };
+        Self {
+            raw_unique: expect_non_null(raw, "webrtc_SdpAudioFormat_new_with_parameters"),
+        }
+    }
+
     /// SDP コーデック名を返す。
     pub fn name(&self) -> Result<String> {
         self.as_ref().name()
@@ -581,6 +608,11 @@ impl SdpAudioFormat {
     pub fn parameters_mut(&mut self) -> MapStringString<'_> {
         let ptr = unsafe { ffi::webrtc_SdpAudioFormat_get_parameters(self.raw().as_ptr()) };
         MapStringString::from_raw(expect_non_null(ptr, "webrtc_SdpAudioFormat_get_parameters"))
+    }
+
+    /// コーデックパラメータを設定する。
+    pub fn set_parameters(&mut self, parameters: &MapStringString<'_>) {
+        unsafe { ffi::webrtc_SdpAudioFormat_set_parameters(self.raw().as_ptr(), parameters.raw()) }
     }
 
     /// 等価かどうかを返す。
@@ -778,6 +810,10 @@ impl AudioCodecInfo {
         self.raw.as_ptr()
     }
 
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_AudioCodecInfo>) -> Self {
+        Self { raw }
+    }
+
     fn into_raw(self) -> *mut ffi::webrtc_AudioCodecInfo {
         std::mem::ManuallyDrop::new(self).raw.as_ptr()
     }
@@ -834,6 +870,16 @@ impl AudioCodecSpec {
         AudioCodecInfo {
             raw: expect_non_null(copied, "webrtc_AudioCodecInfo_copy"),
         }
+    }
+
+    /// SDP フォーマットを設定する。
+    pub fn set_format(&mut self, format: &SdpAudioFormat) {
+        unsafe { ffi::webrtc_AudioCodecSpec_set_format(self.raw(), format.raw().as_ptr()) }
+    }
+
+    /// コーデック情報を設定する。
+    pub fn set_info(&mut self, info: &AudioCodecInfo) {
+        unsafe { ffi::webrtc_AudioCodecSpec_set_info(self.raw(), info.raw()) }
     }
 
     fn raw(&self) -> *mut ffi::webrtc_AudioCodecSpec {
@@ -925,13 +971,67 @@ impl AudioEncoderEncodedInfo {
     }
 
     /// エンコーダータイプを返す。
-    pub fn encoder_type(&self) -> i32 {
-        unsafe { ffi::webrtc_AudioEncoder_EncodedInfo_get_encoder_type(self.raw()) }
+    pub fn encoder_type(&self) -> AudioCodecType {
+        unsafe {
+            AudioCodecType::from_raw(ffi::webrtc_AudioEncoder_EncodedInfo_get_encoder_type(
+                self.raw(),
+            ))
+        }
     }
 
     /// エンコーダータイプを設定する。
-    pub fn set_encoder_type(&mut self, value: i32) {
-        unsafe { ffi::webrtc_AudioEncoder_EncodedInfo_set_encoder_type(self.raw(), value) }
+    ///
+    /// # Panics
+    /// `value` が既知のコーデックタイプでない場合、libwebrtc 内部のヒストグラム配列が
+    /// 範囲外アクセスになるため panic する。
+    pub fn set_encoder_type(&mut self, value: AudioCodecType) {
+        // codec_histogram_bins_log_ は既知の CodecType 分しか持たないため、未知値
+        // (Unknown) は libwebrtc 内部で配列 OOB になる。ここで拒否する。
+        assert!(
+            !matches!(value, AudioCodecType::Unknown(_)),
+            "encoder_type は既知のコーデックタイプで指定してください"
+        );
+        unsafe { ffi::webrtc_AudioEncoder_EncodedInfo_set_encoder_type(self.raw(), value.to_raw()) }
+    }
+
+    /// 冗長符号化の要素をコピーして返す。
+    pub fn redundant(&self) -> Vec<AudioEncoderEncodedInfoLeaf> {
+        let vec = unsafe { ffi::webrtc_AudioEncoder_EncodedInfo_get_redundant(self.raw()) };
+        let vec = expect_non_null(vec, "webrtc_AudioEncoder_EncodedInfo_get_redundant");
+        let size = unsafe { ffi::webrtc_AudioEncoder_EncodedInfoLeaf_vector_size(vec.as_ptr()) };
+        let size = size.max(0) as usize;
+        let mut redundant = Vec::with_capacity(size);
+        for i in 0..size {
+            let raw = unsafe {
+                ffi::webrtc_AudioEncoder_EncodedInfoLeaf_vector_get(vec.as_ptr(), i as i32)
+            };
+            let raw = expect_non_null(raw, "webrtc_AudioEncoder_EncodedInfoLeaf_vector_get");
+            // Safety: vector が保持する leaf への借用ポインタを返す。_copy で複製して所有する。
+            let copied = unsafe { ffi::webrtc_AudioEncoder_EncodedInfoLeaf_copy(raw.as_ptr()) };
+            redundant.push(unsafe {
+                AudioEncoderEncodedInfoLeaf::from_raw(expect_non_null(
+                    copied,
+                    "webrtc_AudioEncoder_EncodedInfoLeaf_copy",
+                ))
+            });
+        }
+        redundant
+    }
+
+    /// 冗長符号化の要素を設定する (コピー)。
+    pub fn set_redundant(&mut self, redundant: Vec<AudioEncoderEncodedInfoLeaf>) {
+        let vec = unsafe { ffi::webrtc_AudioEncoder_EncodedInfoLeaf_vector_new(0) };
+        let vec = expect_non_null(vec, "webrtc_AudioEncoder_EncodedInfoLeaf_vector_new");
+        for leaf in &redundant {
+            unsafe {
+                ffi::webrtc_AudioEncoder_EncodedInfoLeaf_vector_push_back(
+                    vec.as_ptr(),
+                    leaf.raw.as_ptr(),
+                )
+            };
+        }
+        unsafe { ffi::webrtc_AudioEncoder_EncodedInfo_set_redundant(self.raw(), vec.as_ptr()) };
+        unsafe { ffi::webrtc_AudioEncoder_EncodedInfoLeaf_vector_delete(vec.as_ptr()) };
     }
 
     fn raw(&self) -> *mut ffi::webrtc_AudioEncoder_EncodedInfo {
@@ -955,22 +1055,163 @@ impl Drop for AudioEncoderEncodedInfo {
     }
 }
 
-/// `webrtc::BitrateAllocationUpdate` への借用ラッパー。
-pub struct BitrateAllocationUpdateRef<'a> {
-    raw: NonNull<ffi::webrtc_BitrateAllocationUpdate>,
-    _marker: PhantomData<&'a ffi::webrtc_BitrateAllocationUpdate>,
+/// 冗長符号化の 1 要素 (webrtc::AudioEncoder::EncodedInfoLeaf) のラッパー。
+pub struct AudioEncoderEncodedInfoLeaf {
+    raw: NonNull<ffi::webrtc_AudioEncoder_EncodedInfoLeaf>,
 }
 
-unsafe impl<'a> Send for BitrateAllocationUpdateRef<'a> {}
+unsafe impl Send for AudioEncoderEncodedInfoLeaf {}
 
-impl<'a> BitrateAllocationUpdateRef<'a> {
-    /// # Safety
-    /// `raw` は有効な `webrtc_BitrateAllocationUpdate` を指す必要があります。
-    pub(crate) unsafe fn from_raw(raw: NonNull<ffi::webrtc_BitrateAllocationUpdate>) -> Self {
+impl AudioEncoderEncodedInfoLeaf {
+    /// 新しい EncodedInfoLeaf を生成する。
+    pub fn new() -> Self {
+        let raw = unsafe { ffi::webrtc_AudioEncoder_EncodedInfoLeaf_new() };
         Self {
-            raw,
-            _marker: PhantomData,
+            raw: expect_non_null(raw, "webrtc_AudioEncoder_EncodedInfoLeaf_new"),
         }
+    }
+
+    /// # Safety
+    /// `raw` は C 側で生成された有効な leaf を指し、所有権をこの型が引き受ける必要があります。
+    pub(crate) unsafe fn from_raw(raw: NonNull<ffi::webrtc_AudioEncoder_EncodedInfoLeaf>) -> Self {
+        Self { raw }
+    }
+
+    /// エンコード済みバイト数を返す。
+    pub fn encoded_bytes(&self) -> usize {
+        unsafe { ffi::webrtc_AudioEncoder_EncodedInfoLeaf_get_encoded_bytes(self.raw.as_ptr()) }
+    }
+
+    /// エンコード済みバイト数を設定する。
+    pub fn set_encoded_bytes(&mut self, value: usize) {
+        unsafe {
+            ffi::webrtc_AudioEncoder_EncodedInfoLeaf_set_encoded_bytes(self.raw.as_ptr(), value)
+        }
+    }
+
+    /// エンコード済みタイムスタンプを返す。
+    pub fn encoded_timestamp(&self) -> u32 {
+        unsafe { ffi::webrtc_AudioEncoder_EncodedInfoLeaf_get_encoded_timestamp(self.raw.as_ptr()) }
+    }
+
+    /// エンコード済みタイムスタンプを設定する。
+    pub fn set_encoded_timestamp(&mut self, value: u32) {
+        unsafe {
+            ffi::webrtc_AudioEncoder_EncodedInfoLeaf_set_encoded_timestamp(self.raw.as_ptr(), value)
+        }
+    }
+
+    /// ペイロードタイプを返す。
+    pub fn payload_type(&self) -> i32 {
+        unsafe { ffi::webrtc_AudioEncoder_EncodedInfoLeaf_get_payload_type(self.raw.as_ptr()) }
+    }
+
+    /// ペイロードタイプを設定する。
+    pub fn set_payload_type(&mut self, value: i32) {
+        unsafe {
+            ffi::webrtc_AudioEncoder_EncodedInfoLeaf_set_payload_type(self.raw.as_ptr(), value)
+        }
+    }
+
+    /// 空でも送信するかどうかを返す。
+    pub fn send_even_if_empty(&self) -> bool {
+        unsafe {
+            ffi::webrtc_AudioEncoder_EncodedInfoLeaf_get_send_even_if_empty(self.raw.as_ptr()) != 0
+        }
+    }
+
+    /// 空でも送信するかどうかを設定する。
+    pub fn set_send_even_if_empty(&mut self, value: bool) {
+        unsafe {
+            ffi::webrtc_AudioEncoder_EncodedInfoLeaf_set_send_even_if_empty(
+                self.raw.as_ptr(),
+                value.into(),
+            )
+        }
+    }
+
+    /// 音声かどうかを返す。
+    pub fn speech(&self) -> bool {
+        unsafe { ffi::webrtc_AudioEncoder_EncodedInfoLeaf_get_speech(self.raw.as_ptr()) != 0 }
+    }
+
+    /// 音声かどうかを設定する。
+    pub fn set_speech(&mut self, value: bool) {
+        unsafe {
+            ffi::webrtc_AudioEncoder_EncodedInfoLeaf_set_speech(self.raw.as_ptr(), value.into())
+        }
+    }
+
+    /// エンコーダータイプを返す。
+    pub fn encoder_type(&self) -> AudioCodecType {
+        unsafe {
+            AudioCodecType::from_raw(ffi::webrtc_AudioEncoder_EncodedInfoLeaf_get_encoder_type(
+                self.raw.as_ptr(),
+            ))
+        }
+    }
+
+    /// エンコーダータイプを設定する。
+    ///
+    /// # Panics
+    /// `value` が既知のコーデックタイプでない場合、libwebrtc 内部のヒストグラム配列が
+    /// 範囲外アクセスになるため panic する。
+    pub fn set_encoder_type(&mut self, value: AudioCodecType) {
+        assert!(
+            !matches!(value, AudioCodecType::Unknown(_)),
+            "encoder_type は既知のコーデックタイプで指定してください"
+        );
+        unsafe {
+            ffi::webrtc_AudioEncoder_EncodedInfoLeaf_set_encoder_type(
+                self.raw.as_ptr(),
+                value.to_raw(),
+            )
+        }
+    }
+}
+
+impl Default for AudioEncoderEncodedInfoLeaf {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for AudioEncoderEncodedInfoLeaf {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_AudioEncoder_EncodedInfoLeaf_delete(self.raw.as_ptr()) };
+    }
+}
+
+impl Clone for AudioEncoderEncodedInfoLeaf {
+    fn clone(&self) -> Self {
+        let raw = unsafe { ffi::webrtc_AudioEncoder_EncodedInfoLeaf_copy(self.raw.as_ptr()) };
+        Self {
+            raw: expect_non_null(raw, "webrtc_AudioEncoder_EncodedInfoLeaf_copy"),
+        }
+    }
+}
+
+/// `webrtc::BitrateAllocationUpdate` の所有ラッパー。
+pub struct BitrateAllocationUpdate {
+    raw: NonNull<ffi::webrtc_BitrateAllocationUpdate>,
+}
+
+unsafe impl Send for BitrateAllocationUpdate {}
+
+impl BitrateAllocationUpdate {
+    /// 新しい BitrateAllocationUpdate を生成する。
+    pub fn new() -> Self {
+        let raw = unsafe { ffi::webrtc_BitrateAllocationUpdate_new() };
+        Self {
+            raw: expect_non_null(raw, "webrtc_BitrateAllocationUpdate_new"),
+        }
+    }
+
+    /// # Safety
+    /// `raw` は C 側で生成された有効な `webrtc_BitrateAllocationUpdate` を指し、
+    /// 所有権をこの型が引き受ける必要があります。
+    pub(crate) unsafe fn from_raw(raw: NonNull<ffi::webrtc_BitrateAllocationUpdate>) -> Self {
+        Self { raw }
     }
 
     /// 割り当てられたターゲットビットレート (bps) を返す。
@@ -978,9 +1219,23 @@ impl<'a> BitrateAllocationUpdateRef<'a> {
         unsafe { ffi::webrtc_BitrateAllocationUpdate_get_target_bitrate_bps(self.raw.as_ptr()) }
     }
 
+    /// 割り当てられたターゲットビットレート (bps) を設定する。
+    pub fn set_target_bitrate_bps(&mut self, value: i64) {
+        unsafe {
+            ffi::webrtc_BitrateAllocationUpdate_set_target_bitrate_bps(self.raw.as_ptr(), value)
+        }
+    }
+
     /// 予測パケットロス率を返す。
     pub fn packet_loss_ratio(&self) -> f64 {
         unsafe { ffi::webrtc_BitrateAllocationUpdate_get_packet_loss_ratio(self.raw.as_ptr()) }
+    }
+
+    /// 予測パケットロス率を設定する。
+    pub fn set_packet_loss_ratio(&mut self, value: f64) {
+        unsafe {
+            ffi::webrtc_BitrateAllocationUpdate_set_packet_loss_ratio(self.raw.as_ptr(), value)
+        }
     }
 
     /// 予測ラウンドトリップ時間 (マイクロ秒) を返す。
@@ -990,14 +1245,62 @@ impl<'a> BitrateAllocationUpdateRef<'a> {
         unsafe { ffi::webrtc_BitrateAllocationUpdate_get_round_trip_time_us(self.raw.as_ptr()) }
     }
 
+    /// 予測ラウンドトリップ時間 (マイクロ秒) を設定する。
+    ///
+    /// `i64::MAX` を指定すると `webrtc::TimeDelta::PlusInfinity()` となる。
+    pub fn set_round_trip_time_us(&mut self, value: i64) {
+        unsafe {
+            ffi::webrtc_BitrateAllocationUpdate_set_round_trip_time_us(self.raw.as_ptr(), value)
+        }
+    }
+
     /// 輻輳ウィンドウ pushback によるビットレート削減率を返す。
     pub fn cwnd_reduce_ratio(&self) -> f64 {
         unsafe { ffi::webrtc_BitrateAllocationUpdate_get_cwnd_reduce_ratio(self.raw.as_ptr()) }
     }
 
+    /// 輻輳ウィンドウ pushback によるビットレート削減率を設定する。
+    pub fn set_cwnd_reduce_ratio(&mut self, value: f64) {
+        unsafe {
+            ffi::webrtc_BitrateAllocationUpdate_set_cwnd_reduce_ratio(self.raw.as_ptr(), value)
+        }
+    }
+
     /// パケットあたりのトランスポートオーバーヘッド (バイト) を返す。
     pub fn packet_overhead_bytes(&self) -> i64 {
         unsafe { ffi::webrtc_BitrateAllocationUpdate_get_packet_overhead_bytes(self.raw.as_ptr()) }
+    }
+
+    /// パケットあたりのトランスポートオーバーヘッド (バイト) を設定する。
+    pub fn set_packet_overhead_bytes(&mut self, value: i64) {
+        unsafe {
+            ffi::webrtc_BitrateAllocationUpdate_set_packet_overhead_bytes(self.raw.as_ptr(), value)
+        }
+    }
+
+    fn raw(&self) -> *mut ffi::webrtc_BitrateAllocationUpdate {
+        self.raw.as_ptr()
+    }
+}
+
+impl Clone for BitrateAllocationUpdate {
+    fn clone(&self) -> Self {
+        let raw = unsafe { ffi::webrtc_BitrateAllocationUpdate_copy(self.raw.as_ptr()) };
+        Self {
+            raw: expect_non_null(raw, "webrtc_BitrateAllocationUpdate_copy"),
+        }
+    }
+}
+
+impl Default for BitrateAllocationUpdate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for BitrateAllocationUpdate {
+    fn drop(&mut self) {
+        unsafe { ffi::webrtc_BitrateAllocationUpdate_delete(self.raw.as_ptr()) };
     }
 }
 
@@ -1029,18 +1332,25 @@ pub trait AudioEncoderHandler: Send {
     /// オーディオフレームをエンコードし、`encoded` へ書き込み、補助情報を返す。
     ///
     /// `encoded` は WebRTC 側が用意した空のバッファで、`append_data` で書き込む。
-    #[expect(unused_variables)]
+    ///
+    /// # 契約
+    ///
+    /// WebRTC の `AudioEncoder::Encode` (api/audio_codecs/audio_encoder.cc) は以下の
+    /// 2 つを `RTC_CHECK_EQ` で検証するため、違反するとデバッグ・リリースを問わず
+    /// プロセスが abort する。
+    ///
+    /// - `audio.len()` は `sample_rate_hz() * num_channels() / 100` でなければならない
+    /// - `encoded` へ `append_data` したバイト数の合計と `set_encoded_bytes` で設定した値が
+    ///   一致しなければならない
     fn encode(
         &mut self,
         rtp_timestamp: u32,
         audio: &[i16],
         encoded: &mut BufferRef<'_>,
-    ) -> AudioEncoderEncodedInfo {
-        AudioEncoderEncodedInfo::new()
-    }
+    ) -> AudioEncoderEncodedInfo;
 
     /// エンコーダーを初期状態へ戻す。
-    fn reset(&mut self) {}
+    fn reset(&mut self);
 
     /// FEC を有効化/無効化する。
     fn set_fec(&mut self, enable: bool) -> bool {
@@ -1091,7 +1401,7 @@ pub trait AudioEncoderHandler: Send {
 
     /// 上りビットレート割り当てを通知する。
     #[expect(unused_variables)]
-    fn on_received_uplink_allocation(&mut self, allocation: &BitrateAllocationUpdateRef<'_>) {}
+    fn on_received_uplink_allocation(&mut self, allocation: BitrateAllocationUpdate) {}
 
     /// RTT を通知する。
     #[expect(unused_variables)]
@@ -1111,9 +1421,7 @@ pub trait AudioEncoderHandler: Send {
     }
 
     /// サポートされるフレーム長範囲 (マイクロ秒) を返す。
-    fn get_frame_length_range(&mut self) -> Option<(i64, i64)> {
-        None
-    }
+    fn get_frame_length_range(&mut self) -> Option<(i64, i64)>;
 
     /// サポートされるビットレート範囲 (bps) を返す。
     fn get_bitrate_range(&mut self) -> Option<(i64, i64)> {
@@ -1273,6 +1581,10 @@ impl AudioEncoderAnaStats {
                 ptr,
             )
         })
+    }
+
+    pub(crate) fn raw(&self) -> *mut ffi::webrtc_AudioEncoder_ANAStats {
+        self.raw.as_ptr()
     }
 }
 
@@ -1531,8 +1843,15 @@ unsafe extern "C" fn audio_encoder_on_received_uplink_allocation(
         "audio_encoder_on_received_uplink_allocation (update)",
     );
     let state = unsafe { &mut *(user_data as *mut AudioEncoderHandlerState) };
-    let update = unsafe { BitrateAllocationUpdateRef::from_raw(update) };
-    state.handler.on_received_uplink_allocation(&update);
+    // C++ 側の update はコールバック期間だけ生きるため、コピーして所有する。
+    let copied = unsafe { ffi::webrtc_BitrateAllocationUpdate_copy(update.as_ptr()) };
+    let update = unsafe {
+        BitrateAllocationUpdate::from_raw(expect_non_null(
+            copied,
+            "webrtc_BitrateAllocationUpdate_copy",
+        ))
+    };
+    state.handler.on_received_uplink_allocation(update);
 }
 
 unsafe extern "C" fn audio_encoder_on_received_rtt(rtt_ms: i32, user_data: *mut c_void) {
@@ -1776,6 +2095,105 @@ impl AudioEncoder {
     pub fn set_fec(&mut self, enable: bool) -> bool {
         unsafe { ffi::webrtc_AudioEncoder_SetFec(self.as_ptr(), enable.into()) != 0 }
     }
+
+    /// DTX を有効化/無効化する。
+    pub fn set_dtx(&mut self, enable: bool) -> bool {
+        unsafe { ffi::webrtc_AudioEncoder_SetDtx(self.as_ptr(), enable.into()) != 0 }
+    }
+
+    /// DTX の状態を返す。
+    pub fn get_dtx(&self) -> bool {
+        unsafe { ffi::webrtc_AudioEncoder_GetDtx(self.as_ptr()) != 0 }
+    }
+
+    /// アプリケーションモードを設定する。
+    pub fn set_application(&mut self, application: i32) -> bool {
+        unsafe { ffi::webrtc_AudioEncoder_SetApplication(self.as_ptr(), application) != 0 }
+    }
+
+    /// 最大再生レート (Hz) を設定する。
+    pub fn set_max_playback_rate(&mut self, frequency_hz: i32) {
+        unsafe { ffi::webrtc_AudioEncoder_SetMaxPlaybackRate(self.as_ptr(), frequency_hz) }
+    }
+
+    /// 内包するエンコーダーを回収する。
+    pub fn reclaim_contained_encoders(&mut self) -> Vec<AudioEncoder> {
+        let raw_vec = unsafe { ffi::webrtc_AudioEncoder_ReclaimContainedEncoders(self.as_ptr()) };
+        let raw_vec = expect_non_null(raw_vec, "webrtc_AudioEncoder_ReclaimContainedEncoders");
+        let size = unsafe { ffi::webrtc_AudioEncoder_unique_vector_size(raw_vec.as_ptr()) };
+        let mut encoders = Vec::with_capacity(size);
+        for i in 0..size {
+            let raw = unsafe { ffi::webrtc_AudioEncoder_unique_vector_take(raw_vec.as_ptr(), i) };
+            encoders.push(AudioEncoder {
+                raw_unique: expect_non_null(raw, "webrtc_AudioEncoder_unique_vector_take"),
+            });
+        }
+        unsafe { ffi::webrtc_AudioEncoder_unique_vector_delete(raw_vec.as_ptr()) };
+        encoders
+    }
+
+    /// オーディオネットワークアダプターを有効化する。
+    pub fn enable_audio_network_adaptor(&mut self, config: &[u8]) -> bool {
+        unsafe {
+            ffi::webrtc_AudioEncoder_EnableAudioNetworkAdaptor(
+                self.as_ptr(),
+                config.as_ptr(),
+                config.len(),
+            ) != 0
+        }
+    }
+
+    /// オーディオネットワークアダプターを無効化する。
+    pub fn disable_audio_network_adaptor(&mut self) {
+        unsafe { ffi::webrtc_AudioEncoder_DisableAudioNetworkAdaptor(self.as_ptr()) }
+    }
+
+    /// 上りパケットロス率を通知する。
+    pub fn on_received_uplink_packet_loss_fraction(&mut self, fraction: f32) {
+        unsafe {
+            ffi::webrtc_AudioEncoder_OnReceivedUplinkPacketLossFraction(self.as_ptr(), fraction)
+        }
+    }
+
+    /// ターゲット音声ビットレートを通知する。
+    pub fn on_received_target_audio_bitrate(&mut self, target_bps: i32) {
+        unsafe { ffi::webrtc_AudioEncoder_OnReceivedTargetAudioBitrate(self.as_ptr(), target_bps) }
+    }
+
+    /// 上りビットレート割り当てを通知する。
+    pub fn on_received_uplink_allocation(&mut self, allocation: BitrateAllocationUpdate) {
+        unsafe {
+            ffi::webrtc_AudioEncoder_OnReceivedUplinkAllocation(self.as_ptr(), allocation.raw())
+        }
+    }
+
+    /// RTT を通知する。
+    pub fn on_received_rtt(&mut self, rtt_ms: i32) {
+        unsafe { ffi::webrtc_AudioEncoder_OnReceivedRtt(self.as_ptr(), rtt_ms) }
+    }
+
+    /// パケットのオーバーヘッドを通知する。
+    pub fn on_received_overhead(&mut self, overhead_bytes_per_packet: usize) {
+        unsafe {
+            ffi::webrtc_AudioEncoder_OnReceivedOverhead(self.as_ptr(), overhead_bytes_per_packet)
+        }
+    }
+
+    /// 受信側が受け入れられるフレーム長の範囲を設定する。
+    pub fn set_receiver_frame_length_range(&mut self, min_ms: i32, max_ms: i32) {
+        unsafe {
+            ffi::webrtc_AudioEncoder_SetReceiverFrameLengthRange(self.as_ptr(), min_ms, max_ms)
+        }
+    }
+
+    /// ANA 統計を返す。
+    pub fn get_ana_stats(&self) -> AudioEncoderAnaStats {
+        let stats = AudioEncoderAnaStats::new();
+        unsafe {
+            ffi::webrtc_AudioEncoder_GetANAStats(self.as_ptr(), stats.raw());
+        }
+        stats
+    }
 }
 
 impl Drop for AudioEncoder {
@@ -1820,15 +2238,12 @@ impl AudioSpeechType {
 /// 各メソッドは WebRTC の `webrtc::AudioDecoder` の仮想関数に対応する。
 pub trait AudioDecoderHandler: Send {
     /// ペイロードをデコードし、`decoded` へ書き込んでサンプル数と音声タイプを返す。
-    #[expect(unused_variables)]
     fn decode(
         &mut self,
         encoded: &[u8],
         sample_rate_hz: i32,
         decoded: &mut RawBufferWriter<'_, i16>,
-    ) -> (i32, AudioSpeechType) {
-        (0, AudioSpeechType::Speech)
-    }
+    ) -> (i32, AudioSpeechType);
 
     /// 冗長ペイロードをデコードする。デフォルトは decode() を呼ぶ。
     fn decode_redundant(
@@ -1864,7 +2279,7 @@ pub trait AudioDecoderHandler: Send {
     }
 
     /// デコーダーを初期状態へ戻す。
-    fn reset(&mut self) {}
+    fn reset(&mut self);
 
     /// 最後のエラーコードを返す。
     fn error_code(&mut self) -> i32 {
@@ -2210,6 +2625,23 @@ impl AudioDecoder {
         }
     }
 
+    /// パケットロス隠蔽を生成する。
+    ///
+    /// 生成しなかった場合、`concealment_audio` は空のまま残る。
+    pub fn generate_plc(
+        &mut self,
+        requested_samples_per_channel: usize,
+        concealment_audio: &mut BufferS16Ref<'_>,
+    ) {
+        unsafe {
+            ffi::webrtc_AudioDecoder_GeneratePlc(
+                self.as_ptr(),
+                requested_samples_per_channel,
+                concealment_audio.raw(),
+            )
+        }
+    }
+
     /// デコーダーを初期状態へ戻す。
     pub fn reset(&mut self) {
         unsafe { ffi::webrtc_AudioDecoder_Reset(self.as_ptr()) }
@@ -2541,6 +2973,14 @@ impl AudioEncoderFactory {
         }
         unsafe { ffi::webrtc_AudioCodecSpec_vector_delete(raw_vec.as_ptr()) };
         specs
+    }
+
+    /// エンコーダーがフォーマットに対応するかを問い合わせる。
+    pub fn query_audio_encoder(&self, format: SdpAudioFormatRef<'_>) -> Option<AudioCodecInfo> {
+        let raw = unsafe {
+            ffi::webrtc_AudioEncoderFactory_QueryAudioEncoder(self.as_ptr(), format.as_ptr())
+        };
+        NonNull::new(raw).map(AudioCodecInfo::from_raw)
     }
 
     /// エンコーダーを生成する。

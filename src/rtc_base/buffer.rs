@@ -155,4 +155,13 @@ impl<'a> BufferS16Ref<'a> {
         assert!(!ptr.is_null(), "webrtc_BufferS16_data が null を返しました");
         unsafe { slice::from_raw_parts(ptr, size) }
     }
+
+    /// バッファを空にする。
+    pub fn clear(&mut self) {
+        unsafe { ffi::webrtc_BufferS16_Clear(self.raw.as_ptr()) }
+    }
+
+    pub(crate) fn raw(&self) -> *mut ffi::webrtc_BufferS16 {
+        self.raw.as_ptr()
+    }
 }

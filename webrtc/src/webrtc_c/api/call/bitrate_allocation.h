@@ -17,6 +17,9 @@ WEBRTC_EXPORT struct webrtc_BitrateAllocationUpdate*
 webrtc_BitrateAllocationUpdate_new();
 WEBRTC_EXPORT void webrtc_BitrateAllocationUpdate_delete(
     struct webrtc_BitrateAllocationUpdate* self);
+WEBRTC_EXPORT struct webrtc_BitrateAllocationUpdate*
+webrtc_BitrateAllocationUpdate_copy(
+    const struct webrtc_BitrateAllocationUpdate* self);
 WEBRTC_EXPORT int64_t webrtc_BitrateAllocationUpdate_get_target_bitrate_bps(
     const struct webrtc_BitrateAllocationUpdate* self);
 WEBRTC_EXPORT void webrtc_BitrateAllocationUpdate_set_target_bitrate_bps(

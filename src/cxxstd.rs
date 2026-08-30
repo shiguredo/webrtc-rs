@@ -258,6 +258,10 @@ impl<'a> MapStringString<'a> {
         }
     }
 
+    pub(crate) fn raw(&self) -> *mut ffi::std_map_string_string {
+        self.raw.as_ptr()
+    }
+
     /// 要素数を取得する。
     pub fn len(&self) -> usize {
         let len = unsafe { ffi::std_map_string_string_size(self.raw.as_ptr()) };

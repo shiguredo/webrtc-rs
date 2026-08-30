@@ -31,6 +31,14 @@ WEBRTC_EXPORT void webrtc_BitrateAllocationUpdate_delete(
   delete update;
 }
 
+WEBRTC_EXPORT struct webrtc_BitrateAllocationUpdate*
+webrtc_BitrateAllocationUpdate_copy(
+    const struct webrtc_BitrateAllocationUpdate* self) {
+  auto update = reinterpret_cast<const webrtc::BitrateAllocationUpdate*>(self);
+  auto copied = new webrtc::BitrateAllocationUpdate(*update);
+  return reinterpret_cast<struct webrtc_BitrateAllocationUpdate*>(copied);
+}
+
 WEBRTC_EXPORT int64_t webrtc_BitrateAllocationUpdate_get_target_bitrate_bps(
     const struct webrtc_BitrateAllocationUpdate* self) {
   auto update = reinterpret_cast<const webrtc::BitrateAllocationUpdate*>(self);

@@ -241,6 +241,19 @@ WEBRTC_EXPORT size_t webrtc_AudioEncoder_unique_vector_size(
   return vec->size();
 }
 
+WEBRTC_EXPORT struct webrtc_AudioEncoder_unique*
+webrtc_AudioEncoder_unique_vector_take(
+    struct webrtc_AudioEncoder_unique_vector* self,
+    size_t index) {
+  auto vec =
+      reinterpret_cast<std::vector<std::unique_ptr<webrtc::AudioEncoder>>*>(
+          self);
+  auto& encoder = (*vec)[index];
+  // 所有権を呼び出し側へ移す (unique_ptr から生ポインタを取り出すための release)。
+  return reinterpret_cast<struct webrtc_AudioEncoder_unique*>(
+      encoder.release());
+}
+
 WEBRTC_EXPORT void webrtc_AudioEncoder_unique_vector_push_back(
     struct webrtc_AudioEncoder_unique_vector* self,
     struct webrtc_AudioEncoder_unique* value) {
@@ -249,6 +262,136 @@ WEBRTC_EXPORT void webrtc_AudioEncoder_unique_vector_push_back(
           self);
   auto cpp = reinterpret_cast<webrtc::AudioEncoder*>(value);
   vec->push_back(std::unique_ptr<webrtc::AudioEncoder>(cpp));
+}
+
+// -------------------------
+// webrtc::AudioEncoder::EncodedInfoLeaf
+// -------------------------
+
+WEBRTC_DEFINE_VECTOR(webrtc_AudioEncoder_EncodedInfoLeaf,
+                     webrtc::AudioEncoder::EncodedInfoLeaf);
+
+WEBRTC_EXPORT struct webrtc_AudioEncoder_EncodedInfoLeaf_vector*
+webrtc_AudioEncoder_EncodedInfo_get_redundant(
+    struct webrtc_AudioEncoder_EncodedInfo* self) {
+  auto info = reinterpret_cast<webrtc::AudioEncoder::EncodedInfo*>(self);
+  return reinterpret_cast<struct webrtc_AudioEncoder_EncodedInfoLeaf_vector*>(
+      &info->redundant);
+}
+
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_redundant(
+    struct webrtc_AudioEncoder_EncodedInfo* self,
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf_vector* value) {
+  auto info = reinterpret_cast<webrtc::AudioEncoder::EncodedInfo*>(self);
+  auto vec = reinterpret_cast<
+      const std::vector<webrtc::AudioEncoder::EncodedInfoLeaf>*>(value);
+  info->redundant = *vec;
+}
+
+WEBRTC_EXPORT struct webrtc_AudioEncoder_EncodedInfoLeaf*
+webrtc_AudioEncoder_EncodedInfoLeaf_new() {
+  auto leaf = new webrtc::AudioEncoder::EncodedInfoLeaf();
+  return reinterpret_cast<struct webrtc_AudioEncoder_EncodedInfoLeaf*>(leaf);
+}
+
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfoLeaf_delete(
+    struct webrtc_AudioEncoder_EncodedInfoLeaf* self) {
+  auto leaf = reinterpret_cast<webrtc::AudioEncoder::EncodedInfoLeaf*>(self);
+  delete leaf;
+}
+
+WEBRTC_EXPORT struct webrtc_AudioEncoder_EncodedInfoLeaf*
+webrtc_AudioEncoder_EncodedInfoLeaf_copy(
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf* self) {
+  auto leaf =
+      reinterpret_cast<const webrtc::AudioEncoder::EncodedInfoLeaf*>(self);
+  auto copied = new webrtc::AudioEncoder::EncodedInfoLeaf(*leaf);
+  return reinterpret_cast<struct webrtc_AudioEncoder_EncodedInfoLeaf*>(copied);
+}
+
+WEBRTC_EXPORT size_t webrtc_AudioEncoder_EncodedInfoLeaf_get_encoded_bytes(
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf* self) {
+  auto leaf =
+      reinterpret_cast<const webrtc::AudioEncoder::EncodedInfoLeaf*>(self);
+  return leaf->encoded_bytes;
+}
+
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfoLeaf_set_encoded_bytes(
+    struct webrtc_AudioEncoder_EncodedInfoLeaf* self,
+    size_t value) {
+  auto leaf = reinterpret_cast<webrtc::AudioEncoder::EncodedInfoLeaf*>(self);
+  leaf->encoded_bytes = value;
+}
+
+WEBRTC_EXPORT uint32_t
+webrtc_AudioEncoder_EncodedInfoLeaf_get_encoded_timestamp(
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf* self) {
+  auto leaf =
+      reinterpret_cast<const webrtc::AudioEncoder::EncodedInfoLeaf*>(self);
+  return leaf->encoded_timestamp;
+}
+
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfoLeaf_set_encoded_timestamp(
+    struct webrtc_AudioEncoder_EncodedInfoLeaf* self,
+    uint32_t value) {
+  auto leaf = reinterpret_cast<webrtc::AudioEncoder::EncodedInfoLeaf*>(self);
+  leaf->encoded_timestamp = value;
+}
+
+WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfoLeaf_get_payload_type(
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf* self) {
+  auto leaf =
+      reinterpret_cast<const webrtc::AudioEncoder::EncodedInfoLeaf*>(self);
+  return leaf->payload_type;
+}
+
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfoLeaf_set_payload_type(
+    struct webrtc_AudioEncoder_EncodedInfoLeaf* self,
+    int value) {
+  auto leaf = reinterpret_cast<webrtc::AudioEncoder::EncodedInfoLeaf*>(self);
+  leaf->payload_type = value;
+}
+
+WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfoLeaf_get_send_even_if_empty(
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf* self) {
+  auto leaf =
+      reinterpret_cast<const webrtc::AudioEncoder::EncodedInfoLeaf*>(self);
+  return leaf->send_even_if_empty ? 1 : 0;
+}
+
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfoLeaf_set_send_even_if_empty(
+    struct webrtc_AudioEncoder_EncodedInfoLeaf* self,
+    int value) {
+  auto leaf = reinterpret_cast<webrtc::AudioEncoder::EncodedInfoLeaf*>(self);
+  leaf->send_even_if_empty = value != 0;
+}
+
+WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfoLeaf_get_speech(
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf* self) {
+  auto leaf =
+      reinterpret_cast<const webrtc::AudioEncoder::EncodedInfoLeaf*>(self);
+  return leaf->speech ? 1 : 0;
+}
+
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfoLeaf_set_speech(
+    struct webrtc_AudioEncoder_EncodedInfoLeaf* self,
+    int value) {
+  auto leaf = reinterpret_cast<webrtc::AudioEncoder::EncodedInfoLeaf*>(self);
+  leaf->speech = value != 0;
+}
+
+WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfoLeaf_get_encoder_type(
+    const struct webrtc_AudioEncoder_EncodedInfoLeaf* self) {
+  auto leaf =
+      reinterpret_cast<const webrtc::AudioEncoder::EncodedInfoLeaf*>(self);
+  return static_cast<int>(leaf->encoder_type);
+}
+
+WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfoLeaf_set_encoder_type(
+    struct webrtc_AudioEncoder_EncodedInfoLeaf* self,
+    int value) {
+  auto leaf = reinterpret_cast<webrtc::AudioEncoder::EncodedInfoLeaf*>(self);
+  leaf->encoder_type = static_cast<webrtc::AudioEncoder::CodecType>(value);
 }
 
 // -------------------------
