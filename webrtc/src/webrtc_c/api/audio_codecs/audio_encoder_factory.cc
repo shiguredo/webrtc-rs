@@ -121,14 +121,17 @@ WEBRTC_EXPORT void webrtc_AudioEncoderFactory_Options_set_payload_type(
   options->payload_type = value;
 }
 
-WEBRTC_EXPORT void webrtc_AudioEncoderFactory_Options_get_codec_pair_id(
-    const struct webrtc_AudioEncoderFactory_Options* self,
-    int* out_has,
-    struct webrtc_AudioCodecPairId* out_value) {
+WEBRTC_EXPORT struct webrtc_AudioCodecPairId*
+webrtc_AudioEncoderFactory_Options_get_codec_pair_id(
+    const struct webrtc_AudioEncoderFactory_Options* self) {
   auto options =
       reinterpret_cast<const webrtc::AudioEncoderFactory::Options*>(self);
-  webrtc_c::OptionalGet(options->codec_pair_id, out_has,
-                        reinterpret_cast<webrtc::AudioCodecPairId*>(out_value));
+  if (!options->codec_pair_id) {
+    return nullptr;
+  }
+  // AudioCodecPairId はデフォルト構築不可のため、保持している値の所有コピーを返す。
+  auto copied = new webrtc::AudioCodecPairId(*options->codec_pair_id);
+  return reinterpret_cast<struct webrtc_AudioCodecPairId*>(copied);
 }
 
 WEBRTC_EXPORT void webrtc_AudioEncoderFactory_Options_set_codec_pair_id(

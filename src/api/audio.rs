@@ -2706,6 +2706,13 @@ impl AudioCodecPairId {
         unsafe { ffi::webrtc_AudioCodecPairId_NumericRepresentation(self.raw.as_ptr()) }
     }
 
+    /// # Safety
+    /// `raw` は C 側で生成された有効な `webrtc_AudioCodecPairId` を指し、
+    /// 所有権をこの型が引き受ける必要があります。
+    pub(crate) unsafe fn from_raw(raw: NonNull<ffi::webrtc_AudioCodecPairId>) -> Self {
+        Self { raw }
+    }
+
     fn raw(&self) -> *mut ffi::webrtc_AudioCodecPairId {
         self.raw.as_ptr()
     }
@@ -2786,16 +2793,9 @@ impl AudioEncoderFactoryOptions {
 
     /// コーデックペア ID を返す。
     pub fn codec_pair_id(&self) -> Option<AudioCodecPairId> {
-        let mut has = 0;
-        let value = AudioCodecPairId::create();
-        unsafe {
-            ffi::webrtc_AudioEncoderFactory_Options_get_codec_pair_id(
-                self.raw.as_ptr(),
-                &mut has,
-                value.raw(),
-            );
-        }
-        if has == 0 { None } else { Some(value) }
+        let raw =
+            unsafe { ffi::webrtc_AudioEncoderFactory_Options_get_codec_pair_id(self.raw.as_ptr()) };
+        NonNull::new(raw).map(|raw| unsafe { AudioCodecPairId::from_raw(raw) })
     }
 
     /// コーデックペア ID を設定 / 解除する。

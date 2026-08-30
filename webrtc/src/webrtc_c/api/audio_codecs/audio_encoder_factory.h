@@ -27,10 +27,11 @@ WEBRTC_EXPORT int webrtc_AudioEncoderFactory_Options_get_payload_type(
 WEBRTC_EXPORT void webrtc_AudioEncoderFactory_Options_set_payload_type(
     struct webrtc_AudioEncoderFactory_Options* self,
     int value);
-WEBRTC_EXPORT void webrtc_AudioEncoderFactory_Options_get_codec_pair_id(
-    const struct webrtc_AudioEncoderFactory_Options* self,
-    int* out_has,
-    struct webrtc_AudioCodecPairId* out_value);
+// 返り値は Options が保持する codec_pair_id の所有コピー。未設定の場合は null。
+// AudioCodecPairId はデフォルト構築不可のため out パラメータ方式が使えない。
+WEBRTC_EXPORT struct webrtc_AudioCodecPairId*
+webrtc_AudioEncoderFactory_Options_get_codec_pair_id(
+    const struct webrtc_AudioEncoderFactory_Options* self);
 WEBRTC_EXPORT void webrtc_AudioEncoderFactory_Options_set_codec_pair_id(
     struct webrtc_AudioEncoderFactory_Options* self,
     int has,
