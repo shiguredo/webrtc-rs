@@ -811,6 +811,9 @@ impl VideoEncoderEncoderInfo {
         &self,
         spatial_index: usize,
     ) -> Option<VideoEncoderFramerateFractionInlinedVectorRef<'_>> {
+        if spatial_index >= crate::constants::max_spatial_layers() {
+            return None;
+        }
         let spatial_index = i32::try_from(spatial_index).ok()?;
         let raw = unsafe {
             ffi::webrtc_VideoEncoder_EncoderInfo_get_fps_allocation(self.as_ptr(), spatial_index)

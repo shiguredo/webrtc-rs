@@ -590,9 +590,6 @@ webrtc_VideoEncoder_EncoderInfo_get_fps_allocation(
     struct webrtc_VideoEncoder_EncoderInfo* self,
     int spatial_index) {
   auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
-  if (spatial_index < 0 || spatial_index >= webrtc::kMaxSpatialLayers) {
-    return nullptr;
-  }
   return reinterpret_cast<
       struct webrtc_VideoEncoder_FramerateFraction_inlined_vector*>(
       &info->fps_allocation[spatial_index]);

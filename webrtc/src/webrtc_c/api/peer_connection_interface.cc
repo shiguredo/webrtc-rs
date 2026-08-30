@@ -305,11 +305,11 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_IceServer_set_password(
   server->password =
       password != nullptr ? std::string(password, password_len) : std::string();
 }
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicySecure =
         static_cast<int>(webrtc::PeerConnectionInterface::TlsCertPolicy::
                              kTlsCertPolicySecure);
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_TlsCertPolicy_kTlsCertPolicyInsecureNoCheck =
         static_cast<int>(webrtc::PeerConnectionInterface::TlsCertPolicy::
                              kTlsCertPolicyInsecureNoCheck);
@@ -330,7 +330,8 @@ webrtc_PeerConnectionInterface_IceServer_set_tls_client_identity(
       reinterpret_cast<webrtc::PeerConnectionInterface::IceServer*>(self);
   if (identity != nullptr) {
     auto ssl_identity = std::unique_ptr<webrtc::SSLIdentity>(
-        reinterpret_cast<webrtc::SSLIdentity*>(identity));
+        reinterpret_cast<webrtc::SSLIdentity*>(
+            webrtc_SSLIdentity_unique_get(identity)));
     server->tls_client_identity = std::move(ssl_identity);
   } else {
     server->tls_client_identity.reset();
@@ -422,8 +423,8 @@ WEBRTC_EXPORT void webrtc_PeerConnectionDependencies_set_proxy(
   auto deps = reinterpret_cast<webrtc::PeerConnectionDependencies*>(self);
   auto* nm = reinterpret_cast<webrtc::NetworkManager*>(network_manager);
   auto* sf = reinterpret_cast<webrtc::PacketSocketFactory*>(socket_factory);
-  RTC_CHECK(nm != nullptr);
-  RTC_CHECK(sf != nullptr);
+  assert(nm != nullptr);
+  assert(sf != nullptr);
 
   deps->allocator = std::make_unique<webrtc::BasicPortAllocator>(
       webrtc::CreateEnvironment(), nm, sf);
@@ -872,13 +873,13 @@ webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_use_obsolete_sctp_sdp(
 WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_PeerConnectionState_kNew =
         (int)webrtc::PeerConnectionInterface::PeerConnectionState::kNew;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_PeerConnectionState_kConnecting =
         (int)webrtc::PeerConnectionInterface::PeerConnectionState::kConnecting;
 WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_PeerConnectionState_kConnected =
         (int)webrtc::PeerConnectionInterface::PeerConnectionState::kConnected;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_PeerConnectionState_kDisconnected = (int)
         webrtc::PeerConnectionInterface::PeerConnectionState::kDisconnected;
 WEBRTC_EXPORT extern const int
@@ -887,44 +888,44 @@ WEBRTC_EXPORT extern const int
 WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_PeerConnectionState_kClosed =
         (int)webrtc::PeerConnectionInterface::PeerConnectionState::kClosed;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionNew = (int)
         webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionNew;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionChecking =
         (int)webrtc::PeerConnectionInterface::IceConnectionState::
             kIceConnectionChecking;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionConnected =
         (int)webrtc::PeerConnectionInterface::IceConnectionState::
             kIceConnectionConnected;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionCompleted =
         (int)webrtc::PeerConnectionInterface::IceConnectionState::
             kIceConnectionCompleted;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionFailed =
         (int)webrtc::PeerConnectionInterface::IceConnectionState::
             kIceConnectionFailed;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionDisconnected =
         (int)webrtc::PeerConnectionInterface::IceConnectionState::
             kIceConnectionDisconnected;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionClosed =
         (int)webrtc::PeerConnectionInterface::IceConnectionState::
             kIceConnectionClosed;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_IceConnectionState_kIceConnectionMax = (int)
         webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionMax;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringNew = (int)
         webrtc::PeerConnectionInterface::IceGatheringState::kIceGatheringNew;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringGathering =
         (int)webrtc::PeerConnectionInterface::IceGatheringState::
             kIceGatheringGathering;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_IceGatheringState_kIceGatheringComplete =
         (int)webrtc::PeerConnectionInterface::IceGatheringState::
             kIceGatheringComplete;
