@@ -264,7 +264,7 @@ impl AudioTransportRef {
     /// `audio_samples` は `n_samples` と `n_bytes_per_sample` に応じた長さの
     /// 有効なメモリを指している必要がある。
     /// `new_mic_level` は書き込み可能なポインタである必要がある。
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub unsafe fn recorded_data_is_available(
         &self,
         audio_samples: *const u8,
@@ -310,7 +310,7 @@ impl AudioTransportRef {
     /// 書き込み可能なメモリを指している必要がある。
     /// `n_samples_out` は書き込み可能なポインタである必要がある。
     /// `elapsed_time_ms` と `ntp_time_ms` は null または書き込み可能なポインタである必要がある。
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub unsafe fn need_more_play_data(
         &self,
         n_samples: usize,
@@ -341,7 +341,7 @@ impl AudioTransportRef {
     /// `audio_data` は `number_of_frames` と `number_of_channels` と `bits_per_sample` に
     /// 応じた長さの書き込み可能なメモリを指している必要がある。
     /// `elapsed_time_ms` と `ntp_time_ms` は null または書き込み可能なポインタである必要がある。
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub unsafe fn pull_render_data(
         &self,
         bits_per_sample: i32,
@@ -399,7 +399,7 @@ impl AudioTransport {
 
     /// # Safety
     /// `AudioTransportRef::recorded_data_is_available` と同じ前提条件を満たす必要がある。
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub unsafe fn recorded_data_is_available(
         &self,
         audio_samples: *const u8,
@@ -433,7 +433,7 @@ impl AudioTransport {
 
     /// # Safety
     /// `AudioTransportRef::need_more_play_data` と同じ前提条件を満たす必要がある。
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub unsafe fn need_more_play_data(
         &self,
         n_samples: usize,
@@ -461,7 +461,7 @@ impl AudioTransport {
 
     /// # Safety
     /// `AudioTransportRef::pull_render_data` と同じ前提条件を満たす必要がある。
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub unsafe fn pull_render_data(
         &self,
         bits_per_sample: i32,
@@ -493,7 +493,7 @@ impl Drop for AudioTransport {
 }
 
 pub trait AudioTransportHandler: Send {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     #[expect(unused_variables)]
     fn recorded_data_is_available(
         &mut self,
@@ -512,7 +512,7 @@ pub trait AudioTransportHandler: Send {
         0
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     #[expect(unused_variables)]
     fn need_more_play_data(
         &mut self,
@@ -528,7 +528,7 @@ pub trait AudioTransportHandler: Send {
         0
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     #[expect(unused_variables)]
     fn pull_render_data(
         &mut self,

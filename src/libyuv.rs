@@ -622,18 +622,19 @@ pub fn convert_to_i420(
     rotation: LibyuvRotationMode,
     fourcc: LibyuvFourcc,
 ) -> bool {
-    let Some((chroma_width, chroma_height)) = i420_chroma_size(crop_width, crop_height) else {
+    let Some(abs_crop_height) = crop_height.checked_abs() else {
+        return false;
+    };
+    // crop_height の負値は垂直フリップとして libyuv 側で abs 処理されるため、
+    // 出力 (dst) の行数と chroma サイズも abs 値で計算する。
+    let Some((chroma_width, chroma_height)) = i420_chroma_size(crop_width, abs_crop_height) else {
         return false;
     };
 
     let src_ok = match fourcc {
         // ARGB / BGRA は libyuv が src_width * 4 の stride で (crop_y + abs(crop_height)) 行ぶんと
-        // (crop_x + crop_width) * 4 バイトぶんを読み込む。crop_height の負値は垂直フリップとして
-        // libyuv 側で abs 処理されるため、必要長の計算も abs で行う。
+        // (crop_x + crop_width) * 4 バイトぶんを読み込む。
         LibyuvFourcc::Argb | LibyuvFourcc::Bgra => {
-            let Some(abs_crop_height) = crop_height.checked_abs() else {
-                return false;
-            };
             let Some(stride) = src_width.checked_mul(4) else {
                 return false;
             };
@@ -653,7 +654,7 @@ pub fn convert_to_i420(
     };
 
     if !src_ok
-        || !has_required_len(dst_y.len(), dst_stride_y, crop_height, crop_width)
+        || !has_required_len(dst_y.len(), dst_stride_y, abs_crop_height, crop_width)
         || !has_required_len(dst_u.len(), dst_stride_u, chroma_height, chroma_width)
         || !has_required_len(dst_v.len(), dst_stride_v, chroma_height, chroma_width)
     {

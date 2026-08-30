@@ -52,6 +52,15 @@
   - ARGB / BGRA 入力について crop オフセット込みの必要長 (`src_width * 4` の stride で `(crop_y + abs(crop_height))` 行 × `(crop_x + crop_width) * 4` バイト) を検証し、不足時は `false` を返すようにする
   - MJPG 入力は libyuv 側の検証に委ねるため対象外とする
   - @melpon
+- [FIX] `convert_to_i420` が負の `crop_height` (垂直フリップ) 指定時に常に失敗する問題を修正する
+  - dst 側の行数検証と chroma サイズ計算が負値のままだったため `false` が返っていたのを、`abs(crop_height)` で検証するように修正し、負値でも libyuv の垂直フリップ変換を実行できるようにする
+  - @melpon
+- [FIX] `DataChannelObserver` の `on_message` が空メッセージ受信時に null ポインタを `slice::from_raw_parts` へ渡して UB になる問題を修正する
+  - C++ 側の空 `CopyOnWriteBuffer::data()` は `nullptr` を返し得るため、ポインタが null または長さ 0 の場合は空スライスへ置き換えてからハンドラへ渡すようにする
+  - @melpon
+- [FIX] C ラッパーが release ビルドでも abort する `RTC_CHECK` を `assert` に変更する
+  - `webrtc_PeerConnectionDependencies_set_proxy` の `RTC_CHECK(nm != nullptr)` / `RTC_CHECK(sf != nullptr)` を `assert` に変更し、デバッグビルドのみ契約違反を検出するようにする (release では null をそのまま libwebrtc へ渡す)
+  - @melpon
 
 ### misc
 
@@ -70,6 +79,21 @@
 - [UPDATE] FFI の out 引数と out_error のボイラープレートを共通ヘルパーにまとめる
   - `src/api/out_param.rs` に `call_with_out` / `call_with_out_and_error` / `call_with_return_and_error` を追加し、`PeerConnectionFactory` / `PeerConnection` / `SessionDescriptionInterface` / `IceCandidate` / `SdpParseError` の該当メソッドを置き換えて挙動を維持する
   - `Error::NullPointer` のカスタムメッセージと `Error::RtcError` / `Error::SdpParseError` への変換を共通化し、表記ゆれ (`returned null`) を解消する
+  - @melpon
+- [UPDATE] テストの panic / assert メッセージを日本語に統一する
+  - `src/tests.rs` に残っていた英語の `.expect` / `assert!` メッセージを周囲のテストと同じ日本語表記へ揃える (挙動は変更しない)
+  - @melpon
+- [UPDATE] 冗長な `#[allow]` を排除し、必要なものは `#[expect]` へ置き換える
+  - dead_code が発火しない `pub struct` / 使用済み `as_ptr` の `#[allow(dead_code)]` は削除し、それ以外の `#[allow]` は `#[expect]` へ置き換える (挙動は変更しない)
+  - @melpon
+- [UPDATE] C ラッパーの `*_unique` 直接キャストを `*_unique_get` 経由に統一する
+  - `webrtc_PeerConnectionInterface_IceServer_set_tls_client_identity` で行っていた `reinterpret_cast<webrtc::SSLIdentity*>` を `webrtc_SSLIdentity_unique_get` 経由に変更し、他箇所 (e.g. `webrtc_SSLCertificateVerifier_unique_get`) と揃える (挙動は変更しない)
+  - @melpon
+- [UPDATE] `extern const int` 定数定義の `WEBRTC_EXPORT` 欠落を補完する
+  - `webrtc_PeerConnectionInterface` の状態・ポリシー定数と `webrtc_AudioDeviceModule` のデバイス種別定数計 17 箇所の定義に `WEBRTC_EXPORT` (シンボル可視性) を付与し、同一ブロック内の他定義と揃える (挙動は変更しない)
+  - @melpon
+- [UPDATE] C ラッパーに残っていた境界チェックを Rust 側へ移す
+  - `webrtc_VideoEncoder_EncoderInfo_get_fps_allocation` / `webrtc_SSLCertChain_Get` の境界チェックを削除し、`VideoEncoder::EncoderInfo::fps_allocation` に固定配列サイズ (`kMaxSpatialLayers`) の境界検証を追加する (`SSLCertChain::get` は既に検証済み)
   - @melpon
 
 ## 0.152.0

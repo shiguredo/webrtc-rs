@@ -22,7 +22,7 @@ impl CxxString {
     }
 
     /// &str から生成する。
-    #[allow(clippy::should_implement_trait)]
+    #[expect(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         let raw = unsafe { ffi::std_string_new_from_bytes(s.as_ptr() as *const _, s.len()) };
         Self {

@@ -79,9 +79,6 @@ WEBRTC_EXPORT const struct webrtc_SSLCertificate* webrtc_SSLCertChain_Get(
     const struct webrtc_SSLCertChain* self,
     int index) {
   auto chain = reinterpret_cast<const webrtc::SSLCertChain*>(self);
-  if (index < 0 || static_cast<size_t>(index) >= chain->GetSize()) {
-    return nullptr;
-  }
   auto& cert = chain->Get(static_cast<size_t>(index));
   return reinterpret_cast<const struct webrtc_SSLCertificate*>(&cert);
 }

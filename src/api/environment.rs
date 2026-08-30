@@ -43,7 +43,6 @@ impl Drop for Environment {
     }
 }
 
-#[allow(dead_code)]
 pub struct EnvironmentRef<'a> {
     raw: NonNull<ffi::webrtc_Environment>,
     _marker: PhantomData<&'a ffi::webrtc_Environment>,
@@ -61,7 +60,6 @@ impl<'a> EnvironmentRef<'a> {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_Environment {
         self.raw.as_ptr()
     }
