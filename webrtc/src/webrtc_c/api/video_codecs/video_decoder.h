@@ -30,7 +30,7 @@ webrtc_VideoDecoder_DecoderInfo_get_implementation_name(
     struct webrtc_VideoDecoder_DecoderInfo* self);
 WEBRTC_EXPORT void webrtc_VideoDecoder_DecoderInfo_set_implementation_name(
     struct webrtc_VideoDecoder_DecoderInfo* self,
-    struct std_string_unique* name);
+    const struct std_string* name);
 WEBRTC_EXPORT int webrtc_VideoDecoder_DecoderInfo_get_is_hardware_accelerated(
     struct webrtc_VideoDecoder_DecoderInfo* self);
 WEBRTC_EXPORT void webrtc_VideoDecoder_DecoderInfo_set_is_hardware_accelerated(

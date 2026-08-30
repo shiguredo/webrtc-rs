@@ -39,7 +39,7 @@ impl VideoDecoderDecoderInfo {
         unsafe {
             ffi::webrtc_VideoDecoder_DecoderInfo_set_implementation_name(
                 self.as_ptr(),
-                name.into_raw(),
+                name.as_ptr(),
             );
         }
     }

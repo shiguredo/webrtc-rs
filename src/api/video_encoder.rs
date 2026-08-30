@@ -712,7 +712,7 @@ impl VideoEncoderEncoderInfo {
         unsafe {
             ffi::webrtc_VideoEncoder_EncoderInfo_set_implementation_name(
                 self.as_ptr(),
-                name.into_raw(),
+                name.as_ptr(),
             );
         }
     }

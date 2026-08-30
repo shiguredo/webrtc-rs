@@ -481,19 +481,10 @@ webrtc_VideoEncoder_EncoderInfo_get_implementation_name(
 
 WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_set_implementation_name(
     struct webrtc_VideoEncoder_EncoderInfo* self,
-    struct std_string_unique* name) {
+    const struct std_string* name) {
   auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
-  if (name == nullptr) {
-    info->implementation_name.clear();
-    return;
-  }
-  auto cpp_name = reinterpret_cast<std::string*>(std_string_unique_get(name));
-  if (cpp_name != nullptr) {
-    info->implementation_name = *cpp_name;
-  } else {
-    info->implementation_name.clear();
-  }
-  std_string_unique_delete(name);
+  auto cpp_name = reinterpret_cast<const std::string*>(name);
+  info->implementation_name = *cpp_name;
 }
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_EncoderInfo_get_is_hardware_accelerated(
