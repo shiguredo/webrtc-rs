@@ -5,6 +5,7 @@
 
 #include "../../common.h"
 #include "../../rtc_base/buffer.h"
+#include "../call/bitrate_allocation.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -162,9 +163,9 @@ struct webrtc_AudioEncoder_cbs {
   void (*DisableAudioNetworkAdaptor)(void* user_data);
   void (*OnReceivedUplinkPacketLossFraction)(float fraction, void* user_data);
   void (*OnReceivedTargetAudioBitrate)(int target_bps, void* user_data);
-  void (*OnReceivedUplinkAllocation)(int64_t target_bitrate_bps,
-                                     int64_t prediction_interval_us,
-                                     void* user_data);
+  void (*OnReceivedUplinkAllocation)(
+      const struct webrtc_BitrateAllocationUpdate* update,
+      void* user_data);
   void (*OnReceivedRtt)(int rtt_ms, void* user_data);
   void (*OnReceivedOverhead)(size_t overhead_bytes_per_packet, void* user_data);
   void (*SetReceiverFrameLengthRange)(int min_frame_length_ms,
@@ -232,8 +233,7 @@ WEBRTC_EXPORT void webrtc_AudioEncoder_OnReceivedTargetAudioBitrate(
     int target_bps);
 WEBRTC_EXPORT void webrtc_AudioEncoder_OnReceivedUplinkAllocation(
     struct webrtc_AudioEncoder* self,
-    int64_t target_bitrate_bps,
-    int64_t prediction_interval_us);
+    const struct webrtc_BitrateAllocationUpdate* update);
 WEBRTC_EXPORT void webrtc_AudioEncoder_OnReceivedRtt(
     struct webrtc_AudioEncoder* self,
     int rtt_ms);

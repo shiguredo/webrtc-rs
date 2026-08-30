@@ -131,8 +131,11 @@ class AudioEncoderImpl : public webrtc::AudioEncoder {
 
   void OnReceivedUplinkAllocation(
       webrtc::BitrateAllocationUpdate update) override {
-    cbs_.OnReceivedUplinkAllocation(update.target_bitrate.bps(), -1,
-                                    user_data_);
+    // webrtc_BitrateAllocationUpdate は webrtc::BitrateAllocationUpdate の
+    // 値をそのまま指すため、キャストのみで受け渡せる。
+    cbs_.OnReceivedUplinkAllocation(
+        reinterpret_cast<const struct webrtc_BitrateAllocationUpdate*>(&update),
+        user_data_);
   }
 
   void OnReceivedRtt(int rtt_ms) override {
@@ -518,14 +521,14 @@ WEBRTC_EXPORT void webrtc_AudioEncoder_OnReceivedTargetAudioBitrate(
 
 WEBRTC_EXPORT void webrtc_AudioEncoder_OnReceivedUplinkAllocation(
     struct webrtc_AudioEncoder* self,
-    int64_t target_bitrate_bps,
-    int64_t prediction_interval_us) {
+    const struct webrtc_BitrateAllocationUpdate* update) {
   assert(self != nullptr);
+  assert(update != nullptr);
   auto encoder = reinterpret_cast<webrtc::AudioEncoder*>(self);
-  webrtc::BitrateAllocationUpdate update;
-  update.target_bitrate = webrtc::DataRate::BitsPerSec(target_bitrate_bps);
-  (void)prediction_interval_us;
-  encoder->OnReceivedUplinkAllocation(update);
+  // webrtc_BitrateAllocationUpdate は webrtc::BitrateAllocationUpdate の値を
+  // そのまま指すため、キャストのみで値を取り出せる。
+  auto cpp = reinterpret_cast<const webrtc::BitrateAllocationUpdate*>(update);
+  encoder->OnReceivedUplinkAllocation(*cpp);
 }
 
 WEBRTC_EXPORT void webrtc_AudioEncoder_OnReceivedRtt(

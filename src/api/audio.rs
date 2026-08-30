@@ -955,6 +955,52 @@ impl Drop for AudioEncoderEncodedInfo {
     }
 }
 
+/// `webrtc::BitrateAllocationUpdate` への借用ラッパー。
+pub struct BitrateAllocationUpdateRef<'a> {
+    raw: NonNull<ffi::webrtc_BitrateAllocationUpdate>,
+    _marker: PhantomData<&'a ffi::webrtc_BitrateAllocationUpdate>,
+}
+
+unsafe impl<'a> Send for BitrateAllocationUpdateRef<'a> {}
+
+impl<'a> BitrateAllocationUpdateRef<'a> {
+    /// # Safety
+    /// `raw` は有効な `webrtc_BitrateAllocationUpdate` を指す必要があります。
+    pub(crate) unsafe fn from_raw(raw: NonNull<ffi::webrtc_BitrateAllocationUpdate>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    /// 割り当てられたターゲットビットレート (bps) を返す。
+    pub fn target_bitrate_bps(&self) -> i64 {
+        unsafe { ffi::webrtc_BitrateAllocationUpdate_get_target_bitrate_bps(self.raw.as_ptr()) }
+    }
+
+    /// 予測パケットロス率を返す。
+    pub fn packet_loss_ratio(&self) -> f64 {
+        unsafe { ffi::webrtc_BitrateAllocationUpdate_get_packet_loss_ratio(self.raw.as_ptr()) }
+    }
+
+    /// 予測ラウンドトリップ時間 (マイクロ秒) を返す。
+    ///
+    /// 値が未設定の場合は `i64::MAX` として表現される。
+    pub fn round_trip_time_us(&self) -> i64 {
+        unsafe { ffi::webrtc_BitrateAllocationUpdate_get_round_trip_time_us(self.raw.as_ptr()) }
+    }
+
+    /// 輻輳ウィンドウ pushback によるビットレート削減率を返す。
+    pub fn cwnd_reduce_ratio(&self) -> f64 {
+        unsafe { ffi::webrtc_BitrateAllocationUpdate_get_cwnd_reduce_ratio(self.raw.as_ptr()) }
+    }
+
+    /// パケットあたりのトランスポートオーバーヘッド (バイト) を返す。
+    pub fn packet_overhead_bytes(&self) -> i64 {
+        unsafe { ffi::webrtc_BitrateAllocationUpdate_get_packet_overhead_bytes(self.raw.as_ptr()) }
+    }
+}
+
 /// `AudioEncoder` のコールバックハンドラ。
 ///
 /// 各メソッドは WebRTC の `webrtc::AudioEncoder` の仮想関数に対応する。
@@ -1045,7 +1091,7 @@ pub trait AudioEncoderHandler: Send {
 
     /// 上りビットレート割り当てを通知する。
     #[expect(unused_variables)]
-    fn on_received_uplink_allocation(&mut self, target_bitrate_bps: i64) {}
+    fn on_received_uplink_allocation(&mut self, allocation: &BitrateAllocationUpdateRef<'_>) {}
 
     /// RTT を通知する。
     #[expect(unused_variables)]
@@ -1473,18 +1519,20 @@ unsafe extern "C" fn audio_encoder_on_received_target_audio_bitrate(
 }
 
 unsafe extern "C" fn audio_encoder_on_received_uplink_allocation(
-    target_bitrate_bps: i64,
-    _prediction_interval_us: i64,
+    update: *const ffi::webrtc_BitrateAllocationUpdate,
     user_data: *mut c_void,
 ) {
     assert!(
         !user_data.is_null(),
         "audio_encoder_on_received_uplink_allocation: user_data is null"
     );
+    let update = expect_non_null(
+        update.cast_mut(),
+        "audio_encoder_on_received_uplink_allocation (update)",
+    );
     let state = unsafe { &mut *(user_data as *mut AudioEncoderHandlerState) };
-    state
-        .handler
-        .on_received_uplink_allocation(target_bitrate_bps);
+    let update = unsafe { BitrateAllocationUpdateRef::from_raw(update) };
+    state.handler.on_received_uplink_allocation(&update);
 }
 
 unsafe extern "C" fn audio_encoder_on_received_rtt(rtt_ms: i32, user_data: *mut c_void) {
