@@ -4077,3 +4077,170 @@ fn rtp_video_header_h264_full_roundtrip() {
     let e2 = cloned_nalus.get(1).expect("要素が存在する想定");
     assert_eq!(e2.sps_id(), -1);
 }
+
+struct TestAudioEncoderHandler {
+    pub(crate) encoded: bool,
+}
+
+impl AudioEncoderHandler for TestAudioEncoderHandler {
+    fn sample_rate_hz(&mut self) -> i32 {
+        48000
+    }
+    fn num_channels(&mut self) -> usize {
+        2
+    }
+    fn num_10ms_frames_in_next_packet(&mut self) -> usize {
+        1
+    }
+    fn max_10ms_frames_in_a_packet(&mut self) -> usize {
+        4
+    }
+    fn get_target_bitrate(&mut self) -> i32 {
+        32000
+    }
+    fn encode(
+        &mut self,
+        _rtp_timestamp: u32,
+        _audio: &[i16],
+        encoded: &mut BufferRef<'_>,
+    ) -> Option<AudioEncoderEncodedInfo> {
+        self.encoded = true;
+        encoded.append_data(&[0x01, 0x02, 0x03]);
+        let mut info = AudioEncoderEncodedInfo::new();
+        info.set_encoded_bytes(encoded.size());
+        info.set_payload_type(111);
+        Some(info)
+    }
+}
+
+struct TestAudioEncoderFactoryHandler {
+    created: bool,
+}
+
+impl AudioEncoderFactoryHandler for TestAudioEncoderFactoryHandler {
+    fn get_supported_encoders(&mut self) -> Vec<AudioCodecSpec> {
+        vec![AudioCodecSpec::new(
+            SdpAudioFormat::new("opus", 48000, 2),
+            AudioCodecInfo::new(48000, 2, 32000, 6000, 510000),
+        )]
+    }
+    fn create(
+        &mut self,
+        env: EnvironmentRef<'_>,
+        format: SdpAudioFormatRef<'_>,
+        _options: &AudioEncoderFactoryOptions,
+    ) -> Option<AudioEncoder> {
+        assert!(!env.as_ptr().is_null());
+        assert_eq!(format.name().expect("名前の取得に失敗しました"), "opus");
+        if self.created {
+            return None;
+        }
+        self.created = true;
+        Some(AudioEncoder::new_with_handler(Box::new(
+            TestAudioEncoderHandler { encoded: false },
+        )))
+    }
+}
+
+#[test]
+fn custom_audio_encoder_factory_roundtrip() {
+    let factory = AudioEncoderFactory::new_with_handler(Box::new(TestAudioEncoderFactoryHandler {
+        created: false,
+    }));
+    assert_eq!(factory.get_supported_encoders().len(), 1);
+    let env = Environment::new();
+    let format = SdpAudioFormat::new("opus", 48000, 2);
+    let mut options = AudioEncoderFactoryOptions::new();
+    options.set_payload_type(111);
+    let mut encoder = factory
+        .make_audio_encoder(env.as_ref(), format.as_ref(), &options)
+        .expect("カスタムエンコーダーの作成に失敗しました");
+    assert_eq!(encoder.sample_rate_hz(), 48000);
+    assert_eq!(encoder.num_channels(), 2);
+    assert_eq!(encoder.num_10ms_frames_in_next_packet(), 1);
+    assert_eq!(encoder.max_10ms_frames_in_a_packet(), 4);
+    assert_eq!(encoder.get_target_bitrate(), 32000);
+    let mut buffer = Buffer::new();
+    let info = encoder.encode(0, &[0i16; 960], &mut buffer);
+    assert_eq!(buffer.size(), 3);
+    assert_eq!(info.payload_type(), 111);
+    assert!(
+        factory
+            .make_audio_encoder(env.as_ref(), format.as_ref(), &options)
+            .is_none(),
+        "2 回目の make_audio_encoder は None を返す想定です"
+    );
+}
+
+struct TestAudioDecoderHandler;
+
+impl AudioDecoderHandler for TestAudioDecoderHandler {
+    fn sample_rate_hz(&mut self) -> i32 {
+        48000
+    }
+    fn channels(&mut self) -> usize {
+        2
+    }
+    fn decode(
+        &mut self,
+        _encoded: &[u8],
+        _sample_rate_hz: i32,
+        decoded: &mut RawBufferWriter<'_, i16>,
+    ) -> (i32, AudioSpeechType) {
+        decoded.write(&[0i16; 160]);
+        (160, AudioSpeechType::Speech)
+    }
+}
+
+struct TestAudioDecoderFactoryHandler {
+    created: bool,
+}
+
+impl AudioDecoderFactoryHandler for TestAudioDecoderFactoryHandler {
+    fn get_supported_decoders(&mut self) -> Vec<AudioCodecSpec> {
+        vec![AudioCodecSpec::new(
+            SdpAudioFormat::new("opus", 48000, 2),
+            AudioCodecInfo::new(48000, 2, 32000, 6000, 510000),
+        )]
+    }
+    fn is_supported_decoder(&mut self, format: SdpAudioFormatRef<'_>) -> bool {
+        format.name().map(|name| name == "opus").unwrap_or(false)
+    }
+    fn create(
+        &mut self,
+        env: EnvironmentRef<'_>,
+        format: SdpAudioFormatRef<'_>,
+    ) -> Option<AudioDecoder> {
+        assert!(!env.as_ptr().is_null());
+        assert_eq!(format.name().expect("名前の取得に失敗しました"), "opus");
+        if self.created {
+            return None;
+        }
+        self.created = true;
+        Some(AudioDecoder::new_with_handler(Box::new(
+            TestAudioDecoderHandler,
+        )))
+    }
+}
+
+#[test]
+fn custom_audio_decoder_factory_roundtrip() {
+    let factory = AudioDecoderFactory::new_with_handler(Box::new(TestAudioDecoderFactoryHandler {
+        created: false,
+    }));
+    assert_eq!(factory.get_supported_decoders().len(), 1);
+    let env = Environment::new();
+    let format = SdpAudioFormat::new("opus", 48000, 2);
+    assert!(factory.is_supported_decoder(format.as_ref()));
+    let decoder = factory
+        .make_audio_decoder(env.as_ref(), format.as_ref())
+        .expect("カスタムデコーダーの作成に失敗しました");
+    assert_eq!(decoder.sample_rate_hz(), 48000);
+    assert_eq!(decoder.channels(), 2);
+    assert!(
+        factory
+            .make_audio_decoder(env.as_ref(), format.as_ref())
+            .is_none(),
+        "2 回目の make_audio_decoder は None を返す想定です"
+    );
+}

@@ -11,7 +11,15 @@
 
 ## develop
 
-- [CHANGE] libwebrtc 側で std::move により消費される `deps` を `&mut` から値渡しに変更する
+- [ADD] 音声コーデックのユーザー実装を注入するための API を追加する
+  - `AudioCodecType` を追加し、SDP コーデック名 (`opus` / `ISAC` / `G722` / `PCMA` / `PCMU`) との相互変換を提供する
+  - `SdpAudioFormat` / `SdpAudioFormatRef` / `AudioCodecInfo` / `AudioCodecSpec` を追加する
+  - `AudioEncoderFactory::new_with_handler` と `AudioEncoderFactoryHandler` (`get_supported_encoders` / `query_audio_encoder` / `create`) を追加する
+  - `AudioDecoderFactory::new_with_handler` と `AudioDecoderFactoryHandler` (`get_supported_decoders` / `is_supported_decoder` / `create`) を追加する
+  - `AudioEncoder` / `AudioEncoderHandler` を追加し、`webrtc::AudioEncoder` の純仮想・仮想関数 (非推奨を除く) を転送する
+  - `AudioDecoder` / `AudioDecoderHandler` を追加し、`webrtc::AudioDecoder` の純仮想・仮想関数 (非推奨を除く) を転送する
+  - `AudioEncoderFactory::get_supported_encoders` / `make_audio_encoder`、`AudioDecoderFactory::get_supported_decoders` / `make_audio_decoder` / `is_supported_decoder` を追加する
+  - @melpon
   - `PeerConnectionFactory::create_modular` / `create_modular_with_context` / `PeerConnection::create` の `deps` 引数を値渡しに変更する
   - @melpon
 - [CHANGE] ログ初期化 API を `webrtc::LoggingConfig` の C ラッパー経由に変更する

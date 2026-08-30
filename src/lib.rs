@@ -12,6 +12,7 @@ mod error;
 mod helper;
 mod libyuv;
 mod rtc_base;
+mod util;
 
 #[cfg(test)]
 mod tests;
@@ -28,7 +29,8 @@ pub use libyuv::{
     yuy2_to_i420,
 };
 pub use rtc_base::{
-    SSLCertChainRef, SSLCertificateRef, SSLCertificateVerifier, SSLCertificateVerifierHandler,
-    SSLIdentity, Thread, TimestampAligner, log, random_bytes, random_string, rtc_log_format_file,
-    time_millis,
+    Buffer, BufferRef, SSLCertChainRef, SSLCertificateRef, SSLCertificateVerifier,
+    SSLCertificateVerifierHandler, SSLIdentity, Thread, TimestampAligner, log, random_bytes,
+    random_string, rtc_log_format_file, time_millis,
 };
+pub use util::*;

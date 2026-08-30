@@ -1991,17 +1991,17 @@ unsafe extern "C" fn video_encoder_factory_on_destroy(user_data: *mut c_void) {
 unsafe extern "C" fn video_encoder_factory_get_supported_formats(
     user_data: *mut c_void,
 ) -> *mut ffi::webrtc_SdpVideoFormat_vector {
-    let empty = || unsafe { ffi::webrtc_SdpVideoFormat_vector_new() };
     assert!(
         !user_data.is_null(),
         "video_encoder_factory_get_supported_formats: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut VideoEncoderFactoryHandlerState) };
     let formats = state.handler.get_supported_formats();
-    let vec = empty();
-    if vec.is_null() {
-        return std::ptr::null_mut();
-    }
+    let vec = expect_non_null(
+        unsafe { ffi::webrtc_SdpVideoFormat_vector_new() },
+        "webrtc_SdpVideoFormat_vector_new",
+    )
+    .as_ptr();
     for format in &formats {
         unsafe { ffi::webrtc_SdpVideoFormat_vector_push_back(vec, format.raw().as_ptr()) };
     }
