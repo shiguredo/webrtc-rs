@@ -38,9 +38,7 @@ class AudioDecoderFactoryImpl : public webrtc::AudioDecoderFactory {
 
   std::vector<webrtc::AudioCodecSpec> GetSupportedDecoders() override {
     auto raw = cbs_.GetSupportedDecoders(user_data_);
-    if (raw == nullptr) {
-      return {};
-    }
+    assert(raw != nullptr);
     auto vec = reinterpret_cast<std::vector<webrtc::AudioCodecSpec>*>(raw);
     auto copied = *vec;
     webrtc_AudioCodecSpec_vector_delete(raw);

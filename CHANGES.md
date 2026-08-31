@@ -39,7 +39,7 @@
 - [ADD] 音声コーデックのユーザー実装を注入するための API を追加する
   - `AudioCodecType` を追加し、SDP コーデック名 (`opus` / `ISAC` / `G722` / `PCMA` / `PCMU`) と `webrtc::AudioEncoder::CodecType` の生値 (`from_raw` / `to_raw`) との相互変換を提供する
   - `SdpAudioFormat` / `SdpAudioFormatRef` / `AudioCodecInfo` / `AudioCodecSpec` を追加する
-  - handler の引数・戻り値として表面化する公開型 (`AudioCodecPairId` / `AudioEncoderEncodedInfo` / `AudioEncoderAnaStats` / `AudioSpeechType` / `AudioEncoderFactoryOptions` / `Buffer` / `BufferRef` / `BufferS16Ref`) と、長さ不明バッファ向けの `RawBufferWriter` を追加する
+  - handler の引数・戻り値として表面化する公開型 (`AudioCodecPairId` / `AudioEncoderEncodedInfo` / `AudioEncoderAnaStats` / `AudioEncoderApplication` / `AudioSpeechType` / `AudioEncoderFactoryOptions` / `Buffer` / `BufferRef` / `BufferS16Ref`) と、長さ不明バッファ向けの `RawBufferWriter` を追加する
   - `webrtc::BitrateAllocationUpdate` の C ラッパー `BitrateAllocationUpdate` を追加し、`OnReceivedUplinkAllocation` にフル struct を渡す
   - `webrtc::AudioEncoder::EncodedInfoLeaf` と `redundant` の C ラッパーを追加し、冗長符号化を表現できるようにする
   - `AudioEncoderFactory::new_with_handler` と `AudioEncoderFactoryHandler` (`get_supported_encoders` / `query_audio_encoder` / `create`) を追加する
@@ -47,6 +47,9 @@
   - `AudioEncoder` / `AudioEncoderHandler` を追加し、`webrtc::AudioEncoder` の純仮想・仮想関数 (非推奨を除く) を転送する
   - `AudioDecoder` / `AudioDecoderHandler` を追加し、`webrtc::AudioDecoder` の純仮想・仮想関数 (非推奨を除く) を転送する
   - `AudioEncoderFactory::get_supported_encoders` / `create`、`AudioDecoderFactory::get_supported_decoders` / `create` / `is_supported_decoder` を追加する
+  - @melpon
+- [ADD] video 系 enum の生値変換 (`from_raw` / `to_raw`) を公開する
+  - video: `VideoCodecType` / `VideoFrameBufferKind` / `VideoRotation` / `VideoFrameType` / `VideoCodecStatus` の `from_raw` / `to_raw` を `pub(crate)` から `pub` に変更する
   - @melpon
 - [ADD] `webrtc_Thread_Quit` を追加する
   - C API の `webrtc_Thread_Quit` を追加し、libwebrtc の `webrtc::Thread::Quit()` を公開する

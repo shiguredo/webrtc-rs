@@ -154,6 +154,7 @@ class AudioEncoderImpl : public webrtc::AudioEncoder {
 
   webrtc::ANAStats GetANAStats() const override {
     auto raw = cbs_.GetANAStats(user_data_);
+    assert(raw != nullptr);
     webrtc::ANAStats stats = *reinterpret_cast<webrtc::ANAStats*>(raw);
     webrtc_AudioEncoder_ANAStats_delete(raw);
     return stats;
@@ -190,7 +191,6 @@ class AudioEncoderImpl : public webrtc::AudioEncoder {
       uint32_t rtp_timestamp,
       std::span<const int16_t> audio,
       webrtc::Buffer* encoded) override {
-    encoded->Clear();
     auto raw = cbs_.Encode(rtp_timestamp, audio.data(), audio.size(),
                            reinterpret_cast<struct webrtc_Buffer*>(encoded),
                            user_data_);
@@ -499,6 +499,15 @@ WEBRTC_EXPORT const int webrtc_AudioEncoder_CodecType_PcmU =
     static_cast<int>(webrtc::AudioEncoder::CodecType::kPcmU);
 WEBRTC_EXPORT const int webrtc_AudioEncoder_CodecType_G722 =
     static_cast<int>(webrtc::AudioEncoder::CodecType::kG722);
+
+// -------------------------
+// webrtc::AudioEncoder::Application
+// -------------------------
+
+WEBRTC_EXPORT const int webrtc_AudioEncoder_Application_kSpeech =
+    static_cast<int>(webrtc::AudioEncoder::Application::kSpeech);
+WEBRTC_EXPORT const int webrtc_AudioEncoder_Application_kAudio =
+    static_cast<int>(webrtc::AudioEncoder::Application::kAudio);
 
 // -------------------------
 // webrtc::AudioEncoder

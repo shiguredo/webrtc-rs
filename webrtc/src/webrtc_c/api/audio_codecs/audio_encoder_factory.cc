@@ -42,9 +42,7 @@ class AudioEncoderFactoryImpl : public webrtc::AudioEncoderFactory {
 
   std::vector<webrtc::AudioCodecSpec> GetSupportedEncoders() override {
     auto raw = cbs_.GetSupportedEncoders(user_data_);
-    if (raw == nullptr) {
-      return {};
-    }
+    assert(raw != nullptr);
     auto vec = reinterpret_cast<std::vector<webrtc::AudioCodecSpec>*>(raw);
     auto copied = *vec;
     webrtc_AudioCodecSpec_vector_delete(raw);

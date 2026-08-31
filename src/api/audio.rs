@@ -843,8 +843,6 @@ unsafe impl Send for AudioCodecSpec {}
 
 impl AudioCodecSpec {
     /// フォーマットと情報から AudioCodecSpec を生成する。
-    ///
-    /// `format` / `info` はコピーされるだけで所有権は奪われない。
     pub fn new(format: SdpAudioFormat, info: AudioCodecInfo) -> Self {
         let raw = unsafe { ffi::webrtc_AudioCodecSpec_new(format.raw().as_ptr(), info.raw()) };
         Self {
@@ -1369,7 +1367,7 @@ pub trait AudioEncoderHandler: Send {
 
     /// アプリケーションモードを設定する。
     #[expect(unused_variables)]
-    fn set_application(&mut self, application: i32) -> bool {
+    fn set_application(&mut self, application: AudioEncoderApplication) -> bool {
         false
     }
 
@@ -1734,6 +1732,7 @@ unsafe extern "C" fn audio_encoder_set_application(
         "audio_encoder_set_application: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut AudioEncoderHandlerState) };
+    let application = AudioEncoderApplication::from_raw(application);
     if state.handler.set_application(application) {
         1
     } else {
@@ -2107,8 +2106,8 @@ impl AudioEncoder {
     }
 
     /// アプリケーションモードを設定する。
-    pub fn set_application(&mut self, application: i32) -> bool {
-        unsafe { ffi::webrtc_AudioEncoder_SetApplication(self.as_ptr(), application) != 0 }
+    pub fn set_application(&mut self, application: AudioEncoderApplication) -> bool {
+        unsafe { ffi::webrtc_AudioEncoder_SetApplication(self.as_ptr(), application.to_raw()) != 0 }
     }
 
     /// 最大再生レート (Hz) を設定する。
@@ -2202,6 +2201,37 @@ impl Drop for AudioEncoder {
     }
 }
 
+/// `webrtc::AudioEncoder::Application` に対応するアプリケーション種別。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AudioEncoderApplication {
+    /// 音声。
+    Speech,
+    /// オーディオ (音楽) 用途。
+    Audio,
+    /// 未知のアプリケーション種別。
+    Unknown(i32),
+}
+
+impl AudioEncoderApplication {
+    pub fn to_raw(self) -> i32 {
+        match self {
+            Self::Speech => unsafe { ffi::webrtc_AudioEncoder_Application_kSpeech },
+            Self::Audio => unsafe { ffi::webrtc_AudioEncoder_Application_kAudio },
+            Self::Unknown(value) => value,
+        }
+    }
+
+    pub fn from_raw(raw: i32) -> Self {
+        if raw == unsafe { ffi::webrtc_AudioEncoder_Application_kSpeech } {
+            Self::Speech
+        } else if raw == unsafe { ffi::webrtc_AudioEncoder_Application_kAudio } {
+            Self::Audio
+        } else {
+            Self::Unknown(raw)
+        }
+    }
+}
+
 /// デコード結果の音声タイプ。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AudioSpeechType {
@@ -2214,7 +2244,7 @@ pub enum AudioSpeechType {
 }
 
 impl AudioSpeechType {
-    fn to_raw(self) -> i32 {
+    pub fn to_raw(self) -> i32 {
         match self {
             Self::Speech => unsafe { ffi::webrtc_AudioDecoder_SpeechType_kSpeech },
             Self::ComfortNoise => unsafe { ffi::webrtc_AudioDecoder_SpeechType_kComfortNoise },
@@ -2222,7 +2252,7 @@ impl AudioSpeechType {
         }
     }
 
-    fn from_raw(raw: i32) -> Self {
+    pub fn from_raw(raw: i32) -> Self {
         if raw == unsafe { ffi::webrtc_AudioDecoder_SpeechType_kComfortNoise } {
             Self::ComfortNoise
         } else if raw == unsafe { ffi::webrtc_AudioDecoder_SpeechType_kSpeech } {
@@ -2581,7 +2611,7 @@ impl AudioDecoder {
         sample_rate_hz: i32,
         decoded: &mut [i16],
     ) -> (i32, AudioSpeechType) {
-        let mut speech_type = 0i32;
+        let mut speech_type = AudioSpeechType::Speech.to_raw();
         let samples = unsafe {
             ffi::webrtc_AudioDecoder_Decode(
                 self.as_ptr(),

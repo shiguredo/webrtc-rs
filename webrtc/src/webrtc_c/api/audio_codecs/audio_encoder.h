@@ -323,6 +323,13 @@ WEBRTC_EXPORT extern const int webrtc_AudioEncoder_CodecType_PcmA;
 WEBRTC_EXPORT extern const int webrtc_AudioEncoder_CodecType_PcmU;
 WEBRTC_EXPORT extern const int webrtc_AudioEncoder_CodecType_G722;
 
+// -------------------------
+// webrtc::AudioEncoder::Application
+// -------------------------
+
+WEBRTC_EXPORT extern const int webrtc_AudioEncoder_Application_kSpeech;
+WEBRTC_EXPORT extern const int webrtc_AudioEncoder_Application_kAudio;
+
 #if defined(__cplusplus)
 }
 #endif

@@ -4241,7 +4241,7 @@ fn custom_audio_encoder_factory_roundtrip() {
     // 既定実装の仕様を確認する (set_dtx は !enable、get_dtx は false)。
     assert!(!encoder.get_dtx());
     assert!(encoder.set_dtx(false));
-    assert!(!encoder.set_application(0));
+    assert!(!encoder.set_application(AudioEncoderApplication::Speech));
     let mut buffer = Buffer::new();
     let info = encoder.encode(0, &[0i16; 960], &mut buffer);
     assert_eq!(buffer.size(), 3);

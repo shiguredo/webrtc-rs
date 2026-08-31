@@ -81,7 +81,7 @@ class AudioDecoderImpl : public webrtc::AudioDecoder {
                      int sample_rate_hz,
                      int16_t* decoded,
                      SpeechType* speech_type) override {
-    int st = static_cast<int>(SpeechType::kSpeech);
+    int st = static_cast<int>(*speech_type);
     int result = cbs_.Decode(encoded, encoded_len, sample_rate_hz, decoded, &st,
                              user_data_);
     *speech_type = static_cast<SpeechType>(st);
@@ -93,7 +93,7 @@ class AudioDecoderImpl : public webrtc::AudioDecoder {
                               int sample_rate_hz,
                               int16_t* decoded,
                               SpeechType* speech_type) override {
-    int st = static_cast<int>(SpeechType::kSpeech);
+    int st = static_cast<int>(*speech_type);
     int result = cbs_.DecodeRedundant(encoded, encoded_len, sample_rate_hz,
                                       decoded, &st, user_data_);
     *speech_type = static_cast<SpeechType>(st);
@@ -156,7 +156,8 @@ WEBRTC_EXPORT int webrtc_AudioDecoder_DecodeRedundant(
     int* speech_type) {
   assert(self != nullptr);
   auto decoder = reinterpret_cast<webrtc::AudioDecoder*>(self);
-  auto speech = static_cast<webrtc::AudioDecoder::SpeechType>(*speech_type);
+  // speech_type は純出力のため、入力値は読まず既定値から開始する。
+  auto speech = webrtc::AudioDecoder::SpeechType::kSpeech;
   auto result = decoder->DecodeRedundant(encoded, encoded_len, sample_rate_hz,
                                          max_decoded_bytes, decoded, &speech);
   *speech_type = static_cast<int>(speech);
