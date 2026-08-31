@@ -52,3 +52,31 @@ pub(crate) fn set_optional_bool(value: Option<bool>, set_fn: impl FnOnce(c_int, 
         None => set_fn(0, std::ptr::null()),
     }
 }
+
+/// has / value 方式の getter を呼び出し、2 値の `Option<(A, B)>` で返す。
+///
+/// C API が `out_has` + 2 つの値 (`out_a` / `out_b`) を出力する getter のために、
+/// [get_optional] の 2 値版。`has` が 0 なら `None`、そうでなければ `Some((a, b))` を返す。
+pub(crate) fn get_optional2<A: Default, B: Default>(
+    get_fn: impl FnOnce(*mut c_int, *mut A, *mut B),
+) -> Option<(A, B)> {
+    let mut has = 0;
+    let mut a = A::default();
+    let mut b = B::default();
+    get_fn(&mut has, &mut a, &mut b);
+    if has == 0 { None } else { Some((a, b)) }
+}
+
+/// has / value 方式の setter を呼び出す 2 値版。
+///
+/// `value` が `Some((a, b))` なら `has = 1` で 2 つの値へのポインタ、`None` なら
+/// `has = 0` で null ポインタを渡す。C API は `has == 0` のとき値ポインタを読み取らない。
+pub(crate) fn set_optional2<A, B>(
+    value: Option<(A, B)>,
+    set_fn: impl FnOnce(c_int, *const A, *const B),
+) {
+    match value {
+        Some((a, b)) => set_fn(1, &a, &b),
+        None => set_fn(0, std::ptr::null(), std::ptr::null()),
+    }
+}

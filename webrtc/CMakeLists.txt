@@ -422,8 +422,13 @@ add_library(webrtc_c
     src/webrtc_c/api/audio/audio_device_defines.cc
     src/webrtc_c/api/audio/audio_options.cc
     src/webrtc_c/api/audio/audio_processing.cc
+    src/webrtc_c/api/audio_codecs/audio_codec_pair_id.cc
     src/webrtc_c/api/audio_codecs/audio_decoder_factory.cc
     src/webrtc_c/api/audio_codecs/audio_encoder_factory.cc
+    src/webrtc_c/api/audio_codecs/audio_decoder.cc
+    src/webrtc_c/api/audio_codecs/audio_encoder.cc
+    src/webrtc_c/api/audio_codecs/audio_format.cc
+    src/webrtc_c/api/call/bitrate_allocation.cc
     src/webrtc_c/api/data_channel_interface.cc
     src/webrtc_c/api/dtls_transport_interface.cc
     src/webrtc_c/api/frame_transformer_interface.cc
@@ -472,6 +477,7 @@ add_library(webrtc_c
     src/webrtc_c/libyuv.cc
     src/webrtc_c/media/engine/simulcast_encoder_adapter.cc
     src/webrtc_c/pc/connection_context.cc
+    src/webrtc_c/rtc_base/buffer.cc
     src/webrtc_c/rtc_base/crypto_random.cc
     src/webrtc_c/rtc_base/logging.cc
     src/webrtc_c/rtc_base/ssl_adapter.cc

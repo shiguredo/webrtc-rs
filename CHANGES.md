@@ -36,6 +36,21 @@
   - `webrtc_Thread_BlockingCall_r` を非 void テンプレから void 版 `BlockingCall` に変更し、functor 未実行時に確定した `nullptr` を返すようにする
   - `nullptr` は未実行を一意に表すため、停止中スレッドでは `R::default()` を返し、未初期化ポインタの `Box::from_raw` による UB を回避する
   - @melpon
+- [ADD] 音声コーデックのユーザー実装を注入するための API を追加する
+  - `AudioCodecType` を追加し、SDP コーデック名 (`opus` / `ISAC` / `G722` / `PCMA` / `PCMU`) と `webrtc::AudioEncoder::CodecType` の生値 (`from_raw` / `to_raw`) との相互変換を提供する
+  - `SdpAudioFormat` / `SdpAudioFormatRef` / `AudioCodecInfo` / `AudioCodecSpec` を追加する
+  - handler の引数・戻り値として表面化する公開型 (`AudioCodecPairId` / `AudioEncoderEncodedInfo` / `AudioEncoderAnaStats` / `AudioEncoderApplication` / `AudioSpeechType` / `AudioEncoderFactoryOptions` / `Buffer` / `BufferRef` / `BufferS16Ref`) と、長さ不明バッファ向けの `RawBufferWriter` を追加する
+  - `webrtc::BitrateAllocationUpdate` の C ラッパー `BitrateAllocationUpdate` を追加し、`OnReceivedUplinkAllocation` にフル struct を渡す
+  - `webrtc::AudioEncoder::EncodedInfoLeaf` と `redundant` の C ラッパーを追加し、冗長符号化を表現できるようにする
+  - `AudioEncoderFactory::new_with_handler` と `AudioEncoderFactoryHandler` (`get_supported_encoders` / `query_audio_encoder` / `create`) を追加する
+  - `AudioDecoderFactory::new_with_handler` と `AudioDecoderFactoryHandler` (`get_supported_decoders` / `is_supported_decoder` / `create`) を追加する
+  - `AudioEncoder` / `AudioEncoderHandler` を追加し、`webrtc::AudioEncoder` の純仮想・仮想関数 (非推奨を除く) を転送する
+  - `AudioDecoder` / `AudioDecoderHandler` を追加し、`webrtc::AudioDecoder` の純仮想・仮想関数 (非推奨を除く) を転送する
+  - `AudioEncoderFactory::get_supported_encoders` / `create`、`AudioDecoderFactory::get_supported_decoders` / `create` / `is_supported_decoder` を追加する
+  - @melpon
+- [ADD] video 系 enum の生値変換 (`from_raw` / `to_raw`) を公開する
+  - video: `VideoCodecType` / `VideoFrameBufferKind` / `VideoRotation` / `VideoFrameType` / `VideoCodecStatus` の `from_raw` / `to_raw` を `pub(crate)` から `pub` に変更する
+  - @melpon
 - [ADD] `webrtc_Thread_Quit` を追加する
   - C API の `webrtc_Thread_Quit` を追加し、libwebrtc の `webrtc::Thread::Quit()` を公開する
   - `Thread::quit` を追加し、メッセージループを stop せずに停止できるようにする
@@ -60,6 +75,9 @@
   - @melpon
 - [FIX] C ラッパーが release ビルドでも abort する `RTC_CHECK` を `assert` に変更する
   - `webrtc_PeerConnectionDependencies_set_proxy` の `RTC_CHECK(nm != nullptr)` / `RTC_CHECK(sf != nullptr)` を `assert` に変更し、デバッグビルドのみ契約違反を検出するようにする (release では null をそのまま libwebrtc へ渡す)
+  - @melpon
+- [FIX] `set_implementation_name` が `CxxString` を消費 (move) してしまう所有権バグを修正する
+  - `DecoderInfo` / `EncoderInfo` の `set_implementation_name` が C 側の `std_string_unique` を move 消費していたのを、`const struct std_string*` を受け取ってコピーのみ行うように変更し、呼び出し側の `CxxString` を無効化しないようにする
   - @melpon
 
 ### misc

@@ -168,7 +168,7 @@ webrtc_VideoEncoder_EncoderInfo_get_implementation_name(
     struct webrtc_VideoEncoder_EncoderInfo* self);
 WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_set_implementation_name(
     struct webrtc_VideoEncoder_EncoderInfo* self,
-    struct std_string_unique* name);
+    const struct std_string* name);
 WEBRTC_EXPORT int webrtc_VideoEncoder_EncoderInfo_get_is_hardware_accelerated(
     struct webrtc_VideoEncoder_EncoderInfo* self);
 WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_set_is_hardware_accelerated(

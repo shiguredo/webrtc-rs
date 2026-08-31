@@ -105,19 +105,12 @@ webrtc_VideoDecoder_DecoderInfo_get_implementation_name(
 
 WEBRTC_EXPORT void webrtc_VideoDecoder_DecoderInfo_set_implementation_name(
     struct webrtc_VideoDecoder_DecoderInfo* self,
-    struct std_string_unique* name) {
+    const struct std_string* name) {
+  assert(self != nullptr);
+  assert(name != nullptr);
   auto info = reinterpret_cast<webrtc::VideoDecoder::DecoderInfo*>(self);
-  if (name == nullptr) {
-    info->implementation_name.clear();
-    return;
-  }
-  auto cpp_name = reinterpret_cast<std::string*>(std_string_unique_get(name));
-  if (cpp_name != nullptr) {
-    info->implementation_name = *cpp_name;
-  } else {
-    info->implementation_name.clear();
-  }
-  std_string_unique_delete(name);
+  auto cpp_name = reinterpret_cast<const std::string*>(name);
+  info->implementation_name = *cpp_name;
 }
 
 WEBRTC_EXPORT int webrtc_VideoDecoder_DecoderInfo_get_is_hardware_accelerated(

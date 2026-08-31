@@ -193,7 +193,8 @@ impl SdpVideoFormat {
     }
 
     pub fn parameters_mut(&mut self) -> MapStringString<'_> {
-        self.as_ref().parameters_mut()
+        let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(self.raw().as_ptr()) };
+        MapStringString::from_raw(expect_non_null(ptr, "webrtc_SdpVideoFormat_get_parameters"))
     }
 
     pub fn is_equal(&self, other: SdpVideoFormatRef<'_>) -> bool {
@@ -258,7 +259,7 @@ impl<'a> SdpVideoFormatRef<'a> {
         CxxStringRef::from_ptr(expect_non_null(ptr, "webrtc_SdpVideoFormat_get_name")).to_string()
     }
 
-    pub fn parameters_mut(&mut self) -> MapStringString<'a> {
+    pub fn parameters_mut(&mut self) -> MapStringString<'_> {
         let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(self.raw.as_ptr()) };
         MapStringString::from_raw(expect_non_null(ptr, "webrtc_SdpVideoFormat_get_parameters"))
     }
@@ -761,7 +762,7 @@ pub enum VideoFrameBufferKind {
 }
 
 impl VideoFrameBufferKind {
-    pub(crate) fn from_raw(value: i32) -> Self {
+    pub fn from_raw(value: i32) -> Self {
         unsafe {
             if value == ffi::webrtc_VideoFrameBuffer_Type_kNative {
                 Self::Native
@@ -787,7 +788,7 @@ impl VideoFrameBufferKind {
         }
     }
 
-    pub(crate) fn to_raw(self) -> i32 {
+    pub fn to_raw(self) -> i32 {
         unsafe {
             match self {
                 Self::Native => ffi::webrtc_VideoFrameBuffer_Type_kNative,
@@ -1258,7 +1259,7 @@ pub enum VideoRotation {
 }
 
 impl VideoRotation {
-    pub(crate) fn from_raw(value: i32) -> Self {
+    pub fn from_raw(value: i32) -> Self {
         unsafe {
             if value == ffi::webrtc_VideoRotation_0 {
                 Self::R0
@@ -1274,7 +1275,7 @@ impl VideoRotation {
         }
     }
 
-    pub(crate) fn to_raw(self) -> i32 {
+    pub fn to_raw(self) -> i32 {
         unsafe {
             match self {
                 Self::R0 => ffi::webrtc_VideoRotation_0,
@@ -1673,7 +1674,7 @@ pub enum VideoFrameType {
 }
 
 impl VideoFrameType {
-    pub(crate) fn from_raw(value: i32) -> Self {
+    pub fn from_raw(value: i32) -> Self {
         if value == unsafe { ffi::webrtc_VideoFrameType_Empty } {
             Self::Empty
         } else if value == unsafe { ffi::webrtc_VideoFrameType_Key } {
@@ -1685,7 +1686,7 @@ impl VideoFrameType {
         }
     }
 
-    pub(crate) fn to_raw(self) -> i32 {
+    pub fn to_raw(self) -> i32 {
         match self {
             Self::Empty => unsafe { ffi::webrtc_VideoFrameType_Empty },
             Self::Key => unsafe { ffi::webrtc_VideoFrameType_Key },
@@ -1818,7 +1819,7 @@ pub enum VideoCodecStatus {
 }
 
 impl VideoCodecStatus {
-    pub(crate) fn from_raw(value: i32) -> Self {
+    pub fn from_raw(value: i32) -> Self {
         if value == unsafe { ffi::webrtc_VideoCodecStatus_TargetBitrateOvershoot } {
             Self::TargetBitrateOvershoot
         } else if value == unsafe { ffi::webrtc_VideoCodecStatus_OkRequestKeyframe } {
@@ -1850,7 +1851,7 @@ impl VideoCodecStatus {
         }
     }
 
-    pub(crate) fn to_raw(self) -> i32 {
+    pub fn to_raw(self) -> i32 {
         match self {
             Self::TargetBitrateOvershoot => unsafe {
                 ffi::webrtc_VideoCodecStatus_TargetBitrateOvershoot
@@ -1886,7 +1887,7 @@ impl VideoCodecType {
         }
     }
 
-    pub(crate) fn from_raw(value: i32) -> Self {
+    pub fn from_raw(value: i32) -> Self {
         if value == unsafe { ffi::webrtc_VideoCodecType_Generic } {
             Self::Generic
         } else if value == unsafe { ffi::webrtc_VideoCodecType_VP8 } {
@@ -1904,7 +1905,7 @@ impl VideoCodecType {
         }
     }
 
-    pub(crate) fn to_raw(self) -> i32 {
+    pub fn to_raw(self) -> i32 {
         match self {
             Self::Generic => unsafe { ffi::webrtc_VideoCodecType_Generic },
             Self::Vp8 => unsafe { ffi::webrtc_VideoCodecType_VP8 },
