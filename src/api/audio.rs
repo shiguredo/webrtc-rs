@@ -2868,26 +2868,18 @@ impl Drop for AudioEncoderFactoryOptions {
 /// `AudioEncoderFactory` のコールバックハンドラ。
 pub trait AudioEncoderFactoryHandler: Send {
     /// サポートされるエンコーダーの一覧を返す。
-    fn get_supported_encoders(&mut self) -> Vec<AudioCodecSpec> {
-        Vec::new()
-    }
+    fn get_supported_encoders(&mut self) -> Vec<AudioCodecSpec>;
 
     /// エンコーダーがフォーマットに対応するかを問い合わせる。
-    #[expect(unused_variables)]
-    fn query_audio_encoder(&mut self, format: SdpAudioFormatRef<'_>) -> Option<AudioCodecInfo> {
-        None
-    }
+    fn query_audio_encoder(&mut self, format: SdpAudioFormatRef<'_>) -> Option<AudioCodecInfo>;
 
     /// エンコーダーを生成する。
-    #[expect(unused_variables)]
     fn create(
         &mut self,
         env: EnvironmentRef<'_>,
         format: SdpAudioFormatRef<'_>,
         options: &AudioEncoderFactoryOptions,
-    ) -> Option<AudioEncoder> {
-        None
-    }
+    ) -> Option<AudioEncoder>;
 }
 
 type AudioEncoderFactoryHandlerState = HandlerState<dyn AudioEncoderFactoryHandler>;
@@ -3037,25 +3029,17 @@ impl AudioEncoderFactory {
 /// `AudioDecoderFactory` のコールバックハンドラ。
 pub trait AudioDecoderFactoryHandler: Send {
     /// サポートされるデコーダーの一覧を返す。
-    fn get_supported_decoders(&mut self) -> Vec<AudioCodecSpec> {
-        Vec::new()
-    }
+    fn get_supported_decoders(&mut self) -> Vec<AudioCodecSpec>;
 
     /// デコーダーがフォーマットに対応するかを返す。
-    #[expect(unused_variables)]
-    fn is_supported_decoder(&mut self, format: SdpAudioFormatRef<'_>) -> bool {
-        false
-    }
+    fn is_supported_decoder(&mut self, format: SdpAudioFormatRef<'_>) -> bool;
 
     /// デコーダーを生成する。
-    #[expect(unused_variables)]
     fn create(
         &mut self,
         env: EnvironmentRef<'_>,
         format: SdpAudioFormatRef<'_>,
-    ) -> Option<AudioDecoder> {
-        None
-    }
+    ) -> Option<AudioDecoder>;
 }
 
 type AudioDecoderFactoryHandlerState = HandlerState<dyn AudioDecoderFactoryHandler>;

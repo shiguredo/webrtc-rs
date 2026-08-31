@@ -11,6 +11,10 @@
 
 ## develop
 
+- [CHANGE] `VideoEncoderFactory` / `VideoDecoderFactory` の Handler trait を必須化する
+  - `VideoEncoderFactoryHandler` / `VideoDecoderFactoryHandler` の `get_supported_formats` / `create` をデフォルト実装から必須メソッドへ変更し、実装漏れをコンパイルエラーで検知できるようにする
+  - libwebrtc の `webrtc::VideoEncoderFactory` / `webrtc::VideoDecoderFactory` が純粋仮想関数で両メソッドの実装を要求するのに合わせる
+  - @melpon
 - [CHANGE] libwebrtc 側で std::move により消費される `deps` を `&mut` から値渡しに変更する
   - `PeerConnectionFactory::create_modular` / `create_modular_with_context` / `PeerConnection::create` の `deps` 引数を値渡しに変更する
   - @melpon

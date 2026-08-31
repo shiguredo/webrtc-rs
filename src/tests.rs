@@ -2545,6 +2545,9 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
         created: bool,
     }
     impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
+        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+            vec![SdpVideoFormat::new("VP8")]
+        }
         fn create(
             &mut self,
             env: EnvironmentRef<'_>,
@@ -2780,6 +2783,14 @@ fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
             vp8.parameters_mut().set("x-google-start-bitrate", "300");
             vec![h264, vp8]
         }
+        fn create(
+            &mut self,
+            env: EnvironmentRef<'_>,
+            _format: SdpVideoFormatRef<'_>,
+        ) -> Option<VideoEncoder> {
+            assert!(!env.as_ptr().is_null());
+            None
+        }
     }
 
     let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler));
@@ -2984,6 +2995,14 @@ fn video_decoder_factory_get_supported_formats_returns_owned_formats() {
             h264.parameters_mut().set("packetization-mode", "1");
             vec![h264]
         }
+        fn create(
+            &mut self,
+            env: EnvironmentRef<'_>,
+            _format: SdpVideoFormatRef<'_>,
+        ) -> Option<VideoDecoder> {
+            assert!(!env.as_ptr().is_null());
+            None
+        }
     }
 
     let factory = VideoDecoderFactory::new_with_handler(Box::new(TestVideoDecoderFactoryHandler));
@@ -3011,6 +3030,9 @@ fn video_encoder_factory_create_calls_create_callback() {
         called: std::sync::Arc<std::sync::atomic::AtomicBool>,
     }
     impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
+        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+            vec![SdpVideoFormat::new("H264")]
+        }
         fn create(
             &mut self,
             env: EnvironmentRef<'_>,
@@ -3048,6 +3070,9 @@ fn video_decoder_factory_create_calls_create_callback() {
         called: std::sync::Arc<std::sync::atomic::AtomicBool>,
     }
     impl VideoDecoderFactoryHandler for TestVideoDecoderFactoryHandler {
+        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+            vec![SdpVideoFormat::new("H264")]
+        }
         fn create(
             &mut self,
             env: EnvironmentRef<'_>,
@@ -3290,6 +3315,9 @@ fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
         created: bool,
     }
     impl VideoDecoderFactoryHandler for TestVideoDecoderFactoryHandler {
+        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+            vec![SdpVideoFormat::new("VP8")]
+        }
         fn create(
             &mut self,
             env: EnvironmentRef<'_>,
@@ -4201,6 +4229,9 @@ impl AudioEncoderFactoryHandler for TestAudioEncoderFactoryHandler {
             SdpAudioFormat::new("opus", 48000, 2),
             AudioCodecInfo::new(48000, 2, 32000, 6000, 510000),
         )]
+    }
+    fn query_audio_encoder(&mut self, _format: SdpAudioFormatRef<'_>) -> Option<AudioCodecInfo> {
+        None
     }
     fn create(
         &mut self,

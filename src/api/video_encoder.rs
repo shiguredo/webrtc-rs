@@ -1838,18 +1838,13 @@ pub trait VideoEncoderHandler: Send {
 }
 
 pub trait VideoEncoderFactoryHandler: Send {
-    fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
-        Vec::new()
-    }
+    fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat>;
 
-    #[expect(unused_variables)]
     fn create(
         &mut self,
         env: EnvironmentRef<'_>,
         format: SdpVideoFormatRef<'_>,
-    ) -> Option<VideoEncoder> {
-        None
-    }
+    ) -> Option<VideoEncoder>;
 }
 
 type VideoEncoderHandlerState = HandlerState<dyn VideoEncoderHandler>;
