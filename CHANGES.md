@@ -155,7 +155,7 @@
   - `VideoContentType` / `DecodeTargetIndication` / `H264PacketizationType` を追加する
   - `VideoFrameMetadata` と codec specifics 群に `Clone` / `Debug` を追加する
   - @melpon
-- [UPDATE] libwebrtc m152 (m152.7977.0.0) に上げる
+- [UPDATE] libwebrtc m152 (m152.7977.0.2) に上げる
   - @melpon
 - [FIX] webrtc のログ出力が 4096 文字以上だと切り詰められるのを修正する
   - @melpon
