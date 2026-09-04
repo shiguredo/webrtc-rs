@@ -1455,6 +1455,28 @@ impl RtpSender {
     }
 }
 
+/// トラックの生死。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MediaStreamTrackState {
+    Live,
+    Ended,
+    Unknown(i32),
+}
+
+impl MediaStreamTrackState {
+    pub fn from_int(value: i32) -> Self {
+        unsafe {
+            if value == ffi::webrtc_MediaStreamTrackInterface_TrackState_kLive {
+                MediaStreamTrackState::Live
+            } else if value == ffi::webrtc_MediaStreamTrackInterface_TrackState_kEnded {
+                MediaStreamTrackState::Ended
+            } else {
+                MediaStreamTrackState::Unknown(value)
+            }
+        }
+    }
+}
+
 // 安全性: libwebrtc 側で参照カウント管理されたポインタのみを保持する。
 /// webrtc::MediaStreamTrackInterface のラッパー。
 pub struct MediaStreamTrack {
@@ -1504,6 +1526,15 @@ impl MediaStreamTrack {
         unsafe {
             ffi::webrtc_MediaStreamTrackInterface_set_enabled(raw, if enable { 1 } else { 0 }) != 0
         }
+    }
+
+    /// トラックの生死を返す。
+    ///
+    /// 一度 `Ended` になったトラックが再び `Live` になることはない。
+    pub fn state(&self) -> MediaStreamTrackState {
+        let raw = self.raw_ref.as_ptr();
+        let state = unsafe { ffi::webrtc_MediaStreamTrackInterface_state(raw) };
+        MediaStreamTrackState::from_int(state)
     }
 
     pub fn cast_to_video_track(&self) -> VideoTrack {
