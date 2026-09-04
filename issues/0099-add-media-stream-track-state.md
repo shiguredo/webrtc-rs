@@ -3,7 +3,7 @@
 - Created: 2026-09-04
 - Completed: {YYYY-MM-DD}
 - Branch: feature/add-media-stream-track-state
-- Polished: {YYYY-MM-DD}
+- Polished: 2026-09-04
 
 ## 目的
 
@@ -16,13 +16,14 @@
 
 ## 設計方針
 
-- `webrtc_c` にトラックの生死を返す C API を追加し、整数で返す（`DegradationPreference` の `to_int` / `from_int` と同様に Rust 側で列挙へ変換する）
-- `src/api/rtp.rs` に `TrackState` 相当の列挙（生死を表す `Live` / `Ended` と将来値のための `Unknown`）を追加し、`MediaStreamTrack` に `state` を追加する
+- `webrtc_c` にトラック自体の生死を返す C API を追加する（例： `webrtc_MediaStreamTrackInterface_state`）。露出元は `MediaStreamTrackInterface::state` とし、`MediaSourceInterface::SourceState` ではない。`DataChannelState` / `DtlsTransportState` と同様に typedef と `kLive` / `kEnded` 対応定数で表す。読み取り専用の値返し getter として、C 関数の `self` は `const` 扱いにする
+- `src/api/rtp.rs` に `MediaStreamTrackState` を追加する（`DtlsTransportState` / `DataChannelState` の接頭辞付き命名に倣い、素の `TrackState` にはしない）。生死を表す `Live` / `Ended` と将来値のための `Unknown(i32)` を持ち、`from_int` のみを提供する（読み取り専用のため `to_int` は作らない）
+- `MediaStreamTrack` に `state` を追加し、`MediaStreamTrackState` を非 optional で返す
 - 既存の `enabled` とは意味が異なる（有効 / 無効の設定値ではなく生死）ため、別項目として追加し、置き換えはしない
 
 ## 完了条件
 
-- `MediaStreamTrack` から生死を列挙として取得できること
+- `MediaStreamTrack::state` が `MediaStreamTrackState` を非 optional で返し、`Live` / `Ended` の値対応と `Unknown` の扱いをテストで確認できること
 - `cargo test` と `cargo clippy --all-targets -- -D warnings` が成功すること
 
 ## 解決方法
