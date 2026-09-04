@@ -3,11 +3,11 @@
 - Created: 2026-09-04
 - Completed: {YYYY-MM-DD}
 - Branch: feature/add-rtp-receiver-stream-ids
-- Polished: {YYYY-MM-DD}
+- Polished: 2026-09-04
 
 ## 目的
 
-受信トラックに紐づく Stream ID 群を Rust 側から取得できるようにする。Sora の利用ではトラックに Stream ID が 1 つだけ紐づき、上位層でトラックと Stream の対応付けに使うため、取得口がないと同等の情報を提供できない。
+受信器が保持する Stream ID 群を Rust 側から取得できるようにする。上位層ではトラックと Stream の対応付けに Stream ID を使うため、取得口がないと同等の情報を提供できない。
 
 ## 現状
 
@@ -17,13 +17,15 @@
 
 ## 設計方針
 
-- `webrtc_c` に受信器が保持する Stream ID 群を返す C API を追加し、結果を `std_string_vector` の複製として返す
-- `src/api/rtp.rs` の `RtpReceiver` に `stream_ids` を追加し、所有型の `StringVector` を返す（`RtpParameters::encodings` が所有型のベクタを返す先例に倣う）
+- `webrtc_c` に受信器が保持する Stream ID 群を返す C API を追加する（例： `webrtc_RtpReceiverInterface_stream_ids`）。 libwebrtc の `RtpReceiverInterface::stream_ids` の値返し結果を、新規確保した `std_string_vector` に複製して返す。所有権は呼び出し側へ移し、Rust 側が破棄する。`webrtc_RtpTransceiverInit_get_stream_ids` のような内部ベクタへの借用は使わない
+- `std_string_vector` に複製関数がなければ追加する（`webrtc_RtpEncodingParameters_vector_clone` が `new` で複製する先例に倣う）
+- `src/cxxstd.rs` の `StringVector` に FFI ポインタから所有権を引き受ける口を追加した上で、`src/api/rtp.rs` の `RtpReceiver` に `stream_ids` を追加し、所有型の `StringVector` を返す
+- 読み取り専用の値返し getter として、C 関数の `self` は `const` 扱いにする
 - 要素が空の場合も空ベクタとして返し、`None` やエラーにはしない
 
 ## 完了条件
 
-- `RtpReceiver` から Stream ID 群を `StringVector` として取得できること
+- `RtpReceiver` から取得した Stream ID 群が、空の場合に空ベクタとなり、非空の場合に内容が一致することをテストで確認できること
 - `cargo test` と `cargo clippy --all-targets -- -D warnings` が成功すること
 
 ## 解決方法
