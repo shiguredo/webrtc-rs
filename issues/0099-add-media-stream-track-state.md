@@ -1,7 +1,7 @@
 # MediaStreamTrack に state の取得口を追加する
 
 - Created: 2026-09-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-09-04
 - Branch: feature/add-media-stream-track-state
 - Polished: 2026-09-04
 
@@ -28,4 +28,9 @@
 
 ## 解決方法
 
-（詳細は polish / 実装時に確定する）
+- `webrtc_c` に `webrtc_MediaStreamTrackInterface_TrackState` の typedef と `kLive` / `kEnded` 対応定数、`webrtc_MediaStreamTrackInterface_state` を追加し、libwebrtc の `MediaStreamTrackInterface::state` を薄く委譲するようにした（読み取り専用のため `self` は `const` 扱い）
+- `src/api/rtp.rs` に `MediaStreamTrackState` を追加し、`from_int` のみを提供するようにした（読み取り専用のため `to_int` は作らない）
+- `MediaStreamTrack` に `state` を追加し、`MediaStreamTrackState` を非 optional で返すようにした
+- `src/tests.rs` にテスト `media_stream_track_state` を追加し、`Live` / `Ended` の値対応と `Unknown` の扱い、生成直後トラックの生死を確認した
+- `CHANGES.md` の `## develop` 節に `[ADD]` エントリを追加した
+- `cargo test --workspace --features source-build` と `cargo clippy --workspace --features source-build -- -D warnings` の成功を確認した
