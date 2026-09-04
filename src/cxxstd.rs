@@ -191,6 +191,11 @@ impl StringVector {
         self.as_ref().get(index)
     }
 
+    /// FFI が返した所有権付きベクタを引き取る。
+    pub(crate) fn from_raw(raw: NonNull<ffi::std_string_vector>) -> Self {
+        Self { raw }
+    }
+
     pub fn as_ref(&self) -> StringVectorRef<'_> {
         StringVectorRef::from_raw(self.raw)
     }

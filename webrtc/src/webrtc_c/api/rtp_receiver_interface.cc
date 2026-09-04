@@ -2,9 +2,12 @@
 
 #include <api/rtp_receiver_interface.h>
 #include <api/scoped_refptr.h>
+#include <string>
+#include <vector>
 
 #include "../common.h"
 #include "../common.impl.h"
+#include "../std.h"
 #include "api/frame_transformer_interface.h"
 #include "frame_transformer_interface.h"
 #include "media_stream_interface.h"
@@ -19,6 +22,14 @@ webrtc_RtpReceiverInterface_track(struct webrtc_RtpReceiverInterface* self) {
   auto track = receiver->track();
   return reinterpret_cast<struct webrtc_MediaStreamTrackInterface_refcounted*>(
       track.release());
+}
+
+WEBRTC_EXPORT struct std_string_vector* webrtc_RtpReceiverInterface_stream_ids(
+    const struct webrtc_RtpReceiverInterface* self) {
+  auto receiver = reinterpret_cast<const webrtc::RtpReceiverInterface*>(self);
+  auto ids = receiver->stream_ids();
+  auto vec = new std::vector<std::string>(std::move(ids));
+  return reinterpret_cast<struct std_string_vector*>(vec);
 }
 
 WEBRTC_EXPORT void webrtc_RtpReceiverInterface_SetFrameTransformer(
