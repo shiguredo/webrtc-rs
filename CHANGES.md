@@ -59,6 +59,10 @@
   - C API の `webrtc_Thread_Quit` を追加し、libwebrtc の `webrtc::Thread::Quit()` を公開する
   - `Thread::quit` を追加し、メッセージループを stop せずに停止できるようにする
   - @melpon
+- [ADD] `RtpReceiver::stream_ids` を追加する
+  - C API の `webrtc_RtpReceiverInterface_stream_ids` を追加し、受信器に関連付けられた Stream ID 群を複製して返す
+  - `RtpReceiver::stream_ids` を追加し、所有権付きの `StringVector` で Stream ID 群を取得できるようにする
+  - @melpon
 - [UPDATE] 読み取り専用引数と共有ハンドル型レシーバの borrow を実体に合わせて変更する
   - 読み取り専用の `config` / `options` / `init` を `&mut` から `&` に変更する (`PeerConnection::create` / `set_configuration` / `create_offer` / `create_answer` / `create_data_channel` / `add_transceiver` / `add_transceiver_with_track`)
   - 共有ハンドル型レシーバを `&mut self` から `&self` に変更する (`PeerConnection::add_ice_candidate` / `set_configuration` / `PeerConnectionFactory::set_options` / `VideoTrack::add_or_update_sink` / `remove_sink` / `AdaptedVideoTrackSource::adapt_frame` / `on_frame` / `AudioTrack::add_sink` / `remove_sink` / `DataChannel::register_observer`)
