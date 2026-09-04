@@ -37,6 +37,16 @@ WEBRTC_EXPORT int8_t webrtc_MediaStreamTrackInterface_set_enabled(
     struct webrtc_MediaStreamTrackInterface* self,
     int8_t enable);
 
+// TrackState 定数
+typedef int webrtc_MediaStreamTrackInterface_TrackState;
+WEBRTC_EXPORT extern const int
+    webrtc_MediaStreamTrackInterface_TrackState_kLive;
+WEBRTC_EXPORT extern const int
+    webrtc_MediaStreamTrackInterface_TrackState_kEnded;
+WEBRTC_EXPORT webrtc_MediaStreamTrackInterface_TrackState
+webrtc_MediaStreamTrackInterface_state(
+    const struct webrtc_MediaStreamTrackInterface* self);
+
 // -------------------------
 // webrtc::VideoTrackInterface
 // -------------------------
