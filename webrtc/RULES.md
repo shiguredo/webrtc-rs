@@ -76,7 +76,7 @@
 
 - ビルドコマンド: `python3 run.py build ubuntu-24.04_x86_64`
 - 実行コマンド: `./_build/ubuntu-24.04_x86_64/release/webrtc_c/whip_c`
-- デバッグビルドコマンド: `python3 run.py build ubuntu-24.04_x86_64 --local-webrtc-build-dir ../../webrtc-build/_worktree/m143.7499.1.0 --debug`
+- デバッグビルドコマンド: `python3 run.py build ubuntu-24.04_x86_64 --local-webrtc-build-dir ../../webrtc-build/_worktree/m154.8037.1.1 --debug`
 - デバッグ実行コマンド: `./_build/ubuntu-24.04_x86_64/debug/webrtc_c/whip_c`
 - lldb-dap プラグインのインストールと lldb-dap バイナリのインストール、`../.vscode/launch.json` の各種パスの設定さえ適切にやれば、VSCode 上でデバッグ実行も可能です
 - 参照用の libwebrtc のヘッダーファイルの場所: `./_install/ubuntu-24.04_x86_64/release/webrtc/include`
