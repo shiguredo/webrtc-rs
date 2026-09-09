@@ -63,6 +63,8 @@
   - 読み取り専用の `config` / `options` / `init` を `&mut` から `&` に変更する (`PeerConnection::create` / `set_configuration` / `create_offer` / `create_answer` / `create_data_channel` / `add_transceiver` / `add_transceiver_with_track`)
   - 共有ハンドル型レシーバを `&mut self` から `&self` に変更する (`PeerConnection::add_ice_candidate` / `set_configuration` / `PeerConnectionFactory::set_options` / `VideoTrack::add_or_update_sink` / `remove_sink` / `AdaptedVideoTrackSource::adapt_frame` / `on_frame` / `AudioTrack::add_sink` / `remove_sink` / `DataChannel::register_observer`)
   - @melpon
+- [UPDATE] libwebrtc m152 (m152.7977.0.3) に上げる
+  - @voluntas
 - [FIX] `get_stats` のコールバック未発火時に user_data の Box がリークする問題を修正する
   - C 側の `RTCStatsCollectorCallbackImpl` にデストラクタを追加し、コールバック未発火のまま C++ オブジェクトが破棄される場合に `OnDestroy` を呼ぶようにする
   - Rust 側の回収を `OnDestroy` に一元化し、`OnStatsDelivered` は `&mut` 参照 + `Option::take()` による実行に変更する
