@@ -11,6 +11,127 @@
 
 ## develop
 
+## 0.152.1
+
+**リリース日**: 2026-09-10
+
+- [CHANGE] `VideoEncoderFactory` / `VideoDecoderFactory` の Handler trait を必須化する
+  - `VideoEncoderFactoryHandler` / `VideoDecoderFactoryHandler` の `get_supported_formats` / `create` をデフォルト実装から必須メソッドへ変更し、実装漏れをコンパイルエラーで検知できるようにする
+  - libwebrtc の `webrtc::VideoEncoderFactory` / `webrtc::VideoDecoderFactory` が純粋仮想関数で両メソッドの実装を要求するのに合わせる
+  - @melpon
+- [CHANGE] libwebrtc 側で std::move により消費される `deps` を `&mut` から値渡しに変更する
+  - `PeerConnectionFactory::create_modular` / `create_modular_with_context` / `PeerConnection::create` の `deps` 引数を値渡しに変更する
+  - @melpon
+- [CHANGE] ログ初期化 API を `webrtc::LoggingConfig` の C ラッパー経由に変更する
+  - C API の `webrtc_LogMessage_InitializeLogging` を `int severity` 引数から `struct webrtc_LoggingConfig*` 引数に変更し、`webrtc_LoggingConfig` 型 (new / delete / setter / getter) を追加する
+  - `webrtc_LogMessage_LogTimestamps` / `webrtc_LogMessage_LogThreads` を削除し、`log_timestamp` / `log_thread` フィールドに統合する
+  - Rust API の `log::initialize_logging` を `log::Severity` 引数から `log::LoggingConfig` 引数に変更し、`log::enable_timestamps` / `log::enable_threads` を削除する
+  - @melpon
+- [CHANGE] `create_audio_source` に `AudioOptions` 引数を追加する
+  - C API に `webrtc_AudioOptions` 型 (new / delete / 各 std::optional フィールドの getter / setter) を追加し、`webrtc_PeerConnectionFactoryInterface_CreateAudioSource` に `options` 引数を追加する
+  - エコーキャンセル / 自動ゲインコントロール / ノイズサプレッション / ハイパスフィルタ / ステレオスワップ / 受信側 jitter buffer の設定と取得を可能にする
+  - 未設定のフィールドは従来どおり WebRtcVoiceEngine のデフォルト設定が適用される
+  - @melpon
+- [CHANGE] ScopedRef 系の内部機構を pub(crate) 化する
+  - `ScopedRef` / `RefCountedHandle` / `ScopedRef::from_raw` を外部公開 API から外し、参照カウント管理の内部機構として限定する
+  - `RTCStatsReport::from_refcounted_ptr` も pub(crate) 化する
+  - @melpon
+- [CHANGE] `webrtc_Thread_SleepMs` の戻り値型を変更する
+  - C API の `webrtc_Thread_SleepMs` を `void` から `int` (0/1) に変更し、libwebrtc の `webrtc::Thread::SleepMs()` がスリープのシグナル中断で返す `bool` を呼び出し側へ伝達する
+  - Rust API の `Thread::sleep_ms` を `()` から `bool` に変更し、FFI の戻り値 `int` を `!= 0` で `bool` に変換する
+  - @melpon
+- [CHANGE] `Thread::blocking_call` に `R: Default` 境界を追加する
+  - `webrtc_Thread_BlockingCall_r` を非 void テンプレから void 版 `BlockingCall` に変更し、functor 未実行時に確定した `nullptr` を返すようにする
+  - `nullptr` は未実行を一意に表すため、停止中スレッドでは `R::default()` を返し、未初期化ポインタの `Box::from_raw` による UB を回避する
+  - @melpon
+- [ADD] 音声コーデックのユーザー実装を注入するための API を追加する
+  - `AudioCodecType` を追加し、SDP コーデック名 (`opus` / `ISAC` / `G722` / `PCMA` / `PCMU`) と `webrtc::AudioEncoder::CodecType` の生値 (`from_raw` / `to_raw`) との相互変換を提供する
+  - `SdpAudioFormat` / `SdpAudioFormatRef` / `AudioCodecInfo` / `AudioCodecSpec` を追加する
+  - handler の引数・戻り値として表面化する公開型 (`AudioCodecPairId` / `AudioEncoderEncodedInfo` / `AudioEncoderAnaStats` / `AudioEncoderApplication` / `AudioSpeechType` / `AudioEncoderFactoryOptions` / `Buffer` / `BufferRef` / `BufferS16Ref`) と、長さ不明バッファ向けの `RawBufferWriter` を追加する
+  - `webrtc::BitrateAllocationUpdate` の C ラッパー `BitrateAllocationUpdate` を追加し、`OnReceivedUplinkAllocation` にフル struct を渡す
+  - `webrtc::AudioEncoder::EncodedInfoLeaf` と `redundant` の C ラッパーを追加し、冗長符号化を表現できるようにする
+  - `AudioEncoderFactory::new_with_handler` と `AudioEncoderFactoryHandler` (`get_supported_encoders` / `query_audio_encoder` / `create`) を追加する
+  - `AudioDecoderFactory::new_with_handler` と `AudioDecoderFactoryHandler` (`get_supported_decoders` / `is_supported_decoder` / `create`) を追加する
+  - `AudioEncoder` / `AudioEncoderHandler` を追加し、`webrtc::AudioEncoder` の純仮想・仮想関数 (非推奨を除く) を転送する
+  - `AudioDecoder` / `AudioDecoderHandler` を追加し、`webrtc::AudioDecoder` の純仮想・仮想関数 (非推奨を除く) を転送する
+  - `AudioEncoderFactory::get_supported_encoders` / `create`、`AudioDecoderFactory::get_supported_decoders` / `create` / `is_supported_decoder` を追加する
+  - @melpon
+- [ADD] video 系 enum の生値変換 (`from_raw` / `to_raw`) を公開する
+  - video: `VideoCodecType` / `VideoFrameBufferKind` / `VideoRotation` / `VideoFrameType` / `VideoCodecStatus` の `from_raw` / `to_raw` を `pub(crate)` から `pub` に変更する
+  - @melpon
+- [ADD] `webrtc_Thread_Quit` を追加する
+  - C API の `webrtc_Thread_Quit` を追加し、libwebrtc の `webrtc::Thread::Quit()` を公開する
+  - `Thread::quit` を追加し、メッセージループを stop せずに停止できるようにする
+  - @melpon
+- [ADD] カスタム `LogSink` を設定可能にする
+  - `log::LogSink` / `log::LogSinkHandler` / `log::LogLineRef` を追加し、`log::LoggingConfig::add_sink` でアプリケーション独自のログ出力先を登録できるようにする
+  - C API に `webrtc_LogSink_new` / `webrtc_LoggingConfig_AddSink` と `webrtc_LogLineRef` の各アクセサを追加する
+  - @melpon
+- [UPDATE] 読み取り専用引数と共有ハンドル型レシーバの borrow を実体に合わせて変更する
+  - 読み取り専用の `config` / `options` / `init` を `&mut` から `&` に変更する (`PeerConnection::create` / `set_configuration` / `create_offer` / `create_answer` / `create_data_channel` / `add_transceiver` / `add_transceiver_with_track`)
+  - 共有ハンドル型レシーバを `&mut self` から `&self` に変更する (`PeerConnection::add_ice_candidate` / `set_configuration` / `PeerConnectionFactory::set_options` / `VideoTrack::add_or_update_sink` / `remove_sink` / `AdaptedVideoTrackSource::adapt_frame` / `on_frame` / `AudioTrack::add_sink` / `remove_sink` / `DataChannel::register_observer`)
+  - @melpon
+- [UPDATE] libwebrtc m152 (m152.7977.0.3) に上げる
+  - @voluntas
+- [FIX] `get_stats` のコールバック未発火時に user_data の Box がリークする問題を修正する
+  - C 側の `RTCStatsCollectorCallbackImpl` にデストラクタを追加し、コールバック未発火のまま C++ オブジェクトが破棄される場合に `OnDestroy` を呼ぶようにする
+  - Rust 側の回収を `OnDestroy` に一元化し、`OnStatsDelivered` は `&mut` 参照 + `Option::take()` による実行に変更する
+  - @melpon
+- [FIX] `convert_to_i420` が ARGB / BGRA 入力の必要長を検証せず libyuv が短いバッファをオーバーリードする問題を修正する
+  - ARGB / BGRA 入力について crop オフセット込みの必要長 (`src_width * 4` の stride で `(crop_y + abs(crop_height))` 行 × `(crop_x + crop_width) * 4` バイト) を検証し、不足時は `false` を返すようにする
+  - MJPG 入力は libyuv 側の検証に委ねるため対象外とする
+  - @melpon
+- [FIX] `convert_to_i420` が負の `crop_height` (垂直フリップ) 指定時に常に失敗する問題を修正する
+  - dst 側の行数検証と chroma サイズ計算が負値のままだったため `false` が返っていたのを、`abs(crop_height)` で検証するように修正し、負値でも libyuv の垂直フリップ変換を実行できるようにする
+  - @melpon
+- [FIX] `DataChannelObserver` の `on_message` が空メッセージ受信時に null ポインタを `slice::from_raw_parts` へ渡して UB になる問題を修正する
+  - C++ 側の空 `CopyOnWriteBuffer::data()` は `nullptr` を返し得るため、ポインタが null または長さ 0 の場合は空スライスへ置き換えてからハンドラへ渡すようにする
+  - @melpon
+- [FIX] C ラッパーが release ビルドでも abort する `RTC_CHECK` を `assert` に変更する
+  - `webrtc_PeerConnectionDependencies_set_proxy` の `RTC_CHECK(nm != nullptr)` / `RTC_CHECK(sf != nullptr)` を `assert` に変更し、デバッグビルドのみ契約違反を検出するようにする (release では null をそのまま libwebrtc へ渡す)
+  - @melpon
+- [FIX] `set_implementation_name` が `CxxString` を消費 (move) してしまう所有権バグを修正する
+  - `DecoderInfo` / `EncoderInfo` の `set_implementation_name` が C 側の `std_string_unique` を move 消費していたのを、`const struct std_string*` を受け取ってコピーのみ行うように変更し、呼び出し側の `CxxString` を無効化しないようにする
+  - @melpon
+- [FIX] ObjC ビデオコーデックファクトリの二重リテインによるメモリリークを修正する
+  - macOS / iOS の `.mm` を `-fobjc-arc` で ARC 化し、`RTCDefaultVideoEncoderFactory` / `RTCDefaultVideoDecoderFactory` の `new` / `release` のリテイン収支を +1 / -1 に揃える
+  - `build.rs` の bindgen 入力に `objc.h` を追加し、ObjC の参照カウントを検証するテストを追加する
+  - @melpon
+
+### misc
+
+- [UPDATE] 内部向けの共通ヘルパー実装を `src/helper/` に集約する
+  - `src/non_null.rs` / `src/handler.rs` / `src/ref_count.rs` と `src/api/optional.rs` / `src/api/out_param.rs` を `src/helper/` 配下へ移動し、内部向けヘルパーの所在を揃える (挙動は変更しない)
+  - @melpon
+- [UPDATE] observer / callback の登録・破棄の骨格を共通ヘルパーにまとめる
+  - `src/handler.rs` に `HandlerState` / `create_with_handler` / `destroy_handler` を追加し、コールバック型ハンドラ 19 型の登録・破棄と stats コールバックの破棄を置き換えて挙動を維持する
+  - @melpon
+- [UPDATE] FFI の optional 値 (has / value) 方式を持つ getter/setter のボイラープレートを共通ヘルパーにまとめる
+  - `src/api/optional.rs` に `get_optional` / `get_optional_bool` / `set_optional` / `set_optional_bool` を追加し、`RtpCodec` / `RtpEncodingParameters` / `TransformableFrame` / `VideoFrameMetadata` / `VideoEncoderEncoderInfo` / `VideoFrame` / `AudioOptions` の該当アクセサを置き換えて挙動を維持する
+  - @melpon
+- [UPDATE] C API が返す null チェック済みポインタのコンストラクタを共通ヘルパーにまとめる
+  - `src/non_null.rs` に `expect_non_null` / `expect_non_null_with_cleanup` を追加し、`NonNull::new(...).expect(...)` の定型と match + panic パターンを置き換えて挙動と panic メッセージの意味を維持する
+  - @melpon
+- [UPDATE] FFI の out 引数と out_error のボイラープレートを共通ヘルパーにまとめる
+  - `src/api/out_param.rs` に `call_with_out` / `call_with_out_and_error` / `call_with_return_and_error` を追加し、`PeerConnectionFactory` / `PeerConnection` / `SessionDescriptionInterface` / `IceCandidate` / `SdpParseError` の該当メソッドを置き換えて挙動を維持する
+  - `Error::NullPointer` のカスタムメッセージと `Error::RtcError` / `Error::SdpParseError` への変換を共通化し、表記ゆれ (`returned null`) を解消する
+  - @melpon
+- [UPDATE] テストの panic / assert メッセージを日本語に統一する
+  - `src/tests.rs` に残っていた英語の `.expect` / `assert!` メッセージを周囲のテストと同じ日本語表記へ揃える (挙動は変更しない)
+  - @melpon
+- [UPDATE] 冗長な `#[allow]` を排除し、必要なものは `#[expect]` へ置き換える
+  - dead_code が発火しない `pub struct` / 使用済み `as_ptr` の `#[allow(dead_code)]` は削除し、それ以外の `#[allow]` は `#[expect]` へ置き換える (挙動は変更しない)
+  - @melpon
+- [UPDATE] C ラッパーの `*_unique` 直接キャストを `*_unique_get` 経由に統一する
+  - `webrtc_PeerConnectionInterface_IceServer_set_tls_client_identity` で行っていた `reinterpret_cast<webrtc::SSLIdentity*>` を `webrtc_SSLIdentity_unique_get` 経由に変更し、他箇所 (e.g. `webrtc_SSLCertificateVerifier_unique_get`) と揃える (挙動は変更しない)
+  - @melpon
+- [UPDATE] `extern const int` 定数定義の `WEBRTC_EXPORT` 欠落を補完する
+  - `webrtc_PeerConnectionInterface` の状態・ポリシー定数と `webrtc_AudioDeviceModule` のデバイス種別定数計 17 箇所の定義に `WEBRTC_EXPORT` (シンボル可視性) を付与し、同一ブロック内の他定義と揃える (挙動は変更しない)
+  - @melpon
+- [UPDATE] C ラッパーに残っていた境界チェックを Rust 側へ移す
+  - `webrtc_VideoEncoder_EncoderInfo_get_fps_allocation` / `webrtc_SSLCertChain_Get` の境界チェックを削除し、`VideoEncoder::EncoderInfo::fps_allocation` に固定配列サイズ (`kMaxSpatialLayers`) の境界検証を追加する (`SSLCertChain::get` は既に検証済み)
+  - @melpon
+
 ## 0.152.0
 
 **リリース日**: 2026-08-25
@@ -31,6 +152,10 @@
   - index 付き setter と count 系 setter に `assert!` による境界チェックを追加する
   - `VideoCodec::set_number_of_simulcast_streams` に境界チェックを追加する
   - @melpon
+- [CHANGE] `DegradationPreference::Disabled` を `MaintainFramerateAndResolution` に変名する
+  - libwebrtc の `webrtc::DegradationPreference` は `MAINTAIN_FRAMERATE_AND_RESOLUTION` が本名で `DISABLED` は削除予定の互換エイリアスであるため、命名を本流に揃える
+  - C ラッパーの定数を `webrtc_DegradationPreference_MAINTAIN_FRAMERATE_AND_RESOLUTION` に改名する
+  - @melpon
 - [ADD] WebRTC Encoded Transform (フレーム変換) に対応する
   - `FrameTransformerInterface` / `TransformableFrameInterface` / `TransformableVideoFrameInterface` の C ラッパーと、Rust API として `FrameTransformer` / `FrameTransformerHandler` / `TransformableFrame` / `TransformableVideoFrame` / `TransformableFrameDirection` / `RtpTimestampInfo` を追加する
   - `RtpSender::set_frame_transformer` / `RtpReceiver::set_frame_transformer` を追加する
@@ -44,7 +169,7 @@
   - `VideoContentType` / `DecodeTargetIndication` / `H264PacketizationType` を追加する
   - `VideoFrameMetadata` と codec specifics 群に `Clone` / `Debug` を追加する
   - @melpon
-- [UPDATE] libwebrtc m152 (m152.7977.0.0) に上げる
+- [UPDATE] libwebrtc m152 (m152.7977.0.2) に上げる
   - @melpon
 - [FIX] webrtc のログ出力が 4096 文字以上だと切り詰められるのを修正する
   - @melpon

@@ -1,9 +1,12 @@
 #include "objc.h"
 
-#if defined(WEBRTC_IOS)
+#if defined(WEBRTC_IOS) || defined(WEBRTC_MAC)
 
-#import <AVFoundation/AVFoundation.h>
 #import <Foundation/Foundation.h>
+
+#if defined(WEBRTC_IOS)
+#import <AVFoundation/AVFoundation.h>
+#endif  // defined(WEBRTC_IOS)
 
 namespace {
 
@@ -78,8 +81,18 @@ WEBRTC_EXPORT void objc_NSError_release(struct objc_NSError* self) {
 }
 
 // -------------------------
+// Foundation/NSObject
+// -------------------------
+
+WEBRTC_EXPORT uint64_t objc_NSObject_retainCount(struct objc_NSObject* self) {
+  return static_cast<uint64_t>(CFGetRetainCount((CFTypeRef)self));
+}
+
+// -------------------------
 // AVFoundation/AVAudioSession
 // -------------------------
+
+#if defined(WEBRTC_IOS)
 
 WEBRTC_EXPORT objc_AVAudioSessionCategory
 objc_AVAudioSessionCategory_Ambient(void) {
@@ -200,6 +213,8 @@ objc_AVAudioSessionCategoryOption_OverrideMutedMicrophoneInterruption(void) {
       AVAudioSessionCategoryOptionOverrideMutedMicrophoneInterruption);
 }
 
+#endif  // defined(WEBRTC_IOS)
+
 }  // extern "C"
 
-#endif  // defined(WEBRTC_IOS)
+#endif  // defined(WEBRTC_IOS) || defined(WEBRTC_MAC)

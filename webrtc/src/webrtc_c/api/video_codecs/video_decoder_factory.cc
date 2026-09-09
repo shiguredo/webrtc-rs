@@ -2,6 +2,7 @@
 
 #include <stdarg.h>
 #include <stddef.h>
+#include <cassert>
 #include <memory>
 #include <vector>
 

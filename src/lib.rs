@@ -9,9 +9,10 @@ pub fn version() -> &'static str {
 mod api;
 mod cxxstd;
 mod error;
+mod helper;
 mod libyuv;
-mod ref_count;
 mod rtc_base;
+mod util;
 
 #[cfg(test)]
 mod tests;
@@ -21,14 +22,15 @@ pub use cxxstd::{
     CxxString, CxxStringRef, MapStringString, MapStringStringIter, StringVector, StringVectorRef,
 };
 pub use error::{Error, Result};
+use helper::ref_count::ScopedRef;
 pub use libyuv::{
     LibyuvFourcc, LibyuvRotationMode, abgr_to_i420, convert_from_i420, convert_to_i420, i420_copy,
     i420_rotate, i420_to_nv12, mjpg_size, mjpg_to_i420, mjpg_to_nv12, nv12_copy, nv12_to_i420,
     yuy2_to_i420,
 };
-pub use ref_count::{RefCountedHandle, ScopedRef};
 pub use rtc_base::{
-    SSLCertChainRef, SSLCertificateRef, SSLCertificateVerifier, SSLCertificateVerifierHandler,
-    SSLIdentity, Thread, TimestampAligner, log, random_bytes, random_string, rtc_log_format_file,
-    time_millis,
+    Buffer, BufferRef, BufferS16Ref, SSLCertChainRef, SSLCertificateRef, SSLCertificateVerifier,
+    SSLCertificateVerifierHandler, SSLIdentity, Thread, TimestampAligner, log, random_bytes,
+    random_string, rtc_log_format_file, time_millis,
 };
+pub use util::*;

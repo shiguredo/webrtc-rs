@@ -1,7 +1,7 @@
 #include "simulcast_stream.h"
 
-// WebRTC
-#include <api/video_codecs/video_codec.h>
+#include "../../common.h"
+#include "api/video_codecs/simulcast_stream.h"
 
 extern "C" {
 WEBRTC_EXPORT int webrtc_SimulcastStream_width(

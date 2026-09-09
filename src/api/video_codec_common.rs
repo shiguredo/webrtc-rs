@@ -1,4 +1,7 @@
-use crate::ref_count::{
+use crate::helper::handler::{create_with_handler, destroy_handler};
+use crate::helper::non_null::expect_non_null;
+use crate::helper::optional::get_optional;
+use crate::helper::ref_count::{
     EncodedImageBufferHandle, I420BufferHandle, NV12BufferHandle, VideoFrameBufferHandle,
 };
 use crate::{CxxString, CxxStringRef, Error, MapStringString, Result, ScopedRef, ffi};
@@ -51,8 +54,7 @@ pub enum ScalabilityMode {
 impl ScalabilityMode {
     pub fn as_str(self) -> Result<String> {
         let raw = unsafe { ffi::webrtc_ScalabilityModeToString(self.to_raw()) };
-        let raw =
-            NonNull::new(raw).expect("BUG: webrtc_ScalabilityModeToString が null を返しました");
+        let raw = expect_non_null(raw, "webrtc_ScalabilityModeToString");
         CxxString::from_unique(raw).to_string()
     }
 
@@ -150,8 +152,7 @@ impl SdpVideoFormat {
     pub fn new(name: &str) -> Self {
         let raw = unsafe { ffi::webrtc_SdpVideoFormat_new(name.as_ptr() as *const _, name.len()) };
         Self {
-            raw_unique: NonNull::new(raw)
-                .expect("BUG: webrtc_SdpVideoFormat_new が null を返しました"),
+            raw_unique: expect_non_null(raw, "webrtc_SdpVideoFormat_new"),
         }
     }
 
@@ -179,8 +180,7 @@ impl SdpVideoFormat {
             )
         };
         let mut format = Self {
-            raw_unique: NonNull::new(raw)
-                .expect("BUG: webrtc_SdpVideoFormat_new_with_parameters が null を返しました"),
+            raw_unique: expect_non_null(raw, "webrtc_SdpVideoFormat_new_with_parameters"),
         };
         for (key, value) in parameters {
             format.parameters_mut().set(key.as_str(), value.as_str());
@@ -193,7 +193,8 @@ impl SdpVideoFormat {
     }
 
     pub fn parameters_mut(&mut self) -> MapStringString<'_> {
-        self.as_ref().parameters_mut()
+        let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(self.raw().as_ptr()) };
+        MapStringString::from_raw(expect_non_null(ptr, "webrtc_SdpVideoFormat_get_parameters"))
     }
 
     pub fn is_equal(&self, other: SdpVideoFormatRef<'_>) -> bool {
@@ -217,7 +218,7 @@ impl SdpVideoFormat {
 
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_SdpVideoFormat> {
         let raw = unsafe { ffi::webrtc_SdpVideoFormat_unique_get(self.raw_unique.as_ptr()) };
-        NonNull::new(raw).expect("BUG: webrtc_SdpVideoFormat_unique_get が null を返しました")
+        expect_non_null(raw, "webrtc_SdpVideoFormat_unique_get")
     }
 }
 
@@ -225,8 +226,7 @@ impl Clone for SdpVideoFormat {
     fn clone(&self) -> Self {
         let raw = unsafe { ffi::webrtc_SdpVideoFormat_copy(self.raw().as_ptr()) };
         Self {
-            raw_unique: NonNull::new(raw)
-                .expect("BUG: webrtc_SdpVideoFormat_copy が null を返しました"),
+            raw_unique: expect_non_null(raw, "webrtc_SdpVideoFormat_copy"),
         }
     }
 }
@@ -256,15 +256,12 @@ impl<'a> SdpVideoFormatRef<'a> {
 
     pub fn name(&self) -> Result<String> {
         let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_name(self.raw.as_ptr()) };
-        CxxStringRef::from_ptr(
-            NonNull::new(ptr).expect("BUG: webrtc_SdpVideoFormat_get_name が null を返しました"),
-        )
-        .to_string()
+        CxxStringRef::from_ptr(expect_non_null(ptr, "webrtc_SdpVideoFormat_get_name")).to_string()
     }
 
-    pub fn parameters_mut(&mut self) -> MapStringString<'a> {
+    pub fn parameters_mut(&mut self) -> MapStringString<'_> {
         let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(self.raw.as_ptr()) };
-        MapStringString::from_raw(NonNull::new(ptr).expect("BUG: ptr が null"))
+        MapStringString::from_raw(expect_non_null(ptr, "webrtc_SdpVideoFormat_get_parameters"))
     }
 
     pub fn scalability_modes(&self) -> Vec<ScalabilityMode> {
@@ -295,8 +292,7 @@ impl<'a> SdpVideoFormatRef<'a> {
     pub fn to_owned(&self) -> SdpVideoFormat {
         let raw = unsafe { ffi::webrtc_SdpVideoFormat_copy(self.raw.as_ptr()) };
         SdpVideoFormat {
-            raw_unique: NonNull::new(raw)
-                .expect("BUG: webrtc_SdpVideoFormat_copy が null を返しました"),
+            raw_unique: expect_non_null(raw, "webrtc_SdpVideoFormat_copy"),
         }
     }
 }
@@ -306,8 +302,7 @@ pub fn fuzzy_match_sdp_video_format(
     format: SdpVideoFormatRef<'_>,
 ) -> Option<SdpVideoFormat> {
     let raw_formats = unsafe { ffi::webrtc_SdpVideoFormat_vector_new() };
-    let raw_formats =
-        NonNull::new(raw_formats).expect("BUG: webrtc_SdpVideoFormat_vector_new returned null");
+    let raw_formats = expect_non_null(raw_formats, "webrtc_SdpVideoFormat_vector_new");
 
     for supported_format in supported_formats {
         unsafe {
@@ -335,8 +330,10 @@ unsafe impl Send for I420Buffer {}
 
 impl I420Buffer {
     pub fn new(width: i32, height: i32) -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_I420Buffer_Create(width, height) })
-            .expect("BUG: webrtc_I420Buffer_Create が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_I420Buffer_Create(width, height) },
+            "webrtc_I420Buffer_Create",
+        );
         let raw_ref = ScopedRef::<I420BufferHandle>::from_raw(raw);
         Self { raw_ref }
     }
@@ -348,10 +345,14 @@ impl I420Buffer {
         stride_u: i32,
         stride_v: i32,
     ) -> Self {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_I420Buffer_CreateWithStrides(width, height, stride_y, stride_u, stride_v)
-        })
-        .expect("BUG: webrtc_I420Buffer_CreateWithStrides returned null");
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_I420Buffer_CreateWithStrides(
+                    width, height, stride_y, stride_u, stride_v,
+                )
+            },
+            "webrtc_I420Buffer_CreateWithStrides",
+        );
         let raw_ref = ScopedRef::<I420BufferHandle>::from_raw(raw);
         Self { raw_ref }
     }
@@ -534,12 +535,14 @@ impl I420Buffer {
     }
 
     pub fn cast_to_video_frame_buffer(&self) -> VideoFrameBuffer {
-        let raw_ref = NonNull::new(unsafe {
-            ffi::webrtc_I420Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer(
-                self.raw_ref.as_refcounted_ptr(),
-            )
-        })
-        .expect("BUG: webrtc_I420Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer returned null");
+        let raw_ref = expect_non_null(
+            unsafe {
+                ffi::webrtc_I420Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer(
+                    self.raw_ref.as_refcounted_ptr(),
+                )
+            },
+            "webrtc_I420Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer",
+        );
         let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(raw_ref);
         VideoFrameBuffer { raw_ref }
     }
@@ -558,17 +561,19 @@ unsafe impl Send for NV12Buffer {}
 
 impl NV12Buffer {
     pub fn new(width: i32, height: i32) -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_NV12Buffer_Create(width, height) })
-            .expect("BUG: webrtc_NV12Buffer_Create returned null");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_NV12Buffer_Create(width, height) },
+            "webrtc_NV12Buffer_Create",
+        );
         let raw_ref = ScopedRef::<NV12BufferHandle>::from_raw(raw);
         Self { raw_ref }
     }
 
     pub fn new_with_strides(width: i32, height: i32, stride_y: i32, stride_uv: i32) -> Self {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_NV12Buffer_CreateWithStrides(width, height, stride_y, stride_uv)
-        })
-        .expect("BUG: webrtc_NV12Buffer_CreateWithStrides returned null");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_NV12Buffer_CreateWithStrides(width, height, stride_y, stride_uv) },
+            "webrtc_NV12Buffer_CreateWithStrides",
+        );
         let raw_ref = ScopedRef::<NV12BufferHandle>::from_raw(raw);
         Self { raw_ref }
     }
@@ -725,12 +730,14 @@ impl NV12Buffer {
     }
 
     pub fn cast_to_video_frame_buffer(&self) -> VideoFrameBuffer {
-        let raw_ref = NonNull::new(unsafe {
-            ffi::webrtc_NV12Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer(
-                self.raw_ref.as_refcounted_ptr(),
-            )
-        })
-        .expect("BUG: webrtc_NV12Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer returned null");
+        let raw_ref = expect_non_null(
+            unsafe {
+                ffi::webrtc_NV12Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer(
+                    self.raw_ref.as_refcounted_ptr(),
+                )
+            },
+            "webrtc_NV12Buffer_refcounted_cast_to_webrtc_VideoFrameBuffer",
+        );
         let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(raw_ref);
         VideoFrameBuffer { raw_ref }
     }
@@ -755,7 +762,7 @@ pub enum VideoFrameBufferKind {
 }
 
 impl VideoFrameBufferKind {
-    pub(crate) fn from_raw(value: i32) -> Self {
+    pub fn from_raw(value: i32) -> Self {
         unsafe {
             if value == ffi::webrtc_VideoFrameBuffer_Type_kNative {
                 Self::Native
@@ -781,7 +788,7 @@ impl VideoFrameBufferKind {
         }
     }
 
-    pub(crate) fn to_raw(self) -> i32 {
+    pub fn to_raw(self) -> i32 {
         unsafe {
             match self {
                 Self::Native => ffi::webrtc_VideoFrameBuffer_Type_kNative,
@@ -942,11 +949,9 @@ unsafe extern "C" fn video_frame_buffer_crop_and_scale(
 }
 
 unsafe extern "C" fn video_frame_buffer_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "video_frame_buffer_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoFrameBufferHandlerState) };
+    unsafe {
+        destroy_handler::<VideoFrameBufferHandlerState>("video_frame_buffer_on_destroy", user_data)
+    };
 }
 
 /// webrtc::VideoFrameBuffer のラッパー。
@@ -958,12 +963,11 @@ unsafe impl Send for VideoFrameBuffer {}
 
 impl VideoFrameBuffer {
     pub fn new_with_handler(handler: Box<dyn VideoFrameBufferHandler>) -> Self {
-        let state = Box::new(VideoFrameBufferHandlerState {
+        let user_data = Box::into_raw(Box::new(VideoFrameBufferHandlerState {
             handler,
             #[cfg(debug_assertions)]
             callback_thread: None,
-        });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        })) as *mut c_void;
         let cbs = ffi::webrtc_VideoFrameBuffer_cbs {
             type_: Some(video_frame_buffer_type),
             width: Some(video_frame_buffer_width),
@@ -972,14 +976,12 @@ impl VideoFrameBuffer {
             CropAndScale: Some(video_frame_buffer_crop_and_scale),
             OnDestroy: Some(video_frame_buffer_on_destroy),
         };
-        let raw_ref = match NonNull::new(unsafe {
-            ffi::webrtc_VideoFrameBuffer_make_ref_counted(&cbs, user_data)
-        }) {
-            Some(raw_ref) => raw_ref,
-            None => {
-                let _ = unsafe { Box::from_raw(user_data as *mut VideoFrameBufferHandlerState) };
-                panic!("BUG: webrtc_VideoFrameBuffer_make_ref_counted returned null");
-            }
+        let raw_ref = unsafe {
+            create_with_handler::<VideoFrameBufferHandlerState, _>(
+                "webrtc_VideoFrameBuffer_make_ref_counted",
+                user_data,
+                |user_data| ffi::webrtc_VideoFrameBuffer_make_ref_counted(&cbs, user_data),
+            )
         };
         let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(raw_ref);
         Self { raw_ref }
@@ -1129,8 +1131,10 @@ unsafe impl Send for ColorSpace {}
 
 impl ColorSpace {
     pub fn new() -> Self {
-        let raw_unique = NonNull::new(unsafe { ffi::webrtc_ColorSpace_new() })
-            .expect("BUG: webrtc_ColorSpace_new returned null");
+        let raw_unique = expect_non_null(
+            unsafe { ffi::webrtc_ColorSpace_new() },
+            "webrtc_ColorSpace_new",
+        );
         Self { raw_unique }
     }
 
@@ -1142,7 +1146,7 @@ impl ColorSpace {
 
     pub fn as_string(&self) -> Result<String> {
         let raw = unsafe { ffi::webrtc_ColorSpace_AsString(self.raw().as_ptr()) };
-        let raw = NonNull::new(raw).expect("BUG: webrtc_ColorSpace_AsString returned null");
+        let raw = expect_non_null(raw, "webrtc_ColorSpace_AsString");
         CxxString::from_unique(raw).to_string()
     }
 
@@ -1152,7 +1156,7 @@ impl ColorSpace {
 
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_ColorSpace> {
         let raw = unsafe { ffi::webrtc_ColorSpace_unique_get(self.raw_unique.as_ptr()) };
-        NonNull::new(raw).expect("BUG: webrtc_ColorSpace_unique_get returned null")
+        expect_non_null(raw, "webrtc_ColorSpace_unique_get")
     }
 }
 
@@ -1176,8 +1180,10 @@ unsafe impl Send for VideoFrameUpdateRect {}
 
 impl VideoFrameUpdateRect {
     pub fn new() -> Self {
-        let raw_unique = NonNull::new(unsafe { ffi::webrtc_VideoFrame_UpdateRect_new() })
-            .expect("BUG: webrtc_VideoFrame_UpdateRect_new returned null");
+        let raw_unique = expect_non_null(
+            unsafe { ffi::webrtc_VideoFrame_UpdateRect_new() },
+            "webrtc_VideoFrame_UpdateRect_new",
+        );
         Self { raw_unique }
     }
 
@@ -1227,7 +1233,7 @@ impl VideoFrameUpdateRect {
 
     fn raw(&self) -> NonNull<ffi::webrtc_VideoFrame_UpdateRect> {
         let raw = unsafe { ffi::webrtc_VideoFrame_UpdateRect_unique_get(self.raw_unique.as_ptr()) };
-        NonNull::new(raw).expect("BUG: webrtc_VideoFrame_UpdateRect_unique_get returned null")
+        expect_non_null(raw, "webrtc_VideoFrame_UpdateRect_unique_get")
     }
 }
 
@@ -1253,7 +1259,7 @@ pub enum VideoRotation {
 }
 
 impl VideoRotation {
-    pub(crate) fn from_raw(value: i32) -> Self {
+    pub fn from_raw(value: i32) -> Self {
         unsafe {
             if value == ffi::webrtc_VideoRotation_0 {
                 Self::R0
@@ -1269,7 +1275,7 @@ impl VideoRotation {
         }
     }
 
-    pub(crate) fn to_raw(self) -> i32 {
+    pub fn to_raw(self) -> i32 {
         unsafe {
             match self {
                 Self::R0 => ffi::webrtc_VideoRotation_0,
@@ -1290,15 +1296,16 @@ unsafe impl Send for VideoFrameBuilder {}
 
 impl VideoFrameBuilder {
     fn new(buffer: &VideoFrameBuffer) -> Self {
-        let raw_unique =
-            NonNull::new(unsafe { ffi::webrtc_VideoFrameBuilder_new(buffer.as_refcounted_ptr()) })
-                .expect("BUG: webrtc_VideoFrameBuilder_new returned null");
+        let raw_unique = expect_non_null(
+            unsafe { ffi::webrtc_VideoFrameBuilder_new(buffer.as_refcounted_ptr()) },
+            "webrtc_VideoFrameBuilder_new",
+        );
         Self { raw_unique }
     }
 
     fn raw(&self) -> NonNull<ffi::webrtc_VideoFrameBuilder> {
         let raw = unsafe { ffi::webrtc_VideoFrameBuilder_unique_get(self.raw_unique.as_ptr()) };
-        NonNull::new(raw).expect("BUG: webrtc_VideoFrameBuilder_unique_get returned null")
+        expect_non_null(raw, "webrtc_VideoFrameBuilder_unique_get")
     }
 
     pub fn set_timestamp_ms(&mut self, timestamp_ms: i64) -> &mut Self {
@@ -1427,9 +1434,10 @@ impl VideoFrameBuilder {
     }
 
     pub fn build(&mut self) -> VideoFrame {
-        let raw_unique =
-            NonNull::new(unsafe { ffi::webrtc_VideoFrameBuilder_build(self.raw().as_ptr()) })
-                .expect("BUG: webrtc_VideoFrameBuilder_build returned null");
+        let raw_unique = expect_non_null(
+            unsafe { ffi::webrtc_VideoFrameBuilder_build(self.raw().as_ptr()) },
+            "webrtc_VideoFrameBuilder_build",
+        );
         VideoFrame { raw_unique }
     }
 }
@@ -1525,7 +1533,7 @@ impl VideoFrame {
 
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_VideoFrame> {
         let raw = unsafe { ffi::webrtc_VideoFrame_unique_get(self.raw_unique.as_ptr()) };
-        NonNull::new(raw).expect("BUG: webrtc_VideoFrame_unique_get が null を返しました")
+        expect_non_null(raw, "webrtc_VideoFrame_unique_get")
     }
 }
 
@@ -1533,8 +1541,7 @@ impl Clone for VideoFrame {
     fn clone(&self) -> Self {
         let raw = unsafe { ffi::webrtc_VideoFrame_copy(self.raw().as_ptr()) };
         Self {
-            raw_unique: NonNull::new(raw)
-                .expect("BUG: webrtc_VideoFrame_copy が null を返しました"),
+            raw_unique: expect_non_null(raw, "webrtc_VideoFrame_copy"),
         }
     }
 }
@@ -1595,33 +1602,17 @@ impl<'a> VideoFrameRef<'a> {
     }
 
     pub fn presentation_timestamp(&self) -> Option<Duration> {
-        let mut has = 0;
-        let mut value = 0;
-        unsafe {
-            ffi::webrtc_VideoFrame_presentation_timestamp_us(
-                self.raw.as_ptr(),
-                &mut has,
-                &mut value,
-            );
-        }
-        if has == 0 {
-            None
-        } else {
-            Some(timestamp_us_to_duration(value))
-        }
+        get_optional(|has, value| unsafe {
+            ffi::webrtc_VideoFrame_presentation_timestamp_us(self.raw.as_ptr(), has, value)
+        })
+        .map(timestamp_us_to_duration)
     }
 
     pub fn reference_time(&self) -> Option<Duration> {
-        let mut has = 0;
-        let mut value = 0;
-        unsafe {
-            ffi::webrtc_VideoFrame_reference_time_us(self.raw.as_ptr(), &mut has, &mut value);
-        }
-        if has == 0 {
-            None
-        } else {
-            Some(timestamp_us_to_duration(value))
-        }
+        get_optional(|has, value| unsafe {
+            ffi::webrtc_VideoFrame_reference_time_us(self.raw.as_ptr(), has, value)
+        })
+        .map(timestamp_us_to_duration)
     }
 
     pub fn color_space(&self) -> Option<ColorSpace> {
@@ -1633,8 +1624,7 @@ impl<'a> VideoFrameRef<'a> {
         if has == 0 {
             return None;
         }
-        let raw_unique =
-            NonNull::new(raw_unique).expect("BUG: webrtc_VideoFrame_color_space returned null");
+        let raw_unique = expect_non_null(raw_unique, "webrtc_VideoFrame_color_space");
         Some(unsafe { ColorSpace::from_raw_unique(raw_unique) })
     }
 
@@ -1643,9 +1633,10 @@ impl<'a> VideoFrameRef<'a> {
     }
 
     pub fn update_rect(&self) -> VideoFrameUpdateRect {
-        let raw_unique =
-            NonNull::new(unsafe { ffi::webrtc_VideoFrame_update_rect(self.raw.as_ptr()) })
-                .expect("BUG: webrtc_VideoFrame_update_rect returned null");
+        let raw_unique = expect_non_null(
+            unsafe { ffi::webrtc_VideoFrame_update_rect(self.raw.as_ptr()) },
+            "webrtc_VideoFrame_update_rect",
+        );
         unsafe { VideoFrameUpdateRect::from_raw_unique(raw_unique) }
     }
 
@@ -1654,9 +1645,10 @@ impl<'a> VideoFrameRef<'a> {
     }
 
     pub fn buffer(&self) -> VideoFrameBuffer {
-        let buf =
-            NonNull::new(unsafe { ffi::webrtc_VideoFrame_video_frame_buffer(self.raw.as_ptr()) })
-                .expect("BUG: webrtc_VideoFrame_video_frame_buffer が null を返しました");
+        let buf = expect_non_null(
+            unsafe { ffi::webrtc_VideoFrame_video_frame_buffer(self.raw.as_ptr()) },
+            "webrtc_VideoFrame_video_frame_buffer",
+        );
         let raw_ref = ScopedRef::<VideoFrameBufferHandle>::from_raw(buf);
         VideoFrameBuffer { raw_ref }
     }
@@ -1664,8 +1656,7 @@ impl<'a> VideoFrameRef<'a> {
     pub fn to_owned(&self) -> VideoFrame {
         let raw = unsafe { ffi::webrtc_VideoFrame_copy(self.raw.as_ptr()) };
         VideoFrame {
-            raw_unique: NonNull::new(raw)
-                .expect("BUG: webrtc_VideoFrame_copy が null を返しました"),
+            raw_unique: expect_non_null(raw, "webrtc_VideoFrame_copy"),
         }
     }
 
@@ -1683,7 +1674,7 @@ pub enum VideoFrameType {
 }
 
 impl VideoFrameType {
-    pub(crate) fn from_raw(value: i32) -> Self {
+    pub fn from_raw(value: i32) -> Self {
         if value == unsafe { ffi::webrtc_VideoFrameType_Empty } {
             Self::Empty
         } else if value == unsafe { ffi::webrtc_VideoFrameType_Key } {
@@ -1695,7 +1686,7 @@ impl VideoFrameType {
         }
     }
 
-    pub(crate) fn to_raw(self) -> i32 {
+    pub fn to_raw(self) -> i32 {
         match self {
             Self::Empty => unsafe { ffi::webrtc_VideoFrameType_Empty },
             Self::Key => unsafe { ffi::webrtc_VideoFrameType_Key },
@@ -1715,8 +1706,7 @@ impl VideoFrameTypeVector {
     pub fn new(size: usize) -> Self {
         let raw = unsafe { ffi::webrtc_VideoFrameType_vector_new(size) };
         Self {
-            raw: NonNull::new(raw)
-                .expect("BUG: webrtc_VideoFrameType_vector_new が null を返しました"),
+            raw: expect_non_null(raw, "webrtc_VideoFrameType_vector_new"),
         }
     }
 
@@ -1829,7 +1819,7 @@ pub enum VideoCodecStatus {
 }
 
 impl VideoCodecStatus {
-    pub(crate) fn from_raw(value: i32) -> Self {
+    pub fn from_raw(value: i32) -> Self {
         if value == unsafe { ffi::webrtc_VideoCodecStatus_TargetBitrateOvershoot } {
             Self::TargetBitrateOvershoot
         } else if value == unsafe { ffi::webrtc_VideoCodecStatus_OkRequestKeyframe } {
@@ -1861,7 +1851,7 @@ impl VideoCodecStatus {
         }
     }
 
-    pub(crate) fn to_raw(self) -> i32 {
+    pub fn to_raw(self) -> i32 {
         match self {
             Self::TargetBitrateOvershoot => unsafe {
                 ffi::webrtc_VideoCodecStatus_TargetBitrateOvershoot
@@ -1897,7 +1887,7 @@ impl VideoCodecType {
         }
     }
 
-    pub(crate) fn from_raw(value: i32) -> Self {
+    pub fn from_raw(value: i32) -> Self {
         if value == unsafe { ffi::webrtc_VideoCodecType_Generic } {
             Self::Generic
         } else if value == unsafe { ffi::webrtc_VideoCodecType_VP8 } {
@@ -1915,7 +1905,7 @@ impl VideoCodecType {
         }
     }
 
-    pub(crate) fn to_raw(self) -> i32 {
+    pub fn to_raw(self) -> i32 {
         match self {
             Self::Generic => unsafe { ffi::webrtc_VideoCodecType_Generic },
             Self::Vp8 => unsafe { ffi::webrtc_VideoCodecType_VP8 },
@@ -2018,8 +2008,10 @@ unsafe impl Send for VideoCodec {}
 
 impl VideoCodec {
     pub fn new() -> Self {
-        let raw_unique = NonNull::new(unsafe { ffi::webrtc_VideoCodec_new() })
-            .expect("BUG: webrtc_VideoCodec_new が null を返しました");
+        let raw_unique = expect_non_null(
+            unsafe { ffi::webrtc_VideoCodec_new() },
+            "webrtc_VideoCodec_new",
+        );
         Self { raw_unique }
     }
 
@@ -2120,7 +2112,7 @@ impl VideoCodec {
 
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_VideoCodec> {
         let raw = unsafe { ffi::webrtc_VideoCodec_unique_get(self.raw_unique.as_ptr()) };
-        NonNull::new(raw).expect("BUG: webrtc_VideoCodec_unique_get が null を返しました")
+        expect_non_null(raw, "webrtc_VideoCodec_unique_get")
     }
 }
 
@@ -2132,8 +2124,10 @@ impl Default for VideoCodec {
 
 impl Clone for VideoCodec {
     fn clone(&self) -> Self {
-        let raw_unique = NonNull::new(unsafe { ffi::webrtc_VideoCodec_copy(self.raw().as_ptr()) })
-            .expect("BUG: webrtc_VideoCodec_copy が null を返しました");
+        let raw_unique = expect_non_null(
+            unsafe { ffi::webrtc_VideoCodec_copy(self.raw().as_ptr()) },
+            "webrtc_VideoCodec_copy",
+        );
         Self { raw_unique }
     }
 }
@@ -2248,8 +2242,10 @@ impl<'a> VideoCodecRef<'a> {
     }
 
     pub fn to_owned(&self) -> VideoCodec {
-        let raw_unique = NonNull::new(unsafe { ffi::webrtc_VideoCodec_copy(self.raw.as_ptr()) })
-            .expect("BUG: webrtc_VideoCodec_copy が null を返しました");
+        let raw_unique = expect_non_null(
+            unsafe { ffi::webrtc_VideoCodec_copy(self.raw.as_ptr()) },
+            "webrtc_VideoCodec_copy",
+        );
         VideoCodec { raw_unique }
     }
 
@@ -2266,10 +2262,10 @@ unsafe impl Send for EncodedImageBuffer {}
 
 impl EncodedImageBuffer {
     pub fn from_bytes(data: &[u8]) -> Self {
-        let raw_ref = NonNull::new(unsafe {
-            ffi::webrtc_EncodedImageBuffer_Create_from_data(data.as_ptr(), data.len())
-        })
-        .expect("BUG: webrtc_EncodedImageBuffer_Create_from_data が null を返しました");
+        let raw_ref = expect_non_null(
+            unsafe { ffi::webrtc_EncodedImageBuffer_Create_from_data(data.as_ptr(), data.len()) },
+            "webrtc_EncodedImageBuffer_Create_from_data",
+        );
         Self {
             raw_ref: ScopedRef::<EncodedImageBufferHandle>::from_raw(raw_ref),
         }
@@ -2307,8 +2303,10 @@ unsafe impl Send for EncodedImage {}
 
 impl EncodedImage {
     pub fn new() -> Self {
-        let raw_unique = NonNull::new(unsafe { ffi::webrtc_EncodedImage_new() })
-            .expect("BUG: webrtc_EncodedImage_new が null を返しました");
+        let raw_unique = expect_non_null(
+            unsafe { ffi::webrtc_EncodedImage_new() },
+            "webrtc_EncodedImage_new",
+        );
         Self { raw_unique }
     }
 
@@ -2366,7 +2364,7 @@ impl EncodedImage {
 
     fn raw(&self) -> NonNull<ffi::webrtc_EncodedImage> {
         let raw = unsafe { ffi::webrtc_EncodedImage_unique_get(self.raw_unique.as_ptr()) };
-        NonNull::new(raw).expect("BUG: webrtc_EncodedImage_unique_get が null を返しました")
+        expect_non_null(raw, "webrtc_EncodedImage_unique_get")
     }
 }
 

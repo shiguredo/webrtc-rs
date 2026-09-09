@@ -1,17 +1,20 @@
-use crate::ref_count::{
+use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::helper::non_null::expect_non_null;
+use crate::helper::out_param::{call_with_out, call_with_out_and_error, call_with_void_and_error};
+use crate::helper::ref_count::{
     AudioTrackHandle, AudioTrackSourceHandle, ConnectionContextHandle, DataChannelHandle,
     DtlsTransportHandle, MediaStreamHandle, PeerConnectionFactoryHandle, PeerConnectionHandle,
     RtpReceiverHandle, RtpSenderHandle, RtpTransceiverHandle, SetLocalDescriptionObserverHandle,
     SetRemoteDescriptionObserverHandle, VideoTrackHandle,
 };
 use crate::{
-    AudioDecoderFactory, AudioDeviceModule, AudioEncoderFactory, AudioProcessingBuilder,
-    AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit, DtlsTransport, Error,
-    IceCandidate, IceCandidateRef, MediaStream, MediaStreamTrack, MediaType, RTCStatsReport,
-    Result, RtcError, RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender, RtpTransceiver,
-    RtpTransceiverInit, SSLCertificateVerifier, SSLIdentity, ScopedRef, SessionDescription,
-    StringVector, Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack, VideoTrackSource,
-    ffi,
+    AudioDecoderFactory, AudioDeviceModule, AudioEncoderFactory, AudioOptions,
+    AudioProcessingBuilder, AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit,
+    DtlsTransport, Error, IceCandidate, IceCandidateRef, MediaStream, MediaStreamTrack, MediaType,
+    RTCStatsReport, Result, RtcError, RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender,
+    RtpTransceiver, RtpTransceiverInit, SSLCertificateVerifier, SSLIdentity, ScopedRef,
+    SessionDescription, StringVector, Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack,
+    VideoTrackSource, ffi,
 };
 use std::marker::PhantomData;
 use std::os::raw::{c_char, c_void};
@@ -27,8 +30,10 @@ unsafe impl Send for PeerConnectionFactoryDependencies {}
 
 impl PeerConnectionFactoryDependencies {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_PeerConnectionFactoryDependencies_new() })
-            .expect("BUG: webrtc_PeerConnectionFactoryDependencies_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_PeerConnectionFactoryDependencies_new() },
+            "webrtc_PeerConnectionFactoryDependencies_new",
+        );
         Self { raw }
     }
 
@@ -162,8 +167,10 @@ unsafe impl Send for PeerConnectionFactoryOptions {}
 
 impl PeerConnectionFactoryOptions {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_PeerConnectionFactoryInterface_Options_new() })
-            .expect("BUG: webrtc_PeerConnectionFactoryInterface_Options_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_PeerConnectionFactoryInterface_Options_new() },
+            "webrtc_PeerConnectionFactoryInterface_Options_new",
+        );
         Self { raw }
     }
 
@@ -216,11 +223,11 @@ unsafe impl Sync for PeerConnectionFactory {}
 
 impl PeerConnectionFactory {
     /// CreateModularPeerConnectionFactory 相当を生成する。
-    pub fn create_modular(deps: &mut PeerConnectionFactoryDependencies) -> Result<Self> {
+    pub fn create_modular(deps: PeerConnectionFactoryDependencies) -> Result<Self> {
         let raw =
             NonNull::new(unsafe { ffi::webrtc_CreateModularPeerConnectionFactory(deps.as_ptr()) })
                 .ok_or(Error::NullPointer(
-                    "webrtc_CreateModularPeerConnectionFactory が null を返しました",
+                    "webrtc_CreateModularPeerConnectionFactory",
                 ))?;
         let raw_ref = ScopedRef::<PeerConnectionFactoryHandle>::from_raw(raw);
         Ok(Self { raw_ref })
@@ -228,7 +235,7 @@ impl PeerConnectionFactory {
 
     /// CreateModularPeerConnectionFactory 相当を生成し、ConnectionContext も同時に返す。
     pub fn create_modular_with_context(
-        deps: &mut PeerConnectionFactoryDependencies,
+        deps: PeerConnectionFactoryDependencies,
     ) -> Result<(Self, ConnectionContext)> {
         let mut out_context = std::ptr::null_mut();
         let factory_raw = NonNull::new(unsafe {
@@ -238,11 +245,11 @@ impl PeerConnectionFactory {
             )
         })
         .ok_or(Error::NullPointer(
-            "webrtc_CreateModularPeerConnectionFactoryWithContext が null を返しました",
+            "webrtc_CreateModularPeerConnectionFactoryWithContext factory",
         ))?;
         let factory_raw_ref = ScopedRef::<PeerConnectionFactoryHandle>::from_raw(factory_raw);
         let context_raw = NonNull::new(out_context).ok_or(Error::NullPointer(
-            "webrtc_CreateModularPeerConnectionFactoryWithContext が null context を返しました",
+            "webrtc_CreateModularPeerConnectionFactoryWithContext context",
         ))?;
         let context_raw_ref = ScopedRef::<ConnectionContextHandle>::from_raw(context_raw);
         Ok((
@@ -253,34 +260,34 @@ impl PeerConnectionFactory {
         ))
     }
 
-    pub fn set_options(&mut self, options: &PeerConnectionFactoryOptions) {
+    pub fn set_options(&self, options: &PeerConnectionFactoryOptions) {
         unsafe {
             ffi::webrtc_PeerConnectionFactoryInterface_SetOptions(self.as_ptr(), options.as_ptr())
         };
     }
 
     pub fn get_rtp_sender_capabilities(&self, media_type: MediaType) -> RtpCapabilities {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities(
-                self.as_ptr(),
-                media_type.to_int(),
-            )
-        })
-        .expect(
-            "BUG: webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities が null を返しました",
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities(
+                    self.as_ptr(),
+                    media_type.to_int(),
+                )
+            },
+            "webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities",
         );
         RtpCapabilities::from_raw(raw)
     }
 
     pub fn get_rtp_receiver_capabilities(&self, media_type: MediaType) -> RtpCapabilities {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_PeerConnectionFactoryInterface_GetRtpReceiverCapabilities(
-                self.as_ptr(),
-                media_type.to_int(),
-            )
-        })
-        .expect(
-            "BUG: webrtc_PeerConnectionFactoryInterface_GetRtpReceiverCapabilities が null を返しました",
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_PeerConnectionFactoryInterface_GetRtpReceiverCapabilities(
+                    self.as_ptr(),
+                    media_type.to_int(),
+                )
+            },
+            "webrtc_PeerConnectionFactoryInterface_GetRtpReceiverCapabilities",
         );
         RtpCapabilities::from_raw(raw)
     }
@@ -290,34 +297,33 @@ impl PeerConnectionFactory {
         source: &VideoTrackSource,
         track_id: &str,
     ) -> Result<VideoTrack> {
-        let mut out = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_PeerConnectionFactoryInterface_CreateVideoTrack(
-                self.raw_ref.as_ptr(),
-                source.as_refcounted_ptr(),
-                track_id.as_ptr() as *const _,
-                track_id.len(),
-                &mut out,
-            );
-        }
-        let out = NonNull::new(out).ok_or(Error::NullPointer(
-            "webrtc_PeerConnectionFactoryInterface_CreateVideoTrack が null を返しました",
-        ))?;
+        let out = call_with_out(
+            "webrtc_PeerConnectionFactoryInterface_CreateVideoTrack",
+            |out| unsafe {
+                ffi::webrtc_PeerConnectionFactoryInterface_CreateVideoTrack(
+                    self.raw_ref.as_ptr(),
+                    source.as_refcounted_ptr(),
+                    track_id.as_ptr() as *const _,
+                    track_id.len(),
+                    out,
+                );
+            },
+        )?;
         let raw_ref = ScopedRef::<VideoTrackHandle>::from_raw(out);
         Ok(VideoTrack::from_scoped_ref(raw_ref))
     }
 
-    pub fn create_audio_source(&self) -> Result<AudioTrackSource> {
-        let mut out = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_PeerConnectionFactoryInterface_CreateAudioSource(
-                self.raw_ref.as_ptr(),
-                &mut out,
-            );
-        }
-        let out = NonNull::new(out).ok_or(Error::NullPointer(
-            "webrtc_PeerConnectionFactoryInterface_CreateAudioSource が null を返しました",
-        ))?;
+    pub fn create_audio_source(&self, options: &AudioOptions) -> Result<AudioTrackSource> {
+        let out = call_with_out(
+            "webrtc_PeerConnectionFactoryInterface_CreateAudioSource",
+            |out| unsafe {
+                ffi::webrtc_PeerConnectionFactoryInterface_CreateAudioSource(
+                    self.raw_ref.as_ptr(),
+                    options.as_ptr(),
+                    out,
+                );
+            },
+        )?;
         let raw_ref = ScopedRef::<AudioTrackSourceHandle>::from_raw(out);
         Ok(AudioTrackSource::from_scoped_ref(raw_ref))
     }
@@ -327,36 +333,34 @@ impl PeerConnectionFactory {
         source: &AudioTrackSource,
         track_id: &str,
     ) -> Result<AudioTrack> {
-        let mut out = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_PeerConnectionFactoryInterface_CreateAudioTrack(
-                self.raw_ref.as_ptr(),
-                source.as_refcounted_ptr(),
-                track_id.as_ptr() as *const _,
-                track_id.len(),
-                &mut out,
-            );
-        }
-        let out = NonNull::new(out).ok_or(Error::NullPointer(
-            "webrtc_PeerConnectionFactoryInterface_CreateAudioTrack が null を返しました",
-        ))?;
+        let out = call_with_out(
+            "webrtc_PeerConnectionFactoryInterface_CreateAudioTrack",
+            |out| unsafe {
+                ffi::webrtc_PeerConnectionFactoryInterface_CreateAudioTrack(
+                    self.raw_ref.as_ptr(),
+                    source.as_refcounted_ptr(),
+                    track_id.as_ptr() as *const _,
+                    track_id.len(),
+                    out,
+                );
+            },
+        )?;
         let raw_ref = ScopedRef::<AudioTrackHandle>::from_raw(out);
         Ok(AudioTrack::from_scoped_ref(raw_ref))
     }
 
     pub fn create_local_media_stream(&self, stream_id: &str) -> Result<MediaStream> {
-        let mut out = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream(
-                self.raw_ref.as_ptr(),
-                stream_id.as_ptr() as *const _,
-                stream_id.len(),
-                &mut out,
-            );
-        }
-        let out = NonNull::new(out).ok_or(Error::NullPointer(
-            "webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream returned null",
-        ))?;
+        let out = call_with_out(
+            "webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream",
+            |out| unsafe {
+                ffi::webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream(
+                    self.raw_ref.as_ptr(),
+                    stream_id.as_ptr() as *const _,
+                    stream_id.len(),
+                    out,
+                );
+            },
+        )?;
         let raw_ref = ScopedRef::<MediaStreamHandle>::from_raw(out);
         Ok(MediaStream::from_scoped_ref(raw_ref))
     }
@@ -387,18 +391,18 @@ impl ConnectionContext {
     }
 
     pub fn default_network_manager(&self) -> NetworkManagerRef<'_> {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_ConnectionContext_default_network_manager(self.as_ptr())
-        })
-        .expect("BUG: webrtc_ConnectionContext_default_network_manager が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_ConnectionContext_default_network_manager(self.as_ptr()) },
+            "webrtc_ConnectionContext_default_network_manager",
+        );
         NetworkManagerRef::from_raw(raw)
     }
 
     pub fn default_socket_factory(&self) -> PacketSocketFactoryRef<'_> {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_ConnectionContext_default_socket_factory(self.as_ptr())
-        })
-        .expect("BUG: webrtc_ConnectionContext_default_socket_factory が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_ConnectionContext_default_socket_factory(self.as_ptr()) },
+            "webrtc_ConnectionContext_default_socket_factory",
+        );
         PacketSocketFactoryRef::from_raw(raw)
     }
 }
@@ -456,11 +460,10 @@ unsafe impl Send for PeerConnectionRtcConfiguration {}
 
 impl PeerConnectionRtcConfiguration {
     pub fn new() -> Self {
-        let raw =
-            NonNull::new(unsafe { ffi::webrtc_PeerConnectionInterface_RTCConfiguration_new() })
-                .expect(
-                    "BUG: webrtc_PeerConnectionInterface_RTCConfiguration_new が null を返しました",
-                );
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_PeerConnectionInterface_RTCConfiguration_new() },
+            "webrtc_PeerConnectionInterface_RTCConfiguration_new",
+        );
         Self { raw }
     }
 
@@ -485,11 +488,11 @@ impl PeerConnectionRtcConfiguration {
 
     /// servers への可変参照を取得する。寿命は self に束縛される。
     pub fn servers(&mut self) -> IceServerVectorRef<'_> {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_PeerConnectionInterface_RTCConfiguration_get_servers(self.raw.as_ptr())
-        })
-        .expect(
-            "BUG: webrtc_PeerConnectionInterface_RTCConfiguration_get_servers が null を返しました",
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_PeerConnectionInterface_RTCConfiguration_get_servers(self.raw.as_ptr())
+            },
+            "webrtc_PeerConnectionInterface_RTCConfiguration_get_servers",
         );
         IceServerVectorRef::from_raw(raw)
     }
@@ -574,8 +577,10 @@ unsafe impl Send for IceServer {}
 
 impl IceServer {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_new() })
-            .expect("BUG: webrtc_PeerConnectionInterface_IceServer_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_new() },
+            "webrtc_PeerConnectionInterface_IceServer_new",
+        );
         Self { raw }
     }
 
@@ -708,11 +713,10 @@ unsafe impl Send for IceServerVector {}
 
 impl IceServerVector {
     pub fn new(size: usize) -> Self {
-        let raw =
-            NonNull::new(unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_vector_new(size) })
-                .expect(
-                    "BUG: webrtc_PeerConnectionInterface_IceServer_vector_new が null を返しました",
-                );
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_vector_new(size) },
+            "webrtc_PeerConnectionInterface_IceServer_vector_new",
+        );
         Self { raw }
     }
 
@@ -778,13 +782,15 @@ impl<'a> IceServerVectorRef<'a> {
         if index >= len {
             return None;
         }
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_PeerConnectionInterface_IceServer_vector_get(
-                self.raw.as_ptr(),
-                index as i32,
-            )
-        })
-        .expect("BUG: webrtc_PeerConnectionInterface_IceServer_vector_get が null を返しました");
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceServer_vector_get(
+                    self.raw.as_ptr(),
+                    index as i32,
+                )
+            },
+            "webrtc_PeerConnectionInterface_IceServer_vector_get",
+        );
         Some(IceServerRef::from_raw(raw))
     }
 
@@ -807,11 +813,9 @@ unsafe impl Send for PeerConnectionOfferAnswerOptions {}
 
 impl PeerConnectionOfferAnswerOptions {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_new()
-        })
-        .expect(
-            "BUG: webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_new が null を返しました",
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_new() },
+            "webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_new",
         );
         Self { raw }
     }
@@ -1187,11 +1191,7 @@ pub trait PeerConnectionObserverHandler: Send {
     fn on_data_channel(&mut self, data_channel: DataChannel) {}
 }
 
-struct PeerConnectionObserverHandlerState {
-    handler: Box<dyn PeerConnectionObserverHandler>,
-}
-
-unsafe impl Send for PeerConnectionObserverHandlerState {}
+type PeerConnectionObserverHandlerState = HandlerState<dyn PeerConnectionObserverHandler>;
 
 unsafe extern "C" fn observer_on_connection_change(new_state: i32, user_data: *mut c_void) {
     assert!(!user_data.is_null());
@@ -1266,9 +1266,8 @@ unsafe extern "C" fn observer_on_track(
 ) {
     assert!(!user_data.is_null());
     let state = unsafe { &mut *(user_data as *mut PeerConnectionObserverHandlerState) };
-    let raw_ref = ScopedRef::<RtpTransceiverHandle>::from_raw(
-        NonNull::new(transceiver).expect("BUG: transceiver が null"),
-    );
+    let raw_ref =
+        ScopedRef::<RtpTransceiverHandle>::from_raw(expect_non_null(transceiver, "transceiver"));
     let transceiver = RtpTransceiver::from_scoped_ref(raw_ref);
     state.handler.on_track(transceiver);
 }
@@ -1279,8 +1278,7 @@ unsafe extern "C" fn observer_on_ice_candidate(
 ) {
     assert!(!user_data.is_null());
     let state = unsafe { &mut *(user_data as *mut PeerConnectionObserverHandlerState) };
-    let candidate =
-        NonNull::new(candidate as *mut ffi::webrtc_IceCandidate).expect("BUG: candidate が null");
+    let candidate = expect_non_null(candidate as *mut ffi::webrtc_IceCandidate, "candidate");
     let candidate = IceCandidateRef::from_raw(candidate);
     state.handler.on_ice_candidate(candidate);
 }
@@ -1291,9 +1289,7 @@ unsafe extern "C" fn observer_on_remove_track(
 ) {
     assert!(!user_data.is_null());
     let state = unsafe { &mut *(user_data as *mut PeerConnectionObserverHandlerState) };
-    let raw_ref = ScopedRef::<RtpReceiverHandle>::from_raw(
-        NonNull::new(receiver).expect("BUG: receiver が null"),
-    );
+    let raw_ref = ScopedRef::<RtpReceiverHandle>::from_raw(expect_non_null(receiver, "receiver"));
     let receiver = RtpReceiver::from_scoped_ref(raw_ref);
     state.handler.on_remove_track(receiver);
 }
@@ -1307,19 +1303,16 @@ unsafe extern "C" fn observer_on_data_channel(
         "observer_on_data_channel: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut PeerConnectionObserverHandlerState) };
-    let raw_ref = ScopedRef::<DataChannelHandle>::from_raw(
-        NonNull::new(data_channel).expect("BUG: data_channel が null"),
-    );
+    let raw_ref =
+        ScopedRef::<DataChannelHandle>::from_raw(expect_non_null(data_channel, "data_channel"));
     let data_channel = DataChannel::from_scoped_ref(raw_ref);
     state.handler.on_data_channel(data_channel);
 }
 
 unsafe extern "C" fn observer_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "observer_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut PeerConnectionObserverHandlerState) };
+    unsafe {
+        destroy_handler::<PeerConnectionObserverHandlerState>("observer_on_destroy", user_data)
+    };
 }
 
 /// PeerConnectionObserver のラッパー。
@@ -1331,8 +1324,7 @@ unsafe impl Send for PeerConnectionObserver {}
 
 impl PeerConnectionObserver {
     pub fn new_with_handler(handler: Box<dyn PeerConnectionObserverHandler>) -> Self {
-        let state = Box::new(PeerConnectionObserverHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_PeerConnectionObserver_cbs {
             OnStandardizedIceConnectionChange: Some(observer_on_standardized_ice_connection_change),
             OnConnectionChange: Some(observer_on_connection_change),
@@ -1344,15 +1336,12 @@ impl PeerConnectionObserver {
             OnDestroy: Some(observer_on_destroy),
             OnIceGatheringChange: Some(observer_on_ice_gathering_change),
         };
-        let raw = match NonNull::new(unsafe {
-            ffi::webrtc_PeerConnectionObserver_new(&cbs, user_data)
-        }) {
-            Some(raw) => raw,
-            None => {
-                let _ =
-                    unsafe { Box::from_raw(user_data as *mut PeerConnectionObserverHandlerState) };
-                panic!("BUG: webrtc_PeerConnectionObserver_new が null を返しました");
-            }
+        let raw = unsafe {
+            create_with_handler::<PeerConnectionObserverHandlerState, _>(
+                "webrtc_PeerConnectionObserver_new",
+                user_data,
+                |user_data| ffi::webrtc_PeerConnectionObserver_new(&cbs, user_data),
+            )
         };
         Self { raw }
     }
@@ -1377,9 +1366,10 @@ unsafe impl Send for PeerConnectionDependencies {}
 
 impl PeerConnectionDependencies {
     pub fn new(observer: &PeerConnectionObserver) -> Self {
-        let raw =
-            NonNull::new(unsafe { ffi::webrtc_PeerConnectionDependencies_new(observer.as_ptr()) })
-                .expect("BUG: webrtc_PeerConnectionDependencies_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_PeerConnectionDependencies_new(observer.as_ptr()) },
+            "webrtc_PeerConnectionDependencies_new",
+        );
         Self { raw }
     }
 
@@ -1431,7 +1421,7 @@ impl Drop for PeerConnectionDependencies {
 }
 
 struct PeerConnectionStatsCallbackState {
-    on_stats: Box<dyn FnOnce(RTCStatsReport) + Send + 'static>,
+    on_stats: Option<Box<dyn FnOnce(RTCStatsReport) + Send + 'static>>,
 }
 
 unsafe impl Send for PeerConnectionStatsCallbackState {}
@@ -1444,12 +1434,19 @@ unsafe extern "C" fn peer_connection_on_stats(
         !user_data.is_null(),
         "peer_connection_on_stats: user_data is null"
     );
-    let state = unsafe { Box::from_raw(user_data as *mut PeerConnectionStatsCallbackState) };
-    let Some(report) = NonNull::new(report as *mut ffi::webrtc_RTCStatsReport_refcounted) else {
-        return;
+    let state = unsafe { &mut *(user_data as *mut PeerConnectionStatsCallbackState) };
+    let report = RTCStatsReport::from_refcounted_ptr(expect_non_null(
+        report as *mut ffi::webrtc_RTCStatsReport_refcounted,
+        "report",
+    ));
+    let on_stats = state.on_stats.take().expect("BUG: on_stats が消費済みです");
+    on_stats(report);
+}
+
+unsafe extern "C" fn peer_connection_on_destroy(user_data: *mut c_void) {
+    unsafe {
+        destroy_handler::<PeerConnectionStatsCallbackState>("peer_connection_on_destroy", user_data)
     };
-    let report = RTCStatsReport::from_refcounted_ptr(report);
-    (state.on_stats)(report);
 }
 
 pub trait CreateSessionDescriptionObserverHandler: Send {
@@ -1459,19 +1456,15 @@ pub trait CreateSessionDescriptionObserverHandler: Send {
     fn on_failure(&mut self, error: RtcError) {}
 }
 
-struct CreateSessionDescriptionObserverHandlerState {
-    handler: Box<dyn CreateSessionDescriptionObserverHandler>,
-}
-
-unsafe impl Send for CreateSessionDescriptionObserverHandlerState {}
+type CreateSessionDescriptionObserverHandlerState =
+    HandlerState<dyn CreateSessionDescriptionObserverHandler>;
 
 unsafe extern "C" fn csd_on_success(
     desc: *mut ffi::webrtc_SessionDescriptionInterface_unique,
     user_data: *mut c_void,
 ) {
     let state = unsafe { &mut *(user_data as *mut CreateSessionDescriptionObserverHandlerState) };
-    let desc =
-        SessionDescription::from_unique_ptr(NonNull::new(desc).expect("BUG: desc が null です"));
+    let desc = SessionDescription::from_unique_ptr(expect_non_null(desc, "desc"));
     state.handler.on_success(desc);
 }
 
@@ -1480,14 +1473,14 @@ unsafe extern "C" fn csd_on_failure(
     user_data: *mut c_void,
 ) {
     let state = unsafe { &mut *(user_data as *mut CreateSessionDescriptionObserverHandlerState) };
-    let err = RtcError::from_unique_ptr(NonNull::new(error).expect("BUG: error が null です"));
+    let err = RtcError::from_unique_ptr(expect_non_null(error, "error"));
     state.handler.on_failure(err);
 }
 
 unsafe extern "C" fn csd_on_destroy(user_data: *mut c_void) {
-    assert!(!user_data.is_null(), "csd_on_destroy: user_data is null");
-    let _ =
-        unsafe { Box::from_raw(user_data as *mut CreateSessionDescriptionObserverHandlerState) };
+    unsafe {
+        destroy_handler::<CreateSessionDescriptionObserverHandlerState>("csd_on_destroy", user_data)
+    };
 }
 
 /// CreateSessionDescriptionObserver のラッパー。
@@ -1499,23 +1492,20 @@ unsafe impl Send for CreateSessionDescriptionObserver {}
 
 impl CreateSessionDescriptionObserver {
     pub fn new_with_handler(handler: Box<dyn CreateSessionDescriptionObserverHandler>) -> Self {
-        let state = Box::new(CreateSessionDescriptionObserverHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_CreateSessionDescriptionObserver_cbs {
             OnSuccess: Some(csd_on_success),
             OnFailure: Some(csd_on_failure),
             OnDestroy: Some(csd_on_destroy),
         };
-        let raw = match NonNull::new(unsafe {
-            ffi::webrtc_CreateSessionDescriptionObserver_make_ref_counted(&cbs, user_data)
-        }) {
-            Some(raw) => raw,
-            None => {
-                let _ = unsafe {
-                    Box::from_raw(user_data as *mut CreateSessionDescriptionObserverHandlerState)
-                };
-                panic!("BUG: raw が null です");
-            }
+        let raw = unsafe {
+            create_with_handler::<CreateSessionDescriptionObserverHandlerState, _>(
+                "webrtc_CreateSessionDescriptionObserver_make_ref_counted",
+                user_data,
+                |user_data| {
+                    ffi::webrtc_CreateSessionDescriptionObserver_make_ref_counted(&cbs, user_data)
+                },
+            )
         };
         Self { raw }
     }
@@ -1536,24 +1526,21 @@ pub trait SetLocalDescriptionObserverHandler: Send {
     fn on_set_local_description_complete(&mut self, error: RtcError) {}
 }
 
-struct SetLocalDescriptionObserverHandlerState {
-    handler: Box<dyn SetLocalDescriptionObserverHandler>,
-}
-
-unsafe impl Send for SetLocalDescriptionObserverHandlerState {}
+type SetLocalDescriptionObserverHandlerState = HandlerState<dyn SetLocalDescriptionObserverHandler>;
 
 unsafe extern "C" fn sld_on_complete(
     error: *mut ffi::webrtc_RTCError_unique,
     user_data: *mut c_void,
 ) {
     let state = unsafe { &mut *(user_data as *mut SetLocalDescriptionObserverHandlerState) };
-    let err = RtcError::from_unique_ptr(NonNull::new(error).expect("BUG: error が null です"));
+    let err = RtcError::from_unique_ptr(expect_non_null(error, "error"));
     state.handler.on_set_local_description_complete(err);
 }
 
 unsafe extern "C" fn sld_on_destroy(user_data: *mut c_void) {
-    assert!(!user_data.is_null(), "sld_on_destroy: user_data is null");
-    let _ = unsafe { Box::from_raw(user_data as *mut SetLocalDescriptionObserverHandlerState) };
+    unsafe {
+        destroy_handler::<SetLocalDescriptionObserverHandlerState>("sld_on_destroy", user_data)
+    };
 }
 
 /// SetLocalDescriptionObserverInterface のラッパー。
@@ -1565,24 +1552,21 @@ unsafe impl Send for SetLocalDescriptionObserver {}
 
 impl SetLocalDescriptionObserver {
     pub fn new_with_handler(handler: Box<dyn SetLocalDescriptionObserverHandler>) -> Self {
-        let state = Box::new(SetLocalDescriptionObserverHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_SetLocalDescriptionObserverInterface_cbs {
             OnSetLocalDescriptionComplete: Some(sld_on_complete),
             OnDestroy: Some(sld_on_destroy),
         };
-        let raw = match NonNull::new(unsafe {
-            ffi::webrtc_SetLocalDescriptionObserverInterface_make_ref_counted(&cbs, user_data)
-        }) {
-            Some(raw) => raw,
-            None => {
-                let _ = unsafe {
-                    Box::from_raw(user_data as *mut SetLocalDescriptionObserverHandlerState)
-                };
-                panic!(
-                    "BUG: webrtc_SetLocalDescriptionObserverInterface_make_ref_counted が null を返しました"
-                );
-            }
+        let raw = unsafe {
+            create_with_handler::<SetLocalDescriptionObserverHandlerState, _>(
+                "webrtc_SetLocalDescriptionObserverInterface_make_ref_counted",
+                user_data,
+                |user_data| {
+                    ffi::webrtc_SetLocalDescriptionObserverInterface_make_ref_counted(
+                        &cbs, user_data,
+                    )
+                },
+            )
         };
         let raw_ref = ScopedRef::<SetLocalDescriptionObserverHandle>::from_raw(raw);
         Self { raw_ref }
@@ -1604,24 +1588,22 @@ pub trait SetRemoteDescriptionObserverHandler: Send {
     fn on_set_remote_description_complete(&mut self, error: RtcError) {}
 }
 
-struct SetRemoteDescriptionObserverHandlerState {
-    handler: Box<dyn SetRemoteDescriptionObserverHandler>,
-}
-
-unsafe impl Send for SetRemoteDescriptionObserverHandlerState {}
+type SetRemoteDescriptionObserverHandlerState =
+    HandlerState<dyn SetRemoteDescriptionObserverHandler>;
 
 unsafe extern "C" fn srd_on_complete(
     error: *mut ffi::webrtc_RTCError_unique,
     user_data: *mut c_void,
 ) {
     let state = unsafe { &mut *(user_data as *mut SetRemoteDescriptionObserverHandlerState) };
-    let err = RtcError::from_unique_ptr(NonNull::new(error).expect("BUG: error が null"));
+    let err = RtcError::from_unique_ptr(expect_non_null(error, "error"));
     state.handler.on_set_remote_description_complete(err);
 }
 
 unsafe extern "C" fn srd_on_destroy(user_data: *mut c_void) {
-    assert!(!user_data.is_null(), "srd_on_destroy: user_data is null");
-    let _ = unsafe { Box::from_raw(user_data as *mut SetRemoteDescriptionObserverHandlerState) };
+    unsafe {
+        destroy_handler::<SetRemoteDescriptionObserverHandlerState>("srd_on_destroy", user_data)
+    };
 }
 
 /// SetRemoteDescriptionObserverInterface のラッパー。
@@ -1633,22 +1615,21 @@ unsafe impl Send for SetRemoteDescriptionObserver {}
 
 impl SetRemoteDescriptionObserver {
     pub fn new_with_handler(handler: Box<dyn SetRemoteDescriptionObserverHandler>) -> Self {
-        let state = Box::new(SetRemoteDescriptionObserverHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_SetRemoteDescriptionObserverInterface_cbs {
             OnSetRemoteDescriptionComplete: Some(srd_on_complete),
             OnDestroy: Some(srd_on_destroy),
         };
-        let raw = match NonNull::new(unsafe {
-            ffi::webrtc_SetRemoteDescriptionObserverInterface_make_ref_counted(&cbs, user_data)
-        }) {
-            Some(raw) => raw,
-            None => {
-                let _ = unsafe {
-                    Box::from_raw(user_data as *mut SetRemoteDescriptionObserverHandlerState)
-                };
-                panic!("BUG: raw が null です");
-            }
+        let raw = unsafe {
+            create_with_handler::<SetRemoteDescriptionObserverHandlerState, _>(
+                "webrtc_SetRemoteDescriptionObserverInterface_make_ref_counted",
+                user_data,
+                |user_data| {
+                    ffi::webrtc_SetRemoteDescriptionObserverInterface_make_ref_counted(
+                        &cbs, user_data,
+                    )
+                },
+            )
         };
         let raw_ref = ScopedRef::<SetRemoteDescriptionObserverHandle>::from_raw(raw);
         Self { raw_ref }
@@ -1683,34 +1664,30 @@ impl PeerConnection {
     /// `deps` に渡した observer は、`PeerConnection::close` を呼ぶまで drop してはならない。
     pub fn create(
         factory: &PeerConnectionFactory,
-        config: &mut PeerConnectionRtcConfiguration,
-        deps: &mut PeerConnectionDependencies,
+        config: &PeerConnectionRtcConfiguration,
+        deps: PeerConnectionDependencies,
     ) -> Result<Self> {
-        let mut out_pc: *mut ffi::webrtc_PeerConnectionInterface_refcounted = std::ptr::null_mut();
-        let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_PeerConnectionFactoryInterface_CreatePeerConnectionOrError(
-                factory.as_ptr(),
-                config.as_ptr(),
-                deps.as_ptr(),
-                &mut out_pc,
-                &mut out_error,
-            );
-        }
-        if !out_error.is_null() {
-            let err = RtcError::from_unique_ptr(NonNull::new(out_error).unwrap());
-            return Err(Error::RtcError(err));
-        }
-
-        let pc = NonNull::new(out_pc).expect("BUG: out_pc と out_error が両方 null です");
-        let raw_ref = ScopedRef::<PeerConnectionHandle>::from_raw(pc);
+        let out = call_with_out_and_error(
+            "webrtc_PeerConnectionFactoryInterface_CreatePeerConnectionOrError",
+            |out_pc, out_error| unsafe {
+                ffi::webrtc_PeerConnectionFactoryInterface_CreatePeerConnectionOrError(
+                    factory.as_ptr(),
+                    config.as_ptr(),
+                    deps.as_ptr(),
+                    out_pc,
+                    out_error,
+                );
+            },
+            |err| RtcError::from_unique_ptr(err).into(),
+        )?;
+        let raw_ref = ScopedRef::<PeerConnectionHandle>::from_raw(out);
         Ok(Self { raw_ref })
     }
 
     pub fn create_offer(
         &self,
         observer: &mut CreateSessionDescriptionObserver,
-        options: &mut PeerConnectionOfferAnswerOptions,
+        options: &PeerConnectionOfferAnswerOptions,
     ) {
         unsafe {
             ffi::webrtc_PeerConnectionInterface_CreateOffer(
@@ -1724,7 +1701,7 @@ impl PeerConnection {
     pub fn create_answer(
         &self,
         observer: &mut CreateSessionDescriptionObserver,
-        options: &mut PeerConnectionOfferAnswerOptions,
+        options: &PeerConnectionOfferAnswerOptions,
     ) {
         unsafe {
             ffi::webrtc_PeerConnectionInterface_CreateAnswer(
@@ -1765,7 +1742,7 @@ impl PeerConnection {
         };
     }
 
-    pub fn add_ice_candidate(&mut self, candidate: &IceCandidate) -> Result<()> {
+    pub fn add_ice_candidate(&self, candidate: &IceCandidate) -> Result<()> {
         let ok = unsafe {
             ffi::webrtc_PeerConnectionInterface_AddIceCandidate(
                 self.raw_ref.as_ptr(),
@@ -1778,99 +1755,79 @@ impl PeerConnection {
         Ok(())
     }
 
-    pub fn set_configuration(&mut self, config: &mut PeerConnectionRtcConfiguration) -> Result<()> {
-        let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_PeerConnectionInterface_SetConfiguration(
-                self.raw_ref.as_ptr(),
-                config.as_ptr(),
-                &mut out_error,
-            );
-        }
-        if !out_error.is_null() {
-            let err = RtcError::from_unique_ptr(NonNull::new(out_error).unwrap());
-            return Err(Error::RtcError(err));
-        }
-        Ok(())
+    pub fn set_configuration(&self, config: &PeerConnectionRtcConfiguration) -> Result<()> {
+        call_with_void_and_error(
+            |out_error| unsafe {
+                ffi::webrtc_PeerConnectionInterface_SetConfiguration(
+                    self.raw_ref.as_ptr(),
+                    config.as_ptr(),
+                    out_error,
+                );
+            },
+            |err| RtcError::from_unique_ptr(err).into(),
+        )
     }
 
-    pub fn create_data_channel(
-        &self,
-        label: &str,
-        init: &mut DataChannelInit,
-    ) -> Result<DataChannel> {
-        let mut out_dc: *mut ffi::webrtc_DataChannelInterface_refcounted = std::ptr::null_mut();
-        let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_PeerConnectionInterface_CreateDataChannelOrError(
-                self.raw_ref.as_ptr(),
-                label.as_ptr() as *const _,
-                label.len(),
-                init.as_ptr(),
-                &mut out_dc,
-                &mut out_error,
-            );
-        }
-        if !out_error.is_null() {
-            let err = RtcError::from_unique_ptr(NonNull::new(out_error).unwrap());
-            return Err(Error::RtcError(err));
-        }
-        assert!(!out_dc.is_null());
-        let raw_ref = ScopedRef::<DataChannelHandle>::from_raw(NonNull::new(out_dc).unwrap());
+    pub fn create_data_channel(&self, label: &str, init: &DataChannelInit) -> Result<DataChannel> {
+        let out = call_with_out_and_error(
+            "webrtc_PeerConnectionInterface_CreateDataChannelOrError",
+            |out_dc, out_error| unsafe {
+                ffi::webrtc_PeerConnectionInterface_CreateDataChannelOrError(
+                    self.raw_ref.as_ptr(),
+                    label.as_ptr() as *const _,
+                    label.len(),
+                    init.as_ptr(),
+                    out_dc,
+                    out_error,
+                );
+            },
+            |err| RtcError::from_unique_ptr(err).into(),
+        )?;
+        let raw_ref = ScopedRef::<DataChannelHandle>::from_raw(out);
         Ok(DataChannel::from_scoped_ref(raw_ref))
     }
 
     pub fn add_transceiver(
         &self,
         media_type: MediaType,
-        init: &mut RtpTransceiverInit,
+        init: &RtpTransceiverInit,
     ) -> Result<RtpTransceiver> {
-        let mut out_transceiver: *mut ffi::webrtc_RtpTransceiverInterface_refcounted =
-            std::ptr::null_mut();
-        let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_PeerConnectionInterface_AddTransceiver(
-                self.raw_ref.as_ptr(),
-                media_type.to_int(),
-                init.as_ptr(),
-                &mut out_transceiver,
-                &mut out_error,
-            );
-        }
-        if !out_error.is_null() {
-            let err = RtcError::from_unique_ptr(NonNull::new(out_error).unwrap());
-            return Err(Error::RtcError(err));
-        }
-        assert!(!out_transceiver.is_null());
-        let raw_ref =
-            ScopedRef::<RtpTransceiverHandle>::from_raw(NonNull::new(out_transceiver).unwrap());
+        let out = call_with_out_and_error(
+            "webrtc_PeerConnectionInterface_AddTransceiver",
+            |out_transceiver, out_error| unsafe {
+                ffi::webrtc_PeerConnectionInterface_AddTransceiver(
+                    self.raw_ref.as_ptr(),
+                    media_type.to_int(),
+                    init.as_ptr(),
+                    out_transceiver,
+                    out_error,
+                );
+            },
+            |err| RtcError::from_unique_ptr(err).into(),
+        )?;
+        let raw_ref = ScopedRef::<RtpTransceiverHandle>::from_raw(out);
         Ok(RtpTransceiver::from_scoped_ref(raw_ref))
     }
 
     pub fn add_transceiver_with_track(
         &self,
         track: &VideoTrack,
-        init: &mut RtpTransceiverInit,
+        init: &RtpTransceiverInit,
     ) -> Result<RtpTransceiver> {
-        let mut out_transceiver: *mut ffi::webrtc_RtpTransceiverInterface_refcounted =
-            std::ptr::null_mut();
-        let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_PeerConnectionInterface_AddTransceiverWithTrack(
-                self.raw_ref.as_ptr(),
-                track.as_refcounted_ptr(),
-                init.as_ptr(),
-                &mut out_transceiver,
-                &mut out_error,
-            );
-        }
-        if !out_error.is_null() {
-            let err = RtcError::from_unique_ptr(NonNull::new(out_error).unwrap());
-            return Err(Error::RtcError(err));
-        }
-        assert!(!out_transceiver.is_null());
-        let raw_ref =
-            ScopedRef::<RtpTransceiverHandle>::from_raw(NonNull::new(out_transceiver).unwrap());
+        let out = call_with_out_and_error(
+            "webrtc_PeerConnectionInterface_AddTransceiverWithTrack",
+            |out_transceiver, out_error| unsafe {
+                ffi::webrtc_PeerConnectionInterface_AddTransceiverWithTrack(
+                    self.raw_ref.as_ptr(),
+                    track.as_refcounted_ptr(),
+                    init.as_ptr(),
+                    out_transceiver,
+                    out_error,
+                );
+            },
+            |err| RtcError::from_unique_ptr(err).into(),
+        )?;
+        let raw_ref = ScopedRef::<RtpTransceiverHandle>::from_raw(out);
         Ok(RtpTransceiver::from_scoped_ref(raw_ref))
     }
 
@@ -1879,40 +1836,34 @@ impl PeerConnection {
         track: &MediaStreamTrack,
         stream_ids: &StringVector,
     ) -> Result<RtpSender> {
-        let mut out_sender: *mut ffi::webrtc_RtpSenderInterface_refcounted = std::ptr::null_mut();
-        let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_PeerConnectionInterface_AddTrack(
-                self.raw_ref.as_ptr(),
-                track.as_refcounted_ptr(),
-                stream_ids.as_ptr(),
-                &mut out_sender,
-                &mut out_error,
-            );
-        }
-        if !out_error.is_null() {
-            let err = RtcError::from_unique_ptr(NonNull::new(out_error).unwrap());
-            return Err(Error::RtcError(err));
-        }
-        assert!(!out_sender.is_null());
-        let raw_ref = ScopedRef::<RtpSenderHandle>::from_raw(NonNull::new(out_sender).unwrap());
+        let out = call_with_out_and_error(
+            "webrtc_PeerConnectionInterface_AddTrack",
+            |out_sender, out_error| unsafe {
+                ffi::webrtc_PeerConnectionInterface_AddTrack(
+                    self.raw_ref.as_ptr(),
+                    track.as_refcounted_ptr(),
+                    stream_ids.as_ptr(),
+                    out_sender,
+                    out_error,
+                );
+            },
+            |err| RtcError::from_unique_ptr(err).into(),
+        )?;
+        let raw_ref = ScopedRef::<RtpSenderHandle>::from_raw(out);
         Ok(RtpSender::from_scoped_ref(raw_ref))
     }
 
     pub fn remove_track(&self, sender: &RtpSender) -> Result<()> {
-        let mut out_error: *mut ffi::webrtc_RTCError_unique = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_PeerConnectionInterface_RemoveTrackOrError(
-                self.raw_ref.as_ptr(),
-                sender.as_refcounted_ptr(),
-                &mut out_error,
-            );
-        }
-        if !out_error.is_null() {
-            let err = RtcError::from_unique_ptr(NonNull::new(out_error).unwrap());
-            return Err(Error::RtcError(err));
-        }
-        Ok(())
+        call_with_void_and_error(
+            |out_error| unsafe {
+                ffi::webrtc_PeerConnectionInterface_RemoveTrackOrError(
+                    self.raw_ref.as_ptr(),
+                    sender.as_refcounted_ptr(),
+                    out_error,
+                );
+            },
+            |err| RtcError::from_unique_ptr(err).into(),
+        )
     }
 
     pub fn get_stats<F>(&self, on_stats: F)
@@ -1920,10 +1871,11 @@ impl PeerConnection {
         F: FnOnce(RTCStatsReport) + Send + 'static,
     {
         let state = Box::new(PeerConnectionStatsCallbackState {
-            on_stats: Box::new(on_stats),
+            on_stats: Some(Box::new(on_stats)),
         });
         let mut cbs = ffi::webrtc_RTCStatsCollectorCallback_cbs {
             OnStatsDelivered: Some(peer_connection_on_stats),
+            OnDestroy: Some(peer_connection_on_destroy),
         };
         let user_data = Box::into_raw(state) as *mut c_void;
         unsafe {

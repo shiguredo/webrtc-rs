@@ -1,7 +1,7 @@
 # DegradationPreference の DISABLED を MAINTAIN_FRAMERATE_AND_RESOLUTION に揃える
 
 - Created: 2026-08-25
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-25
 - Branch: feature/update-degradation-preference
 - Polished: {YYYY-MM-DD}
 
@@ -39,3 +39,14 @@ libwebrtc は 2025-10-13 の "Rename DISABLED to MAINTAIN_FRAMERATE_AND_RESOLUTI
 - `src/tests.rs`（往復テストの追加）
 - `webrtc/src/webrtc_c/api/rtp_parameters.h` / `webrtc/src/webrtc_c/api/rtp_parameters.cc`（C シム定数の改名）
 - `CHANGES.md`
+
+## 解決方法
+
+- `webrtc::DegradationPreference::DISABLED` への参照を `MAINTAIN_FRAMERATE_AND_RESOLUTION` に置き換えた
+  - C シムの定数を `webrtc_DegradationPreference_MAINTAIN_FRAMERATE_AND_RESOLUTION` に改名し、`webrtc::DegradationPreference::MAINTAIN_FRAMERATE_AND_RESOLUTION` から定義するようにした（rtp_parameters.h / .cc の宣言・定義の両方）
+  - Rust enum の `Disabled` を `MaintainFramerateAndResolution` に変名した（src/api/rtp.rs の `DegradationPreference`）
+  - `to_int` / `from_int` の参照先定数を差し替えた
+- 互換エイリアス `Disabled` は残さず、値の同一性を API 上で隠さない形にした
+- src/tests.rs の往復テストに `MaintainFramerateAndResolution` のケースを追加した
+- CHANGES.md の `## develop` セクションに `[CHANGE]` エントリを追加した
+- `cargo test` と `cargo clippy --all-targets -- -D warnings` の成功を確認した

@@ -1,7 +1,7 @@
 # get_stats のコールバック未発火時に user_data の Box がリークする
 
 - Created: 2026-08-03
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-26
 - Branch: feature/fix-get-stats-callback-box-leak
 - Polished: 2026-08-12
 
@@ -41,9 +41,9 @@ C 側の `RTCStatsCollectorCallbackImpl` に破棄通知 (`OnDestroy`) を追加
 
 ## 解決方法
 
-- `webrtc/src/webrtc_c/api/stats/rtc_stats_collector_callback.h` の `webrtc_RTCStatsCollectorCallback_cbs` に `OnDestroy` を追加する
-- `RTCStatsCollectorCallbackImpl` (`webrtc/src/webrtc_c/api/peer_connection_interface.cc`) にデストラクタを追加し、`OnDestroy(user_data_)` を呼ぶ
-- `RTCStatsCollectorCallbackImpl` のコンストラクタで `assert(cbs->OnDestroy != nullptr)` を追加する (RULES.md の Cbs 契約に従う)
-- Rust 側 `get_stats` の cbs 初期化に `OnDestroy` を追加し、破棄時に `Box::from_raw` で回収するハンドラを実装する
-- `peer_connection_on_stats` を `Box::from_raw` から `&mut` 参照 + `Option::take()` による実行に変更し、回収を `OnDestroy` に一元化する（二重回収を防ぐため）
+- `webrtc_RTCStatsCollectorCallback_cbs` (`webrtc/src/webrtc_c/api/stats/rtc_stats_collector_callback.h`) に `OnDestroy` を追加する
+- `RTCStatsCollectorCallbackImpl` (`webrtc/src/webrtc_c/api/peer_connection_interface.cc`) にデストラクタ `~RTCStatsCollectorCallbackImpl()` を追加して `OnDestroy(user_data_)` を呼ぶ。コンストラクタに `assert(cbs->OnDestroy != nullptr)` を追加する (RULES.md の Cbs 契約に従う)
+- Rust 側 `get_stats` の cbs 初期化に `OnDestroy` を追加し、破棄時に `Box::from_raw` で回収する `peer_connection_on_destroy` を実装する
+- `peer_connection_on_stats` を `Box::from_raw` から `&mut` 参照 + `Option::take()` による実行に変更し、回収を `OnDestroy` に一元化する（二重回収を防ぐため）。null report および `on_stats` 消費済みは起きない契約であるため `.expect("BUG: ...")` で顕在化する
 - `webrtc/RULES.md` の「`RTCStatsCollectorCallback_cbs` は OnDestroy を持たない」という例外注記を削除する
+- テストは `src/tests.rs` にレポートが配信されることを確認する `get_stats_delivers_report` を追加する。リーク・二重解放を専用に検証するテストは、クロージャの drop 回数を数える間接的な検証で価値が低く、二重解放はセグフォで顕在化するため見送った

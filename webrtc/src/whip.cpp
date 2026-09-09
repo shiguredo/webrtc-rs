@@ -1198,9 +1198,12 @@ int main() {
   } wsa_deleter;
 #endif
 
-  webrtc::LogMessage::LogToDebug(webrtc::LS_INFO);
-  webrtc::LogMessage::LogTimestamps();
-  webrtc::LogMessage::LogThreads();
+  webrtc::LoggingConfig logging_config;
+  logging_config.set_min_severity(webrtc::LoggingSeverity::LS_INFO);
+  logging_config.set_debug_severity(webrtc::LoggingSeverity::LS_INFO);
+  logging_config.set_log_timestamp(true);
+  logging_config.set_log_thread(true);
+  webrtc::InitializeLogging(std::move(logging_config));
 
   auto client = WhipClient::Create();
   client->Run();

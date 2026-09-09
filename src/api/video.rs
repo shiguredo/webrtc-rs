@@ -1,5 +1,7 @@
 use super::video_codec_common::{VideoFrame, VideoFrameRef};
-use crate::ref_count::{
+use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::helper::non_null::expect_non_null;
+use crate::helper::ref_count::{
     AdaptedVideoTrackSourceHandle, MediaStreamTrackHandle, VideoTrackHandle, VideoTrackSourceHandle,
 };
 use crate::{MediaStreamTrack, ScopedRef, ffi};
@@ -11,18 +13,14 @@ pub trait VideoSinkHandler: Send {
     fn on_discarded_frame(&mut self) {}
 }
 
-struct VideoSinkHandlerState {
-    handler: Box<dyn VideoSinkHandler>,
-}
-
-unsafe impl Send for VideoSinkHandlerState {}
+type VideoSinkHandlerState = HandlerState<dyn VideoSinkHandler>;
 
 unsafe extern "C" fn video_sink_on_frame(
     frame: *const ffi::webrtc_VideoFrame,
     user_data: *mut c_void,
 ) {
     let state = unsafe { &mut *(user_data as *mut VideoSinkHandlerState) };
-    let frame = NonNull::new(frame as *mut ffi::webrtc_VideoFrame).expect("BUG: frame が null");
+    let frame = expect_non_null(frame as *mut ffi::webrtc_VideoFrame, "VideoFrame");
     let frame = unsafe { VideoFrameRef::from_raw(frame) };
     state.handler.on_frame(frame);
 }
@@ -37,11 +35,7 @@ unsafe extern "C" fn video_sink_on_discarded_frame(user_data: *mut c_void) {
 }
 
 unsafe extern "C" fn video_sink_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "video_sink_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut VideoSinkHandlerState) };
+    unsafe { destroy_handler::<VideoSinkHandlerState>("video_sink_on_destroy", user_data) };
 }
 
 /// webrtc::VideoSinkWants のラッパー。
@@ -53,8 +47,10 @@ unsafe impl Send for VideoSinkWants {}
 
 impl VideoSinkWants {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_VideoSinkWants_new() })
-            .expect("BUG: webrtc_VideoSinkWants_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_VideoSinkWants_new() },
+            "webrtc_VideoSinkWants_new",
+        );
         Self { raw }
     }
 
@@ -84,20 +80,18 @@ unsafe impl Send for VideoSink {}
 
 impl VideoSink {
     pub fn new_with_handler(handler: Box<dyn VideoSinkHandler>) -> Self {
-        let state = Box::new(VideoSinkHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_VideoSinkInterface_cbs {
             OnFrame: Some(video_sink_on_frame),
             OnDiscardedFrame: Some(video_sink_on_discarded_frame),
             OnDestroy: Some(video_sink_on_destroy),
         };
-        let raw = match NonNull::new(unsafe { ffi::webrtc_VideoSinkInterface_new(&cbs, user_data) })
-        {
-            Some(raw) => raw,
-            None => {
-                let _ = unsafe { Box::from_raw(user_data as *mut VideoSinkHandlerState) };
-                panic!("BUG: webrtc_VideoSinkInterface_new が null を返しました");
-            }
+        let raw = unsafe {
+            create_with_handler::<VideoSinkHandlerState, _>(
+                "webrtc_VideoSinkInterface_new",
+                user_data,
+                |user_data| ffi::webrtc_VideoSinkInterface_new(&cbs, user_data),
+            )
         };
         Self { raw }
     }
@@ -126,14 +120,16 @@ unsafe impl Sync for AdaptedVideoTrackSource {}
 
 impl AdaptedVideoTrackSource {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_AdaptedVideoTrackSource_Create() })
-            .expect("BUG: webrtc_AdaptedVideoTrackSource_Create が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_AdaptedVideoTrackSource_Create() },
+            "webrtc_AdaptedVideoTrackSource_Create",
+        );
         let raw_ref = ScopedRef::<AdaptedVideoTrackSourceHandle>::from_raw(raw);
         Self { raw_ref }
     }
 
     /// フレームをアダプトし、適用の有無と結果を返す。
-    pub fn adapt_frame(&mut self, width: i32, height: i32, timestamp_us: i64) -> AdaptFrameResult {
+    pub fn adapt_frame(&self, width: i32, height: i32, timestamp_us: i64) -> AdaptFrameResult {
         let raw = self.raw();
         let mut out = AdaptedSize::default();
         let ok = unsafe {
@@ -157,7 +153,7 @@ impl AdaptedVideoTrackSource {
     }
 
     /// フレームをソースに投入する。
-    pub fn on_frame(&mut self, frame: &VideoFrame) {
+    pub fn on_frame(&self, frame: &VideoFrame) {
         let raw = self.raw();
         let frame_raw = frame.raw();
         unsafe { ffi::webrtc_AdaptedVideoTrackSource_OnFrame(raw.as_ptr(), frame_raw.as_ptr()) };
@@ -165,12 +161,14 @@ impl AdaptedVideoTrackSource {
 
     /// VideoTrackSourceInterface へキャストする。
     pub fn cast_to_video_track_source(&self) -> VideoTrackSource {
-        let raw_ref = NonNull::new(unsafe {
-            ffi::webrtc_AdaptedVideoTrackSource_refcounted_cast_to_webrtc_VideoTrackSourceInterface(
-                self.raw_ref.as_refcounted_ptr(),
-            )
-        })
-        .expect("BUG: webrtc_AdaptedVideoTrackSource_refcounted_cast_to_webrtc_VideoTrackSourceInterface が null を返しました");
+        let raw_ref = expect_non_null(
+            unsafe {
+                ffi::webrtc_AdaptedVideoTrackSource_refcounted_cast_to_webrtc_VideoTrackSourceInterface(
+                    self.raw_ref.as_refcounted_ptr(),
+                )
+            },
+            "webrtc_AdaptedVideoTrackSource_refcounted_cast_to_webrtc_VideoTrackSourceInterface",
+        );
         let raw_ref = ScopedRef::<VideoTrackSourceHandle>::from_raw(raw_ref);
         VideoTrackSource { raw_ref }
     }
@@ -267,12 +265,14 @@ impl VideoTrack {
     }
 
     pub fn cast_to_media_stream_track(&self) -> MediaStreamTrack {
-        let raw_ref = NonNull::new(unsafe {
-            ffi::webrtc_VideoTrackInterface_refcounted_cast_to_webrtc_MediaStreamTrackInterface(
-                self.raw_ref.as_refcounted_ptr(),
-            )
-        })
-        .expect("BUG: webrtc_VideoTrackInterface_refcounted_cast_to_webrtc_MediaStreamTrackInterface が null を返しました");
+        let raw_ref = expect_non_null(
+            unsafe {
+                ffi::webrtc_VideoTrackInterface_refcounted_cast_to_webrtc_MediaStreamTrackInterface(
+                    self.raw_ref.as_refcounted_ptr(),
+                )
+            },
+            "webrtc_VideoTrackInterface_refcounted_cast_to_webrtc_MediaStreamTrackInterface",
+        );
         MediaStreamTrack::from_scoped_ref(ScopedRef::<MediaStreamTrackHandle>::from_raw(raw_ref))
     }
 
@@ -280,7 +280,7 @@ impl VideoTrack {
     ///
     /// この VideoTrack に登録した `sink` は、`remove_sink` で登録を解除するまで
     /// drop してはならない。
-    pub fn add_or_update_sink(&mut self, sink: &VideoSink, wants: &VideoSinkWants) {
+    pub fn add_or_update_sink(&self, sink: &VideoSink, wants: &VideoSinkWants) {
         unsafe {
             ffi::webrtc_VideoTrackInterface_AddOrUpdateSink(
                 self.raw_ref.as_ptr(),
@@ -291,7 +291,7 @@ impl VideoTrack {
     }
 
     /// VideoSink の登録を解除する。
-    pub fn remove_sink(&mut self, sink: &VideoSink) {
+    pub fn remove_sink(&self, sink: &VideoSink) {
         unsafe { ffi::webrtc_VideoTrackInterface_RemoveSink(self.raw_ref.as_ptr(), sink.as_ptr()) };
     }
 }

@@ -2,7 +2,10 @@ use super::video_codec_common::{VideoCodecType, VideoFrameType, VideoRotation};
 use super::video_codec_specifics::{
     RTPVideoHeaderCodecSpecifics, RTPVideoHeaderH264, RTPVideoHeaderVP8, RTPVideoHeaderVP9,
 };
-use crate::ref_count::{FrameTransformerHandle, TransformedFrameCallbackHandle};
+use crate::helper::handler::{create_with_handler, destroy_handler};
+use crate::helper::non_null::expect_non_null;
+use crate::helper::optional::{get_optional, set_optional};
+use crate::helper::ref_count::{FrameTransformerHandle, TransformedFrameCallbackHandle};
 use crate::{CxxString, Result, ScopedRef, ffi};
 use std::collections::HashMap;
 use std::os::raw::c_void;
@@ -190,9 +193,7 @@ unsafe extern "C" fn frame_transformer_transform(
     );
     // frame の所有権は C++ 側から引き継いでいる (unique_ptr を release 済み)。
     let state = unsafe { &*(user_data as *const FrameTransformerHandlerState) };
-    let frame = unsafe {
-        TransformableFrame::from_unique_ptr(NonNull::new(frame).expect("BUG: frame が null"))
-    };
+    let frame = unsafe { TransformableFrame::from_unique_ptr(expect_non_null(frame, "frame")) };
     if let Some(frame) = state.handler.transform(frame) {
         deliver_transformed_frame(state, frame);
     }
@@ -234,7 +235,7 @@ unsafe extern "C" fn frame_transformer_register_transformed_frame_callback(
         "frame_transformer_register_transformed_frame_callback: user_data is null"
     );
     let state = unsafe { &*(user_data as *const FrameTransformerHandlerState) };
-    let callback = NonNull::new(callback).expect("BUG: callback が null");
+    let callback = expect_non_null(callback, "callback");
     let callback = ScopedRef::<TransformedFrameCallbackHandle>::from_raw(callback);
     state
         .callbacks
@@ -253,7 +254,7 @@ unsafe extern "C" fn frame_transformer_register_transformed_frame_sink_callback(
         "frame_transformer_register_transformed_frame_sink_callback: user_data is null"
     );
     let state = unsafe { &*(user_data as *const FrameTransformerHandlerState) };
-    let callback = NonNull::new(callback).expect("BUG: callback が null");
+    let callback = expect_non_null(callback, "callback");
     let callback = ScopedRef::<TransformedFrameCallbackHandle>::from_raw(callback);
     state
         .callbacks
@@ -296,11 +297,9 @@ unsafe extern "C" fn frame_transformer_unregister_transformed_frame_sink_callbac
 }
 
 unsafe extern "C" fn frame_transformer_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "frame_transformer_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut FrameTransformerHandlerState) };
+    unsafe {
+        destroy_handler::<FrameTransformerHandlerState>("frame_transformer_on_destroy", user_data)
+    };
 }
 
 /// webrtc::FrameTransformerInterface のラッパー。
@@ -322,11 +321,10 @@ unsafe impl Send for FrameTransformer {}
 impl FrameTransformer {
     /// [FrameTransformerHandler] を実行する FrameTransformer を生成する。
     pub fn new_with_handler(handler: Box<dyn FrameTransformerHandler>) -> Self {
-        let state = Box::new(FrameTransformerHandlerState {
+        let user_data = Box::into_raw(Box::new(FrameTransformerHandlerState {
             handler,
             callbacks: Mutex::new(FrameTransformerCallbacks::new()),
-        });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        })) as *mut c_void;
         let cbs = ffi::webrtc_FrameTransformerInterface_cbs {
             Transform: Some(frame_transformer_transform),
             RegisterTransformedFrameCallback: Some(
@@ -343,14 +341,12 @@ impl FrameTransformer {
             ),
             OnDestroy: Some(frame_transformer_on_destroy),
         };
-        let raw = unsafe { ffi::webrtc_FrameTransformerInterface_new(&cbs, user_data) };
-        let raw = match NonNull::new(raw) {
-            Some(raw) => raw,
-            None => {
-                // null が返った場合は state を回収してから panic する。
-                let _ = unsafe { Box::from_raw(user_data as *mut FrameTransformerHandlerState) };
-                panic!("BUG: webrtc_FrameTransformerInterface_new が null を返しました");
-            }
+        let raw = unsafe {
+            create_with_handler::<FrameTransformerHandlerState, _>(
+                "webrtc_FrameTransformerInterface_new",
+                user_data,
+                |user_data| ffi::webrtc_FrameTransformerInterface_new(&cbs, user_data),
+            )
         };
         let raw_ref = ScopedRef::<FrameTransformerHandle>::from_raw(raw);
         Self { raw_ref }
@@ -448,14 +444,12 @@ impl TransformableFrame {
     /// libwebrtc の `GetTimestamp` は deprecated のため、
     /// オフセットの有無を区別できる `GetRtpTimestampInfo` を使用する。
     pub fn rtp_timestamp_info(&self) -> RtpTimestampInfo {
-        let raw_unique =
-            unsafe { ffi::webrtc_TransformableFrameInterface_GetRtpTimestampInfo(self.as_ptr()) };
-        let raw_unique = NonNull::new(raw_unique).expect(
-            "BUG: webrtc_TransformableFrameInterface_GetRtpTimestampInfo が null を返しました",
+        let raw_unique = expect_non_null(
+            unsafe { ffi::webrtc_TransformableFrameInterface_GetRtpTimestampInfo(self.as_ptr()) },
+            "webrtc_TransformableFrameInterface_GetRtpTimestampInfo",
         );
         let raw = unsafe { ffi::webrtc_RtpTimestampInfo_unique_get(raw_unique.as_ptr()) };
-        let raw = NonNull::new(raw)
-            .expect("BUG: webrtc_RtpTimestampInfo_unique_get が null を返しました");
+        let raw = expect_non_null(raw, "webrtc_RtpTimestampInfo_unique_get");
         let index = unsafe { ffi::webrtc_RtpTimestampInfo_index(raw.as_ptr()) };
         let value = if index == 0 {
             let alt =
@@ -500,8 +494,7 @@ impl TransformableFrame {
     /// 例: `"video/VP8"`。
     pub fn mime_type(&self) -> Result<String> {
         let ptr = unsafe { ffi::webrtc_TransformableFrameInterface_GetMimeType(self.as_ptr()) };
-        let raw = NonNull::new(ptr)
-            .expect("BUG: webrtc_TransformableFrameInterface_GetMimeType が null を返しました");
+        let raw = expect_non_null(ptr, "webrtc_TransformableFrameInterface_GetMimeType");
         CxxString::from_unique(raw).to_string()
     }
 
@@ -509,46 +502,29 @@ impl TransformableFrame {
     ///
     /// 受信フレームでのみ定義される。
     pub fn receive_time(&self) -> Option<i64> {
-        let mut has = 0;
-        let mut timestamp_us = 0;
-        unsafe {
-            ffi::webrtc_TransformableFrameInterface_ReceiveTime(
-                self.as_ptr(),
-                &mut has,
-                &mut timestamp_us,
-            )
-        };
-        if has == 0 { None } else { Some(timestamp_us) }
+        get_optional(|has, timestamp_us| unsafe {
+            ffi::webrtc_TransformableFrameInterface_ReceiveTime(self.as_ptr(), has, timestamp_us)
+        })
     }
 
     /// プレゼンテーション用のタイムスタンプ (マイクロ秒) を返す。
     ///
     /// deprecated の `GetCaptureTimeIdentifier` の後継。
     pub fn presentation_timestamp(&self) -> Option<i64> {
-        let mut has = 0;
-        let mut timestamp_us = 0;
-        unsafe {
+        get_optional(|has, timestamp_us| unsafe {
             ffi::webrtc_TransformableFrameInterface_GetPresentationTimestamp(
                 self.as_ptr(),
-                &mut has,
-                &mut timestamp_us,
+                has,
+                timestamp_us,
             )
-        };
-        if has == 0 { None } else { Some(timestamp_us) }
+        })
     }
 
     /// キャプチャシステム内でフレームがキャプチャされた時刻 (マイクロ秒) を返す。
     pub fn capture_time(&self) -> Option<i64> {
-        let mut has = 0;
-        let mut timestamp_us = 0;
-        unsafe {
-            ffi::webrtc_TransformableFrameInterface_CaptureTime(
-                self.as_ptr(),
-                &mut has,
-                &mut timestamp_us,
-            )
-        };
-        if has == 0 { None } else { Some(timestamp_us) }
+        get_optional(|has, timestamp_us| unsafe {
+            ffi::webrtc_TransformableFrameInterface_CaptureTime(self.as_ptr(), has, timestamp_us)
+        })
     }
 
     /// キャプチャ時間を変更できるかどうかを返す。
@@ -573,16 +549,13 @@ impl TransformableFrame {
     ///
     /// absolute capture timestamp ヘッダー拡張が有効な場合のみ利用できる。
     pub fn sender_capture_time_offset(&self) -> Option<i64> {
-        let mut has = 0;
-        let mut delta_us = 0;
-        unsafe {
+        get_optional(|has, delta_us| unsafe {
             ffi::webrtc_TransformableFrameInterface_SenderCaptureTimeOffset(
                 self.as_ptr(),
-                &mut has,
-                &mut delta_us,
+                has,
+                delta_us,
             )
-        };
-        if has == 0 { None } else { Some(delta_us) }
+        })
     }
 }
 
@@ -641,8 +614,7 @@ impl TransformableVideoFrame {
     pub fn metadata(&self) -> VideoFrameMetadata {
         let raw =
             unsafe { ffi::webrtc_TransformableVideoFrameInterface_Metadata(self.as_video_ptr()) };
-        let raw = NonNull::new(raw)
-            .expect("BUG: webrtc_TransformableVideoFrameInterface_Metadata が null を返しました");
+        let raw = expect_non_null(raw, "webrtc_TransformableVideoFrameInterface_Metadata");
         VideoFrameMetadata::from_raw(raw)
     }
 
@@ -708,8 +680,10 @@ unsafe impl Send for VideoFrameMetadata {}
 impl VideoFrameMetadata {
     /// 新しく生成する。
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_VideoFrameMetadata_new() })
-            .expect("BUG: webrtc_VideoFrameMetadata_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_VideoFrameMetadata_new() },
+            "webrtc_VideoFrameMetadata_new",
+        );
         Self { raw }
     }
 
@@ -752,24 +726,16 @@ impl VideoFrameMetadata {
 
     /// フレーム ID を返す。
     pub fn frame_id(&self) -> Option<i64> {
-        let mut has = 0;
-        let mut value = 0;
-        unsafe {
-            ffi::webrtc_VideoFrameMetadata_GetFrameId(self.raw.as_ptr(), &mut has, &mut value)
-        };
-        if has == 0 { None } else { Some(value) }
+        get_optional(|has, value| unsafe {
+            ffi::webrtc_VideoFrameMetadata_GetFrameId(self.raw.as_ptr(), has, value)
+        })
     }
 
     /// フレーム ID を設定する。
     pub fn set_frame_id(&mut self, frame_id: Option<i64>) {
-        match frame_id {
-            Some(v) => unsafe {
-                ffi::webrtc_VideoFrameMetadata_SetFrameId(self.raw.as_ptr(), 1, &v)
-            },
-            None => unsafe {
-                ffi::webrtc_VideoFrameMetadata_SetFrameId(self.raw.as_ptr(), 0, std::ptr::null())
-            },
-        }
+        set_optional(frame_id, |has, value_ptr| unsafe {
+            ffi::webrtc_VideoFrameMetadata_SetFrameId(self.raw.as_ptr(), has, value_ptr)
+        });
     }
 
     /// 空間レイヤーインデックスを返す。
@@ -944,14 +910,12 @@ impl VideoFrameMetadata {
     /// 値はコピーして返す。
     pub fn csrcs(&self) -> Vec<u32> {
         let raw = unsafe { ffi::webrtc_VideoFrameMetadata_GetCsrcs(self.raw.as_ptr()) };
-        let raw = NonNull::new(raw)
-            .expect("BUG: webrtc_VideoFrameMetadata_GetCsrcs が null を返しました");
+        let raw = expect_non_null(raw, "webrtc_VideoFrameMetadata_GetCsrcs");
         let len = unsafe { ffi::webrtc_uint32_vector_size(raw.as_ptr()) };
         let mut result = Vec::new();
         for index in 0..len {
             let elem = unsafe { ffi::webrtc_uint32_vector_get(raw.as_ptr(), index) };
-            let elem =
-                NonNull::new(elem).expect("BUG: webrtc_uint32_vector_get が null を返しました");
+            let elem = expect_non_null(elem, "webrtc_uint32_vector_get");
             result.push(unsafe { ffi::webrtc_uint32_value(elem.as_ptr()) });
         }
         unsafe { ffi::webrtc_uint32_vector_delete(raw.as_ptr()) };
@@ -960,8 +924,10 @@ impl VideoFrameMetadata {
 
     /// CSRC の一覧を設定する。
     pub fn set_csrcs(&mut self, csrcs: &[u32]) {
-        let raw = NonNull::new(unsafe { ffi::webrtc_uint32_vector_new(0) })
-            .expect("BUG: webrtc_uint32_vector_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_uint32_vector_new(0) },
+            "webrtc_uint32_vector_new",
+        );
         for value in csrcs {
             unsafe { ffi::webrtc_uint32_vector_push_back_value(raw.as_ptr(), *value) };
         }
@@ -971,11 +937,11 @@ impl VideoFrameMetadata {
 
     /// コーデック固有の RTP ビデオヘッダー情報を返す。
     pub fn rtp_video_header_codec_specifics(&self) -> RTPVideoHeaderCodecSpecifics {
-        let raw_unique = unsafe {
-            ffi::webrtc_VideoFrameMetadata_GetRTPVideoHeaderCodecSpecifics(self.raw.as_ptr())
-        };
-        let raw_unique = NonNull::new(raw_unique).expect(
-            "BUG: webrtc_VideoFrameMetadata_GetRTPVideoHeaderCodecSpecifics が null を返しました",
+        let raw_unique = expect_non_null(
+            unsafe {
+                ffi::webrtc_VideoFrameMetadata_GetRTPVideoHeaderCodecSpecifics(self.raw.as_ptr())
+            },
+            "webrtc_VideoFrameMetadata_GetRTPVideoHeaderCodecSpecifics",
         );
         let raw =
             unsafe { ffi::webrtc_RTPVideoHeaderCodecSpecifics_unique_get(raw_unique.as_ptr()) };
@@ -1031,8 +997,7 @@ impl VideoFrameMetadata {
                 ffi::webrtc_RTPVideoHeaderCodecSpecifics_new_RTPVideoHeaderH264(header.as_ptr())
             },
         };
-        let raw_unique = NonNull::new(raw_unique)
-            .expect("BUG: webrtc_RTPVideoHeaderCodecSpecifics_new_* が null を返しました");
+        let raw_unique = expect_non_null(raw_unique, "webrtc_RTPVideoHeaderCodecSpecifics_new_*");
         let raw =
             unsafe { ffi::webrtc_RTPVideoHeaderCodecSpecifics_unique_get(raw_unique.as_ptr()) };
         unsafe {
@@ -1050,8 +1015,10 @@ impl Default for VideoFrameMetadata {
 
 impl Clone for VideoFrameMetadata {
     fn clone(&self) -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_VideoFrameMetadata_copy(self.raw.as_ptr()) })
-            .expect("BUG: webrtc_VideoFrameMetadata_copy が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_VideoFrameMetadata_copy(self.raw.as_ptr()) },
+            "webrtc_VideoFrameMetadata_copy",
+        );
         Self { raw }
     }
 }

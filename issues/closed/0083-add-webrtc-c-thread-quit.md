@@ -1,7 +1,7 @@
 # webrtc::Thread::Quit 相当の C API を追加する
 
 - Created: 2026-08-20
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-27
 - Branch: feature/add-webrtc-c-thread-quit
 - Polished: {YYYY-MM-DD}
 
@@ -34,3 +34,12 @@ libwebrtc の `webrtc::Thread::Quit()` (`rtc_base/thread.h`) は `void` を返�
 - `src/tests.rs` に Quit のテストが追加され、関連テストが通過すること
 - `CHANGES.md` の `## develop` セクションに `[ADD]` エントリが追加されている
 - `IsQuitting` / `Restart` の C API 追加は本 issue の対象外とする
+
+## 解決方法
+
+- `webrtc/src/webrtc_c/rtc_base/thread.h` に `webrtc_Thread_Quit` の宣言を、`webrtc/src/webrtc_c/rtc_base/thread.cc` に `p->Quit()` を呼ぶだけのラッパーを追加した
+- `src/rtc_base/thread.rs` に `Thread::quit(&mut self)` を追加した
+- `src/tests.rs` に `thread_quit_runs` と `thread_blocking_call_after_quit_does_not_run` を追加した
+  - libwebrtc の `Thread::BlockingCallImpl` は冒頭の `if (IsQuitting()) { return; }` により、quit 後はコールバックを実行せず即座に戻ることを確認した（デッドロックしない）
+- `CHANGES.md` の `## develop` に `[ADD]` エントリを追記した
+- `IsQuitting` / `Restart` の C API 追加は本 issue の対象外とした

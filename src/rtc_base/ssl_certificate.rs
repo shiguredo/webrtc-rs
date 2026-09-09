@@ -1,3 +1,5 @@
+use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::helper::non_null::expect_non_null;
 use crate::{CxxString, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -25,15 +27,18 @@ impl<'a> SSLCertificateRef<'a> {
     }
 
     pub fn to_pem_string(&self) -> Result<String> {
-        let raw =
-            NonNull::new(unsafe { ffi::webrtc_SSLCertificate_ToPEMString(self.raw.as_ptr()) })
-                .expect("BUG: webrtc_SSLCertificate_ToPEMString が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_SSLCertificate_ToPEMString(self.raw.as_ptr()) },
+            "webrtc_SSLCertificate_ToPEMString",
+        );
         CxxString::from_unique(raw).to_string()
     }
 
     pub fn to_der(&self) -> Vec<u8> {
-        let raw = NonNull::new(unsafe { ffi::webrtc_SSLCertificate_ToDER(self.raw.as_ptr()) })
-            .expect("BUG: webrtc_SSLCertificate_ToDER が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_SSLCertificate_ToDER(self.raw.as_ptr()) },
+            "webrtc_SSLCertificate_ToDER",
+        );
         CxxString::from_unique(raw).to_bytes()
     }
 
@@ -76,11 +81,13 @@ impl<'a> SSLCertChainRef<'a> {
         if index >= self.len() {
             return None;
         }
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_SSLCertChain_Get(self.raw.as_ptr(), index as i32)
-                as *mut ffi::webrtc_SSLCertificate
-        })
-        .expect("BUG: webrtc_SSLCertChain_Get が null を返しました");
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_SSLCertChain_Get(self.raw.as_ptr(), index as i32)
+                    as *mut ffi::webrtc_SSLCertificate
+            },
+            "webrtc_SSLCertChain_Get",
+        );
         Some(SSLCertificateRef::from_raw(raw))
     }
 }
@@ -92,11 +99,7 @@ pub trait SSLCertificateVerifierHandler: Send {
     }
 }
 
-struct SSLCertificateVerifierHandlerState {
-    handler: Box<dyn SSLCertificateVerifierHandler>,
-}
-
-unsafe impl Send for SSLCertificateVerifierHandlerState {}
+type SSLCertificateVerifierHandlerState = HandlerState<dyn SSLCertificateVerifierHandler>;
 
 unsafe extern "C" fn ssl_certificate_verifier_verify_chain(
     chain: *const ffi::webrtc_SSLCertChain,
@@ -107,8 +110,7 @@ unsafe extern "C" fn ssl_certificate_verifier_verify_chain(
         "ssl_certificate_verifier_verify_chain: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut SSLCertificateVerifierHandlerState) };
-    let chain =
-        NonNull::new(chain as *mut ffi::webrtc_SSLCertChain).expect("BUG: chain が null です");
+    let chain = expect_non_null(chain as *mut ffi::webrtc_SSLCertChain, "SSLCertChain");
     let chain = SSLCertChainRef::from_raw(chain);
     if state.handler.verify_chain(chain) {
         1
@@ -118,11 +120,12 @@ unsafe extern "C" fn ssl_certificate_verifier_verify_chain(
 }
 
 unsafe extern "C" fn ssl_certificate_verifier_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "ssl_certificate_verifier_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut SSLCertificateVerifierHandlerState) };
+    unsafe {
+        destroy_handler::<SSLCertificateVerifierHandlerState>(
+            "ssl_certificate_verifier_on_destroy",
+            user_data,
+        )
+    };
 }
 
 /// webrtc::SSLCertificateVerifier のラッパー。
@@ -134,20 +137,17 @@ unsafe impl Send for SSLCertificateVerifier {}
 
 impl SSLCertificateVerifier {
     pub fn new_with_handler(handler: Box<dyn SSLCertificateVerifierHandler>) -> Self {
-        let state = Box::new(SSLCertificateVerifierHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_SSLCertificateVerifier_cbs {
             VerifyChain: Some(ssl_certificate_verifier_verify_chain),
             OnDestroy: Some(ssl_certificate_verifier_on_destroy),
         };
-        let raw = unsafe { ffi::webrtc_SSLCertificateVerifier_new(&cbs, user_data) };
-        let raw_unique = match NonNull::new(raw) {
-            Some(raw_unique) => raw_unique,
-            None => {
-                let _ =
-                    unsafe { Box::from_raw(user_data as *mut SSLCertificateVerifierHandlerState) };
-                panic!("BUG: webrtc_SSLCertificateVerifier_new が null を返しました");
-            }
+        let raw_unique = unsafe {
+            create_with_handler::<SSLCertificateVerifierHandlerState, _>(
+                "webrtc_SSLCertificateVerifier_new",
+                user_data,
+                |user_data| ffi::webrtc_SSLCertificateVerifier_new(&cbs, user_data),
+            )
         };
         Self { raw_unique }
     }

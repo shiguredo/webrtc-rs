@@ -1,4 +1,5 @@
 use crate::ffi;
+use crate::helper::non_null::expect_non_null;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -11,8 +12,7 @@ use std::ptr::NonNull;
 ///
 /// ただし全てのオブジェクトが他のスレッドに移動して正しく動作するとは限らないため、
 /// RefCountedHandle を実装する型ごとに Send 可能かどうかを判断する必要がある。
-#[allow(clippy::missing_safety_doc)]
-pub trait RefCountedHandle {
+pub(crate) trait RefCountedHandle {
     type Refcounted;
     type Raw;
 
@@ -23,7 +23,7 @@ pub trait RefCountedHandle {
 
 /// webrtc::scoped_refptr 相当の簡易ラッパー。
 #[derive(Debug)]
-pub struct ScopedRef<H: RefCountedHandle> {
+pub(crate) struct ScopedRef<H: RefCountedHandle> {
     raw_ref: NonNull<H::Refcounted>,
     _marker: PhantomData<H>,
 }
@@ -50,7 +50,7 @@ impl<H: RefCountedHandle> ScopedRef<H> {
 
     pub(crate) fn raw(&self) -> NonNull<H::Raw> {
         let raw = unsafe { H::get(self.raw_ref.as_ptr()) };
-        NonNull::new(raw).expect("BUG: RefCountedHandle::get が null を返しました")
+        expect_non_null(raw, "RefCountedHandle::get")
     }
 }
 

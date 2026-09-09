@@ -253,7 +253,7 @@ fn fuzzy_match_sdp_video_format_prefers_more_parameter_matches() {
     );
 
     let mut matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
-        .expect("fuzzy_match_sdp_video_format should return a matched format");
+        .expect("fuzzy_match_sdp_video_format が一致するフォーマットを見つけられませんでした");
     let params = matched
         .parameters_mut()
         .iter()
@@ -288,7 +288,7 @@ fn fuzzy_match_sdp_video_format_keeps_first_candidate_on_tie() {
     let requested = SdpVideoFormat::new("H264");
 
     let mut matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
-        .expect("fuzzy_match_sdp_video_format should return a matched format");
+        .expect("fuzzy_match_sdp_video_format が一致するフォーマットを見つけられませんでした");
     let params = matched
         .parameters_mut()
         .iter()
@@ -1235,7 +1235,7 @@ fn video_frame_buffer_as_i420_and_as_nv12() {
     let i420_frame_buffer = i420.cast_to_video_frame_buffer();
     let i420_view = i420_frame_buffer
         .as_i420()
-        .expect("as_i420 failed on I420 buffer");
+        .expect("I420 buffer の as_i420 に失敗しました");
     assert_eq!(i420_view.width(), 2);
     assert_eq!(i420_view.height(), 2);
     assert!(i420_frame_buffer.as_nv12().is_none());
@@ -1244,7 +1244,7 @@ fn video_frame_buffer_as_i420_and_as_nv12() {
     let nv12_frame_buffer = nv12.cast_to_video_frame_buffer();
     let nv12_view = nv12_frame_buffer
         .as_nv12()
-        .expect("as_nv12 failed on NV12 buffer");
+        .expect("NV12 buffer の as_nv12 に失敗しました");
     assert_eq!(nv12_view.width(), 2);
     assert_eq!(nv12_view.height(), 2);
     assert!(nv12_frame_buffer.as_i420().is_none());
@@ -1278,9 +1278,22 @@ fn logging_functions_are_callable() {
     // severity は Info にしておく。実際のログ内容は検証しない。
     // initialize_logging は最初のログ出力前に呼ぶ必要があるが、テストの実行順序は
     // 保証されないため戻り値の検証は行わない。
-    log::initialize_logging(log::Severity::Info);
-    log::enable_timestamps();
-    log::enable_threads();
+    let mut config = log::LoggingConfig::new();
+    config.set_min_severity(log::Severity::Info);
+    config.set_debug_severity(log::Severity::Info);
+    config.set_log_timestamp(true);
+    config.set_log_thread(true);
+    config.set_log_queue_name(true);
+    config.set_log_to_stderr(true);
+    config.set_log_prefix("prefix");
+    assert_eq!(config.min_severity(), log::Severity::Info);
+    assert_eq!(config.debug_severity(), log::Severity::Info);
+    assert!(config.log_timestamp());
+    assert!(config.log_thread());
+    assert!(config.log_queue_name());
+    assert!(config.log_to_stderr());
+    assert_eq!(config.log_prefix().unwrap(), "prefix");
+    log::initialize_logging(config);
     log::print(log::Severity::Info, "webrtc-c", 0, "log test");
 }
 
@@ -1327,7 +1340,8 @@ fn logging_long_message_is_not_truncated() {
 fn logging_message_helper() {
     // 検証用ヘルパー。ログ (webrtc::LogMessage) は stderr へ直接書き込まれるため、
     // logging_long_message_is_not_truncated からサブプロセスとして実行される。
-    log::initialize_logging(log::Severity::Info);
+    let config = log::LoggingConfig::new();
+    log::initialize_logging(config);
     // 環境変数でメッセージ長を指定する（指定なしの場合は短いメッセージ）。
     let len = std::env::var("WEBRTC_LOG_MESSAGE_LEN")
         .map(|v| {
@@ -1337,6 +1351,94 @@ fn logging_message_helper() {
         .unwrap_or(16);
     let message = "A".repeat(len);
     log::print(log::Severity::Info, "webrtc-c", 0, &message);
+}
+
+#[test]
+fn logging_sink_drop_releases_handler() {
+    struct TestSinkHandler {
+        destroyed: Arc<AtomicBool>,
+    }
+
+    impl log::LogSinkHandler for TestSinkHandler {}
+
+    impl Drop for TestSinkHandler {
+        fn drop(&mut self) {
+            self.destroyed.store(true, Ordering::SeqCst);
+        }
+    }
+
+    // LogSink 単体の drop で OnDestroy が呼ばれ、handler が解放されることと、
+    // 二重解放でないことを検証する。
+    let destroyed = Arc::new(AtomicBool::new(false));
+    let sink = log::LogSink::new_with_handler(Box::new(TestSinkHandler {
+        destroyed: destroyed.clone(),
+    }));
+    drop(sink);
+    assert!(
+        destroyed.load(Ordering::SeqCst),
+        "log::LogSinkHandler が解放されていません"
+    );
+}
+
+#[test]
+fn logging_sink_receives_log_line_ref() {
+    let exe = std::env::current_exe().expect("テストバイナリのパスを取得できませんでした");
+    let expected = "log sink test message";
+    // log::print はグローバルの LoggingConfig へ sink を登録するため、
+    // initialize_logging の競合を避けるべくサブプロセスとして実行する。
+    let output = std::process::Command::new(&exe)
+        .arg("logging_sink_helper")
+        .env("WEBRTC_LOG_SINK_EXPECT", expected)
+        .output()
+        .expect("サブプロセスの実行に失敗しました");
+    assert!(
+        output.status.success(),
+        "sink がメッセージと重大度を受け取れていません\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn logging_sink_helper() {
+    // 検証用ヘルパー。logging_sink_receives_log_line_ref からサブプロセスとして
+    // 実行され、sink がメッセージと重大度を受け取れることを検証する。
+    struct TestSinkHandler {
+        expected: String,
+        seen: Arc<Mutex<bool>>,
+    }
+
+    impl log::LogSinkHandler for TestSinkHandler {
+        fn on_log_message(&mut self, line: log::LogLineRef<'_>) {
+            if line.message().contains(&self.expected) && line.severity() == log::Severity::Info {
+                *self.seen.lock().unwrap() = true;
+            }
+        }
+    }
+
+    let expected = std::env::var("WEBRTC_LOG_SINK_EXPECT").unwrap_or_default();
+    // このヘルパーは logging_sink_receives_log_line_ref からのみサブプロセスと
+    // して実行される。テスト本体として直接実行された場合（グローバルの
+    // LoggingConfig が別のテストで既に初期化済みで、検証が意味を持たない場合）
+    // は何もせず成功とする。
+    if expected.is_empty() {
+        return;
+    }
+    let seen = Arc::new(Mutex::new(false));
+    let mut config = log::LoggingConfig::new();
+    config.set_min_severity(log::Severity::Info);
+    config.set_debug_severity(log::Severity::Info);
+    config.add_sink(log::LogSink::new_with_handler(Box::new(TestSinkHandler {
+        expected: expected.clone(),
+        seen: seen.clone(),
+    })));
+    if !log::initialize_logging(config) {
+        panic!("logging_sink_helper: initialize_logging が失敗しました");
+    }
+    log::print(log::Severity::Info, "webrtc-c", 0, &expected);
+    assert!(
+        *seen.lock().unwrap(),
+        "sink がメッセージを受け取っていません"
+    );
 }
 
 #[test]
@@ -1361,8 +1463,51 @@ fn thread_start_returns_true() {
 }
 
 #[test]
+fn thread_quit_runs() {
+    // quit 後も stop が例外なく実行できることを確認する。
+    // libwebrtc の Stop は Quit + Join のため、quit 済みでも安全に実行できる。
+    let mut thread = Thread::new();
+    assert!(thread.start());
+    thread.quit();
+    thread.stop();
+}
+
+#[test]
+fn thread_blocking_call_after_quit_does_not_run() {
+    // quit 後はメッセージループが停止し、() を返す blocking_call は
+    // クロージャを実行せずに即座に戻ることを確認する。
+    let mut thread = Thread::new();
+    assert!(thread.start());
+    thread.quit();
+
+    let called = Arc::new(AtomicBool::new(false));
+    let called_clone = Arc::clone(&called);
+    // 必ず quit の後に blocking_call を呼び、quit との競合を避ける。
+    thread.blocking_call(move || {
+        called_clone.store(true, Ordering::SeqCst);
+    });
+    assert!(
+        !called.load(Ordering::SeqCst),
+        "quit 後にブロックしたコールバックが実行されました"
+    );
+    thread.stop();
+}
+
+#[test]
+fn thread_blocking_call_after_stop_returns_default() {
+    // stop 後はメッセージループが停止し、非 void の blocking_call は
+    // クロージャを実行せずに R::default() (0) を返すことを確認する。
+    // 未実行時に未初期化ポインタが渡り Box::from_raw で UB になる問題の回帰テスト。
+    let mut thread = Thread::new();
+    assert!(thread.start());
+    thread.stop();
+    let result = thread.blocking_call(|| 42);
+    assert_eq!(result, 0);
+}
+
+#[test]
 fn thread_sleep_ms_runs() {
-    Thread::sleep_ms(1);
+    assert!(Thread::sleep_ms(1));
 }
 
 #[test]
@@ -1553,7 +1698,7 @@ fn audio_device_module_get_stats_none_returns_zero() {
 
 #[test]
 fn adapted_video_track_source() {
-    let mut src = AdaptedVideoTrackSource::new();
+    let src = AdaptedVideoTrackSource::new();
     let adapted = src.adapt_frame(640, 480, 1_000_000);
     // applied が false の場合でもサイズ情報が得られることを確認する。
     assert!(adapted.size.adapted_width >= 0);
@@ -1597,7 +1742,7 @@ fn peer_connection_factory_and_capabilities() {
     deps.enable_media();
 
     // Factory を生成し、オプションと RTP 能力を取得する。
-    let (mut factory, context) = PeerConnectionFactory::create_modular_with_context(&mut deps)
+    let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps)
         .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
     let mut opts = PeerConnectionFactoryOptions::new();
     opts.set_disable_encryption(false);
@@ -1622,7 +1767,6 @@ fn peer_connection_factory_and_capabilities() {
     drop(caps);
     drop(context);
     drop(factory);
-    drop(deps);
     network.stop();
     worker.stop();
     signaling.stop();
@@ -1697,7 +1841,7 @@ fn create_modular_with_context_returns_default_network_objects() {
     deps.set_audio_device_module(&adm);
     deps.enable_media();
 
-    let (factory, context) = PeerConnectionFactory::create_modular_with_context(&mut deps)
+    let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps)
         .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
     let network_manager = context.default_network_manager();
     let socket_factory = context.default_socket_factory();
@@ -1707,7 +1851,6 @@ fn create_modular_with_context_returns_default_network_objects() {
 
     drop(context);
     drop(factory);
-    drop(deps);
     network.stop();
     worker.stop();
     signaling.stop();
@@ -1817,6 +1960,11 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     );
     assert_eq!(enc_codec.clock_rate(), Some(48_000));
     assert_eq!(enc_codec.num_channels(), Some(2));
+    // clock_rate / num_channels を None に戻せば getter が None に戻ることを検証する
+    codec.set_clock_rate(None);
+    codec.set_num_channels(None);
+    assert_eq!(codec.clock_rate(), None);
+    assert_eq!(codec.num_channels(), None);
     enc.set_scalability_mode(None);
     assert!(enc.scalability_mode().is_none());
     enc.set_codec(None);
@@ -1885,6 +2033,11 @@ fn rtp_parameters_round_trip() {
         params.degradation_preference(),
         Some(DegradationPreference::Balanced)
     );
+    params.set_degradation_preference(Some(DegradationPreference::MaintainFramerateAndResolution));
+    assert_eq!(
+        params.degradation_preference(),
+        Some(DegradationPreference::MaintainFramerateAndResolution)
+    );
     params.set_degradation_preference(None);
     assert_eq!(params.degradation_preference(), None);
 }
@@ -1917,7 +2070,7 @@ fn rtp_sender_get_set_parameters() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     let source = AdaptedVideoTrackSource::new();
@@ -1926,10 +2079,10 @@ fn rtp_sender_get_set_parameters() {
         .create_video_track(&vts, "video-track-1")
         .expect("VideoTrack の生成に失敗しました");
 
-    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let mut pc_deps = PeerConnectionDependencies::new(&observer);
-    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+    let pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("PeerConnection の生成に失敗しました");
 
     let stream_track = track.cast_to_media_stream_track();
@@ -1950,9 +2103,7 @@ fn rtp_sender_get_set_parameters() {
     drop(track);
     drop(vts);
     drop(source);
-    drop(pc_deps);
     drop(factory);
-    drop(deps_factory);
     drop(adm);
     drop(env);
     network.stop();
@@ -1984,23 +2135,21 @@ fn peer_connection_create_and_transceiver() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     // PC 用の構成と observer/dependencies を準備する。
-    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let mut pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc_deps = PeerConnectionDependencies::new(&observer);
 
     // PeerConnection を生成し、取得できることを確認する。
-    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("PeerConnection の生成に失敗しました");
     assert!(!pc.as_ptr().is_null());
 
     drop(pc);
-    drop(pc_deps);
     drop(factory);
-    drop(deps_factory);
     network.stop();
     worker.stop();
     signaling.stop();
@@ -2029,19 +2178,19 @@ fn peer_connection_lookup_dtls_transport() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
-    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let mut pc_deps = PeerConnectionDependencies::new(&observer);
-    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+    let pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("PeerConnection の生成に失敗しました");
 
     let mut transceiver_init = RtpTransceiverInit::new();
     transceiver_init.set_direction(RtpTransceiverDirection::SendRecv);
     let _ = pc
-        .add_transceiver(MediaType::Audio, &mut transceiver_init)
+        .add_transceiver(MediaType::Audio, &transceiver_init)
         .expect("transceiver の追加に失敗しました");
 
     if let Some(dtls_transport) = pc.lookup_dtls_transport_by_mid("0") {
@@ -2052,9 +2201,55 @@ fn peer_connection_lookup_dtls_transport() {
     }
 
     drop(pc);
-    drop(pc_deps);
     drop(factory);
-    drop(deps_factory);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
+fn get_stats_delivers_report() {
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc);
+    deps_factory.set_audio_decoder_factory(&dec);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    let pc_config = PeerConnectionRtcConfiguration::new();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
+    let pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
+        .expect("PeerConnection の生成に失敗しました");
+
+    let (tx, rx) = mpsc::channel::<()>();
+    pc.get_stats(move |_report| {
+        let _ = tx.send(());
+    });
+
+    // 配信はシグナリングスレッドで非同期に行われるため、コールバック発火を待つ。
+    rx.recv_timeout(Duration::from_secs(10))
+        .expect("get_stats のコールバックが呼ばれませんでした");
+
+    drop(pc);
+    drop(factory);
     network.stop();
     worker.stop();
     signaling.stop();
@@ -2083,7 +2278,7 @@ fn peer_connection_create_with_proxy_allocator() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let (factory, context) = PeerConnectionFactory::create_modular_with_context(&mut deps_factory)
+    let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps_factory)
         .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
 
     let network_manager = context.default_network_manager();
@@ -2091,7 +2286,7 @@ fn peer_connection_create_with_proxy_allocator() {
     assert!(!network_manager.as_ptr().is_null());
     assert!(!socket_factory.as_ptr().is_null());
 
-    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
     pc_deps.set_proxy(
@@ -2103,15 +2298,13 @@ fn peer_connection_create_with_proxy_allocator() {
         "pass",
         "shiguredo_webrtc test",
     );
-    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("Proxy 設定付き PeerConnection の生成に失敗しました");
     assert!(!pc.as_ptr().is_null());
 
     drop(pc);
-    drop(pc_deps);
     drop(context);
     drop(factory);
-    drop(deps_factory);
     network.stop();
     worker.stop();
     signaling.stop();
@@ -2145,11 +2338,11 @@ fn video_track_and_transceiver_with_track() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     // VideoTrack を生成する。
-    let mut source = AdaptedVideoTrackSource::new();
+    let source = AdaptedVideoTrackSource::new();
     let vts = source.cast_to_video_track_source();
     let track = factory
         .create_video_track(&vts, "video-track-0")
@@ -2164,15 +2357,15 @@ fn video_track_and_transceiver_with_track() {
     source.on_frame(&frame);
 
     // PeerConnection を作成し、トラック付きで transceiver を追加する。
-    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let mut pc_deps = PeerConnectionDependencies::new(&observer);
-    let pc = PeerConnection::create(&factory, &mut pc_config, &mut pc_deps)
+    let pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("PeerConnection の生成に失敗しました");
 
     let mut init = RtpTransceiverInit::new();
     init.set_direction(RtpTransceiverDirection::SendOnly);
-    pc.add_transceiver_with_track(&track, &mut init)
+    pc.add_transceiver_with_track(&track, &init)
         .expect("AddTransceiverWithTrack が失敗しました");
 
     // webrtc オブジェクトを先に解放してからスレッドを停止する。
@@ -2180,9 +2373,7 @@ fn video_track_and_transceiver_with_track() {
     drop(track);
     drop(vts);
     drop(source);
-    drop(pc_deps);
     drop(factory);
-    drop(deps_factory);
     drop(adm);
     drop(env);
     network.stop();
@@ -2257,18 +2448,18 @@ fn always_negotiate_data_channels_adds_data_section() {
 
     fn create_offer_sdp(
         factory: &PeerConnectionFactory,
-        config: &mut PeerConnectionRtcConfiguration,
+        config: &PeerConnectionRtcConfiguration,
     ) -> String {
         let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-        let mut pc_deps = PeerConnectionDependencies::new(&observer);
-        let pc = PeerConnection::create(factory, config, &mut pc_deps)
+        let pc_deps = PeerConnectionDependencies::new(&observer);
+        let pc = PeerConnection::create(factory, config, pc_deps)
             .expect("PeerConnection の生成に失敗しました");
 
-        let mut opts = PeerConnectionOfferAnswerOptions::new();
+        let opts = PeerConnectionOfferAnswerOptions::new();
         let (tx, rx) = mpsc::channel::<Result<String>>();
         let mut obs =
             CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferHandler { tx }));
-        pc.create_offer(&mut obs, &mut opts);
+        pc.create_offer(&mut obs, &opts);
         let sdp = rx
             .recv_timeout(Duration::from_secs(5))
             .expect("createOffer がタイムアウトしました")
@@ -2276,7 +2467,6 @@ fn always_negotiate_data_channels_adds_data_section() {
 
         drop(obs);
         drop(pc);
-        drop(pc_deps);
         sdp
     }
 
@@ -2301,28 +2491,27 @@ fn always_negotiate_data_channels_adds_data_section() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     // always_negotiate_data_channels=true かつ DataChannel 未生成でも m=application が含まれる。
     let mut pc_config_on = PeerConnectionRtcConfiguration::new();
     pc_config_on.set_always_negotiate_data_channels(true);
-    let sdp_on = create_offer_sdp(&factory, &mut pc_config_on);
+    let sdp_on = create_offer_sdp(&factory, &pc_config_on);
     assert!(
         sdp_on.contains("m=application"),
         "always_negotiate_data_channels=true で SDP に m=application が含まれません: {sdp_on}"
     );
 
     // 対照実験: デフォルト (false) で DataChannel 未生成なら m=application は含まれない。
-    let mut pc_config_off = PeerConnectionRtcConfiguration::new();
-    let sdp_off = create_offer_sdp(&factory, &mut pc_config_off);
+    let pc_config_off = PeerConnectionRtcConfiguration::new();
+    let sdp_off = create_offer_sdp(&factory, &pc_config_off);
     assert!(
         !sdp_off.contains("m=application"),
         "always_negotiate_data_channels=false で SDP に m=application が含まれました: {sdp_off}"
     );
 
     drop(factory);
-    drop(deps_factory);
     drop(adm);
     drop(env);
     network.stop();
@@ -2356,6 +2545,9 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
         created: bool,
     }
     impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
+        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+            vec![SdpVideoFormat::new("VP8")]
+        }
         fn create(
             &mut self,
             env: EnvironmentRef<'_>,
@@ -2591,6 +2783,14 @@ fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
             vp8.parameters_mut().set("x-google-start-bitrate", "300");
             vec![h264, vp8]
         }
+        fn create(
+            &mut self,
+            env: EnvironmentRef<'_>,
+            _format: SdpVideoFormatRef<'_>,
+        ) -> Option<VideoEncoder> {
+            assert!(!env.as_ptr().is_null());
+            None
+        }
     }
 
     let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler));
@@ -2620,28 +2820,28 @@ fn objc_video_encoder_factory_bridge_works() {
     let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoEncoderFactory_new() };
     assert!(
         !objc_factory.is_null(),
-        "webrtc_objc_RTCDefaultVideoEncoderFactory_new returned null"
+        "webrtc_objc_RTCDefaultVideoEncoderFactory_new が null を返しました"
     );
 
     let native_unique = unsafe { ffi::webrtc_ObjCToNativeVideoEncoderFactory(objc_factory) };
     assert!(
         !native_unique.is_null(),
-        "webrtc_ObjCToNativeVideoEncoderFactory returned null"
+        "webrtc_ObjCToNativeVideoEncoderFactory が null を返しました"
     );
 
     let native = unsafe { ffi::webrtc_VideoEncoderFactory_unique_get(native_unique) };
     assert!(
         !native.is_null(),
-        "webrtc_VideoEncoderFactory_unique_get returned null"
+        "webrtc_VideoEncoderFactory_unique_get が null を返しました"
     );
 
     let formats = unsafe { ffi::webrtc_VideoEncoderFactory_GetSupportedFormats(native) };
     assert!(
         !formats.is_null(),
-        "webrtc_VideoEncoderFactory_GetSupportedFormats returned null"
+        "webrtc_VideoEncoderFactory_GetSupportedFormats が null を返しました"
     );
     let size = unsafe { ffi::webrtc_SdpVideoFormat_vector_size(formats) };
-    assert!(size >= 0, "invalid format size: {size}");
+    assert!(size >= 0, "フォーマット数が不正です: {size}");
 
     unsafe {
         ffi::webrtc_SdpVideoFormat_vector_delete(formats);
@@ -2656,28 +2856,28 @@ fn objc_video_decoder_factory_bridge_works() {
     let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoDecoderFactory_new() };
     assert!(
         !objc_factory.is_null(),
-        "webrtc_objc_RTCDefaultVideoDecoderFactory_new returned null"
+        "webrtc_objc_RTCDefaultVideoDecoderFactory_new が null を返しました"
     );
 
     let native_unique = unsafe { ffi::webrtc_ObjCToNativeVideoDecoderFactory(objc_factory) };
     assert!(
         !native_unique.is_null(),
-        "webrtc_ObjCToNativeVideoDecoderFactory returned null"
+        "webrtc_ObjCToNativeVideoDecoderFactory が null を返しました"
     );
 
     let native = unsafe { ffi::webrtc_VideoDecoderFactory_unique_get(native_unique) };
     assert!(
         !native.is_null(),
-        "webrtc_VideoDecoderFactory_unique_get returned null"
+        "webrtc_VideoDecoderFactory_unique_get が null を返しました"
     );
 
     let formats = unsafe { ffi::webrtc_VideoDecoderFactory_GetSupportedFormats(native) };
     assert!(
         !formats.is_null(),
-        "webrtc_VideoDecoderFactory_GetSupportedFormats returned null"
+        "webrtc_VideoDecoderFactory_GetSupportedFormats が null を返しました"
     );
     let size = unsafe { ffi::webrtc_SdpVideoFormat_vector_size(formats) };
-    assert!(size >= 0, "invalid format size: {size}");
+    assert!(size >= 0, "フォーマット数が不正です: {size}");
 
     unsafe {
         ffi::webrtc_SdpVideoFormat_vector_delete(formats);
@@ -2702,13 +2902,53 @@ fn video_decoder_factory_from_objc_default_works() {
     let _formats = factory.get_supported_formats();
 }
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[test]
+fn objc_video_encoder_factory_release_no_retain_leak() {
+    let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoEncoderFactory_new() };
+    assert!(
+        !objc_factory.is_null(),
+        "webrtc_objc_RTCDefaultVideoEncoderFactory_new が null を返しました"
+    );
+
+    // new が +1 のみを返していれば参照カウントは 1、二重リテインがあれば 2 になる
+    let retain_count = unsafe { ffi::objc_NSObject_retainCount(objc_factory.cast()) };
+    assert_eq!(
+        retain_count, 1,
+        "エンコーダーファクトリのリテインリークを検出しました: retain_count={}",
+        retain_count
+    );
+
+    unsafe { ffi::webrtc_objc_RTCVideoEncoderFactory_release(objc_factory) };
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[test]
+fn objc_video_decoder_factory_release_no_retain_leak() {
+    let objc_factory = unsafe { ffi::webrtc_objc_RTCDefaultVideoDecoderFactory_new() };
+    assert!(
+        !objc_factory.is_null(),
+        "webrtc_objc_RTCDefaultVideoDecoderFactory_new が null を返しました"
+    );
+
+    // new が +1 のみを返していれば参照カウントは 1、二重リテインがあれば 2 になる
+    let retain_count = unsafe { ffi::objc_NSObject_retainCount(objc_factory.cast()) };
+    assert_eq!(
+        retain_count, 1,
+        "デコーダーファクトリのリテインリークを検出しました: retain_count={}",
+        retain_count
+    );
+
+    unsafe { ffi::webrtc_objc_RTCVideoDecoderFactory_release(objc_factory) };
+}
+
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
 #[test]
 fn objc_video_factory_functions_return_null_on_non_apple() {
     let enc_objc = unsafe { ffi::webrtc_objc_RTCDefaultVideoEncoderFactory_new() };
     assert!(
         enc_objc.is_null(),
-        "encoder objc factory should be null on non-Apple platforms"
+        "非 Apple プラットフォームでは encoder objc factory が null になること"
     );
     let enc_native = unsafe {
         ffi::webrtc_ObjCToNativeVideoEncoderFactory(std::ptr::null_mut::<
@@ -2717,7 +2957,7 @@ fn objc_video_factory_functions_return_null_on_non_apple() {
     };
     assert!(
         enc_native.is_null(),
-        "encoder native factory should be null on non-Apple platforms"
+        "非 Apple プラットフォームでは encoder native factory が null になること"
     );
     unsafe {
         ffi::webrtc_objc_RTCVideoEncoderFactory_release(std::ptr::null_mut::<
@@ -2728,7 +2968,7 @@ fn objc_video_factory_functions_return_null_on_non_apple() {
     let dec_objc = unsafe { ffi::webrtc_objc_RTCDefaultVideoDecoderFactory_new() };
     assert!(
         dec_objc.is_null(),
-        "decoder objc factory should be null on non-Apple platforms"
+        "非 Apple プラットフォームでは decoder objc factory が null になること"
     );
     let dec_native = unsafe {
         ffi::webrtc_ObjCToNativeVideoDecoderFactory(std::ptr::null_mut::<
@@ -2737,7 +2977,7 @@ fn objc_video_factory_functions_return_null_on_non_apple() {
     };
     assert!(
         dec_native.is_null(),
-        "decoder native factory should be null on non-Apple platforms"
+        "非 Apple プラットフォームでは decoder native factory が null になること"
     );
     unsafe {
         ffi::webrtc_objc_RTCVideoDecoderFactory_release(std::ptr::null_mut::<
@@ -2754,6 +2994,14 @@ fn video_decoder_factory_get_supported_formats_returns_owned_formats() {
             let mut h264 = SdpVideoFormat::new("H264");
             h264.parameters_mut().set("packetization-mode", "1");
             vec![h264]
+        }
+        fn create(
+            &mut self,
+            env: EnvironmentRef<'_>,
+            _format: SdpVideoFormatRef<'_>,
+        ) -> Option<VideoDecoder> {
+            assert!(!env.as_ptr().is_null());
+            None
         }
     }
 
@@ -2782,6 +3030,9 @@ fn video_encoder_factory_create_calls_create_callback() {
         called: std::sync::Arc<std::sync::atomic::AtomicBool>,
     }
     impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
+        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+            vec![SdpVideoFormat::new("H264")]
+        }
         fn create(
             &mut self,
             env: EnvironmentRef<'_>,
@@ -2819,6 +3070,9 @@ fn video_decoder_factory_create_calls_create_callback() {
         called: std::sync::Arc<std::sync::atomic::AtomicBool>,
     }
     impl VideoDecoderFactoryHandler for TestVideoDecoderFactoryHandler {
+        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+            vec![SdpVideoFormat::new("H264")]
+        }
         fn create(
             &mut self,
             env: EnvironmentRef<'_>,
@@ -3061,6 +3315,9 @@ fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
         created: bool,
     }
     impl VideoDecoderFactoryHandler for TestVideoDecoderFactoryHandler {
+        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+            vec![SdpVideoFormat::new("VP8")]
+        }
         fn create(
             &mut self,
             env: EnvironmentRef<'_>,
@@ -3196,7 +3453,7 @@ fn create_local_media_stream_returns_requested_id() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     let stream = factory
@@ -3209,7 +3466,6 @@ fn create_local_media_stream_returns_requested_id() {
 
     drop(stream);
     drop(factory);
-    drop(deps_factory);
     drop(adm);
     drop(env);
     network.stop();
@@ -3244,14 +3500,15 @@ fn media_stream_track_round_trip() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let factory = PeerConnectionFactory::create_modular(&mut deps_factory)
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     let stream = factory
         .create_local_media_stream("stream-1")
         .expect("CreateLocalMediaStream が失敗しました");
+    let audio_options = AudioOptions::new();
     let audio_source = factory
-        .create_audio_source()
+        .create_audio_source(&audio_options)
         .expect("AudioSource の生成に失敗しました");
     let audio_track = factory
         .create_audio_track(&audio_source, "audio-track-0")
@@ -3309,9 +3566,138 @@ fn media_stream_track_round_trip() {
     drop(video_source);
     drop(audio_track);
     drop(audio_source);
+    drop(audio_options);
     drop(stream);
     drop(factory);
-    drop(deps_factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
+fn audio_options_set_and_get_options() {
+    // 未設定の AudioOptions はすべての getter が None を返すことを検証する
+    let options = AudioOptions::new();
+    assert_eq!(options.echo_cancellation(), None);
+    assert_eq!(options.auto_gain_control(), None);
+    assert_eq!(options.noise_suppression(), None);
+    assert_eq!(options.highpass_filter(), None);
+    assert_eq!(options.stereo_swapping(), None);
+    assert_eq!(options.audio_jitter_buffer_max_packets(), None);
+    assert_eq!(options.audio_jitter_buffer_fast_accelerate(), None);
+    assert_eq!(options.audio_jitter_buffer_min_delay_ms(), None);
+    drop(options);
+
+    // 全フィールドに設定した値が getter で取得できることを検証する
+    let mut options = AudioOptions::new();
+    options.set_echo_cancellation(Some(false));
+    options.set_auto_gain_control(Some(true));
+    options.set_noise_suppression(Some(false));
+    options.set_highpass_filter(Some(true));
+    options.set_stereo_swapping(Some(false));
+    options.set_audio_jitter_buffer_max_packets(Some(50));
+    options.set_audio_jitter_buffer_fast_accelerate(Some(true));
+    options.set_audio_jitter_buffer_min_delay_ms(Some(100));
+    assert_eq!(options.echo_cancellation(), Some(false));
+    assert_eq!(options.auto_gain_control(), Some(true));
+    assert_eq!(options.noise_suppression(), Some(false));
+    assert_eq!(options.highpass_filter(), Some(true));
+    assert_eq!(options.stereo_swapping(), Some(false));
+    assert_eq!(options.audio_jitter_buffer_max_packets(), Some(50));
+    assert_eq!(options.audio_jitter_buffer_fast_accelerate(), Some(true));
+    assert_eq!(options.audio_jitter_buffer_min_delay_ms(), Some(100));
+
+    // 未設定 (None) に戻せば getter が None に戻ることを検証する
+    options.set_echo_cancellation(None);
+    options.set_audio_jitter_buffer_max_packets(None);
+    assert_eq!(options.echo_cancellation(), None);
+    assert_eq!(options.audio_jitter_buffer_max_packets(), None);
+    drop(options);
+}
+
+#[test]
+fn create_audio_source_with_audio_options() {
+    // 設定付きの AudioOptions を渡して AudioSource を生成できることを検証する
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc);
+    deps_factory.set_audio_decoder_factory(&dec);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    let mut options = AudioOptions::new();
+    options.set_echo_cancellation(Some(false));
+    options.set_auto_gain_control(Some(false));
+    options.set_noise_suppression(Some(false));
+    options.set_highpass_filter(Some(false));
+    let audio_source = factory
+        .create_audio_source(&options)
+        .expect("AudioSource の生成に失敗しました");
+
+    drop(audio_source);
+    drop(options);
+    drop(factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
+fn create_audio_source_with_default_audio_options() {
+    // 何も設定しない AudioOptions を渡しても、従来と同じように AudioSource を生成できることを検証する
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc);
+    deps_factory.set_audio_decoder_factory(&dec);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    let options = AudioOptions::new();
+    let audio_source = factory
+        .create_audio_source(&options)
+        .expect("AudioSource の生成に失敗しました");
+
+    drop(audio_source);
+    drop(options);
+    drop(factory);
     drop(adm);
     drop(env);
     network.stop();
@@ -3718,4 +4104,377 @@ fn rtp_video_header_h264_full_roundtrip() {
     assert_eq!(e1.sps_id(), 1);
     let e2 = cloned_nalus.get(1).expect("要素が存在する想定");
     assert_eq!(e2.sps_id(), -1);
+}
+
+#[test]
+fn audio_codec_type_raw_round_trip() {
+    let cases = [
+        (AudioCodecType::Other, None),
+        (AudioCodecType::Opus, Some("opus")),
+        (AudioCodecType::Isac, Some("ISAC")),
+        (AudioCodecType::G722, Some("G722")),
+        (AudioCodecType::PcmA, Some("PCMA")),
+        (AudioCodecType::PcmU, Some("PCMU")),
+    ];
+    for (codec_type, name) in cases {
+        assert_eq!(
+            codec_type.to_raw(),
+            AudioCodecType::from_raw(codec_type.to_raw()).to_raw()
+        );
+        assert_eq!(AudioCodecType::from_raw(codec_type.to_raw()), codec_type);
+        assert_eq!(codec_type.as_str(), name);
+    }
+    let unknown = AudioCodecType::from_raw(999);
+    assert_eq!(unknown, AudioCodecType::Unknown(999));
+    assert_eq!(unknown.to_raw(), 999);
+    assert_eq!(unknown.as_str(), None);
+    // kOther は 0、kG722 は 5 (kMaxLoggedAudioCodecTypes=6 未満) であることを確認する。
+    assert_eq!(AudioCodecType::Other.to_raw(), 0);
+    assert_eq!(AudioCodecType::G722.to_raw(), 5);
+}
+
+#[test]
+fn audio_codec_type_try_from_invalid() {
+    let error =
+        AudioCodecType::try_from("bogus").expect_err("未知のコーデック名はエラーになる想定です");
+    assert!(matches!(error, Error::InvalidAudioCodecType(_)));
+}
+
+#[test]
+fn audio_encoder_encoded_info_encoder_type_validation() {
+    let mut info = AudioEncoderEncodedInfo::new();
+    for codec_type in [
+        AudioCodecType::Other,
+        AudioCodecType::Opus,
+        AudioCodecType::Isac,
+        AudioCodecType::G722,
+        AudioCodecType::PcmA,
+        AudioCodecType::PcmU,
+    ] {
+        info.set_encoder_type(codec_type);
+        assert_eq!(info.encoder_type(), codec_type);
+    }
+    // 範囲外 (6以上) は libwebrtc 内部 OOB になるため panic する。
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        info.set_encoder_type(AudioCodecType::Unknown(6));
+    }));
+    assert!(
+        result.is_err(),
+        "encoder_type の範囲外指定は panic する想定です"
+    );
+}
+
+#[test]
+fn audio_encoder_encoded_info_redundant_round_trip() {
+    let mut info = AudioEncoderEncodedInfo::new();
+    assert!(info.redundant().is_empty());
+    let mut leaf = AudioEncoderEncodedInfoLeaf::new();
+    leaf.set_encoded_bytes(10);
+    leaf.set_payload_type(96);
+    leaf.set_speech(true);
+    info.set_redundant(vec![leaf]);
+    let redundant = info.redundant();
+    assert_eq!(redundant.len(), 1);
+    assert_eq!(redundant[0].encoded_bytes(), 10);
+    assert_eq!(redundant[0].payload_type(), 96);
+    assert!(redundant[0].speech());
+}
+
+struct TestAudioEncoderHandler {
+    pub(crate) encoded: bool,
+}
+
+impl AudioEncoderHandler for TestAudioEncoderHandler {
+    fn sample_rate_hz(&mut self) -> i32 {
+        48000
+    }
+    fn num_channels(&mut self) -> usize {
+        2
+    }
+    fn num_10ms_frames_in_next_packet(&mut self) -> usize {
+        1
+    }
+    fn max_10ms_frames_in_a_packet(&mut self) -> usize {
+        4
+    }
+    fn get_target_bitrate(&mut self) -> i32 {
+        32000
+    }
+    fn encode(
+        &mut self,
+        _rtp_timestamp: u32,
+        _audio: &[i16],
+        encoded: &mut BufferRef<'_>,
+    ) -> AudioEncoderEncodedInfo {
+        self.encoded = true;
+        encoded.append_data(&[0x01, 0x02, 0x03]);
+        let mut info = AudioEncoderEncodedInfo::new();
+        info.set_encoded_bytes(encoded.size());
+        info.set_payload_type(111);
+        info
+    }
+    fn reset(&mut self) {}
+    fn get_frame_length_range(&mut self) -> Option<(i64, i64)> {
+        None
+    }
+}
+
+struct TestAudioEncoderFactoryHandler {
+    created: bool,
+}
+
+impl AudioEncoderFactoryHandler for TestAudioEncoderFactoryHandler {
+    fn get_supported_encoders(&mut self) -> Vec<AudioCodecSpec> {
+        vec![AudioCodecSpec::new(
+            SdpAudioFormat::new("opus", 48000, 2),
+            AudioCodecInfo::new(48000, 2, 32000, 6000, 510000),
+        )]
+    }
+    fn query_audio_encoder(&mut self, _format: SdpAudioFormatRef<'_>) -> Option<AudioCodecInfo> {
+        None
+    }
+    fn create(
+        &mut self,
+        env: EnvironmentRef<'_>,
+        format: SdpAudioFormatRef<'_>,
+        _options: &AudioEncoderFactoryOptions,
+    ) -> Option<AudioEncoder> {
+        assert!(!env.as_ptr().is_null());
+        assert_eq!(format.name().expect("名前の取得に失敗しました"), "opus");
+        if self.created {
+            return None;
+        }
+        self.created = true;
+        Some(AudioEncoder::new_with_handler(Box::new(
+            TestAudioEncoderHandler { encoded: false },
+        )))
+    }
+}
+
+#[test]
+fn custom_audio_encoder_factory_roundtrip() {
+    let factory = AudioEncoderFactory::new_with_handler(Box::new(TestAudioEncoderFactoryHandler {
+        created: false,
+    }));
+    assert_eq!(factory.get_supported_encoders().len(), 1);
+    let env = Environment::new();
+    let format = SdpAudioFormat::new("opus", 48000, 2);
+    let mut options = AudioEncoderFactoryOptions::new();
+    options.set_payload_type(111);
+    let mut encoder = factory
+        .create(env.as_ref(), format.as_ref(), &options)
+        .expect("カスタムエンコーダーの作成に失敗しました");
+    assert_eq!(encoder.sample_rate_hz(), 48000);
+    assert_eq!(encoder.num_channels(), 2);
+    assert_eq!(encoder.num_10ms_frames_in_next_packet(), 1);
+    assert_eq!(encoder.max_10ms_frames_in_a_packet(), 4);
+    assert_eq!(encoder.get_target_bitrate(), 32000);
+    // 既定実装の仕様を確認する (set_dtx は !enable、get_dtx は false)。
+    assert!(!encoder.get_dtx());
+    assert!(encoder.set_dtx(false));
+    assert!(!encoder.set_application(AudioEncoderApplication::Speech));
+    let mut buffer = Buffer::new();
+    let info = encoder.encode(0, &[0i16; 960], &mut buffer);
+    assert_eq!(buffer.size(), 3);
+    assert_eq!(info.payload_type(), 111);
+    assert!(
+        factory
+            .create(env.as_ref(), format.as_ref(), &options)
+            .is_none(),
+        "2 回目の create は None を返す想定です"
+    );
+}
+
+#[test]
+fn custom_audio_encoder_no_output() {
+    let mut encoder = AudioEncoder::new_with_handler(Box::new(TestAudioEncoderNoOutputHandler));
+    let mut buffer = Buffer::new();
+    let info = encoder.encode(0, &[0i16; 960], &mut buffer);
+    assert_eq!(buffer.size(), 0);
+    assert_eq!(info.encoded_bytes(), 0);
+}
+
+struct TestAudioEncoderNoOutputHandler;
+
+impl AudioEncoderHandler for TestAudioEncoderNoOutputHandler {
+    fn sample_rate_hz(&mut self) -> i32 {
+        48000
+    }
+    fn num_channels(&mut self) -> usize {
+        2
+    }
+    fn num_10ms_frames_in_next_packet(&mut self) -> usize {
+        1
+    }
+    fn max_10ms_frames_in_a_packet(&mut self) -> usize {
+        4
+    }
+    fn get_target_bitrate(&mut self) -> i32 {
+        32000
+    }
+    fn encode(
+        &mut self,
+        _rtp_timestamp: u32,
+        _audio: &[i16],
+        _encoded: &mut BufferRef<'_>,
+    ) -> AudioEncoderEncodedInfo {
+        AudioEncoderEncodedInfo::new()
+    }
+    fn reset(&mut self) {}
+    fn get_frame_length_range(&mut self) -> Option<(i64, i64)> {
+        None
+    }
+}
+
+struct TestAudioDecoderHandler;
+
+impl AudioDecoderHandler for TestAudioDecoderHandler {
+    fn sample_rate_hz(&mut self) -> i32 {
+        48000
+    }
+    fn channels(&mut self) -> usize {
+        2
+    }
+    fn decode(
+        &mut self,
+        _encoded: &[u8],
+        _sample_rate_hz: i32,
+        decoded: &mut RawBufferWriter<'_, i16>,
+    ) -> (i32, AudioSpeechType) {
+        decoded.write(&[0x1111i16; 160]);
+        (160, AudioSpeechType::Speech)
+    }
+    fn reset(&mut self) {}
+}
+
+struct TestAudioDecoderFactoryHandler {
+    created: bool,
+}
+
+impl AudioDecoderFactoryHandler for TestAudioDecoderFactoryHandler {
+    fn get_supported_decoders(&mut self) -> Vec<AudioCodecSpec> {
+        vec![AudioCodecSpec::new(
+            SdpAudioFormat::new("opus", 48000, 2),
+            AudioCodecInfo::new(48000, 2, 32000, 6000, 510000),
+        )]
+    }
+    fn is_supported_decoder(&mut self, format: SdpAudioFormatRef<'_>) -> bool {
+        format.name().map(|name| name == "opus").unwrap_or(false)
+    }
+    fn create(
+        &mut self,
+        env: EnvironmentRef<'_>,
+        format: SdpAudioFormatRef<'_>,
+    ) -> Option<AudioDecoder> {
+        assert!(!env.as_ptr().is_null());
+        assert_eq!(format.name().expect("名前の取得に失敗しました"), "opus");
+        if self.created {
+            return None;
+        }
+        self.created = true;
+        Some(AudioDecoder::new_with_handler(Box::new(
+            TestAudioDecoderHandler,
+        )))
+    }
+}
+
+#[test]
+fn custom_audio_decoder_factory_roundtrip() {
+    let factory = AudioDecoderFactory::new_with_handler(Box::new(TestAudioDecoderFactoryHandler {
+        created: false,
+    }));
+    assert_eq!(factory.get_supported_decoders().len(), 1);
+    let env = Environment::new();
+    let format = SdpAudioFormat::new("opus", 48000, 2);
+    assert!(factory.is_supported_decoder(format.as_ref()));
+    let mut decoder = factory
+        .create(env.as_ref(), format.as_ref())
+        .expect("カスタムデコーダーの作成に失敗しました");
+    assert_eq!(decoder.sample_rate_hz(), 48000);
+    assert_eq!(decoder.channels(), 2);
+    let mut decoded = [0x7FFFi16; 320];
+    let (samples, speech) = decoder.decode(&[0x01, 0x02, 0x03], 48000, &mut decoded);
+    assert_eq!(samples, 160);
+    assert_eq!(speech, AudioSpeechType::Speech);
+    assert!(
+        decoded[..160].iter().all(|&v| v == 0x1111),
+        "FFI 経由でデコード結果が書き込まれていない想定です"
+    );
+    assert!(
+        decoded[160..].iter().all(|&v| v == 0x7FFF),
+        "未書き込み領域の番兵が破壊された想定です"
+    );
+    assert!(
+        factory.create(env.as_ref(), format.as_ref()).is_none(),
+        "2 回目の create は None を返す想定です"
+    );
+}
+
+struct TestComfortNoiseDecoderHandler;
+
+impl AudioDecoderHandler for TestComfortNoiseDecoderHandler {
+    fn sample_rate_hz(&mut self) -> i32 {
+        48000
+    }
+    fn channels(&mut self) -> usize {
+        2
+    }
+    fn decode(
+        &mut self,
+        _encoded: &[u8],
+        _sample_rate_hz: i32,
+        decoded: &mut RawBufferWriter<'_, i16>,
+    ) -> (i32, AudioSpeechType) {
+        decoded.write(&[0x2222i16; 80]);
+        (80, AudioSpeechType::ComfortNoise)
+    }
+    fn reset(&mut self) {}
+}
+
+#[test]
+fn audio_decoder_comfort_noise_round_trip() {
+    let mut decoder = AudioDecoder::new_with_handler(Box::new(TestComfortNoiseDecoderHandler));
+    let mut decoded = [0x7FFFi16; 160];
+    let (samples, speech) = decoder.decode(&[0x01], 48000, &mut decoded);
+    assert_eq!(samples, 80);
+    assert_eq!(speech, AudioSpeechType::ComfortNoise);
+    assert!(
+        decoded[..80].iter().all(|&v| v == 0x2222),
+        "快音のデコード結果が書き込まれていない想定です"
+    );
+    assert!(
+        decoded[80..].iter().all(|&v| v == 0x7FFF),
+        "未書き込み領域の番兵が破壊された想定です"
+    );
+}
+
+#[test]
+fn audio_decoder_default_queries() {
+    // 既定実装は packet_duration が -2 (kNotImplemented)、packet_has_fec / has_decode_plc が false。
+    let decoder = AudioDecoder::new_with_handler(Box::new(TestAudioDecoderHandler));
+    assert_eq!(decoder.packet_duration(&[0x01, 0x02]), -2);
+    assert!(!decoder.packet_has_fec(&[0x01]));
+    assert!(!decoder.has_decode_plc());
+}
+
+#[test]
+fn audio_codec_pair_id_eq_ord() {
+    let a = AudioCodecPairId::create();
+    let b = a.clone();
+    assert!(a == b);
+    assert!(a.cmp(&b) == std::cmp::Ordering::Equal);
+    assert_eq!(a.numeric_representation(), b.numeric_representation());
+}
+
+#[test]
+fn audio_encoder_owned_wrapper_methods() {
+    let mut encoder =
+        AudioEncoder::new_with_handler(Box::new(TestAudioEncoderHandler { encoded: false }));
+    // 既定実装の仕様。
+    encoder.set_max_playback_rate(48000);
+    encoder.disable_audio_network_adaptor();
+    assert!(!encoder.enable_audio_network_adaptor(&[0x01]));
+    encoder.on_received_rtt(10);
+    encoder.on_received_target_audio_bitrate(64000);
+    encoder.on_received_overhead(12);
 }

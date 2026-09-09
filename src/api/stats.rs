@@ -1,4 +1,5 @@
-use crate::ref_count::RTCStatsReportHandle;
+use crate::helper::non_null::expect_non_null;
+use crate::helper::ref_count::RTCStatsReportHandle;
 use crate::{CxxString, Result, ScopedRef, ffi};
 use std::ptr::NonNull;
 
@@ -10,7 +11,9 @@ pub struct RTCStatsReport {
 unsafe impl Send for RTCStatsReport {}
 
 impl RTCStatsReport {
-    pub fn from_refcounted_ptr(raw_ref: NonNull<ffi::webrtc_RTCStatsReport_refcounted>) -> Self {
+    pub(crate) fn from_refcounted_ptr(
+        raw_ref: NonNull<ffi::webrtc_RTCStatsReport_refcounted>,
+    ) -> Self {
         let raw_ref = ScopedRef::<RTCStatsReportHandle>::from_raw(raw_ref);
         Self { raw_ref }
     }
@@ -18,8 +21,7 @@ impl RTCStatsReport {
     pub fn to_json(&self) -> Result<String> {
         let raw = self.raw();
         let json = unsafe { ffi::webrtc_RTCStatsReport_ToJson(raw.as_ptr()) };
-        let json =
-            NonNull::new(json).expect("BUG: webrtc_RTCStatsReport_ToJson が null を返しました");
+        let json = expect_non_null(json, "webrtc_RTCStatsReport_ToJson");
         let json = CxxString::from_unique(json);
         json.to_string()
     }

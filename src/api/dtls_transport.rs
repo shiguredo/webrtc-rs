@@ -1,4 +1,5 @@
-use crate::ref_count::DtlsTransportHandle;
+use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::helper::ref_count::DtlsTransportHandle;
 use crate::{ScopedRef, ffi};
 use std::os::raw::c_void;
 use std::ptr::NonNull;
@@ -81,11 +82,7 @@ pub trait DtlsTransportObserverHandler: Send {
     fn on_error(&mut self) {}
 }
 
-struct DtlsTransportObserverHandlerState {
-    handler: Box<dyn DtlsTransportObserverHandler>,
-}
-
-unsafe impl Send for DtlsTransportObserverHandlerState {}
+type DtlsTransportObserverHandlerState = HandlerState<dyn DtlsTransportObserverHandler>;
 
 unsafe extern "C" fn dtls_observer_on_state_change(new_state: i32, user_data: *mut c_void) {
     assert!(
@@ -108,11 +105,9 @@ unsafe extern "C" fn dtls_observer_on_error(user_data: *mut c_void) {
 }
 
 unsafe extern "C" fn dtls_observer_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "dtls_observer_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut DtlsTransportObserverHandlerState) };
+    unsafe {
+        destroy_handler::<DtlsTransportObserverHandlerState>("dtls_observer_on_destroy", user_data)
+    };
 }
 
 /// DtlsTransportObserver のラッパー。
@@ -124,22 +119,18 @@ unsafe impl Send for DtlsTransportObserver {}
 
 impl DtlsTransportObserver {
     pub fn new_with_handler(handler: Box<dyn DtlsTransportObserverHandler>) -> Self {
-        let state = Box::new(DtlsTransportObserverHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_DtlsTransportObserver_cbs {
             OnStateChange: Some(dtls_observer_on_state_change),
             OnError: Some(dtls_observer_on_error),
             OnDestroy: Some(dtls_observer_on_destroy),
         };
-        let raw = match NonNull::new(unsafe {
-            ffi::webrtc_DtlsTransportObserver_new(&cbs, user_data)
-        }) {
-            Some(raw) => raw,
-            None => {
-                let _ =
-                    unsafe { Box::from_raw(user_data as *mut DtlsTransportObserverHandlerState) };
-                panic!("BUG: webrtc_DtlsTransportObserver_new が null を返しました");
-            }
+        let raw = unsafe {
+            create_with_handler::<DtlsTransportObserverHandlerState, _>(
+                "webrtc_DtlsTransportObserver_new",
+                user_data,
+                |user_data| ffi::webrtc_DtlsTransportObserver_new(&cbs, user_data),
+            )
         };
         Self { raw }
     }

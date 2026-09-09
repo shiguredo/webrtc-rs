@@ -859,12 +859,12 @@ WEBRTC_EXPORT extern const int webrtc_AudioDeviceModule_kAndroidJavaAudio =
     webrtc::AudioDeviceModule::kAndroidJavaAudio;
 WEBRTC_EXPORT extern const int webrtc_AudioDeviceModule_kAndroidOpenSLESAudio =
     webrtc::AudioDeviceModule::kAndroidOpenSLESAudio;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_AudioDeviceModule_kAndroidJavaInputAndOpenSLESOutputAudio =
         webrtc::AudioDeviceModule::kAndroidJavaInputAndOpenSLESOutputAudio;
 WEBRTC_EXPORT extern const int webrtc_AudioDeviceModule_kAndroidAAudioAudio =
     webrtc::AudioDeviceModule::kAndroidAAudioAudio;
-extern const int
+WEBRTC_EXPORT extern const int
     webrtc_AudioDeviceModule_kAndroidJavaInputAndAAudioOutputAudio =
         webrtc::AudioDeviceModule::kAndroidJavaInputAndAAudioOutputAudio;
 WEBRTC_EXPORT extern const int webrtc_AudioDeviceModule_kDummyAudio =

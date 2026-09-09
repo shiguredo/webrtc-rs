@@ -1,4 +1,6 @@
-use crate::ref_count::AudioDeviceModuleHandle;
+use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::helper::non_null::expect_non_null;
+use crate::helper::ref_count::AudioDeviceModuleHandle;
 use crate::{Environment, Error, Result, ScopedRef, ffi};
 use std::ffi::c_char;
 use std::os::raw::c_void;
@@ -20,15 +22,14 @@ impl AudioDeviceModule {
         let raw = NonNull::new(unsafe {
             ffi::webrtc_CreateAudioDeviceModule(env.as_ptr(), audio_type.to_int())
         })
-        .ok_or(Error::NullPointer(
-            "webrtc_CreateAudioDeviceModule が null を返しました",
-        ))?;
+        .ok_or(Error::NullPointer("webrtc_CreateAudioDeviceModule"))?;
         let raw_ref = ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw);
         Ok(Self { raw_ref })
     }
 
     /// Rust 側で拡張可能な AudioDeviceModule を生成する。
     pub fn new_with_handler(handler: Box<dyn AudioDeviceModuleHandler>) -> Self {
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let mut cbs = ffi::webrtc_AudioDeviceModule_cbs {
             ActiveAudioLayer: Some(adm_active_audio_layer),
             RegisterAudioCallback: Some(adm_register_audio_callback),
@@ -98,14 +99,14 @@ impl AudioDeviceModule {
             GetStats: Some(adm_get_stats),
             OnDestroy: Some(adm_on_destroy),
         };
-        let mut state = Box::new(AudioDeviceModuleHandlerState { handler });
-        let user_data_ptr = state.as_mut() as *mut AudioDeviceModuleHandlerState as *mut c_void;
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_CreateAudioDeviceModuleWithCallback(&mut cbs, user_data_ptr)
-        })
-        .expect("BUG: webrtc_CreateAudioDeviceModuleWithCallback が null を返しました");
+        let raw = unsafe {
+            create_with_handler::<AudioDeviceModuleHandlerState, _>(
+                "webrtc_CreateAudioDeviceModuleWithCallback",
+                user_data,
+                |user_data| ffi::webrtc_CreateAudioDeviceModuleWithCallback(&mut cbs, user_data),
+            )
+        };
         let raw_ref = ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw);
-        let _ = Box::into_raw(state);
         Self { raw_ref }
     }
 
@@ -263,7 +264,7 @@ impl AudioTransportRef {
     /// `audio_samples` は `n_samples` と `n_bytes_per_sample` に応じた長さの
     /// 有効なメモリを指している必要がある。
     /// `new_mic_level` は書き込み可能なポインタである必要がある。
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub unsafe fn recorded_data_is_available(
         &self,
         audio_samples: *const u8,
@@ -309,7 +310,7 @@ impl AudioTransportRef {
     /// 書き込み可能なメモリを指している必要がある。
     /// `n_samples_out` は書き込み可能なポインタである必要がある。
     /// `elapsed_time_ms` と `ntp_time_ms` は null または書き込み可能なポインタである必要がある。
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub unsafe fn need_more_play_data(
         &self,
         n_samples: usize,
@@ -340,7 +341,7 @@ impl AudioTransportRef {
     /// `audio_data` は `number_of_frames` と `number_of_channels` と `bits_per_sample` に
     /// 応じた長さの書き込み可能なメモリを指している必要がある。
     /// `elapsed_time_ms` と `ntp_time_ms` は null または書き込み可能なポインタである必要がある。
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub unsafe fn pull_render_data(
         &self,
         bits_per_sample: i32,
@@ -375,20 +376,19 @@ unsafe impl Send for AudioTransport {}
 
 impl AudioTransport {
     pub fn new_with_handler(handler: Box<dyn AudioTransportHandler>) -> Self {
-        let state = Box::new(AudioTransportHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_AudioTransport_cbs {
             RecordedDataIsAvailable: Some(audio_transport_recorded_data_is_available),
             NeedMorePlayData: Some(audio_transport_need_more_play_data),
             PullRenderData: Some(audio_transport_pull_render_data),
             OnDestroy: Some(audio_transport_on_destroy),
         };
-        let raw = match NonNull::new(unsafe { ffi::webrtc_AudioTransport_new(&cbs, user_data) }) {
-            Some(raw) => raw,
-            None => {
-                let _ = unsafe { Box::from_raw(user_data as *mut AudioTransportHandlerState) };
-                panic!("BUG: webrtc_AudioTransport_new が null を返しました");
-            }
+        let raw = unsafe {
+            create_with_handler::<AudioTransportHandlerState, _>(
+                "webrtc_AudioTransport_new",
+                user_data,
+                |user_data| ffi::webrtc_AudioTransport_new(&cbs, user_data),
+            )
         };
         Self { raw }
     }
@@ -399,7 +399,7 @@ impl AudioTransport {
 
     /// # Safety
     /// `AudioTransportRef::recorded_data_is_available` と同じ前提条件を満たす必要がある。
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub unsafe fn recorded_data_is_available(
         &self,
         audio_samples: *const u8,
@@ -433,7 +433,7 @@ impl AudioTransport {
 
     /// # Safety
     /// `AudioTransportRef::need_more_play_data` と同じ前提条件を満たす必要がある。
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub unsafe fn need_more_play_data(
         &self,
         n_samples: usize,
@@ -461,7 +461,7 @@ impl AudioTransport {
 
     /// # Safety
     /// `AudioTransportRef::pull_render_data` と同じ前提条件を満たす必要がある。
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub unsafe fn pull_render_data(
         &self,
         bits_per_sample: i32,
@@ -493,7 +493,7 @@ impl Drop for AudioTransport {
 }
 
 pub trait AudioTransportHandler: Send {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     #[expect(unused_variables)]
     fn recorded_data_is_available(
         &mut self,
@@ -512,7 +512,7 @@ pub trait AudioTransportHandler: Send {
         0
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     #[expect(unused_variables)]
     fn need_more_play_data(
         &mut self,
@@ -528,7 +528,7 @@ pub trait AudioTransportHandler: Send {
         0
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     #[expect(unused_variables)]
     fn pull_render_data(
         &mut self,
@@ -543,18 +543,12 @@ pub trait AudioTransportHandler: Send {
     }
 }
 
-struct AudioTransportHandlerState {
-    handler: Box<dyn AudioTransportHandler>,
-}
-
-unsafe impl Send for AudioTransportHandlerState {}
+type AudioTransportHandlerState = HandlerState<dyn AudioTransportHandler>;
 
 unsafe extern "C" fn audio_transport_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "audio_transport_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut AudioTransportHandlerState) };
+    unsafe {
+        destroy_handler::<AudioTransportHandlerState>("audio_transport_on_destroy", user_data)
+    };
 }
 
 unsafe extern "C" fn audio_transport_recorded_data_is_available(
@@ -663,10 +657,10 @@ unsafe impl Send for AudioParameters {}
 
 impl AudioParameters {
     pub fn new(sample_rate: i32, channels: usize, frames_per_buffer: usize) -> Self {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_AudioParameters_new(sample_rate, channels, frames_per_buffer)
-        })
-        .expect("AudioParameters::new: webrtc_AudioParameters_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_AudioParameters_new(sample_rate, channels, frames_per_buffer) },
+            "webrtc_AudioParameters_new",
+        );
         Self { raw }
     }
 
@@ -714,17 +708,17 @@ impl AudioDeviceModuleStats {
         total_playout_delay_s: f64,
         total_samples_count: u64,
     ) -> Self {
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_AudioDeviceModule_Stats_new(
-                synthesized_samples_duration_s,
-                synthesized_samples_events,
-                total_samples_duration_s,
-                total_playout_delay_s,
-                total_samples_count,
-            )
-        })
-        .expect(
-            "AudioDeviceModuleStats::new: webrtc_AudioDeviceModule_Stats_new が null を返しました",
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_AudioDeviceModule_Stats_new(
+                    synthesized_samples_duration_s,
+                    synthesized_samples_events,
+                    total_samples_duration_s,
+                    total_playout_delay_s,
+                    total_samples_count,
+                )
+            },
+            "webrtc_AudioDeviceModule_Stats_new",
         );
         Self { raw }
     }
@@ -995,11 +989,7 @@ pub trait AudioDeviceModuleHandler: Send + Sync {
     }
 }
 
-struct AudioDeviceModuleHandlerState {
-    handler: Box<dyn AudioDeviceModuleHandler>,
-}
-
-unsafe impl Send for AudioDeviceModuleHandlerState {}
+type AudioDeviceModuleHandlerState = HandlerState<dyn AudioDeviceModuleHandler>;
 
 fn bool_to_i32(value: bool) -> i32 {
     if value { 1 } else { 0 }
@@ -1540,8 +1530,5 @@ unsafe extern "C" fn adm_get_stats(
 }
 
 unsafe extern "C" fn adm_on_destroy(user_data: *mut c_void) {
-    assert!(!user_data.is_null(), "adm_on_destroy: user_data is null");
-    unsafe {
-        let _ = Box::from_raw(user_data as *mut AudioDeviceModuleHandlerState);
-    }
+    unsafe { destroy_handler::<AudioDeviceModuleHandlerState>("adm_on_destroy", user_data) };
 }

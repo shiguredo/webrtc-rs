@@ -9,3 +9,5 @@ target/
 .cursor/
 
 .cargo/config.toml
+
+refs/*

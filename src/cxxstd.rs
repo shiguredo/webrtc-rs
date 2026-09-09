@@ -1,4 +1,5 @@
 use crate::ffi;
+use crate::helper::non_null::expect_non_null;
 use crate::{Error, Result};
 use std::marker::PhantomData;
 use std::ptr::NonNull;
@@ -16,17 +17,16 @@ impl CxxString {
     pub fn new() -> Self {
         let raw = unsafe { ffi::std_string_new_empty() };
         Self {
-            raw_unique: NonNull::new(raw).expect("BUG: std_string_new_empty が null を返しました"),
+            raw_unique: expect_non_null(raw, "std_string_new_empty"),
         }
     }
 
     /// &str から生成する。
-    #[allow(clippy::should_implement_trait)]
+    #[expect(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         let raw = unsafe { ffi::std_string_new_from_bytes(s.as_ptr() as *const _, s.len()) };
         Self {
-            raw_unique: NonNull::new(raw)
-                .expect("BUG: std_string_new_from_bytes が null を返しました"),
+            raw_unique: expect_non_null(raw, "std_string_new_from_bytes"),
         }
     }
 
@@ -78,7 +78,7 @@ impl CxxString {
 
     fn raw_string(&self) -> NonNull<ffi::std_string> {
         let raw = unsafe { ffi::std_string_unique_get(self.raw_unique.as_ptr()) };
-        NonNull::new(raw).expect("BUG: std_string_unique_get が null を返しました")
+        expect_non_null(raw, "std_string_unique_get")
     }
 }
 
@@ -163,7 +163,7 @@ impl StringVector {
     pub fn new(size: usize) -> Self {
         let raw = unsafe { ffi::std_string_vector_new(size) };
         Self {
-            raw: NonNull::new(raw).expect("BUG: std_string_vector_new が null を返しました"),
+            raw: expect_non_null(raw, "std_string_vector_new"),
         }
     }
 
@@ -237,10 +237,7 @@ impl<'a> StringVectorRef<'a> {
             return Err(Error::OutOfIndex(index));
         }
         let ptr = unsafe { ffi::std_string_vector_get(self.raw.as_ptr(), index as i32) };
-        CxxStringRef::from_ptr(
-            NonNull::new(ptr).expect("BUG: std_string_vector_get が null を返しました"),
-        )
-        .to_string()
+        CxxStringRef::from_ptr(expect_non_null(ptr, "std_string_vector_get")).to_string()
     }
 }
 
@@ -259,6 +256,10 @@ impl<'a> MapStringString<'a> {
             raw,
             _marker: PhantomData,
         }
+    }
+
+    pub(crate) fn raw(&self) -> *mut ffi::std_map_string_string {
+        self.raw.as_ptr()
     }
 
     /// 要素数を取得する。
@@ -289,8 +290,7 @@ impl<'a> MapStringString<'a> {
     /// イテレータを生成する。
     pub fn iter(&self) -> MapStringStringIter<'_> {
         let iter = unsafe { ffi::std_map_string_string_iter_new(self.raw.as_ptr()) };
-        let raw_iter =
-            NonNull::new(iter).expect("BUG: std_map_string_string_iter_new が null を返しました");
+        let raw_iter = expect_non_null(iter, "std_map_string_string_iter_new");
         MapStringStringIter {
             raw: raw_iter,
             _marker: PhantomData,
@@ -319,9 +319,8 @@ impl<'a> Iterator for MapStringStringIter<'a> {
             return None;
         }
         // key, value が null になることは無いはず
-        let key = CxxString::from_unique(NonNull::new(key).expect("BUG: key が null を返しました"));
-        let value =
-            CxxString::from_unique(NonNull::new(value).expect("BUG: value が null を返しました"));
+        let key = CxxString::from_unique(expect_non_null(key, "key"));
+        let value = CxxString::from_unique(expect_non_null(value, "value"));
         // key, value が UTF-8 に変換できないことはあるはずなので、ちゃんと処理する
         Some((key.to_string().ok()?, value.to_string().ok()?))
     }

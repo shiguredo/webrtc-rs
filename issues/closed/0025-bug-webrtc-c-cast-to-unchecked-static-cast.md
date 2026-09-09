@@ -3,6 +3,7 @@
 - Priority: Medium
 - Polished: 2026-06-06
 - Created: 2026-06-05
+- Completed: 2026-08-30
 - Model: Opus 4.8
 
 ## pending 理由
@@ -152,3 +153,18 @@ nullable に見えるという不一致が生じる。このため、ダウン�
 - 不正な型を渡した場合に未定義動作ではなく `nullptr` が返る
 - アップキャスト 6 箇所は変更不要であることを確認している
 - 採用した方針について RULES.md との整合性が確認・承認されている
+
+## 解決方法
+
+`dynamic_cast` + nullptr チェックによる実行時型検査は採用せず、`static_cast` を維持する方針とした。
+
+- `WEBRTC_DEFINE_CAST` / `WEBRTC_DEFINE_CAST_REFCOUNTED` マクロとそれを用いる
+  `MediaStreamTrackInterface` → `VideoTrackInterface` / `AudioTrackInterface`、
+  `RtpCodecCapability` → `RtpCodec` のダウンキャストは `static_cast` のままとする
+- 薄いラッパー原則 (`webrtc/RULES.md`) に基づき、C ラッパーでは実行時型検査を行わず、
+  呼び出し側 (Rust) が正しい型を渡すことを保証する
+- 先行事例の `video_frame_buffer.cc` (`cast_to_webrtc_I420Buffer` /
+  `cast_to_webrtc_NV12Buffer`) の `dynamic_cast` + nullptr チェックは、
+  Rust 側の `VideoFrameBuffer::as_i420` / `as_nv12` が型判別に必要とする
+  正当な例外として維持する
+- そのため RULES.md の修正は行わない (実行時型検査を導入しない)

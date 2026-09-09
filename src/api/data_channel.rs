@@ -1,4 +1,6 @@
-use crate::ref_count::DataChannelHandle;
+use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
+use crate::helper::non_null::expect_non_null;
+use crate::helper::ref_count::DataChannelHandle;
 use crate::{CxxString, Result, ScopedRef, ffi};
 use std::os::raw::c_void;
 use std::ptr::NonNull;
@@ -51,9 +53,10 @@ impl DataChannel {
 
     /// DataChannel のラベルを取得する。
     pub fn label(&self) -> Result<String> {
-        let ptr =
-            NonNull::new(unsafe { ffi::webrtc_DataChannelInterface_label(self.raw_ref.as_ptr()) })
-                .expect("BUG: webrtc_DataChannelInterface_label が null を返しました");
+        let ptr = expect_non_null(
+            unsafe { ffi::webrtc_DataChannelInterface_label(self.raw_ref.as_ptr()) },
+            "webrtc_DataChannelInterface_label",
+        );
         CxxString::from_unique(ptr).to_string()
     }
 
@@ -92,7 +95,7 @@ impl DataChannel {
     /// 本メソッドと `unregister_observer` は network thread 以外のどのスレッドからでも
     /// 呼べるが、コールバック内から呼んではならない。コールバックは signaling thread
     /// で発火する。
-    pub fn register_observer(&mut self, observer: &DataChannelObserver) {
+    pub fn register_observer(&self, observer: &DataChannelObserver) {
         unsafe {
             ffi::webrtc_DataChannelInterface_RegisterObserver(
                 self.raw_ref.as_ptr(),
@@ -124,11 +127,7 @@ pub trait DataChannelObserverHandler: Send {
     fn on_message(&mut self, data: &[u8], is_binary: bool) {}
 }
 
-struct DataChannelObserverHandlerState {
-    handler: Box<dyn DataChannelObserverHandler>,
-}
-
-unsafe impl Send for DataChannelObserverHandlerState {}
+type DataChannelObserverHandlerState = HandlerState<dyn DataChannelObserverHandler>;
 
 unsafe extern "C" fn dc_observer_on_state_change(user_data: *mut c_void) {
     assert!(
@@ -150,16 +149,20 @@ unsafe extern "C" fn dc_observer_on_message(
         "dc_observer_on_message: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut DataChannelObserverHandlerState) };
-    let slice = unsafe { slice::from_raw_parts(data, len) };
-    state.handler.on_message(slice, is_binary != 0);
+    // C++ 側 (CopyOnWriteBuffer::data) は空バッファで null を渡すことがあるが、
+    // from_raw_parts は null では UB なので空スライスで置き換える。
+    let data = if data.is_null() || len == 0 {
+        &[]
+    } else {
+        unsafe { slice::from_raw_parts(data, len) }
+    };
+    state.handler.on_message(data, is_binary != 0);
 }
 
 unsafe extern "C" fn dc_observer_on_destroy(user_data: *mut c_void) {
-    assert!(
-        !user_data.is_null(),
-        "dc_observer_on_destroy: user_data is null"
-    );
-    let _ = unsafe { Box::from_raw(user_data as *mut DataChannelObserverHandlerState) };
+    unsafe {
+        destroy_handler::<DataChannelObserverHandlerState>("dc_observer_on_destroy", user_data)
+    };
 }
 
 /// DataChannelObserver のラッパー。
@@ -171,21 +174,18 @@ unsafe impl Send for DataChannelObserver {}
 
 impl DataChannelObserver {
     pub fn new_with_handler(handler: Box<dyn DataChannelObserverHandler>) -> Self {
-        let state = Box::new(DataChannelObserverHandlerState { handler });
-        let user_data = Box::into_raw(state) as *mut c_void;
+        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_DataChannelObserver_cbs {
             OnStateChange: Some(dc_observer_on_state_change),
             OnMessage: Some(dc_observer_on_message),
             OnDestroy: Some(dc_observer_on_destroy),
         };
-        let raw = match NonNull::new(unsafe {
-            ffi::webrtc_DataChannelObserver_new(&cbs, user_data)
-        }) {
-            Some(raw) => raw,
-            None => {
-                let _ = unsafe { Box::from_raw(user_data as *mut DataChannelObserverHandlerState) };
-                panic!("BUG: webrtc_DataChannelObserver_new が null を返しました");
-            }
+        let raw = unsafe {
+            create_with_handler::<DataChannelObserverHandlerState, _>(
+                "webrtc_DataChannelObserver_new",
+                user_data,
+                |user_data| ffi::webrtc_DataChannelObserver_new(&cbs, user_data),
+            )
         };
         Self { raw }
     }
@@ -214,8 +214,10 @@ unsafe impl Send for DataChannelInit {}
 
 impl DataChannelInit {
     pub fn new() -> Self {
-        let raw = NonNull::new(unsafe { ffi::webrtc_DataChannelInit_new() })
-            .expect("BUG: webrtc_DataChannelInit_new が null を返しました");
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_DataChannelInit_new() },
+            "webrtc_DataChannelInit_new",
+        );
         Self { raw }
     }
 

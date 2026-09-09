@@ -9,9 +9,7 @@
 
 // WebRTC
 #include <absl/container/inlined_vector.h>
-#include <api/units/data_rate.h>
 #include <api/video/encoded_image.h>
-#include <api/video/video_bitrate_allocation.h>
 #include <api/video/video_codec_constants.h>
 #include <api/video/video_frame.h>
 #include <api/video/video_frame_buffer.h>
@@ -19,7 +17,6 @@
 #include <api/video_codecs/video_codec.h>
 #include <api/video_codecs/video_encoder.h>
 #include <modules/video_coding/include/video_codec_interface.h>
-#include <modules/video_coding/include/video_error_codes.h>
 
 #include "../../common.h"
 #include "../../common.impl.h"
@@ -484,19 +481,12 @@ webrtc_VideoEncoder_EncoderInfo_get_implementation_name(
 
 WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_set_implementation_name(
     struct webrtc_VideoEncoder_EncoderInfo* self,
-    struct std_string_unique* name) {
+    const struct std_string* name) {
+  assert(self != nullptr);
+  assert(name != nullptr);
   auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
-  if (name == nullptr) {
-    info->implementation_name.clear();
-    return;
-  }
-  auto cpp_name = reinterpret_cast<std::string*>(std_string_unique_get(name));
-  if (cpp_name != nullptr) {
-    info->implementation_name = *cpp_name;
-  } else {
-    info->implementation_name.clear();
-  }
-  std_string_unique_delete(name);
+  auto cpp_name = reinterpret_cast<const std::string*>(name);
+  info->implementation_name = *cpp_name;
 }
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_EncoderInfo_get_is_hardware_accelerated(
@@ -593,9 +583,6 @@ webrtc_VideoEncoder_EncoderInfo_get_fps_allocation(
     struct webrtc_VideoEncoder_EncoderInfo* self,
     int spatial_index) {
   auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
-  if (spatial_index < 0 || spatial_index >= webrtc::kMaxSpatialLayers) {
-    return nullptr;
-  }
   return reinterpret_cast<
       struct webrtc_VideoEncoder_FramerateFraction_inlined_vector*>(
       &info->fps_allocation[spatial_index]);

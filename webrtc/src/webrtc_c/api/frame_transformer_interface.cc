@@ -1,6 +1,8 @@
 #include "frame_transformer_interface.h"
 
 #include <assert.h>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <span>
@@ -16,6 +18,7 @@
 
 #include "../common.h"
 #include "../common.impl.h"
+#include "../std.h"
 #include "../std.impl.h"
 #include "video/video_frame_metadata.h"
 

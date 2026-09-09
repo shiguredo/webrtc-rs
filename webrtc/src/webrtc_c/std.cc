@@ -1,6 +1,7 @@
 #include "std.h"
 
 #include <stddef.h>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <string>

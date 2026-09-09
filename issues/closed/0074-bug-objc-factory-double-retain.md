@@ -1,7 +1,7 @@
 # ObjC ビデオコーデックファクトリの二重リテインによるメモリリーク
 
 - Created: 2026-08-03
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-27
 - Branch: feature/fix-objc-factory-double-retain
 - Polished: 2026-08-12
 
@@ -37,6 +37,8 @@ Rust 側 (`src/api/video_encoder.rs` の `VideoEncoderFactory::from_objc_default
 
 ## 解決方法
 
-- `webrtc/CMakeLists.txt`: macOS / iOS ブランチで `-fobjc-arc` を追加する
+- `webrtc/CMakeLists.txt`: macOS / iOS ブランチの `target_compile_options` に `$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>` を追加する（非 Apple ターゲットでは `.mm` が CXX としてコンパイルされるため OBJCXX 言語にのみ適用）
+- `build.rs`: macOS / iOS の bindgen 時に `webrtc_c.h` に加えて `objc.h` も読み込み、`objc_NSObject_retainCount` などのバインディングを生成する
 - 修正後、`RTCDefaultVideoDecoderFactory.mm` / `RTCDefaultVideoEncoderFactory.mm` の `new` が +1 のみで返ることを確認する
 - `webrtc/src/webrtc_c/sdk/objc/native/api/video_decoder_factory.mm` / `video_encoder_factory.mm` も ARC 化の影響を受けるため、ビルド・テストで正しく動作することを確認する
+- macOS で `cargo build --features source-build` と `cargo test --features source-build objc_` が成功することを確認する

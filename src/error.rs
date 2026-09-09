@@ -13,6 +13,7 @@ pub enum Error {
     InvalidSdp,
     InvalidIceCandidate,
     InvalidVideoCodecType(String),
+    InvalidAudioCodecType(String),
     OutOfIndex(usize),
 }
 
@@ -45,6 +46,9 @@ impl fmt::Display for Error {
             Error::InvalidIceCandidate => f.write_str("不正な ICE candidate です"),
             Error::InvalidVideoCodecType(codec_type) => {
                 write!(f, "不正な VideoCodecType です: {}", codec_type)
+            }
+            Error::InvalidAudioCodecType(codec_type) => {
+                write!(f, "不正な AudioCodecType です: {}", codec_type)
             }
             Error::OutOfIndex(index) => write!(f, "インデックス {} が範囲外です", index),
         }

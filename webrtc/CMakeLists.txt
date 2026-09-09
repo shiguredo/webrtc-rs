@@ -420,9 +420,15 @@ add_library(webrtc_c
   STATIC
     src/webrtc_c/api/audio/audio_device.cc
     src/webrtc_c/api/audio/audio_device_defines.cc
+    src/webrtc_c/api/audio/audio_options.cc
     src/webrtc_c/api/audio/audio_processing.cc
+    src/webrtc_c/api/audio_codecs/audio_codec_pair_id.cc
     src/webrtc_c/api/audio_codecs/audio_decoder_factory.cc
     src/webrtc_c/api/audio_codecs/audio_encoder_factory.cc
+    src/webrtc_c/api/audio_codecs/audio_decoder.cc
+    src/webrtc_c/api/audio_codecs/audio_encoder.cc
+    src/webrtc_c/api/audio_codecs/audio_format.cc
+    src/webrtc_c/api/call/bitrate_allocation.cc
     src/webrtc_c/api/data_channel_interface.cc
     src/webrtc_c/api/dtls_transport_interface.cc
     src/webrtc_c/api/frame_transformer_interface.cc
@@ -471,6 +477,7 @@ add_library(webrtc_c
     src/webrtc_c/libyuv.cc
     src/webrtc_c/media/engine/simulcast_encoder_adapter.cc
     src/webrtc_c/pc/connection_context.cc
+    src/webrtc_c/rtc_base/buffer.cc
     src/webrtc_c/rtc_base/crypto_random.cc
     src/webrtc_c/rtc_base/logging.cc
     src/webrtc_c/rtc_base/ssl_adapter.cc
@@ -645,8 +652,17 @@ if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
 elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
   enable_language(OBJCXX)
 
+  target_sources(webrtc_c
+    PRIVATE
+      src/webrtc_c/objc.mm
+  )
+
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_options(${target} PRIVATE -fconstant-string-class=NSConstantString)
+    target_compile_options(${target}
+      PRIVATE
+        -fconstant-string-class=NSConstantString
+        "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>"
+    )
     target_compile_definitions(${target}
       PRIVATE
         WEBRTC_POSIX
@@ -696,7 +712,11 @@ elseif (WEBRTC_C_TARGET STREQUAL "ios_arm64")
   )
 
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_options(${target} PRIVATE -fconstant-string-class=NSConstantString)
+    target_compile_options(${target}
+      PRIVATE
+        -fconstant-string-class=NSConstantString
+        "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>"
+    )
     target_compile_definitions(${target}
       PRIVATE
         WEBRTC_POSIX
