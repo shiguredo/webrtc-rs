@@ -11,6 +11,10 @@
 
 ## develop
 
+## 0.152.1
+
+**リリース日**: 2026-09-10
+
 - [CHANGE] `VideoEncoderFactory` / `VideoDecoderFactory` の Handler trait を必須化する
   - `VideoEncoderFactoryHandler` / `VideoDecoderFactoryHandler` の `get_supported_formats` / `create` をデフォルト実装から必須メソッドへ変更し、実装漏れをコンパイルエラーで検知できるようにする
   - libwebrtc の `webrtc::VideoEncoderFactory` / `webrtc::VideoDecoderFactory` が純粋仮想関数で両メソッドの実装を要求するのに合わせる
