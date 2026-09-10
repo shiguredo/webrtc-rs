@@ -65,7 +65,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 ## バージョニング
 
 - メジャーバージョンは常に 0
-- マイナーバージョンは libwebrtc の m バージョンと一致 (例: 0.146.x は m146)
+- マイナーバージョンは libwebrtc の m バージョンと一致 (例: 0.154.x は m154)
 - パッチバージョンは同一 m バージョン内での変更時にインクリメント
 
 ## 使い方
@@ -74,7 +74,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 
 ```toml
 [dependencies]
-shiguredo_webrtc = "0.146"
+shiguredo_webrtc = "0.154"
 ```
 
 ### PeerConnectionFactory の生成
@@ -430,7 +430,7 @@ C++ ラッパーのコード変更や、prebuilt が提供されていないプ�
 
 ```toml
 [dependencies]
-shiguredo_webrtc = { version = "0.146", features = ["source-build"] }
+shiguredo_webrtc = { version = "0.154", features = ["source-build"] }
 ```
 
 または `cargo build` 時に指定:

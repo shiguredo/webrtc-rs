@@ -18,7 +18,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 ## バージョン情報
 
 - crate 名: `shiguredo_webrtc`
-- 現行バージョン: 0.151.x (libwebrtc m151 ベース、`webrtc-build = "m151.7922.0.0"`)
+- 現行バージョン: 0.154.x (libwebrtc m154 ベース、`webrtc-build = "m154.8037.1.1"`)
 - Rust Edition: 2024
 - 最小 Rust バージョン: 1.93
 - ライセンス: Apache-2.0
@@ -26,7 +26,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 ### バージョニング規則
 
 - メジャーバージョンは常に 0
-- マイナーバージョンは libwebrtc の m バージョンと一致 (例: 0.151.x は m151)
+- マイナーバージョンは libwebrtc の m バージョンと一致 (例: 0.154.x は m154)
 - パッチバージョンは同一 m バージョン内での変更時にインクリメント
 
 ## ビルド設定 (`Cargo.toml` メタデータ)
