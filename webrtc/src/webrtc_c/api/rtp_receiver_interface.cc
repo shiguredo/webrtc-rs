@@ -1,9 +1,10 @@
 #include "rtp_receiver_interface.h"
 
-#include <api/rtp_receiver_interface.h>
-#include <api/scoped_refptr.h>
 #include <string>
 #include <vector>
+
+#include <api/rtp_receiver_interface.h>
+#include <api/scoped_refptr.h>
 
 #include "../common.h"
 #include "../common.impl.h"

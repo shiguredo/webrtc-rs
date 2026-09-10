@@ -11,6 +11,11 @@
 
 ## develop
 
+- [ADD] `RtpReceiver::stream_ids` を追加する
+  - C API の `webrtc_RtpReceiverInterface_stream_ids` を追加し、受信器に関連付けられた Stream ID 群を複製して返す
+  - `RtpReceiver::stream_ids` を追加し、所有権付きの `StringVector` で Stream ID 群を取得できるようにする
+  - @voluntas
+
 ## 0.154.0
 
 **リリース日**: 2026-09-10
@@ -87,10 +92,6 @@
 - [ADD] カスタム `LogSink` を設定可能にする
   - `log::LogSink` / `log::LogSinkHandler` / `log::LogLineRef` を追加し、`log::LoggingConfig::add_sink` でアプリケーション独自のログ出力先を登録できるようにする
   - C API に `webrtc_LogSink_new` / `webrtc_LoggingConfig_AddSink` と `webrtc_LogLineRef` の各アクセサを追加する
-  - @melpon
-- [ADD] `RtpReceiver::stream_ids` を追加する
-  - C API の `webrtc_RtpReceiverInterface_stream_ids` を追加し、受信器に関連付けられた Stream ID 群を複製して返す
-  - `RtpReceiver::stream_ids` を追加し、所有権付きの `StringVector` で Stream ID 群を取得できるようにする
   - @melpon
 - [UPDATE] 読み取り専用引数と共有ハンドル型レシーバの borrow を実体に合わせて変更する
   - 読み取り専用の `config` / `options` / `init` を `&mut` から `&` に変更する (`PeerConnection::create` / `set_configuration` / `create_offer` / `create_answer` / `create_data_channel` / `add_transceiver` / `add_transceiver_with_track`)
