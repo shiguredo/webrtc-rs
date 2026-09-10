@@ -2346,6 +2346,76 @@ fn rtp_receiver_stream_ids() {
 }
 
 #[test]
+fn media_stream_track_state() {
+    // 整数と列挙の対応を確認する。C 側の定数との対応が崩れていないことも見る。
+    assert_eq!(
+        MediaStreamTrackState::from_int(unsafe {
+            ffi::webrtc_MediaStreamTrackInterface_TrackState_kLive
+        }),
+        MediaStreamTrackState::Live
+    );
+    assert_eq!(
+        MediaStreamTrackState::from_int(unsafe {
+            ffi::webrtc_MediaStreamTrackInterface_TrackState_kEnded
+        }),
+        MediaStreamTrackState::Ended
+    );
+    assert_eq!(
+        MediaStreamTrackState::from_int(999),
+        MediaStreamTrackState::Unknown(999)
+    );
+
+    // Factory を組み立てる。
+    let dec_audio = AudioDecoderFactory::builtin();
+    let enc_audio = AudioEncoderFactory::builtin();
+    let enc_video = VideoEncoderFactory::builtin();
+    let dec_video = VideoDecoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc_audio);
+    deps_factory.set_audio_decoder_factory(&dec_audio);
+    deps_factory.set_video_encoder_factory(enc_video);
+    deps_factory.set_video_decoder_factory(dec_video);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    // 生成直後の映像トラックが生きた状態であることを確認する。
+    let source = AdaptedVideoTrackSource::new();
+    let vts = source.cast_to_video_track_source();
+    let track = factory
+        .create_video_track(&vts, "video-track-state")
+        .expect("VideoTrack の生成に失敗しました");
+    let stream_track = track.cast_to_media_stream_track();
+    assert_eq!(stream_track.state(), MediaStreamTrackState::Live);
+
+    drop(stream_track);
+    drop(track);
+    drop(vts);
+    drop(source);
+    drop(factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
 fn peer_connection_lookup_dtls_transport() {
     let dec = AudioDecoderFactory::builtin();
     let enc = AudioEncoderFactory::builtin();

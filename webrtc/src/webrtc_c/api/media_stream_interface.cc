@@ -71,6 +71,21 @@ WEBRTC_EXPORT int8_t webrtc_MediaStreamTrackInterface_set_enabled(
   auto track = reinterpret_cast<webrtc::MediaStreamTrackInterface*>(self);
   return track->set_enabled(enable != 0) ? 1 : 0;
 }
+
+WEBRTC_EXPORT extern const int
+    webrtc_MediaStreamTrackInterface_TrackState_kLive =
+        static_cast<int>(webrtc::MediaStreamTrackInterface::TrackState::kLive);
+WEBRTC_EXPORT extern const int
+    webrtc_MediaStreamTrackInterface_TrackState_kEnded =
+        static_cast<int>(webrtc::MediaStreamTrackInterface::TrackState::kEnded);
+
+WEBRTC_EXPORT webrtc_MediaStreamTrackInterface_TrackState
+webrtc_MediaStreamTrackInterface_state(
+    const struct webrtc_MediaStreamTrackInterface* self) {
+  auto track = reinterpret_cast<const webrtc::MediaStreamTrackInterface*>(self);
+  return static_cast<webrtc_MediaStreamTrackInterface_TrackState>(
+      track->state());
+}
 }
 
 // -------------------------

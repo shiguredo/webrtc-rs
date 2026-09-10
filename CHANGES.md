@@ -15,6 +15,10 @@
   - C API の `webrtc_RtpReceiverInterface_stream_ids` を追加し、受信器に関連付けられた Stream ID 群を複製して返す
   - `RtpReceiver::stream_ids` を追加し、所有権付きの `StringVector` で Stream ID 群を取得できるようにする
   - @voluntas
+- [ADD] `MediaStreamTrack::state` を追加する
+  - C API の `webrtc_MediaStreamTrackInterface_state` を追加し、トラック自体の生死を返す
+  - `MediaStreamTrackState` を追加し、`MediaStreamTrack::state` で生死を取得できるようにする
+  - @voluntas
 
 ## 0.154.0
 
