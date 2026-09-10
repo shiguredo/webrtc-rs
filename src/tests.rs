@@ -2156,6 +2156,196 @@ fn peer_connection_create_and_transceiver() {
 }
 
 #[test]
+fn rtp_receiver_stream_ids() {
+    // 受信側の on_track で渡される送受信器から、送信側が付けた Stream ID 群が返ることを確認する。
+    struct TrackHandler {
+        tx: mpsc::Sender<Vec<String>>,
+    }
+
+    impl PeerConnectionObserverHandler for TrackHandler {
+        fn on_track(&mut self, transceiver: RtpTransceiver) {
+            let ids = transceiver.receiver().stream_ids();
+            let mut out = Vec::new();
+            for i in 0..ids.len() {
+                out.push(ids.get(i).expect("Stream ID の取得に失敗しました"));
+            }
+            let _ = self.tx.send(out);
+        }
+    }
+
+    // Offer 生成の完了を待つための処理。
+    struct OfferHandler {
+        tx: mpsc::Sender<Result<String>>,
+    }
+
+    impl CreateSessionDescriptionObserverHandler for OfferHandler {
+        fn on_success(&mut self, desc: SessionDescription) {
+            let _ = self.tx.send(desc.to_string());
+        }
+
+        fn on_failure(&mut self, err: RtcError) {
+            let _ = self.tx.send(Err(err.into()));
+        }
+    }
+
+    // Offer / Answer の設定完了を待つための処理。
+    struct SetDescriptionHandler {
+        tx: mpsc::Sender<bool>,
+    }
+
+    impl SetLocalDescriptionObserverHandler for SetDescriptionHandler {
+        fn on_set_local_description_complete(&mut self, error: RtcError) {
+            let _ = self.tx.send(error.ok());
+        }
+    }
+
+    impl SetRemoteDescriptionObserverHandler for SetDescriptionHandler {
+        fn on_set_remote_description_complete(&mut self, error: RtcError) {
+            let _ = self.tx.send(error.ok());
+        }
+    }
+
+    // Factory を組み立てる。
+    let dec_audio = AudioDecoderFactory::builtin();
+    let enc_audio = AudioEncoderFactory::builtin();
+    let enc_video = VideoEncoderFactory::builtin();
+    let dec_video = VideoDecoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut worker = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    worker.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc_audio);
+    deps_factory.set_audio_decoder_factory(&dec_audio);
+    deps_factory.set_video_encoder_factory(enc_video);
+    deps_factory.set_video_decoder_factory(dec_video);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    // 送信側の PeerConnection を生成し、映像トラックを 2 件追加する。
+    // 1 件目には Stream ID を 1 件付け、2 件目には付けず、空の場合の振る舞いも確認する。
+    let pc_config = PeerConnectionRtcConfiguration::new();
+    let offer_observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
+    let offer_deps = PeerConnectionDependencies::new(&offer_observer);
+    let offer_pc = PeerConnection::create(&factory, &pc_config, offer_deps)
+        .expect("PeerConnection の生成に失敗しました");
+    let source = AdaptedVideoTrackSource::new();
+    let vts = source.cast_to_video_track_source();
+    let track = factory
+        .create_video_track(&vts, "video-track-1")
+        .expect("VideoTrack の生成に失敗しました");
+    let stream_track = track.cast_to_media_stream_track();
+    let mut offer_stream_ids = StringVector::new(0);
+    offer_stream_ids.push(&CxxString::from_str("loopback-stream"));
+    offer_pc
+        .add_track(&stream_track, &offer_stream_ids)
+        .expect("AddTrack が失敗しました");
+    let empty_track = factory
+        .create_video_track(&vts, "video-track-2")
+        .expect("VideoTrack の生成に失敗しました");
+    let empty_stream_track = empty_track.cast_to_media_stream_track();
+    let empty_stream_ids = StringVector::new(0);
+    offer_pc
+        .add_track(&empty_stream_track, &empty_stream_ids)
+        .expect("AddTrack が失敗しました");
+
+    // 受信側の PeerConnection を生成する。on_track 到達時の Stream ID 群を受け取る。
+    let (track_tx, track_rx) = mpsc::channel::<Vec<String>>();
+    let answer_observer =
+        PeerConnectionObserver::new_with_handler(Box::new(TrackHandler { tx: track_tx }));
+    let answer_deps = PeerConnectionDependencies::new(&answer_observer);
+    let answer_pc = PeerConnection::create(&factory, &pc_config, answer_deps)
+        .expect("PeerConnection の生成に失敗しました");
+
+    // 送信側で Offer を生成する。
+    let opts = PeerConnectionOfferAnswerOptions::new();
+    let (offer_tx, offer_rx) = mpsc::channel::<Result<String>>();
+    let mut offer_obs =
+        CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferHandler { tx: offer_tx }));
+    offer_pc.create_offer(&mut offer_obs, &opts);
+    let sdp = offer_rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("createOffer がタイムアウトしました")
+        .expect("createOffer が失敗しました");
+
+    // 送信側に Offer を設定する。
+    let (local_tx, local_rx) = mpsc::channel::<bool>();
+    let local_obs =
+        SetLocalDescriptionObserver::new_with_handler(Box::new(SetDescriptionHandler {
+            tx: local_tx,
+        }));
+    let local_desc =
+        SessionDescription::new(SdpType::Offer, &sdp).expect("Offer の組み立てに失敗しました");
+    offer_pc.set_local_description(local_desc, &local_obs);
+    assert!(
+        local_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("setLocalDescription がタイムアウトしました"),
+        "setLocalDescription が失敗しました"
+    );
+
+    // 受信側に Offer を設定し、on_track で届く 2 件の Stream ID 群を確認する。
+    // 到達順は問わないため、両方受け取ってから並べ替えて比較する。
+    let (remote_tx, remote_rx) = mpsc::channel::<bool>();
+    let remote_obs =
+        SetRemoteDescriptionObserver::new_with_handler(Box::new(SetDescriptionHandler {
+            tx: remote_tx,
+        }));
+    let remote_desc =
+        SessionDescription::new(SdpType::Offer, &sdp).expect("Offer の組み立てに失敗しました");
+    answer_pc.set_remote_description(remote_desc, &remote_obs);
+    assert!(
+        remote_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("setRemoteDescription がタイムアウトしました"),
+        "setRemoteDescription が失敗しました"
+    );
+    let mut received = Vec::new();
+    for _ in 0..2 {
+        received.push(
+            track_rx
+                .recv_timeout(Duration::from_secs(10))
+                .expect("on_track がタイムアウトしました"),
+        );
+    }
+    received.sort();
+    assert_eq!(
+        received,
+        vec![Vec::<String>::new(), vec!["loopback-stream".to_string()]]
+    );
+
+    drop(offer_obs);
+    drop(local_obs);
+    drop(remote_obs);
+    drop(offer_pc);
+    drop(answer_pc);
+    drop(empty_stream_track);
+    drop(empty_track);
+    drop(stream_track);
+    drop(track);
+    drop(vts);
+    drop(source);
+    drop(factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    worker.stop();
+    signaling.stop();
+}
+
+#[test]
 fn peer_connection_lookup_dtls_transport() {
     let dec = AudioDecoderFactory::builtin();
     let enc = AudioEncoderFactory::builtin();

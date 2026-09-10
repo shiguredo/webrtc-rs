@@ -7,7 +7,7 @@ use crate::helper::ref_count::{
 };
 use crate::{
     AudioTrack, CxxString, CxxStringRef, FrameTransformer, MapStringString, MediaType, Result,
-    RtcError, ScopedRef, StringVectorRef, VideoTrack, ffi,
+    RtcError, ScopedRef, StringVector, StringVectorRef, VideoTrack, ffi,
 };
 use std::marker::PhantomData;
 use std::ptr::NonNull;
@@ -1362,6 +1362,17 @@ impl RtpReceiver {
             "webrtc_RtpReceiverInterface_track",
         ));
         MediaStreamTrack::from_scoped_ref(raw_ref)
+    }
+
+    /// 受信器に関連付けられた Stream ID 群を返す。
+    ///
+    /// 呼び出し時点の複製を返すため、後の状態変化は反映されない。
+    pub fn stream_ids(&self) -> StringVector {
+        let raw = unsafe { ffi::webrtc_RtpReceiverInterface_stream_ids(self.raw_ref.as_ptr()) };
+        StringVector::from_raw(expect_non_null(
+            raw,
+            "webrtc_RtpReceiverInterface_stream_ids",
+        ))
     }
 
     /// フレーム変換を設定する。

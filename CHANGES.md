@@ -11,6 +11,11 @@
 
 ## develop
 
+- [ADD] `RtpReceiver::stream_ids` を追加する
+  - C API の `webrtc_RtpReceiverInterface_stream_ids` を追加し、受信器に関連付けられた Stream ID 群を複製して返す
+  - `RtpReceiver::stream_ids` を追加し、所有権付きの `StringVector` で Stream ID 群を取得できるようにする
+  - @voluntas
+
 ## 0.154.0
 
 **リリース日**: 2026-09-10

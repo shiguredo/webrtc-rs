@@ -1,7 +1,7 @@
 # RtpReceiver に stream_ids の取得口を追加する
 
 - Created: 2026-09-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-09-04
 - Branch: feature/add-rtp-receiver-stream-ids
 - Polished: 2026-09-04
 
@@ -30,4 +30,9 @@
 
 ## 解決方法
 
-（詳細は polish / 実装時に確定する）
+- `webrtc_c` に `webrtc_RtpReceiverInterface_stream_ids` を追加し、libwebrtc の `RtpReceiverInterface::stream_ids` の値返し結果を新規確保した `std_string_vector` に複製して返すようにした（所有権は呼び出し側へ移す。読み取り専用のため `self` は `const` 扱い）
+- `src/cxxstd.rs` の `StringVector` に FFI ポインタから所有権を引き受ける `from_raw` を追加した
+- `src/api/rtp.rs` の `RtpReceiver` に `stream_ids` を追加し、所有型の `StringVector` を返すようにした（空の場合は空ベクタを返す）
+- `src/tests.rs` に送受信の往復テスト `rtp_receiver_stream_ids` を追加し、非空と空の ID 群を確認した
+- `CHANGES.md` の `## develop` 節に `[ADD]` エントリを追加した
+- `cargo test --workspace --features source-build` と `cargo clippy --workspace --features source-build -- -D warnings` の成功を確認した
