@@ -1,9 +1,9 @@
 ---
-name: libwebrtc_c
+name: libwebrtc-c
 description: webrtc-rs リポジトリ配下の webrtc/ サブプロジェクト (libwebrtc C++ API の薄い C ラッパー) の機能・設計ルールリファレンス。命名規則、*_refcounted / *_unique / *_vector / *_inlined_vector のメモリ管理、null チェック方針、Cbs ルール、RULES.md の移植ルール、webrtc_c.h の公開 API、CMake ビルドターゲット、WHIP/WHEP サンプル、セルフチェック手順に関する質問時に使用。
 ---
 
-# libwebrtc_c
+# libwebrtc-c
 
 `webrtc-rs` リポジトリの `webrtc/` サブプロジェクトに存在する、libwebrtc C++ API の薄い C ラッパー層。Rust 側の `shiguredo_webrtc` crate はこの C API を通じて libwebrtc を利用する。
 
@@ -263,5 +263,5 @@ C アプリ側で `webrtc::scoped_refptr` に相互変換できるクラスを�
 
 ## 関連
 
-- Rust 側 API (`shiguredo_webrtc` crate): `shiguredo_webrtc` skill を参照
+- Rust 側 API (`shiguredo_webrtc` crate): `shiguredo-webrtc` skill を参照
 - 移植ルールの一次情報: `webrtc/RULES.md`

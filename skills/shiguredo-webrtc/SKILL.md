@@ -1,9 +1,9 @@
 ---
-name: shiguredo_webrtc
+name: shiguredo-webrtc
 description: 時雨堂の Rust 製 WebRTC ライブラリ shiguredo_webrtc (webrtc-rs) の機能・API リファレンス。PeerConnection、SDP/JSEP、DataChannel、AudioTrack/VideoTrack、RTP、DTLS、libyuv、Thread 管理、C++ 薄層ラッパー経由の libwebrtc 利用、ログマクロに関する質問時に使用。
 ---
 
-# shiguredo_webrtc
+# shiguredo-webrtc
 
 libwebrtc の C API バインディングを Rust から安全に利用するためのライブラリ (webrtc-rs)。
 
@@ -199,4 +199,4 @@ libwebrtc の `scoped_refptr` 相当を Rust 側で安全に扱うための型:
 
 ## Rust 側で完結する範囲
 
-本 skill は Rust API のみを対象とする。C++ → C ラッパー (`webrtc/` サブプロジェクト) の設計・実装・移植ルールは `libwebrtc_c` skill を参照。
+本 skill は Rust API のみを対象とする。C++ → C ラッパー (`webrtc/` サブプロジェクト) の設計・実装・移植ルールは `libwebrtc-c` skill を参照。
