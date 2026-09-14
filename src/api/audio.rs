@@ -3013,7 +3013,7 @@ impl AudioEncoderFactory {
         options: &AudioEncoderFactoryOptions,
     ) -> Option<AudioEncoder> {
         let raw = unsafe {
-            ffi::webrtc_AudioEncoderFactory_MakeAudioEncoder(
+            ffi::webrtc_AudioEncoderFactory_Create(
                 self.as_ptr(),
                 env.as_ptr(),
                 format.as_ptr(),
@@ -3168,11 +3168,7 @@ impl AudioDecoderFactory {
         format: SdpAudioFormatRef<'_>,
     ) -> Option<AudioDecoder> {
         let raw = unsafe {
-            ffi::webrtc_AudioDecoderFactory_MakeAudioDecoder(
-                self.as_ptr(),
-                env.as_ptr(),
-                format.as_ptr(),
-            )
+            ffi::webrtc_AudioDecoderFactory_Create(self.as_ptr(), env.as_ptr(), format.as_ptr())
         };
         Some(AudioDecoder {
             raw_unique: NonNull::new(raw)?,
