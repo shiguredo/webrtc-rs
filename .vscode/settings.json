@@ -9,4 +9,5 @@
     "**/node_modules/**": true,
     "**/_build/**": true,
   },
+  "cmake.sourceDirectory": "${workspaceFolder}/webrtc",
 }
