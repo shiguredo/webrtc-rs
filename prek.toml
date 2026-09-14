@@ -78,12 +78,14 @@ pass_filenames = false
 priority = 0
 
 # CI と同じく source-build を有効にし、警告をエラーに昇格する
+# C/C++ の変更も対象にするのは、C API の変更で bindgen の生成結果が変わり Rust 側が壊れるため
+# (types = ["rust"] だけだと C/C++ のみのコミットでスキップされてしまう)
 [[repos.hooks]]
 id = "cargo-clippy"
 name = "cargo clippy"
 entry = "cargo clippy --workspace --features source-build -- -D warnings"
 language = "system"
-types = ["rust"]
+files = "^(src/.*\\.rs|examples/.*\\.rs|tests/.*\\.rs|build\\.rs|webrtc/src/.*)$"
 pass_filenames = false
 priority = 10
 
@@ -98,12 +100,13 @@ pass_filenames = false
 priority = 10
 
 # cargo test: コミットを遅くしないため pre-push でだけ実行する
+# 対象ファイルの条件は cargo-clippy と同じく C/C++ の変更も含める
 [[repos.hooks]]
 id = "cargo-test"
 name = "cargo test"
 entry = "cargo test --workspace --features source-build"
 language = "system"
-types = ["rust"]
+files = "^(src/.*\\.rs|examples/.*\\.rs|tests/.*\\.rs|build\\.rs|webrtc/src/.*)$"
 pass_filenames = false
 stages = ["pre-push"]
 priority = 20
