@@ -19,6 +19,10 @@
   - C API の `webrtc_MediaStreamTrackInterface_state` を追加し、トラック自体の生死を返す
   - `MediaStreamTrackState` を追加し、`MediaStreamTrack::state` で生死を取得できるようにする
   - @voluntas
+- [FIX] C の関数名が間違っていたのを修正する
+  - `webrtc_AudioDecoderFactory_MakeAudioDecoder` → `webrtc_AudioDecoderFactory_Create`
+  - `webrtc_AudioEncoderFactory_MakeAudioEncoder` → `webrtc_AudioEncoderFactory_Create`
+  - @melpon
 
 ## 0.154.0
 

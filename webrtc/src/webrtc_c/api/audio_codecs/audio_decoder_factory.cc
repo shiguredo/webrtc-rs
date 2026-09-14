@@ -112,10 +112,9 @@ WEBRTC_EXPORT int webrtc_AudioDecoderFactory_IsSupportedDecoder(
 }
 
 WEBRTC_EXPORT struct webrtc_AudioDecoder_unique*
-webrtc_AudioDecoderFactory_MakeAudioDecoder(
-    struct webrtc_AudioDecoderFactory* self,
-    const struct webrtc_Environment* env,
-    const struct webrtc_SdpAudioFormat* format) {
+webrtc_AudioDecoderFactory_Create(struct webrtc_AudioDecoderFactory* self,
+                                  const struct webrtc_Environment* env,
+                                  const struct webrtc_SdpAudioFormat* format) {
   assert(self != nullptr);
   assert(env != nullptr);
   assert(format != nullptr);
