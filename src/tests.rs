@@ -1524,13 +1524,11 @@ fn builtin_audio_factories_create() {
     // PeerConnectionFactoryDependencies を組み立てて EnableMedia まで呼ぶ。
     let mut deps = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps.set_network_thread(&network);
-    deps.set_worker_thread(&worker);
+    deps.set_worker_thread(&network);
     deps.set_signaling_thread(&signaling);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
@@ -1544,7 +1542,6 @@ fn builtin_audio_factories_create() {
     assert!(!deps.as_ptr().is_null());
     drop(deps);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -1722,13 +1719,11 @@ fn peer_connection_factory_and_capabilities() {
     // PeerConnectionFactoryDependencies を組み立てる。スレッドのライフサイクルはここで管理する。
     let mut deps = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps.set_network_thread(&network);
-    deps.set_worker_thread(&worker);
+    deps.set_worker_thread(&network);
     deps.set_signaling_thread(&signaling);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
@@ -1768,7 +1763,6 @@ fn peer_connection_factory_and_capabilities() {
     drop(context);
     drop(factory);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -1824,13 +1818,11 @@ fn create_modular_with_context_returns_default_network_objects() {
 
     let mut deps = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps.set_network_thread(&network);
-    deps.set_worker_thread(&worker);
+    deps.set_worker_thread(&network);
     deps.set_signaling_thread(&signaling);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
@@ -1852,7 +1844,6 @@ fn create_modular_with_context_returns_default_network_objects() {
     drop(context);
     drop(factory);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -2052,13 +2043,11 @@ fn rtp_sender_get_set_parameters() {
 
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -2107,7 +2096,6 @@ fn rtp_sender_get_set_parameters() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -2119,13 +2107,11 @@ fn peer_connection_create_and_transceiver() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -2151,7 +2137,6 @@ fn peer_connection_create_and_transceiver() {
     drop(pc);
     drop(factory);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -2213,13 +2198,11 @@ fn rtp_receiver_stream_ids() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -2341,7 +2324,6 @@ fn rtp_receiver_stream_ids() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -2373,13 +2355,11 @@ fn media_stream_track_state() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -2411,7 +2391,6 @@ fn media_stream_track_state() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -2422,13 +2401,11 @@ fn peer_connection_lookup_dtls_transport() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -2463,7 +2440,6 @@ fn peer_connection_lookup_dtls_transport() {
     drop(pc);
     drop(factory);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -2474,13 +2450,11 @@ fn get_stats_delivers_report() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -2511,7 +2485,6 @@ fn get_stats_delivers_report() {
     drop(pc);
     drop(factory);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -2522,13 +2495,11 @@ fn peer_connection_create_with_proxy_allocator() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -2566,7 +2537,6 @@ fn peer_connection_create_with_proxy_allocator() {
     drop(context);
     drop(factory);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -2580,13 +2550,11 @@ fn video_track_and_transceiver_with_track() {
 
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -2637,7 +2605,6 @@ fn video_track_and_transceiver_with_track() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -2735,13 +2702,11 @@ fn always_negotiate_data_channels_adds_data_section() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -2775,7 +2740,6 @@ fn always_negotiate_data_channels_adds_data_section() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -3697,13 +3661,11 @@ fn create_local_media_stream_returns_requested_id() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -3729,7 +3691,6 @@ fn create_local_media_stream_returns_requested_id() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -3742,13 +3703,11 @@ fn media_stream_track_round_trip() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -3832,7 +3791,6 @@ fn media_stream_track_round_trip() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -3885,13 +3843,11 @@ fn create_audio_source_with_audio_options() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -3919,7 +3875,6 @@ fn create_audio_source_with_audio_options() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -3931,13 +3886,11 @@ fn create_audio_source_with_default_audio_options() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -3961,7 +3914,6 @@ fn create_audio_source_with_default_audio_options() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 

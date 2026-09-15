@@ -24,6 +24,13 @@
   - `webrtc_AudioEncoderFactory_MakeAudioEncoder` → `webrtc_AudioEncoderFactory_Create`
   - @melpon
 
+### misc
+
+- [UPDATE] サンプルとテストで PeerConnectionFactory の worker thread に network thread を使う
+  - `PeerConnectionFactoryDependencies::set_worker_thread` に network thread を渡す
+  - C / C++ の whip / whep サンプルから専用 worker thread の生成を削除する
+  - @melpon
+
 ## 0.154.0
 
 **リリース日**: 2026-09-10
