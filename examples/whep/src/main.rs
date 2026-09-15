@@ -26,7 +26,6 @@ use std::time::{Duration, Instant};
 pub struct FactoryHolder {
     factory: PeerConnectionFactory,
     _network: Thread,
-    _worker: Thread,
     _signaling: Thread,
 }
 
@@ -34,15 +33,13 @@ impl FactoryHolder {
     pub fn new() -> Option<Arc<Self>> {
         let env = Environment::new();
         let mut network = Thread::new_with_socket_server();
-        let mut worker = Thread::new();
         let mut signaling = Thread::new();
         network.start();
-        worker.start();
         signaling.start();
 
         let mut deps = PeerConnectionFactoryDependencies::new();
         deps.set_network_thread(&network);
-        deps.set_worker_thread(&worker);
+        deps.set_worker_thread(&network);
         deps.set_signaling_thread(&signaling);
         let event_log = RtcEventLogFactory::new();
         deps.set_event_log_factory(event_log);
@@ -65,7 +62,6 @@ impl FactoryHolder {
         Some(Arc::new(Self {
             factory,
             _network: network,
-            _worker: worker,
             _signaling: signaling,
         }))
     }

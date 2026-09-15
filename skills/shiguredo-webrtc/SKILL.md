@@ -113,15 +113,13 @@ use shiguredo_webrtc::{
 
 let env = Environment::new();
 let mut network = Thread::new_with_socket_server();
-let mut worker = Thread::new();
 let mut signaling = Thread::new();
 network.start();
-worker.start();
 signaling.start();
 
 let mut deps = PeerConnectionFactoryDependencies::new();
 deps.set_network_thread(&network);
-deps.set_worker_thread(&worker);
+deps.set_worker_thread(&network);
 deps.set_signaling_thread(&signaling);
 deps.set_event_log_factory(RtcEventLogFactory::new());
 

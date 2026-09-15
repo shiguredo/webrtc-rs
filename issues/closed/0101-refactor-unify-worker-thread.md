@@ -1,7 +1,7 @@
 # PeerConnectionFactory に渡す worker thread を network thread に統一する
 
 - Created: 2026-09-15
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-09-15
 - Branch: feature/refactor-unify-worker-thread
 - Polished: {YYYY-MM-DD}
 
@@ -67,4 +67,15 @@ C++ 版と C 版は CMake の `whip_cpp` / `whep_cpp` / `whip_c` / `whep_c` タ�
 
 ## 解決方法
 
-（詳細は polish / 実装時に確定する）
+専用 worker thread の生成を削除し、factory の worker thread として network thread を使うようにした。
+
+- `README.md` / `skills/shiguredo-webrtc/SKILL.md` / `examples/whip/src/main.rs` / `examples/whep/src/main.rs` / `src/tests.rs` で worker 用の `Thread::new()` / `start()` / `stop()` を削除し、`set_worker_thread` に network thread を渡すようにした
+- `webrtc/src/whip.cpp` / `webrtc/src/whep.cpp` で `worker_thread_` メンバ、生成、`Start()`、`Stop()`、`worker_thread()` アクセサを削除し、`dependencies.worker_thread` と ADM の生成を network thread に変更した
+- `webrtc/src/whip.c` / `webrtc/src/whep.c` で `worker_thread` フィールド、生成、`Start()`、後始末を削除し、deps の設定と ADM の生成を network thread に変更した
+- `CHANGES.md` の `## develop` の `### misc` に追記した
+
+確認:
+
+- `cargo clippy --workspace --features source-build -- -D warnings` が通ることを確認した
+- `cargo test --workspace --features source-build` が通ることを確認した（35 件 + doctest 4 件）
+- CMake の `whip_cpp` / `whep_cpp` がビルドできることを確認した（`whip_c` / `whep_c` は `webrtc_SdpVideoFormat_new` の引数不一致という既存の問題でビルドできないため対象外とした）

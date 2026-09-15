@@ -84,20 +84,18 @@ class PeerConnectionFactory : public webrtc::RefCountInterface {
 
     c->network_thread_ = webrtc::Thread::CreateWithSocketServer();
     c->network_thread_->Start();
-    c->worker_thread_ = webrtc::Thread::Create();
-    c->worker_thread_->Start();
     c->signaling_thread_ = webrtc::Thread::Create();
     c->signaling_thread_->Start();
 
     webrtc::PeerConnectionFactoryDependencies dependencies;
     auto env = webrtc::CreateEnvironment();
     dependencies.network_thread = c->network_thread_.get();
-    dependencies.worker_thread = c->worker_thread_.get();
+    dependencies.worker_thread = c->network_thread_.get();
     dependencies.signaling_thread = c->signaling_thread_.get();
     dependencies.event_log_factory =
         absl::make_unique<webrtc::RtcEventLogFactory>();
 
-    dependencies.adm = c->worker_thread_->BlockingCall([&] {
+    dependencies.adm = c->network_thread_->BlockingCall([&] {
       return webrtc::CreateAudioDeviceModule(
           env, webrtc::AudioDeviceModule::kDummyAudio);
     });
@@ -137,14 +135,12 @@ class PeerConnectionFactory : public webrtc::RefCountInterface {
   ~PeerConnectionFactory() {
     factory_ = nullptr;
     network_thread_->Stop();
-    worker_thread_->Stop();
     signaling_thread_->Stop();
 
     // webrtc::CleanupSSL();
   }
 
   webrtc::Thread* network_thread() const { return network_thread_.get(); }
-  webrtc::Thread* worker_thread() const { return worker_thread_.get(); }
   webrtc::Thread* signaling_thread() const { return signaling_thread_.get(); }
   webrtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface>
   peer_connection_factory() const {
@@ -153,7 +149,6 @@ class PeerConnectionFactory : public webrtc::RefCountInterface {
 
  private:
   std::unique_ptr<webrtc::Thread> network_thread_;
-  std::unique_ptr<webrtc::Thread> worker_thread_;
   std::unique_ptr<webrtc::Thread> signaling_thread_;
   webrtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> factory_;
 };
