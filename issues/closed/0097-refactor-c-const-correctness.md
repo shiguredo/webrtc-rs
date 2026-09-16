@@ -49,7 +49,7 @@ webrtc_c の C API 全体を対象に、libwebrtc の C++ シグネチャと突�
 
 - `self` の const 化
   - 宣言 (`*.h`) と定義 (`*.cc`) を同時に `const struct ...* self` にし、内部の `reinterpret_cast<webrtc::Xxx*>(self)` も `reinterpret_cast<const webrtc::Xxx*>(self)` にした
-  - 全 908 個の `self` のうち 411 個を const 化した。残り 497 個は C++ 側が非 const メソッドを呼ぶ、またはフィールドへの可変参照を返すため非 const のままとした
+  - 全 908 個の `self` のうち 392 個を const 化した。残り 516 個は C++ 側が非 const メソッドを呼ぶ、またはフィールドへの可変参照を返すため非 const のままとした
   - 判定は目視ではなくコンパイラで検証した。全 `self` を機械的に const 化してビルドし、const 化できない箇所だけを戻す作業を収束するまで繰り返し、最終的に非 const として残ったものが「C++ 側が書き換える」関数であることを保証している
 - 入力ポインタ引数の const 化
   - `struct Xxx* name` 形式の入力引数を `const struct Xxx* name` にした（`out_` で始まる出力引数と `*_delete` は対象外）
@@ -73,6 +73,9 @@ webrtc_c の C API 全体を対象に、libwebrtc の C++ シグネチャと突�
   - `webrtc/RULES.md` に「C++ 側の const 性を C API でもそのまま反映する」ルールと、セルフチェック手順の確認項目を追加した
   - `skills/libwebrtc-c/SKILL.md` に const 性の節とセルフチェック手順を追加した
   - Rust 側の公開 API に変更が無いため `CHANGES.md` の `## develop` の `### misc` に `[UPDATE]` として記載した
+- 対象外とした範囲
+  - ObjC のオブジェクトハンドル (`objc_*` / `webrtc_objc_*`) を扱う C API (`objc.h` / `objc.mm` / `sdk/objc/**`) は const 化していない。ObjC の `id` は const を表現できず、対応する ObjC メソッドにも const が無いため、非 const のままが元の API と一致する。const 化すると `__bridge` で const を外すことになり、`release` や setter のような書き換える関数まで const になってしまう
+  - この誤りは macOS / iOS の CI で検出した。Linux / Android では ObjC のファイルがダミー実装として C++ コンパイルされるため、ObjC 側の const 化の誤りがコンパイルエラーにならない
 - 確認したコマンド
   - `cargo fmt --all -- --check`
   - `cargo clippy --workspace --features source-build -- -D warnings`
