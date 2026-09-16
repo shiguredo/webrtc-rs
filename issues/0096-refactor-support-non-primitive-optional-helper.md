@@ -1,10 +1,9 @@
 # optional 用ヘルパーを非プリミティブ型でも扱えるようにする
 
 - Created: 2026-08-30
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-09-16
 - Branch: feature/refactor-optional-helper
 - Polished: {YYYY-MM-DD}
-- Milestone:
 
 ## 目的
 
@@ -49,4 +48,30 @@
 
 ## 解決方法
 
-（詳細は polish / 実装時に確定する）
+`src/helper/optional.rs` のヘルパーを C API の値の種類ごとに揃え、`src/api/*.rs` に散っていた手動実装をすべてヘルパーの呼び出しに置き換えた。あわせて `webrtc_c` 側の optional のシグネチャも統一した。
+
+- ヘルパーの構成を整理した
+  - `has` を読んで `Option` に変換する部分を、モジュール内 private の `get_optional` / `set_optional` に集約した
+  - 値の種類ごとのヘルパーはその薄いラッパーにした
+    - `get_optional_scalar` / `set_optional_scalar`: スカラー（`Default` で初期化できる型）。既存の `get_optional` / `set_optional` をリネームしたもの
+    - `get_optional_scalar2` / `set_optional_scalar2`: 2 つのスカラーの組。既存の `get_optional2` / `set_optional2` をリネームしたもの
+    - `get_optional_object` / `set_optional_object`: 出力先 / 入力元が C オブジェクト。Rust 側のラッパーを生成して `as_ptr()` が返すポインタを渡す
+    - `get_optional_ptr` / `set_optional_ptr`: 値が生ポインタ。getter は C API が出力したポインタを `Option<NonNull<U>>` で返し、所有 / 借用は C API の契約に従って呼び出し側が包む。setter は生ポインタをそのまま渡す（C API にこのシグネチャの setter がまだ無いため、現時点では呼び出し先が無い）
+    - `get_optional_slice` / `set_optional_slice`: ポインタ + 長さで表されるデータ
+  - どの C API のシグネチャにどのヘルパーを使うかを各ヘルパーのドキュメントに書いた
+- `webrtc_c` の optional のシグネチャを統一した
+  - `webrtc/RULES.md` に optional のルールを追記した（値の種類ごとの `int has` + `const T*`、getter の `out_has` という引数名、`has == 0` のときの扱い、`webrtc_c::OptionalGet` 系の利用）
+  - `std::optional<webrtc::Timestamp>` を値渡ししていた `webrtc_TransformableFrameInterface_SetCaptureTime` / `webrtc_VideoFrameBuilder_set_presentation_timestamp_us` / `webrtc_VideoFrameBuilder_set_reference_time_us` を `const int64_t*` に変更し、C++ 実装を `webrtc_c::OptionalSetAs` に統一した。これにより Rust 側はこの 3 箇所を `set_optional_scalar` で書けるようになり、値渡し専用のヘルパーを増やさずに済んだ
+  - ルールに合っていなかった既存箇所を直した（optional の getter の `has` 引数 6 件を `out_has` に統一、`webrtc_VideoFrame_color_space` が `has == 0` のとき値の出力先を書き換えないように `webrtc_c::OptionalGetAs` へ寄せる）
+- 手動実装を置き換えた
+  - `VideoEncoderScalingSettings::thresholds` / `VideoEncoderEncoderInfo::mapped_resolution` / `VideoEncoderEncoderInfo::get_encoder_bitrate_limits_for_resolution`
+  - `RtpEncodingParameters::scale_resolution_down_to` / `scalability_mode` / `codec`
+  - `RtpParameters::degradation_preference`（値が `int` のため `get_optional_scalar` + `DegradationPreference::from_int` / `to_int` へ寄せた）
+  - `VideoFrame::color_space`
+  - `TransformableVideoFrameInterface::rid`（`Option<Result<String>>` を `transpose` して `Result<Option<String>>` にする）
+  - `VideoFrameMetadata::dependencies` / `set_dependencies`
+  - `AudioEncoderFactoryOptions::set_codec_pair_id`（getter は C API が未設定を null で返す方式であり has / value 方式ではないため対象外とした）
+  - 同じパターンの手動実装が残っていた `VideoFrameBuilder::set_presentation_timestamp` / `set_reference_time` / `set_color_space` / `set_update_rect`、`TransformableFrame::set_capture_time`、`LogLineRef::thread_id` も併せて置き換えた
+- `RtpEncodingParameters::scalability_mode` の戻り値を `Option<Result<String>>` から `Result<Option<String>>` に変更した
+- `CHANGES.md` の `## develop` にエントリ（`[CHANGE]` と `### misc`）を追加した
+- `cargo clippy --workspace --features source-build -- -D warnings` / `cargo test --workspace --features source-build` / `python3 webrtc/run.py format --check` の成功を確認した
