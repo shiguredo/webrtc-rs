@@ -22,8 +22,8 @@ webrtc_CreateBuiltinVideoEncoderFactory();
 struct webrtc_VideoEncoderFactory_cbs {
   struct webrtc_SdpVideoFormat_vector* (*GetSupportedFormats)(void* user_data);
   struct webrtc_VideoEncoder_unique* (*Create)(
-      struct webrtc_Environment* env,
-      struct webrtc_SdpVideoFormat* format,
+      const struct webrtc_Environment* env,
+      const struct webrtc_SdpVideoFormat* format,
       void* user_data);
   void (*OnDestroy)(void* user_data);
 };
@@ -32,11 +32,11 @@ webrtc_VideoEncoderFactory_new(const struct webrtc_VideoEncoderFactory_cbs* cbs,
                                void* user_data);
 WEBRTC_EXPORT struct webrtc_VideoEncoder_unique*
 webrtc_VideoEncoderFactory_Create(struct webrtc_VideoEncoderFactory* self,
-                                  struct webrtc_Environment* env,
-                                  struct webrtc_SdpVideoFormat* format);
+                                  const struct webrtc_Environment* env,
+                                  const struct webrtc_SdpVideoFormat* format);
 WEBRTC_EXPORT struct webrtc_SdpVideoFormat_vector*
 webrtc_VideoEncoderFactory_GetSupportedFormats(
-    struct webrtc_VideoEncoderFactory* self);
+    const struct webrtc_VideoEncoderFactory* self);
 
 #if defined(__cplusplus)
 }

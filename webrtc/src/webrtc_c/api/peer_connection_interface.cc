@@ -735,10 +735,9 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_delete(
 }
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_offer_to_receive_video(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
-  auto opts =
-      reinterpret_cast<webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(
-          self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
+  auto opts = reinterpret_cast<
+      const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(self);
   return opts->offer_to_receive_video;
 }
 WEBRTC_EXPORT void
@@ -752,10 +751,9 @@ webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_offer_to_receive_video(
 }
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_offer_to_receive_audio(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
-  auto opts =
-      reinterpret_cast<webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(
-          self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
+  auto opts = reinterpret_cast<
+      const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(self);
   return opts->offer_to_receive_audio;
 }
 WEBRTC_EXPORT void
@@ -769,10 +767,9 @@ webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_offer_to_receive_audio(
 }
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_voice_activity_detection(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
-  auto opts =
-      reinterpret_cast<webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(
-          self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
+  auto opts = reinterpret_cast<
+      const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(self);
   return opts->voice_activity_detection ? 1 : 0;
 }
 WEBRTC_EXPORT void
@@ -786,10 +783,9 @@ webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_voice_activity_detectio
 }
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_ice_restart(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
-  auto opts =
-      reinterpret_cast<webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(
-          self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
+  auto opts = reinterpret_cast<
+      const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(self);
   return opts->ice_restart ? 1 : 0;
 }
 WEBRTC_EXPORT void
@@ -803,10 +799,9 @@ webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_ice_restart(
 }
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_use_rtp_mux(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
-  auto opts =
-      reinterpret_cast<webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(
-          self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
+  auto opts = reinterpret_cast<
+      const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(self);
   return opts->use_rtp_mux ? 1 : 0;
 }
 WEBRTC_EXPORT void
@@ -820,10 +815,9 @@ webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_use_rtp_mux(
 }
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_raw_packetization_for_video(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
-  auto opts =
-      reinterpret_cast<webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(
-          self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
+  auto opts = reinterpret_cast<
+      const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(self);
   return opts->raw_packetization_for_video ? 1 : 0;
 }
 WEBRTC_EXPORT void
@@ -837,10 +831,9 @@ webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_raw_packetization_for_v
 }
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_num_simulcast_layers(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
-  auto opts =
-      reinterpret_cast<webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(
-          self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
+  auto opts = reinterpret_cast<
+      const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(self);
   return opts->num_simulcast_layers;
 }
 WEBRTC_EXPORT void
@@ -854,10 +847,9 @@ webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_num_simulcast_layers(
 }
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_use_obsolete_sctp_sdp(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
-  auto opts =
-      reinterpret_cast<webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(
-          self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self) {
+  auto opts = reinterpret_cast<
+      const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions*>(self);
   return opts->use_obsolete_sctp_sdp ? 1 : 0;
 }
 WEBRTC_EXPORT void
@@ -1228,20 +1220,20 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream(
 }
 WEBRTC_EXPORT struct webrtc_RtpCapabilities*
 webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities(
-    struct webrtc_PeerConnectionFactoryInterface* self,
+    const struct webrtc_PeerConnectionFactoryInterface* self,
     int media_type) {
   auto factory =
-      reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
+      reinterpret_cast<const webrtc::PeerConnectionFactoryInterface*>(self);
   auto caps = new webrtc::RtpCapabilities(factory->GetRtpSenderCapabilities(
       static_cast<webrtc::MediaType>(media_type)));
   return reinterpret_cast<struct webrtc_RtpCapabilities*>(caps);
 }
 WEBRTC_EXPORT struct webrtc_RtpCapabilities*
 webrtc_PeerConnectionFactoryInterface_GetRtpReceiverCapabilities(
-    struct webrtc_PeerConnectionFactoryInterface* self,
+    const struct webrtc_PeerConnectionFactoryInterface* self,
     int media_type) {
   auto factory =
-      reinterpret_cast<webrtc::PeerConnectionFactoryInterface*>(self);
+      reinterpret_cast<const webrtc::PeerConnectionFactoryInterface*>(self);
   auto caps = new webrtc::RtpCapabilities(factory->GetRtpReceiverCapabilities(
       static_cast<webrtc::MediaType>(media_type)));
   return reinterpret_cast<struct webrtc_RtpCapabilities*>(caps);

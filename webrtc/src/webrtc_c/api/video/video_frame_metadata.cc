@@ -128,8 +128,8 @@ WEBRTC_EXPORT struct webrtc_VideoFrameMetadata* webrtc_VideoFrameMetadata_copy(
 }
 
 WEBRTC_EXPORT int webrtc_VideoFrameMetadata_GetFrameType(
-    struct webrtc_VideoFrameMetadata* self) {
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+    const struct webrtc_VideoFrameMetadata* self) {
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   return static_cast<int>(metadata->GetFrameType());
 }
 
@@ -140,9 +140,9 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetFrameType(
   metadata->SetFrameType(static_cast<webrtc::VideoFrameType>(frame_type));
 }
 
-WEBRTC_EXPORT uint16_t
-webrtc_VideoFrameMetadata_GetWidth(struct webrtc_VideoFrameMetadata* self) {
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+WEBRTC_EXPORT uint16_t webrtc_VideoFrameMetadata_GetWidth(
+    const struct webrtc_VideoFrameMetadata* self) {
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   return metadata->GetWidth();
 }
 
@@ -153,9 +153,9 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetWidth(
   metadata->SetWidth(width);
 }
 
-WEBRTC_EXPORT uint16_t
-webrtc_VideoFrameMetadata_GetHeight(struct webrtc_VideoFrameMetadata* self) {
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+WEBRTC_EXPORT uint16_t webrtc_VideoFrameMetadata_GetHeight(
+    const struct webrtc_VideoFrameMetadata* self) {
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   return metadata->GetHeight();
 }
 
@@ -167,10 +167,10 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetHeight(
 }
 
 WEBRTC_EXPORT void webrtc_VideoFrameMetadata_GetFrameId(
-    struct webrtc_VideoFrameMetadata* self,
+    const struct webrtc_VideoFrameMetadata* self,
     int* out_has,
     int64_t* frame_id) {
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   auto value = metadata->GetFrameId();
   webrtc_c::OptionalGet(value, out_has, frame_id);
 }
@@ -186,8 +186,8 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetFrameId(
 }
 
 WEBRTC_EXPORT int webrtc_VideoFrameMetadata_GetSpatialIndex(
-    struct webrtc_VideoFrameMetadata* self) {
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+    const struct webrtc_VideoFrameMetadata* self) {
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   return metadata->GetSpatialIndex();
 }
 
@@ -199,8 +199,8 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetSpatialIndex(
 }
 
 WEBRTC_EXPORT int webrtc_VideoFrameMetadata_GetTemporalIndex(
-    struct webrtc_VideoFrameMetadata* self) {
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+    const struct webrtc_VideoFrameMetadata* self) {
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   return metadata->GetTemporalIndex();
 }
 
@@ -212,14 +212,14 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetTemporalIndex(
 }
 
 WEBRTC_EXPORT void webrtc_VideoFrameMetadata_GetDependencies(
-    struct webrtc_VideoFrameMetadata* self,
+    const struct webrtc_VideoFrameMetadata* self,
     int* out_has,
     const int64_t** data,
     size_t* len) {
   assert(out_has != nullptr);
   assert(data != nullptr);
   assert(len != nullptr);
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   auto value = metadata->GetDependencies();
   if (value.has_value()) {
     *out_has = 1;
@@ -245,8 +245,8 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetDependencies(
 }
 
 WEBRTC_EXPORT int webrtc_VideoFrameMetadata_GetIsLastFrameInPicture(
-    struct webrtc_VideoFrameMetadata* self) {
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+    const struct webrtc_VideoFrameMetadata* self) {
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   return metadata->GetIsLastFrameInPicture() ? 1 : 0;
 }
 
@@ -258,8 +258,8 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetIsLastFrameInPicture(
 }
 
 WEBRTC_EXPORT uint8_t webrtc_VideoFrameMetadata_GetSimulcastIdx(
-    struct webrtc_VideoFrameMetadata* self) {
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+    const struct webrtc_VideoFrameMetadata* self) {
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   return metadata->GetSimulcastIdx();
 }
 
@@ -271,8 +271,8 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetSimulcastIdx(
 }
 
 WEBRTC_EXPORT int webrtc_VideoFrameMetadata_GetCodec(
-    struct webrtc_VideoFrameMetadata* self) {
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+    const struct webrtc_VideoFrameMetadata* self) {
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   return static_cast<int>(metadata->GetCodec());
 }
 
@@ -283,9 +283,9 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetCodec(
   metadata->SetCodec(static_cast<webrtc::VideoCodecType>(codec));
 }
 
-WEBRTC_EXPORT uint32_t
-webrtc_VideoFrameMetadata_GetSsrc(struct webrtc_VideoFrameMetadata* self) {
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+WEBRTC_EXPORT uint32_t webrtc_VideoFrameMetadata_GetSsrc(
+    const struct webrtc_VideoFrameMetadata* self) {
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   return metadata->GetSsrc();
 }
 
@@ -297,8 +297,8 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetSsrc(
 }
 
 WEBRTC_EXPORT int webrtc_VideoFrameMetadata_GetRotation(
-    struct webrtc_VideoFrameMetadata* self) {
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+    const struct webrtc_VideoFrameMetadata* self) {
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   return static_cast<int>(metadata->GetRotation());
 }
 
@@ -310,8 +310,8 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetRotation(
 }
 
 WEBRTC_EXPORT int webrtc_VideoFrameMetadata_GetContentType(
-    struct webrtc_VideoFrameMetadata* self) {
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+    const struct webrtc_VideoFrameMetadata* self) {
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   return static_cast<int>(metadata->GetContentType());
 }
 
@@ -323,12 +323,12 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetContentType(
 }
 
 WEBRTC_EXPORT void webrtc_VideoFrameMetadata_GetDecodeTargetIndications(
-    struct webrtc_VideoFrameMetadata* self,
+    const struct webrtc_VideoFrameMetadata* self,
     const int** out_data,
     size_t* out_len) {
   assert(out_data != nullptr);
   assert(out_len != nullptr);
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   auto indications = metadata->GetDecodeTargetIndications();
   *out_data = reinterpret_cast<const int*>(indications.data());
   *out_len = indications.size();
@@ -349,8 +349,8 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetDecodeTargetIndications(
 }
 
 WEBRTC_EXPORT struct webrtc_uint32_vector* webrtc_VideoFrameMetadata_GetCsrcs(
-    struct webrtc_VideoFrameMetadata* self) {
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+    const struct webrtc_VideoFrameMetadata* self) {
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   auto csrcs = std::make_unique<std::vector<uint32_t>>(metadata->GetCsrcs());
   return reinterpret_cast<struct webrtc_uint32_vector*>(csrcs.release());
 }
@@ -365,8 +365,8 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetCsrcs(
 
 WEBRTC_EXPORT struct webrtc_RTPVideoHeaderCodecSpecifics_unique*
 webrtc_VideoFrameMetadata_GetRTPVideoHeaderCodecSpecifics(
-    struct webrtc_VideoFrameMetadata* self) {
-  auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
+    const struct webrtc_VideoFrameMetadata* self) {
+  auto metadata = reinterpret_cast<const webrtc::VideoFrameMetadata*>(self);
   auto variant = std::make_unique<webrtc::RTPVideoHeaderCodecSpecifics>(
       metadata->GetRTPVideoHeaderCodecSpecifics());
   return reinterpret_cast<struct webrtc_RTPVideoHeaderCodecSpecifics_unique*>(

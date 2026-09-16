@@ -17,12 +17,12 @@
 extern "C" {
 WEBRTC_DEFINE_UNIQUE(std_string, std::string);
 
-WEBRTC_EXPORT size_t std_string_size(struct std_string* self) {
-  auto str = reinterpret_cast<std::string*>(self);
+WEBRTC_EXPORT size_t std_string_size(const struct std_string* self) {
+  auto str = reinterpret_cast<const std::string*>(self);
   return str->size();
 }
-WEBRTC_EXPORT const char* std_string_c_str(struct std_string* self) {
-  auto str = reinterpret_cast<std::string*>(self);
+WEBRTC_EXPORT const char* std_string_c_str(const struct std_string* self) {
+  auto str = reinterpret_cast<const std::string*>(self);
   return str->c_str();
 }
 WEBRTC_EXPORT void std_string_append(struct std_string* self,
@@ -63,8 +63,8 @@ WEBRTC_DEFINE_VECTOR(std_string, std::string);
 extern "C" {
 WEBRTC_DEFINE_VECTOR(webrtc_uint32, uint32_t);
 
-WEBRTC_EXPORT uint32_t webrtc_uint32_value(struct webrtc_uint32* self) {
-  auto value = reinterpret_cast<uint32_t*>(self);
+WEBRTC_EXPORT uint32_t webrtc_uint32_value(const struct webrtc_uint32* self) {
+  auto value = reinterpret_cast<const uint32_t*>(self);
   return *value;
 }
 
@@ -96,8 +96,8 @@ WEBRTC_EXPORT void std_map_string_string_set(struct std_map_string_string* self,
   (*map)[std::string(key, key_len)] = std::string(value, value_len);
 }
 WEBRTC_EXPORT int std_map_string_string_size(
-    struct std_map_string_string* self) {
-  auto map = reinterpret_cast<std::map<std::string, std::string>*>(self);
+    const struct std_map_string_string* self) {
+  auto map = reinterpret_cast<const std::map<std::string, std::string>*>(self);
   return static_cast<int>(map->size());
 }
 WEBRTC_EXPORT struct std_map_string_string_iter* std_map_string_string_iter_new(

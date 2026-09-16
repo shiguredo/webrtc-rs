@@ -14,8 +14,8 @@ extern "C" {
 // -------------------------
 
 WEBRTC_DECLARE_UNIQUE(std_string);
-WEBRTC_EXPORT size_t std_string_size(struct std_string* self);
-WEBRTC_EXPORT const char* std_string_c_str(struct std_string* self);
+WEBRTC_EXPORT size_t std_string_size(const struct std_string* self);
+WEBRTC_EXPORT const char* std_string_c_str(const struct std_string* self);
 WEBRTC_EXPORT void std_string_append(struct std_string* self,
                                      const char* str,
                                      size_t len);
@@ -37,7 +37,7 @@ WEBRTC_DECLARE_VECTOR(std_string);
 // -------------------------
 
 WEBRTC_DECLARE_VECTOR(webrtc_uint32);
-WEBRTC_EXPORT uint32_t webrtc_uint32_value(struct webrtc_uint32* self);
+WEBRTC_EXPORT uint32_t webrtc_uint32_value(const struct webrtc_uint32* self);
 WEBRTC_EXPORT void webrtc_uint32_vector_push_back_value(
     struct webrtc_uint32_vector* self,
     uint32_t value);
@@ -53,7 +53,7 @@ WEBRTC_EXPORT void std_map_string_string_set(struct std_map_string_string* self,
                                              const char* value,
                                              size_t value_len);
 WEBRTC_EXPORT int std_map_string_string_size(
-    struct std_map_string_string* self);
+    const struct std_map_string_string* self);
 
 struct std_map_string_string_iter;
 WEBRTC_EXPORT struct std_map_string_string_iter* std_map_string_string_iter_new(

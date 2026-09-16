@@ -30,8 +30,8 @@ WEBRTC_EXPORT struct webrtc_RTPVideoHeaderVP8* webrtc_RTPVideoHeaderVP8_copy(
 }
 
 WEBRTC_EXPORT int webrtc_RTPVideoHeaderVP8_get_nonReference(
-    struct webrtc_RTPVideoHeaderVP8* self) {
-  auto header = reinterpret_cast<webrtc::RTPVideoHeaderVP8*>(self);
+    const struct webrtc_RTPVideoHeaderVP8* self) {
+  auto header = reinterpret_cast<const webrtc::RTPVideoHeaderVP8*>(self);
   return header->nonReference ? 1 : 0;
 }
 
@@ -42,9 +42,9 @@ WEBRTC_EXPORT void webrtc_RTPVideoHeaderVP8_set_nonReference(
   header->nonReference = value != 0;
 }
 
-WEBRTC_EXPORT int16_t
-webrtc_RTPVideoHeaderVP8_get_pictureId(struct webrtc_RTPVideoHeaderVP8* self) {
-  auto header = reinterpret_cast<webrtc::RTPVideoHeaderVP8*>(self);
+WEBRTC_EXPORT int16_t webrtc_RTPVideoHeaderVP8_get_pictureId(
+    const struct webrtc_RTPVideoHeaderVP8* self) {
+  auto header = reinterpret_cast<const webrtc::RTPVideoHeaderVP8*>(self);
   return header->pictureId;
 }
 
@@ -55,9 +55,9 @@ WEBRTC_EXPORT void webrtc_RTPVideoHeaderVP8_set_pictureId(
   header->pictureId = value;
 }
 
-WEBRTC_EXPORT int16_t
-webrtc_RTPVideoHeaderVP8_get_tl0PicIdx(struct webrtc_RTPVideoHeaderVP8* self) {
-  auto header = reinterpret_cast<webrtc::RTPVideoHeaderVP8*>(self);
+WEBRTC_EXPORT int16_t webrtc_RTPVideoHeaderVP8_get_tl0PicIdx(
+    const struct webrtc_RTPVideoHeaderVP8* self) {
+  auto header = reinterpret_cast<const webrtc::RTPVideoHeaderVP8*>(self);
   return header->tl0PicIdx;
 }
 
@@ -69,8 +69,8 @@ WEBRTC_EXPORT void webrtc_RTPVideoHeaderVP8_set_tl0PicIdx(
 }
 
 WEBRTC_EXPORT uint8_t webrtc_RTPVideoHeaderVP8_get_temporalIdx(
-    struct webrtc_RTPVideoHeaderVP8* self) {
-  auto header = reinterpret_cast<webrtc::RTPVideoHeaderVP8*>(self);
+    const struct webrtc_RTPVideoHeaderVP8* self) {
+  auto header = reinterpret_cast<const webrtc::RTPVideoHeaderVP8*>(self);
   return header->temporalIdx;
 }
 
@@ -82,8 +82,8 @@ WEBRTC_EXPORT void webrtc_RTPVideoHeaderVP8_set_temporalIdx(
 }
 
 WEBRTC_EXPORT int webrtc_RTPVideoHeaderVP8_get_layerSync(
-    struct webrtc_RTPVideoHeaderVP8* self) {
-  auto header = reinterpret_cast<webrtc::RTPVideoHeaderVP8*>(self);
+    const struct webrtc_RTPVideoHeaderVP8* self) {
+  auto header = reinterpret_cast<const webrtc::RTPVideoHeaderVP8*>(self);
   return header->layerSync ? 1 : 0;
 }
 
@@ -95,8 +95,8 @@ WEBRTC_EXPORT void webrtc_RTPVideoHeaderVP8_set_layerSync(
 }
 
 WEBRTC_EXPORT int webrtc_RTPVideoHeaderVP8_get_keyIdx(
-    struct webrtc_RTPVideoHeaderVP8* self) {
-  auto header = reinterpret_cast<webrtc::RTPVideoHeaderVP8*>(self);
+    const struct webrtc_RTPVideoHeaderVP8* self) {
+  auto header = reinterpret_cast<const webrtc::RTPVideoHeaderVP8*>(self);
   return header->keyIdx;
 }
 
@@ -108,8 +108,8 @@ WEBRTC_EXPORT void webrtc_RTPVideoHeaderVP8_set_keyIdx(
 }
 
 WEBRTC_EXPORT int webrtc_RTPVideoHeaderVP8_get_partitionId(
-    struct webrtc_RTPVideoHeaderVP8* self) {
-  auto header = reinterpret_cast<webrtc::RTPVideoHeaderVP8*>(self);
+    const struct webrtc_RTPVideoHeaderVP8* self) {
+  auto header = reinterpret_cast<const webrtc::RTPVideoHeaderVP8*>(self);
   return header->partitionId;
 }
 
@@ -121,8 +121,8 @@ WEBRTC_EXPORT void webrtc_RTPVideoHeaderVP8_set_partitionId(
 }
 
 WEBRTC_EXPORT int webrtc_RTPVideoHeaderVP8_get_beginningOfPartition(
-    struct webrtc_RTPVideoHeaderVP8* self) {
-  auto header = reinterpret_cast<webrtc::RTPVideoHeaderVP8*>(self);
+    const struct webrtc_RTPVideoHeaderVP8* self) {
+  auto header = reinterpret_cast<const webrtc::RTPVideoHeaderVP8*>(self);
   return header->beginningOfPartition ? 1 : 0;
 }
 

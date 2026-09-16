@@ -36,8 +36,9 @@ WEBRTC_EXPORT struct webrtc_NaluInfo* webrtc_NaluInfo_copy(
   return reinterpret_cast<struct webrtc_NaluInfo*>(copy.release());
 }
 
-WEBRTC_EXPORT uint8_t webrtc_NaluInfo_get_type(struct webrtc_NaluInfo* self) {
-  auto info = reinterpret_cast<webrtc::NaluInfo*>(self);
+WEBRTC_EXPORT uint8_t
+webrtc_NaluInfo_get_type(const struct webrtc_NaluInfo* self) {
+  auto info = reinterpret_cast<const webrtc::NaluInfo*>(self);
   return info->type;
 }
 
@@ -47,8 +48,9 @@ WEBRTC_EXPORT void webrtc_NaluInfo_set_type(struct webrtc_NaluInfo* self,
   info->type = value;
 }
 
-WEBRTC_EXPORT int webrtc_NaluInfo_get_sps_id(struct webrtc_NaluInfo* self) {
-  auto info = reinterpret_cast<webrtc::NaluInfo*>(self);
+WEBRTC_EXPORT int webrtc_NaluInfo_get_sps_id(
+    const struct webrtc_NaluInfo* self) {
+  auto info = reinterpret_cast<const webrtc::NaluInfo*>(self);
   return info->sps_id;
 }
 
@@ -58,8 +60,9 @@ WEBRTC_EXPORT void webrtc_NaluInfo_set_sps_id(struct webrtc_NaluInfo* self,
   info->sps_id = value;
 }
 
-WEBRTC_EXPORT int webrtc_NaluInfo_get_pps_id(struct webrtc_NaluInfo* self) {
-  auto info = reinterpret_cast<webrtc::NaluInfo*>(self);
+WEBRTC_EXPORT int webrtc_NaluInfo_get_pps_id(
+    const struct webrtc_NaluInfo* self) {
+  auto info = reinterpret_cast<const webrtc::NaluInfo*>(self);
   return info->pps_id;
 }
 
@@ -91,8 +94,8 @@ WEBRTC_EXPORT struct webrtc_RTPVideoHeaderH264* webrtc_RTPVideoHeaderH264_copy(
 }
 
 WEBRTC_EXPORT uint8_t webrtc_RTPVideoHeaderH264_get_nalu_type(
-    struct webrtc_RTPVideoHeaderH264* self) {
-  auto header = reinterpret_cast<webrtc::RTPVideoHeaderH264*>(self);
+    const struct webrtc_RTPVideoHeaderH264* self) {
+  auto header = reinterpret_cast<const webrtc::RTPVideoHeaderH264*>(self);
   return header->nalu_type;
 }
 
@@ -104,8 +107,8 @@ WEBRTC_EXPORT void webrtc_RTPVideoHeaderH264_set_nalu_type(
 }
 
 WEBRTC_EXPORT int webrtc_RTPVideoHeaderH264_get_packetization_type(
-    struct webrtc_RTPVideoHeaderH264* self) {
-  auto header = reinterpret_cast<webrtc::RTPVideoHeaderH264*>(self);
+    const struct webrtc_RTPVideoHeaderH264* self) {
+  auto header = reinterpret_cast<const webrtc::RTPVideoHeaderH264*>(self);
   return static_cast<int>(header->packetization_type);
 }
 
@@ -132,8 +135,8 @@ WEBRTC_EXPORT void webrtc_RTPVideoHeaderH264_set_nalus(
 }
 
 WEBRTC_EXPORT int webrtc_RTPVideoHeaderH264_get_packetization_mode(
-    struct webrtc_RTPVideoHeaderH264* self) {
-  auto header = reinterpret_cast<webrtc::RTPVideoHeaderH264*>(self);
+    const struct webrtc_RTPVideoHeaderH264* self) {
+  auto header = reinterpret_cast<const webrtc::RTPVideoHeaderH264*>(self);
   return static_cast<int>(header->packetization_mode);
 }
 

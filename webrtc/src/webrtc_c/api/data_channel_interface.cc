@@ -77,15 +77,16 @@ WEBRTC_EXPORT extern const int webrtc_DataChannelInterface_DataState_kClosed =
     static_cast<int>(webrtc::DataChannelInterface::DataState::kClosed);
 
 WEBRTC_EXPORT struct std_string_unique* webrtc_DataChannelInterface_label(
-    struct webrtc_DataChannelInterface* self) {
-  auto dc = reinterpret_cast<webrtc::DataChannelInterface*>(self);
+    const struct webrtc_DataChannelInterface* self) {
+  auto dc = reinterpret_cast<const webrtc::DataChannelInterface*>(self);
   auto label = std::make_unique<std::string>(dc->label());
   return reinterpret_cast<struct std_string_unique*>(label.release());
 }
 
 WEBRTC_EXPORT webrtc_DataChannelInterface_DataState
-webrtc_DataChannelInterface_state(struct webrtc_DataChannelInterface* self) {
-  auto dc = reinterpret_cast<webrtc::DataChannelInterface*>(self);
+webrtc_DataChannelInterface_state(
+    const struct webrtc_DataChannelInterface* self) {
+  auto dc = reinterpret_cast<const webrtc::DataChannelInterface*>(self);
   return static_cast<webrtc_DataChannelInterface_DataState>(dc->state());
 }
 

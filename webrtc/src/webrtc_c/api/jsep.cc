@@ -61,14 +61,16 @@ webrtc_CreateSessionDescription(int sdp_type, const char* sdp, size_t sdp_len) {
       desc.release());
 }
 WEBRTC_EXPORT int webrtc_SessionDescriptionInterface_GetType(
-    struct webrtc_SessionDescriptionInterface* self) {
-  auto desc = reinterpret_cast<webrtc::SessionDescriptionInterface*>(self);
+    const struct webrtc_SessionDescriptionInterface* self) {
+  auto desc =
+      reinterpret_cast<const webrtc::SessionDescriptionInterface*>(self);
   return static_cast<int>(desc->GetType());
 }
 WEBRTC_EXPORT int webrtc_SessionDescriptionInterface_ToString(
-    struct webrtc_SessionDescriptionInterface* self,
+    const struct webrtc_SessionDescriptionInterface* self,
     struct std_string_unique** out_sdp) {
-  auto desc = reinterpret_cast<webrtc::SessionDescriptionInterface*>(self);
+  auto desc =
+      reinterpret_cast<const webrtc::SessionDescriptionInterface*>(self);
   std::string sdp;
   if (!desc->ToString(&sdp)) {
     *out_sdp = nullptr;
@@ -82,20 +84,21 @@ WEBRTC_EXPORT int webrtc_SessionDescriptionInterface_ToString(
 
 extern "C" {
 WEBRTC_DEFINE_UNIQUE(webrtc_SdpParseError, webrtc::SdpParseError);
-WEBRTC_EXPORT void webrtc_SdpParseError_line(struct webrtc_SdpParseError* self,
-                                             const char** out_line,
-                                             size_t* out_len) {
-  auto error = reinterpret_cast<webrtc::SdpParseError*>(self);
+WEBRTC_EXPORT void webrtc_SdpParseError_line(
+    const struct webrtc_SdpParseError* self,
+    const char** out_line,
+    size_t* out_len) {
+  auto error = reinterpret_cast<const webrtc::SdpParseError*>(self);
   assert(out_line != nullptr);
   *out_line = error->line.c_str();
   assert(out_len != nullptr);
   *out_len = error->line.size();
 }
 WEBRTC_EXPORT void webrtc_SdpParseError_description(
-    struct webrtc_SdpParseError* self,
+    const struct webrtc_SdpParseError* self,
     const char** out_description,
     size_t* out_len) {
-  auto error = reinterpret_cast<webrtc::SdpParseError*>(self);
+  auto error = reinterpret_cast<const webrtc::SdpParseError*>(self);
   assert(out_description != nullptr);
   *out_description = error->description.c_str();
   assert(out_len != nullptr);

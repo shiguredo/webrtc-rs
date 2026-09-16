@@ -82,8 +82,9 @@ WEBRTC_EXPORT void webrtc_RtpTransceiverInterface_SetCodecPreferences(
 
 WEBRTC_EXPORT struct webrtc_RtpReceiverInterface_refcounted*
 webrtc_RtpTransceiverInterface_receiver(
-    struct webrtc_RtpTransceiverInterface* self) {
-  auto transceiver = reinterpret_cast<webrtc::RtpTransceiverInterface*>(self);
+    const struct webrtc_RtpTransceiverInterface* self) {
+  auto transceiver =
+      reinterpret_cast<const webrtc::RtpTransceiverInterface*>(self);
   auto receiver = transceiver->receiver();
   return reinterpret_cast<struct webrtc_RtpReceiverInterface_refcounted*>(
       receiver.release());

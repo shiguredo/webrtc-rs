@@ -26,9 +26,10 @@ WEBRTC_EXPORT extern const int webrtc_DataChannelInterface_DataState_kClosed;
 
 // DataChannel メソッド
 WEBRTC_EXPORT struct std_string_unique* webrtc_DataChannelInterface_label(
-    struct webrtc_DataChannelInterface* self);
+    const struct webrtc_DataChannelInterface* self);
 WEBRTC_EXPORT webrtc_DataChannelInterface_DataState
-webrtc_DataChannelInterface_state(struct webrtc_DataChannelInterface* self);
+webrtc_DataChannelInterface_state(
+    const struct webrtc_DataChannelInterface* self);
 WEBRTC_EXPORT int webrtc_DataChannelInterface_Send(
     struct webrtc_DataChannelInterface* self,
     const uint8_t* data,

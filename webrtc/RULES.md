@@ -44,12 +44,22 @@
   - Cbs 構築時に `assert(cbs->OnXxx != nullptr)` で契約違反を検出する
   - ディスパッチ時の null チェックは行わず、無条件呼び出しとする
   - この方針は `AudioDeviceModule_cbs` には適用しない（デフォルト実装 + 部分上書き方式のため）
+- **C++ 側の const 性を C API でもそのまま反映する**
+  - C++ 側が const メソッド、または読み取り専用のフィールド参照で済む操作は `const struct webrtc_Xxx* self` にする
+    - 値返しの getter（`webrtc_VideoFrameMetadata_GetFrameType` 等）や `int` を返す `_vector_size` / `_index` が該当する
+  - C++ 側が `const T&` / `const T*` で受ける引数は `const struct webrtc_Xxx*` にする
+    - Cbs 構造体の関数ポインタも同じ規則に従う
+  - `const_cast` は使わない
+  - フィールドへの可変参照を返す getter（`webrtc_SdpVideoFormat_get_parameters` / `webrtc_SdpVideoFormat_get_name` 等）は非 const のままとする
+    - 呼び出し側が借用先を書き換えられるため、const 化すると const 契約が壊れる
+  - 迷ったときは「C++ 側のシグネチャと同じ const 性になっているか」で判断する
 
 ## セルフチェック手順
 
-- 作業開始前に RULES.md を読み直し、今回の作業で関係するルール（薄いラッパー、元の C++ パスと名前、命名規則、`*_unique` / `*_refcounted` の扱い）を箇条書きにする
+- 作業開始前に RULES.md を読み直し、今回の作業で関係するルール（薄いラッパー、元の C++ パスと名前、命名規則、`*_unique` / `*_refcounted` の扱い、const 性）を箇条書きにする
 - 対応する C++ パスと型名を必ず開いて照合し、C 側のファイル・シンボル名が元の C++ に一致しているか確認する
 - `*_unique` / `*_refcounted` へのキャストが必ず `*_unique_get` / `*_refcounted_get` / `release` 経由になっているか `rg` でチェックする
+- `const_cast` が残っていないか、`self` と引数の const 性が元の C++ シグネチャと一致しているかを `rg` でチェックする
 - 便利関数やパラメータ展開を追加していないか、各変更ブロックごとに「薄いラッパーか」を自問する
 - 変更後に再度 RULES.md を読み直し、全ルール順守をチェックリスト形式で確認してから回答する
 

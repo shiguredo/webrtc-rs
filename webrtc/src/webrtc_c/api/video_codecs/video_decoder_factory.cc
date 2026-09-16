@@ -50,12 +50,10 @@ class VideoDecoderFactoryImpl : public webrtc::VideoDecoderFactory {
   std::unique_ptr<webrtc::VideoDecoder> Create(
       const webrtc::Environment& env,
       const webrtc::SdpVideoFormat& format) override {
-    auto raw_decoder =
-        cbs_.Create(reinterpret_cast<struct webrtc_Environment*>(
-                        const_cast<webrtc::Environment*>(&env)),
-                    reinterpret_cast<struct webrtc_SdpVideoFormat*>(
-                        const_cast<webrtc::SdpVideoFormat*>(&format)),
-                    user_data_);
+    auto raw_decoder = cbs_.Create(
+        reinterpret_cast<const struct webrtc_Environment*>(&env),
+        reinterpret_cast<const struct webrtc_SdpVideoFormat*>(&format),
+        user_data_);
     if (raw_decoder == nullptr) {
       return nullptr;
     }
@@ -87,14 +85,14 @@ webrtc_VideoDecoderFactory_new(const struct webrtc_VideoDecoderFactory_cbs* cbs,
 
 WEBRTC_EXPORT struct webrtc_VideoDecoder_unique*
 webrtc_VideoDecoderFactory_Create(struct webrtc_VideoDecoderFactory* self,
-                                  struct webrtc_Environment* env,
-                                  struct webrtc_SdpVideoFormat* format) {
+                                  const struct webrtc_Environment* env,
+                                  const struct webrtc_SdpVideoFormat* format) {
   assert(self != nullptr);
   assert(env != nullptr);
   assert(format != nullptr);
   auto factory = reinterpret_cast<webrtc::VideoDecoderFactory*>(self);
-  auto cpp_env = reinterpret_cast<webrtc::Environment*>(env);
-  auto cpp_format = reinterpret_cast<webrtc::SdpVideoFormat*>(format);
+  auto cpp_env = reinterpret_cast<const webrtc::Environment*>(env);
+  auto cpp_format = reinterpret_cast<const webrtc::SdpVideoFormat*>(format);
   auto decoder = factory->Create(*cpp_env, *cpp_format);
   return reinterpret_cast<struct webrtc_VideoDecoder_unique*>(
       decoder.release());
@@ -102,9 +100,9 @@ webrtc_VideoDecoderFactory_Create(struct webrtc_VideoDecoderFactory* self,
 
 WEBRTC_EXPORT struct webrtc_SdpVideoFormat_vector*
 webrtc_VideoDecoderFactory_GetSupportedFormats(
-    struct webrtc_VideoDecoderFactory* self) {
+    const struct webrtc_VideoDecoderFactory* self) {
   assert(self != nullptr);
-  auto factory = reinterpret_cast<webrtc::VideoDecoderFactory*>(self);
+  auto factory = reinterpret_cast<const webrtc::VideoDecoderFactory*>(self);
   auto formats = factory->GetSupportedFormats();
   auto vec = new std::vector<webrtc::SdpVideoFormat>(formats);
   return reinterpret_cast<struct webrtc_SdpVideoFormat_vector*>(vec);

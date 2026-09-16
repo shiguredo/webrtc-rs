@@ -40,7 +40,7 @@ WEBRTC_EXPORT void webrtc_RtpTransceiverInterface_SetCodecPreferences(
     struct webrtc_RTCError_unique** out_rtc_error);
 WEBRTC_EXPORT struct webrtc_RtpReceiverInterface_refcounted*
 webrtc_RtpTransceiverInterface_receiver(
-    struct webrtc_RtpTransceiverInterface* self);
+    const struct webrtc_RtpTransceiverInterface* self);
 #if defined(__cplusplus)
 }
 #endif

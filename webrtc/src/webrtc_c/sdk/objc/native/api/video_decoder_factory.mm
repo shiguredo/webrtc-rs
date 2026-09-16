@@ -6,7 +6,8 @@ extern "C" {
 
 WEBRTC_EXPORT struct webrtc_VideoDecoderFactory_unique*
 webrtc_ObjCToNativeVideoDecoderFactory(
-    struct webrtc_objc_RTCVideoDecoderFactory* objc_video_decoder_factory) {
+    const struct webrtc_objc_RTCVideoDecoderFactory*
+        objc_video_decoder_factory) {
   (void)objc_video_decoder_factory;
   return nullptr;
 }
@@ -28,7 +29,8 @@ id<RTC_OBJC_TYPE(RTCVideoDecoderFactory)> ToRTCVideoDecoderFactory(
 extern "C" {
 WEBRTC_EXPORT struct webrtc_VideoDecoderFactory_unique*
 webrtc_ObjCToNativeVideoDecoderFactory(
-    struct webrtc_objc_RTCVideoDecoderFactory* objc_video_decoder_factory) {
+    const struct webrtc_objc_RTCVideoDecoderFactory*
+        objc_video_decoder_factory) {
   if (objc_video_decoder_factory == nullptr) {
     return nullptr;
   }
