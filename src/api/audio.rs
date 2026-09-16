@@ -1,7 +1,8 @@
 use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
 use crate::helper::non_null::expect_non_null;
 use crate::helper::optional::{
-    get_optional, get_optional_bool, get_optional2, set_optional, set_optional_bool, set_optional2,
+    get_optional_bool, get_optional_scalar, get_optional_scalar2, set_optional_bool,
+    set_optional_object, set_optional_scalar, set_optional_scalar2,
 };
 use crate::helper::ref_count::{
     AudioDecoderFactoryHandle, AudioEncoderFactoryHandle, AudioTrackHandle, AudioTrackSourceHandle,
@@ -110,7 +111,7 @@ impl AudioOptions {
 
     /// 受信側 jitter buffer (NetEq) の最大パケット数を取得する。
     pub fn audio_jitter_buffer_max_packets(&self) -> Option<i32> {
-        get_optional(|has, value| unsafe {
+        get_optional_scalar(|has, value| unsafe {
             ffi::webrtc_AudioOptions_get_audio_jitter_buffer_max_packets(
                 self.raw.as_ptr(),
                 has,
@@ -121,7 +122,7 @@ impl AudioOptions {
 
     /// 受信側 jitter buffer (NetEq) の最大パケット数を設定する。
     pub fn set_audio_jitter_buffer_max_packets(&mut self, value: Option<i32>) {
-        set_optional(value, |has, value_ptr| unsafe {
+        set_optional_scalar(value, |has, value_ptr| unsafe {
             ffi::webrtc_AudioOptions_set_audio_jitter_buffer_max_packets(
                 self.raw.as_ptr(),
                 has,
@@ -154,7 +155,7 @@ impl AudioOptions {
 
     /// 受信側 jitter buffer (NetEq) の最小ターゲット遅延 (ミリ秒) を取得する。
     pub fn audio_jitter_buffer_min_delay_ms(&self) -> Option<i32> {
-        get_optional(|has, value| unsafe {
+        get_optional_scalar(|has, value| unsafe {
             ffi::webrtc_AudioOptions_get_audio_jitter_buffer_min_delay_ms(
                 self.raw.as_ptr(),
                 has,
@@ -165,7 +166,7 @@ impl AudioOptions {
 
     /// 受信側 jitter buffer (NetEq) の最小ターゲット遅延 (ミリ秒) を設定する。
     pub fn set_audio_jitter_buffer_min_delay_ms(&mut self, value: Option<i32>) {
-        set_optional(value, |has, value_ptr| unsafe {
+        set_optional_scalar(value, |has, value_ptr| unsafe {
             ffi::webrtc_AudioOptions_set_audio_jitter_buffer_min_delay_ms(
                 self.raw.as_ptr(),
                 has,
@@ -1445,7 +1446,7 @@ impl AudioEncoderAnaStats {
 
     /// ANA ビットレートコントローラーが動作した回数を返す。
     pub fn bitrate_action_counter(&self) -> Option<u32> {
-        get_optional(|has, value| unsafe {
+        get_optional_scalar(|has, value| unsafe {
             ffi::webrtc_AudioEncoder_ANAStats_get_bitrate_action_counter(
                 self.raw.as_ptr(),
                 has,
@@ -1456,7 +1457,7 @@ impl AudioEncoderAnaStats {
 
     /// ANA ビットレートコントローラーが動作した回数を設定する。
     pub fn set_bitrate_action_counter(&mut self, value: Option<u32>) {
-        set_optional(value, |has, ptr| unsafe {
+        set_optional_scalar(value, |has, ptr| unsafe {
             ffi::webrtc_AudioEncoder_ANAStats_set_bitrate_action_counter(
                 self.raw.as_ptr(),
                 has,
@@ -1467,7 +1468,7 @@ impl AudioEncoderAnaStats {
 
     /// ANA チャンネルコントローラーが動作した回数を返す。
     pub fn channel_action_counter(&self) -> Option<u32> {
-        get_optional(|has, value| unsafe {
+        get_optional_scalar(|has, value| unsafe {
             ffi::webrtc_AudioEncoder_ANAStats_get_channel_action_counter(
                 self.raw.as_ptr(),
                 has,
@@ -1478,7 +1479,7 @@ impl AudioEncoderAnaStats {
 
     /// ANA チャンネルコントローラーが動作した回数を設定する。
     pub fn set_channel_action_counter(&mut self, value: Option<u32>) {
-        set_optional(value, |has, ptr| unsafe {
+        set_optional_scalar(value, |has, ptr| unsafe {
             ffi::webrtc_AudioEncoder_ANAStats_set_channel_action_counter(
                 self.raw.as_ptr(),
                 has,
@@ -1489,35 +1490,35 @@ impl AudioEncoderAnaStats {
 
     /// ANA DTX コントローラーが動作した回数を返す。
     pub fn dtx_action_counter(&self) -> Option<u32> {
-        get_optional(|has, value| unsafe {
+        get_optional_scalar(|has, value| unsafe {
             ffi::webrtc_AudioEncoder_ANAStats_get_dtx_action_counter(self.raw.as_ptr(), has, value)
         })
     }
 
     /// ANA DTX コントローラーが動作した回数を設定する。
     pub fn set_dtx_action_counter(&mut self, value: Option<u32>) {
-        set_optional(value, |has, ptr| unsafe {
+        set_optional_scalar(value, |has, ptr| unsafe {
             ffi::webrtc_AudioEncoder_ANAStats_set_dtx_action_counter(self.raw.as_ptr(), has, ptr)
         })
     }
 
     /// ANA FEC コントローラーが動作した回数を返す。
     pub fn fec_action_counter(&self) -> Option<u32> {
-        get_optional(|has, value| unsafe {
+        get_optional_scalar(|has, value| unsafe {
             ffi::webrtc_AudioEncoder_ANAStats_get_fec_action_counter(self.raw.as_ptr(), has, value)
         })
     }
 
     /// ANA FEC コントローラーが動作した回数を設定する。
     pub fn set_fec_action_counter(&mut self, value: Option<u32>) {
-        set_optional(value, |has, ptr| unsafe {
+        set_optional_scalar(value, |has, ptr| unsafe {
             ffi::webrtc_AudioEncoder_ANAStats_set_fec_action_counter(self.raw.as_ptr(), has, ptr)
         })
     }
 
     /// ANA フレーム長コントローラーが増加を決定した回数を返す。
     pub fn frame_length_increase_counter(&self) -> Option<u32> {
-        get_optional(|has, value| unsafe {
+        get_optional_scalar(|has, value| unsafe {
             ffi::webrtc_AudioEncoder_ANAStats_get_frame_length_increase_counter(
                 self.raw.as_ptr(),
                 has,
@@ -1528,7 +1529,7 @@ impl AudioEncoderAnaStats {
 
     /// ANA フレーム長コントローラーが増加を決定した回数を設定する。
     pub fn set_frame_length_increase_counter(&mut self, value: Option<u32>) {
-        set_optional(value, |has, ptr| unsafe {
+        set_optional_scalar(value, |has, ptr| unsafe {
             ffi::webrtc_AudioEncoder_ANAStats_set_frame_length_increase_counter(
                 self.raw.as_ptr(),
                 has,
@@ -1539,7 +1540,7 @@ impl AudioEncoderAnaStats {
 
     /// ANA フレーム長コントローラーが減少を決定した回数を返す。
     pub fn frame_length_decrease_counter(&self) -> Option<u32> {
-        get_optional(|has, value| unsafe {
+        get_optional_scalar(|has, value| unsafe {
             ffi::webrtc_AudioEncoder_ANAStats_get_frame_length_decrease_counter(
                 self.raw.as_ptr(),
                 has,
@@ -1550,7 +1551,7 @@ impl AudioEncoderAnaStats {
 
     /// ANA フレーム長コントローラーが減少を決定した回数を設定する。
     pub fn set_frame_length_decrease_counter(&mut self, value: Option<u32>) {
-        set_optional(value, |has, ptr| unsafe {
+        set_optional_scalar(value, |has, ptr| unsafe {
             ffi::webrtc_AudioEncoder_ANAStats_set_frame_length_decrease_counter(
                 self.raw.as_ptr(),
                 has,
@@ -1561,7 +1562,7 @@ impl AudioEncoderAnaStats {
 
     /// ANA FEC コントローラーが設定した上りパケットロス率を返す。
     pub fn uplink_packet_loss_fraction(&self) -> Option<f32> {
-        get_optional(|has, value| unsafe {
+        get_optional_scalar(|has, value| unsafe {
             ffi::webrtc_AudioEncoder_ANAStats_get_uplink_packet_loss_fraction(
                 self.raw.as_ptr(),
                 has,
@@ -1572,7 +1573,7 @@ impl AudioEncoderAnaStats {
 
     /// ANA FEC コントローラーが設定した上りパケットロス率を設定する。
     pub fn set_uplink_packet_loss_fraction(&mut self, value: Option<f32>) {
-        set_optional(value, |has, ptr| unsafe {
+        set_optional_scalar(value, |has, ptr| unsafe {
             ffi::webrtc_AudioEncoder_ANAStats_set_uplink_packet_loss_fraction(
                 self.raw.as_ptr(),
                 has,
@@ -1915,7 +1916,7 @@ unsafe extern "C" fn audio_encoder_get_frame_length_range(
         "audio_encoder_get_frame_length_range: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut AudioEncoderHandlerState) };
-    set_optional2(
+    set_optional_scalar2(
         state.handler.get_frame_length_range(),
         |has, min, max| unsafe {
             *out_has = has;
@@ -1938,7 +1939,7 @@ unsafe extern "C" fn audio_encoder_get_bitrate_range(
         "audio_encoder_get_bitrate_range: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut AudioEncoderHandlerState) };
-    set_optional2(state.handler.get_bitrate_range(), |has, min, max| unsafe {
+    set_optional_scalar2(state.handler.get_bitrate_range(), |has, min, max| unsafe {
         *out_has = has;
         if has != 0 {
             *out_min_bps = *min;
@@ -2042,7 +2043,7 @@ impl AudioEncoder {
 
     /// サポートされるフレーム長範囲（マイクロ秒）を返す。
     pub fn get_frame_length_range(&self) -> Option<(i64, i64)> {
-        get_optional2(|out_has, out_min_us, out_max_us| unsafe {
+        get_optional_scalar2(|out_has, out_min_us, out_max_us| unsafe {
             ffi::webrtc_AudioEncoder_GetFrameLengthRange(
                 self.as_ptr(),
                 out_has,
@@ -2054,7 +2055,7 @@ impl AudioEncoder {
 
     /// サポートされるビットレート範囲 (bps) を返す。
     pub fn get_bitrate_range(&self) -> Option<(i64, i64)> {
-        get_optional2(|out_has, out_min_bps, out_max_bps| unsafe {
+        get_optional_scalar2(|out_has, out_min_bps, out_max_bps| unsafe {
             ffi::webrtc_AudioEncoder_GetBitrateRange(
                 self.as_ptr(),
                 out_has,
@@ -2830,22 +2831,17 @@ impl AudioEncoderFactoryOptions {
 
     /// コーデックペア ID を設定 / 解除する。
     pub fn set_codec_pair_id(&mut self, value: Option<&AudioCodecPairId>) {
-        match value {
-            Some(v) => unsafe {
+        set_optional_object(
+            value,
+            |codec_pair_id| codec_pair_id.raw(),
+            |has, codec_pair_id| unsafe {
                 ffi::webrtc_AudioEncoderFactory_Options_set_codec_pair_id(
                     self.raw.as_ptr(),
-                    1,
-                    v.raw(),
+                    has,
+                    codec_pair_id,
                 )
             },
-            None => unsafe {
-                ffi::webrtc_AudioEncoderFactory_Options_set_codec_pair_id(
-                    self.raw.as_ptr(),
-                    0,
-                    std::ptr::null(),
-                )
-            },
-        }
+        );
     }
 
     fn raw(&self) -> *mut ffi::webrtc_AudioEncoderFactory_Options {

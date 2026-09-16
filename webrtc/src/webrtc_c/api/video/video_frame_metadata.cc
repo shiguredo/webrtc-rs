@@ -168,11 +168,11 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetHeight(
 
 WEBRTC_EXPORT void webrtc_VideoFrameMetadata_GetFrameId(
     struct webrtc_VideoFrameMetadata* self,
-    int* has,
+    int* out_has,
     int64_t* frame_id) {
   auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
   auto value = metadata->GetFrameId();
-  webrtc_c::OptionalGet(value, has, frame_id);
+  webrtc_c::OptionalGet(value, out_has, frame_id);
 }
 
 WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetFrameId(
@@ -213,20 +213,20 @@ WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetTemporalIndex(
 
 WEBRTC_EXPORT void webrtc_VideoFrameMetadata_GetDependencies(
     struct webrtc_VideoFrameMetadata* self,
-    int* has,
+    int* out_has,
     const int64_t** data,
     size_t* len) {
-  assert(has != nullptr);
+  assert(out_has != nullptr);
   assert(data != nullptr);
   assert(len != nullptr);
   auto metadata = reinterpret_cast<webrtc::VideoFrameMetadata*>(self);
   auto value = metadata->GetDependencies();
   if (value.has_value()) {
-    *has = 1;
+    *out_has = 1;
     *data = value->data();
     *len = value->size();
   } else {
-    *has = 0;
+    *out_has = 0;
   }
 }
 

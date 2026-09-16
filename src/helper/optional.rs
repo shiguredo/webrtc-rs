@@ -1,82 +1,192 @@
 //! C API の optional (has / value) 方式の getter/setter を共通化するヘルパー。
 //!
-//! C API (`webrtc/src/webrtc_c/api/*.h`) は optional 値を
-//! getter は `out_has` / `out_value`、setter は `has` + 値ポインタで表現する。
-//! この定型的なボイラープレートを各ヘルパーに集約し、アクセサごとの
-//! 繰り返しを無くす。
+//! C API (`webrtc/src/webrtc_c/api/*.h`) は optional 値を getter では
+//! `out_has` + `out_value`、setter では `has` + 値で表現する。setter は
+//! `has` が 0 のとき値を読まないため、値がない場合は null を渡す。
+//!
+//! 使う C API のシグネチャに合うヘルパーを選ぶこと。対応するシグネチャは各ヘルパーの
+//! ドキュメントに書いてある。
+//!
+//! - スカラー: [get_optional_scalar] / [set_optional_scalar]
+//! - スカラー 2 値: [get_optional_scalar2] / [set_optional_scalar2]
+//! - bool (c_int の 1 / 0): [get_optional_bool] / [set_optional_bool]
+//! - C オブジェクト: [get_optional_object] / [set_optional_object]
+//! - 生ポインタ: [get_optional_ptr] / [set_optional_ptr]
+//! - ポインタ + 長さ: [get_optional_slice] / [set_optional_slice]
 
+use crate::helper::non_null::expect_non_null;
 use std::os::raw::c_int;
+use std::ptr::NonNull;
 
-/// has / value 方式の getter を呼び出し、`Option<T>` で返す。
+/// has / value 方式 getter の共通処理。
 ///
-/// `get_fn` には FFI の getter を呼び出すクロージャを渡す。クロージャは
-/// `out_has` と `out_value` のポインタを受け取り、C API を呼び出す。
-/// `has` が 0 なら `None`、そうでなければ `Some(value)` を返す。
-///
-/// `value` は `T::default()` で初期化してから渡す。C API は `has == 0` の
-/// 場合は `out_value` を書き換えない。
-pub(crate) fn get_optional<T: Default>(get_fn: impl FnOnce(*mut c_int, *mut T)) -> Option<T> {
+/// `get_fn` に `has` と `out_value` を渡し、`has` が 1 なら `out_value` を返す。
+fn get_optional<T>(out_value: T, get_fn: impl FnOnce(*mut c_int, &mut T)) -> Option<T> {
+    let mut out_value = out_value;
     let mut has = 0;
-    let mut value = T::default();
-    get_fn(&mut has, &mut value);
-    if has == 0 { None } else { Some(value) }
+    get_fn(&mut has, &mut out_value);
+    if has == 0 { None } else { Some(out_value) }
 }
 
-/// bool 型の has / value 方式 getter を呼び出し、`Option<bool>` で返す。
+/// has / value 方式 setter の共通処理。
 ///
-/// C API 側は bool を c_int の 1 / 0 で表現するため、取得結果を
-/// `value != 0` で bool に変換する。
+/// `value` が `Some` なら `has = 1` と `as_ptr` の結果、`None` なら `has = 0` と
+/// `null_ptr` を `set_fn` に渡す。
+fn set_optional<T, P>(
+    value: Option<T>,
+    as_ptr: impl FnOnce(&T) -> P,
+    null_ptr: P,
+    set_fn: impl FnOnce(c_int, P),
+) {
+    match value {
+        Some(v) => set_fn(1, as_ptr(&v)),
+        None => set_fn(0, null_ptr),
+    }
+}
+
+/// スカラーの getter。
+///
+/// C API のシグネチャが `void get(int* out_has, T* out_value)` のときに使う。
+pub(crate) fn get_optional_scalar<T: Default>(
+    get_fn: impl FnOnce(*mut c_int, *mut T),
+) -> Option<T> {
+    get_optional(T::default(), |has, out_value| get_fn(has, out_value))
+}
+
+/// スカラーの setter。
+///
+/// C API のシグネチャが `void set(int has, const T* value)` のときに使う。
+pub(crate) fn set_optional_scalar<T>(value: Option<T>, set_fn: impl FnOnce(c_int, *const T)) {
+    set_optional(value, std::ptr::from_ref, std::ptr::null(), set_fn)
+}
+
+/// bool の getter。
+///
+/// C API のシグネチャが `void get(int* out_has, int* out_value)` のときに使う。
+/// c_int の 1 / 0 を bool に変換する。
 pub(crate) fn get_optional_bool(get_fn: impl FnOnce(*mut c_int, *mut c_int)) -> Option<bool> {
-    get_optional(get_fn).map(|value| value != 0)
+    get_optional(0, |has, out_value| get_fn(has, out_value)).map(|value| value != 0)
 }
 
-/// has / value 方式の setter を呼び出す。
+/// bool の setter。
 ///
-/// `value` が `Some` なら `has = 1` で値へのポインタ、`None` なら `has = 0`
-/// で null ポインタを渡す。C API は `has == 0` のとき値ポインタを読み取らない。
-pub(crate) fn set_optional<T>(value: Option<T>, set_fn: impl FnOnce(c_int, *const T)) {
-    match value {
-        Some(v) => set_fn(1, &v),
-        None => set_fn(0, std::ptr::null()),
-    }
-}
-
-/// bool 型の has / value 方式 setter を呼び出す。
-///
-/// C API 側は bool を c_int の 1 / 0 で表現するため、`Some(true)` / `Some(false)`
-/// をそれぞれ c_int の 1 / 0 に変換して渡す。`None` は `has = 0` で null を渡す。
+/// C API のシグネチャが `void set(int has, const int* value)` のときに使う。
+/// bool を c_int の 1 / 0 に変換して渡す。
 pub(crate) fn set_optional_bool(value: Option<bool>, set_fn: impl FnOnce(c_int, *const c_int)) {
-    match value {
-        Some(true) => set_fn(1, &1),
-        Some(false) => set_fn(1, &0),
-        None => set_fn(0, std::ptr::null()),
-    }
+    set_optional(
+        value,
+        |v| if *v { &1 } else { &0 },
+        std::ptr::null(),
+        set_fn,
+    )
 }
 
-/// has / value 方式の getter を呼び出し、2 値の `Option<(A, B)>` で返す。
+/// 2 つのスカラーの getter。
 ///
-/// C API が `out_has` + 2 つの値 (`out_a` / `out_b`) を出力する getter のために、
-/// [get_optional] の 2 値版。`has` が 0 なら `None`、そうでなければ `Some((a, b))` を返す。
-pub(crate) fn get_optional2<A: Default, B: Default>(
+/// C API のシグネチャが `void get(int* out_has, A* out_a, B* out_b)` のときに使う。
+pub(crate) fn get_optional_scalar2<A: Default, B: Default>(
     get_fn: impl FnOnce(*mut c_int, *mut A, *mut B),
 ) -> Option<(A, B)> {
-    let mut has = 0;
-    let mut a = A::default();
-    let mut b = B::default();
-    get_fn(&mut has, &mut a, &mut b);
-    if has == 0 { None } else { Some((a, b)) }
+    get_optional((A::default(), B::default()), |has, out_value| {
+        let (a, b) = out_value;
+        get_fn(has, a, b)
+    })
 }
 
-/// has / value 方式の setter を呼び出す 2 値版。
+/// 2 つのスカラーの setter。
 ///
-/// `value` が `Some((a, b))` なら `has = 1` で 2 つの値へのポインタ、`None` なら
-/// `has = 0` で null ポインタを渡す。C API は `has == 0` のとき値ポインタを読み取らない。
-pub(crate) fn set_optional2<A, B>(
+/// C API のシグネチャが `void set(int has, const A* a, const B* b)` のときに使う。
+pub(crate) fn set_optional_scalar2<A, B>(
     value: Option<(A, B)>,
     set_fn: impl FnOnce(c_int, *const A, *const B),
 ) {
-    match value {
-        Some((a, b)) => set_fn(1, &a, &b),
-        None => set_fn(0, std::ptr::null(), std::ptr::null()),
-    }
+    set_optional(
+        value,
+        |(a, b)| (std::ptr::from_ref(a), std::ptr::from_ref(b)),
+        (std::ptr::null(), std::ptr::null()),
+        |has, (a, b)| set_fn(has, a, b),
+    )
+}
+
+/// C オブジェクトの getter。
+///
+/// C API のシグネチャが `void get(int* out_has, U* out_value)` のときに使う。
+pub(crate) fn get_optional_object<T, U>(
+    value: T,
+    as_ptr: impl FnOnce(&T) -> *mut U,
+    get_fn: impl FnOnce(*mut c_int, *mut U),
+) -> Option<T> {
+    get_optional(value, |has, value| get_fn(has, as_ptr(value)))
+}
+
+/// C オブジェクトの setter。
+///
+/// C API のシグネチャが `void set(int has, const U* value)` のときに使う。
+/// `as_ptr` が返すポインタを渡す。
+pub(crate) fn set_optional_object<T, U>(
+    value: Option<T>,
+    as_ptr: impl FnOnce(&T) -> *mut U,
+    set_fn: impl FnOnce(c_int, *const U),
+) {
+    set_optional(value, |v| as_ptr(v).cast_const(), std::ptr::null(), set_fn)
+}
+
+/// 生ポインタが出力の getter。
+///
+/// C API のシグネチャが `void get(int* out_has, U** out_value)` のときに使う。
+/// `has` が 1 なのに null なら panic する (`what` には関数名を渡す)。
+/// 返すポインタの所有 / 借用は C API の契約に従う。
+pub(crate) fn get_optional_ptr<U>(
+    what: &'static str,
+    get_fn: impl FnOnce(*mut c_int, *mut *mut U),
+) -> Option<NonNull<U>> {
+    get_optional(std::ptr::null_mut::<U>(), |has, out_value| {
+        get_fn(has, out_value)
+    })
+    .map(|raw| expect_non_null(raw, what))
+}
+
+/// 生ポインタを渡す setter。
+///
+/// C API のシグネチャが `void set(int has, const U* value)` のときに使う。Rust 側の値が
+/// `NonNull<U>` のときに使う。
+#[expect(dead_code)]
+pub(crate) fn set_optional_ptr<U>(value: Option<NonNull<U>>, set_fn: impl FnOnce(c_int, *const U)) {
+    set_optional(value, |p| p.as_ptr(), std::ptr::null(), set_fn)
+}
+
+/// ポインタ + 長さが出力の getter。
+///
+/// C API のシグネチャが `void get(int* out_has, const T** out_data, size_t* out_len)` のときに使う。
+/// 長さ 0 なら空スライスを返し、返すスライスの寿命は `'a` に束縛される。
+pub(crate) fn get_optional_slice<'a, T>(
+    get_fn: impl FnOnce(*mut c_int, *mut *const T, *mut usize),
+) -> Option<&'a [T]> {
+    get_optional((std::ptr::null::<T>(), 0), |has, out_value| {
+        let (data, len) = out_value;
+        get_fn(has, data, len)
+    })
+    .map(|(data, len)| -> &'a [T] {
+        if len == 0 {
+            // C API が null を返していても安全なように空スライスを返す。
+            return &[];
+        }
+        // SAFETY: `data` / `len` は C API が `has == 1` のときだけ設定する。
+        unsafe { std::slice::from_raw_parts(data, len) }
+    })
+}
+
+/// ポインタ + 長さで渡す setter。
+///
+/// C API のシグネチャが `void set(int has, const T* value, size_t value_len)` のときに使う。
+pub(crate) fn set_optional_slice<T>(
+    value: Option<&[T]>,
+    set_fn: impl FnOnce(c_int, *const T, usize),
+) {
+    set_optional(
+        value,
+        |v| (v.as_ptr(), v.len()),
+        (std::ptr::null(), 0),
+        |has, (data, len)| set_fn(has, data, len),
+    )
 }

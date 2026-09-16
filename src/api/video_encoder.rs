@@ -5,7 +5,10 @@ use super::video_codec_common::{
 use super::video_codec_specifics::H264PacketizationMode;
 use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
 use crate::helper::non_null::expect_non_null;
-use crate::helper::optional::{get_optional, get_optional_bool, set_optional, set_optional_bool};
+use crate::helper::optional::{
+    get_optional_bool, get_optional_object, get_optional_scalar, set_optional_bool,
+    set_optional_object, set_optional_scalar,
+};
 use crate::{CxxString, EnvironmentRef, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -267,35 +270,31 @@ impl<'a> VideoEncoderScalingSettingsRef<'a> {
     }
 
     pub fn thresholds(&self) -> Option<VideoEncoderQpThresholds> {
-        let mut has = 0;
-        let value = VideoEncoderQpThresholds::new();
-        unsafe {
-            ffi::webrtc_VideoEncoder_ScalingSettings_get_thresholds(
-                self.raw.as_ptr(),
-                &mut has,
-                value.as_ptr(),
-            );
-        }
-        if has == 0 { None } else { Some(value) }
+        get_optional_object(
+            VideoEncoderQpThresholds::new(),
+            |thresholds| thresholds.as_ptr(),
+            |has, thresholds| unsafe {
+                ffi::webrtc_VideoEncoder_ScalingSettings_get_thresholds(
+                    self.raw.as_ptr(),
+                    has,
+                    thresholds,
+                )
+            },
+        )
     }
 
     pub fn set_thresholds(&mut self, value: Option<&VideoEncoderQpThresholds>) {
-        match value {
-            Some(v) => unsafe {
+        set_optional_object(
+            value,
+            |thresholds| thresholds.as_ptr(),
+            |has, thresholds| unsafe {
                 ffi::webrtc_VideoEncoder_ScalingSettings_set_thresholds(
                     self.raw.as_ptr(),
-                    1,
-                    v.as_ptr(),
-                );
+                    has,
+                    thresholds,
+                )
             },
-            None => unsafe {
-                ffi::webrtc_VideoEncoder_ScalingSettings_set_thresholds(
-                    self.raw.as_ptr(),
-                    0,
-                    std::ptr::null(),
-                );
-            },
-        }
+        );
     }
 
     pub fn min_pixels_per_frame(&self) -> i32 {
@@ -839,17 +838,18 @@ impl VideoEncoderEncoderInfo {
         &self,
         frame_size_pixels: i32,
     ) -> Option<VideoEncoderResolutionBitrateLimits> {
-        let mut has = 0;
-        let value = VideoEncoderResolutionBitrateLimits::new(0, 0, 0, 0);
-        unsafe {
-            ffi::webrtc_VideoEncoder_EncoderInfo_GetEncoderBitrateLimitsForResolution(
-                self.as_ptr(),
-                frame_size_pixels,
-                &mut has,
-                value.as_ptr(),
-            );
-        }
-        if has == 0 { None } else { Some(value) }
+        get_optional_object(
+            VideoEncoderResolutionBitrateLimits::new(0, 0, 0, 0),
+            |limits| limits.as_ptr(),
+            |has, limits| unsafe {
+                ffi::webrtc_VideoEncoder_EncoderInfo_GetEncoderBitrateLimitsForResolution(
+                    self.as_ptr(),
+                    frame_size_pixels,
+                    has,
+                    limits,
+                )
+            },
+        )
     }
 
     pub fn supports_simulcast(&self) -> bool {
@@ -889,47 +889,43 @@ impl VideoEncoderEncoderInfo {
     }
 
     pub fn min_qp(&self) -> Option<i32> {
-        get_optional(|has, value| unsafe {
+        get_optional_scalar(|has, value| unsafe {
             ffi::webrtc_VideoEncoder_EncoderInfo_get_min_qp(self.as_ptr(), has, value)
         })
     }
 
     pub fn set_min_qp(&mut self, value: Option<i32>) {
-        set_optional(value, |has, value_ptr| unsafe {
+        set_optional_scalar(value, |has, value_ptr| unsafe {
             ffi::webrtc_VideoEncoder_EncoderInfo_set_min_qp(self.as_ptr(), has, value_ptr)
         });
     }
 
     pub fn mapped_resolution(&self) -> Option<VideoEncoderResolution> {
-        let mut has = 0;
-        let value = VideoEncoderResolution::new(0, 0);
-        unsafe {
-            ffi::webrtc_VideoEncoder_EncoderInfo_get_mapped_resolution(
-                self.as_ptr(),
-                &mut has,
-                value.as_ptr(),
-            )
-        };
-        if has == 0 { None } else { Some(value) }
+        get_optional_object(
+            VideoEncoderResolution::new(0, 0),
+            |resolution| resolution.as_ptr(),
+            |has, resolution| unsafe {
+                ffi::webrtc_VideoEncoder_EncoderInfo_get_mapped_resolution(
+                    self.as_ptr(),
+                    has,
+                    resolution,
+                )
+            },
+        )
     }
 
     pub fn set_mapped_resolution(&mut self, value: Option<&VideoEncoderResolution>) {
-        match value {
-            Some(v) => unsafe {
+        set_optional_object(
+            value,
+            |resolution| resolution.as_ptr(),
+            |has, resolution| unsafe {
                 ffi::webrtc_VideoEncoder_EncoderInfo_set_mapped_resolution(
                     self.as_ptr(),
-                    1,
-                    v.as_ptr(),
-                );
+                    has,
+                    resolution,
+                )
             },
-            None => unsafe {
-                ffi::webrtc_VideoEncoder_EncoderInfo_set_mapped_resolution(
-                    self.as_ptr(),
-                    0,
-                    std::ptr::null(),
-                );
-            },
-        }
+        );
     }
 
     pub fn to_string(&self) -> Result<String> {

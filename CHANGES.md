@@ -30,6 +30,13 @@
   - `PeerConnectionFactoryDependencies::set_worker_thread` に network thread を渡す
   - C / C++ の whip / whep サンプルから専用 worker thread の生成を削除する
   - @melpon
+- [UPDATE] optional 値 (has / value) 方式のヘルパーを C API の値の種類ごとに揃える
+  - `has` を読んで `Option` に変換する部分を private な `get_optional` / `set_optional` に集約し、値の種類ごとのヘルパーをその薄いラッパーにする
+  - スカラー用を `get_optional_scalar` / `set_optional_scalar`、2 値用を `get_optional_scalar2` / `set_optional_scalar2` にリネームし、C オブジェクト用の `get_optional_object` / `set_optional_object`、生ポインタ用の `get_optional_ptr` / `set_optional_ptr`、ポインタ + 長さ用の `get_optional_slice` / `set_optional_slice` を追加する
+  - `webrtc_c` の optional を `int has` + `const T*` に統一し、値を直接渡していた `webrtc_TransformableFrameInterface_SetCaptureTime` / `webrtc_VideoFrameBuilder_set_presentation_timestamp_us` / `webrtc_VideoFrameBuilder_set_reference_time_us` を `const int64_t*` にする
+  - optional の getter の `has` 引数を `out_has` に揃え、`webrtc_VideoFrame_color_space` が `has == 0` のときに値の出力先を書き換えないようにする (挙動は変更しない)
+  - `src/api/*.rs` と `src/rtc_base/logging.rs` に散っていた手動実装を各ヘルパーの呼び出しに置き換える (挙動は変更しない)
+  - @melpon
 
 ## 0.154.0
 
