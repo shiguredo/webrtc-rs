@@ -75,10 +75,10 @@ webrtc_VideoFrameMetadata_GetHeight(struct webrtc_VideoFrameMetadata* self);
 WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetHeight(
     struct webrtc_VideoFrameMetadata* self,
     uint16_t height);
-// optional は int* has に 0 か 1 を設定する。
+// optional は int* out_has に 0 か 1 を設定する。
 WEBRTC_EXPORT void webrtc_VideoFrameMetadata_GetFrameId(
     struct webrtc_VideoFrameMetadata* self,
-    int* has,
+    int* out_has,
     int64_t* frame_id);
 WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetFrameId(
     struct webrtc_VideoFrameMetadata* self,
@@ -94,10 +94,10 @@ WEBRTC_EXPORT int webrtc_VideoFrameMetadata_GetTemporalIndex(
 WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetTemporalIndex(
     struct webrtc_VideoFrameMetadata* self,
     int temporal_index);
-// optional<span<const int64_t>> は int* has と data/len に展開する。
+// optional<span<const int64_t>> は int* out_has と data/len に展開する。
 WEBRTC_EXPORT void webrtc_VideoFrameMetadata_GetDependencies(
     struct webrtc_VideoFrameMetadata* self,
-    int* has,
+    int* out_has,
     const int64_t** data,
     size_t* len);
 WEBRTC_EXPORT void webrtc_VideoFrameMetadata_SetDependencies(

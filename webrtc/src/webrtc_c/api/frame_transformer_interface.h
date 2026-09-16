@@ -105,28 +105,28 @@ WEBRTC_EXPORT int webrtc_TransformableFrameInterface_GetDirection(
 WEBRTC_EXPORT struct std_string_unique*
 webrtc_TransformableFrameInterface_GetMimeType(
     struct webrtc_TransformableFrameInterface* self);
-// 各 optional は int* has に 0 か 1 を設定し、値はマイクロ秒で返す。
+// 各 optional は int* out_has に 0 か 1 を設定し、値はマイクロ秒で返す。
 WEBRTC_EXPORT void webrtc_TransformableFrameInterface_ReceiveTime(
     struct webrtc_TransformableFrameInterface* self,
-    int* has,
+    int* out_has,
     int64_t* timestamp_us);
 WEBRTC_EXPORT void webrtc_TransformableFrameInterface_GetPresentationTimestamp(
     struct webrtc_TransformableFrameInterface* self,
-    int* has,
+    int* out_has,
     int64_t* timestamp_us);
 WEBRTC_EXPORT void webrtc_TransformableFrameInterface_CaptureTime(
     struct webrtc_TransformableFrameInterface* self,
-    int* has,
+    int* out_has,
     int64_t* timestamp_us);
 WEBRTC_EXPORT int webrtc_TransformableFrameInterface_CanSetCaptureTime(
     struct webrtc_TransformableFrameInterface* self);
 WEBRTC_EXPORT void webrtc_TransformableFrameInterface_SetCaptureTime(
     struct webrtc_TransformableFrameInterface* self,
     int has,
-    int64_t timestamp_us);
+    const int64_t* timestamp_us);
 WEBRTC_EXPORT void webrtc_TransformableFrameInterface_SenderCaptureTimeOffset(
     struct webrtc_TransformableFrameInterface* self,
-    int* has,
+    int* out_has,
     int64_t* delta_us);
 
 // -------------------------

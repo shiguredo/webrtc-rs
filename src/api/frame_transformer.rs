@@ -4,7 +4,10 @@ use super::video_codec_specifics::{
 };
 use crate::helper::handler::{create_with_handler, destroy_handler};
 use crate::helper::non_null::expect_non_null;
-use crate::helper::optional::{get_optional, set_optional};
+use crate::helper::optional::{
+    get_optional_ptr, get_optional_scalar, get_optional_slice, set_optional_scalar,
+    set_optional_slice,
+};
 use crate::helper::ref_count::{FrameTransformerHandle, TransformedFrameCallbackHandle};
 use crate::{CxxString, Result, ScopedRef, ffi};
 use std::collections::HashMap;
@@ -502,7 +505,7 @@ impl TransformableFrame {
     ///
     /// 受信フレームでのみ定義される。
     pub fn receive_time(&self) -> Option<i64> {
-        get_optional(|has, timestamp_us| unsafe {
+        get_optional_scalar(|has, timestamp_us| unsafe {
             ffi::webrtc_TransformableFrameInterface_ReceiveTime(self.as_ptr(), has, timestamp_us)
         })
     }
@@ -511,7 +514,7 @@ impl TransformableFrame {
     ///
     /// deprecated の `GetCaptureTimeIdentifier` の後継。
     pub fn presentation_timestamp(&self) -> Option<i64> {
-        get_optional(|has, timestamp_us| unsafe {
+        get_optional_scalar(|has, timestamp_us| unsafe {
             ffi::webrtc_TransformableFrameInterface_GetPresentationTimestamp(
                 self.as_ptr(),
                 has,
@@ -522,7 +525,7 @@ impl TransformableFrame {
 
     /// キャプチャシステム内でフレームがキャプチャされた時刻 (マイクロ秒) を返す。
     pub fn capture_time(&self) -> Option<i64> {
-        get_optional(|has, timestamp_us| unsafe {
+        get_optional_scalar(|has, timestamp_us| unsafe {
             ffi::webrtc_TransformableFrameInterface_CaptureTime(self.as_ptr(), has, timestamp_us)
         })
     }
@@ -536,20 +539,16 @@ impl TransformableFrame {
     ///
     /// `None` を指定するとキャプチャ時間を未設定にする。
     pub fn set_capture_time(&mut self, capture_time: Option<i64>) {
-        let (has, timestamp_us) = match capture_time {
-            Some(v) => (1, v),
-            None => (0, 0),
-        };
-        unsafe {
+        set_optional_scalar(capture_time, |has, timestamp_us| unsafe {
             ffi::webrtc_TransformableFrameInterface_SetCaptureTime(self.as_ptr(), has, timestamp_us)
-        };
+        });
     }
 
     /// 送信側システムとキャプチャ側システムのクロックオフセット (マイクロ秒) を返す。
     ///
     /// absolute capture timestamp ヘッダー拡張が有効な場合のみ利用できる。
     pub fn sender_capture_time_offset(&self) -> Option<i64> {
-        get_optional(|has, delta_us| unsafe {
+        get_optional_scalar(|has, delta_us| unsafe {
             ffi::webrtc_TransformableFrameInterface_SenderCaptureTimeOffset(
                 self.as_ptr(),
                 has,
@@ -592,22 +591,14 @@ impl TransformableVideoFrame {
 
     /// RID (RTP Stream ID) を返す。
     pub fn rid(&self) -> Result<Option<String>> {
-        let mut has = 0;
-        let mut ptr: *mut ffi::std_string_unique = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_TransformableVideoFrameInterface_Rid(
-                self.as_video_ptr(),
-                &mut has,
-                &mut ptr,
-            )
-        };
-        if has == 0 {
-            return Ok(None);
-        }
-        let raw = NonNull::new(ptr).expect(
-            "BUG: has が 1 なのに webrtc_TransformableVideoFrameInterface_Rid が null を返しました",
-        );
-        Ok(Some(CxxString::from_unique(raw).to_string()?))
+        get_optional_ptr(
+            "webrtc_TransformableVideoFrameInterface_Rid",
+            |has, value| unsafe {
+                ffi::webrtc_TransformableVideoFrameInterface_Rid(self.as_video_ptr(), has, value)
+            },
+        )
+        .map(|raw| CxxString::from_unique(raw).to_string())
+        .transpose()
     }
 
     /// フレームのメタデータを返す。
@@ -726,14 +717,14 @@ impl VideoFrameMetadata {
 
     /// フレーム ID を返す。
     pub fn frame_id(&self) -> Option<i64> {
-        get_optional(|has, value| unsafe {
+        get_optional_scalar(|has, value| unsafe {
             ffi::webrtc_VideoFrameMetadata_GetFrameId(self.raw.as_ptr(), has, value)
         })
     }
 
     /// フレーム ID を設定する。
     pub fn set_frame_id(&mut self, frame_id: Option<i64>) {
-        set_optional(frame_id, |has, value_ptr| unsafe {
+        set_optional_scalar(frame_id, |has, value_ptr| unsafe {
             ffi::webrtc_VideoFrameMetadata_SetFrameId(self.raw.as_ptr(), has, value_ptr)
         });
     }
@@ -762,47 +753,16 @@ impl VideoFrameMetadata {
 
     /// フレームの依存関係 (参照フレーム ID の一覧) を返す。
     pub fn dependencies(&self) -> Option<&[i64]> {
-        let mut has = 0;
-        let mut data: *const i64 = std::ptr::null();
-        let mut len = 0;
-        unsafe {
-            ffi::webrtc_VideoFrameMetadata_GetDependencies(
-                self.raw.as_ptr(),
-                &mut has,
-                &mut data,
-                &mut len,
-            )
-        };
-        if has == 0 {
-            return None;
-        }
-        if len == 0 {
-            return Some(&[]);
-        }
-        // ライフタイムは &self に束縛される。
-        Some(unsafe { std::slice::from_raw_parts(data, len) })
+        get_optional_slice(|has, data, len| unsafe {
+            ffi::webrtc_VideoFrameMetadata_GetDependencies(self.raw.as_ptr(), has, data, len)
+        })
     }
 
     /// フレームの依存関係 (参照フレーム ID の一覧) を設定する。
     pub fn set_dependencies(&mut self, dependencies: Option<&[i64]>) {
-        match dependencies {
-            Some(v) => unsafe {
-                ffi::webrtc_VideoFrameMetadata_SetDependencies(
-                    self.raw.as_ptr(),
-                    1,
-                    v.as_ptr(),
-                    v.len(),
-                )
-            },
-            None => unsafe {
-                ffi::webrtc_VideoFrameMetadata_SetDependencies(
-                    self.raw.as_ptr(),
-                    0,
-                    std::ptr::null(),
-                    0,
-                )
-            },
-        }
+        set_optional_slice(dependencies, |has, data, len| unsafe {
+            ffi::webrtc_VideoFrameMetadata_SetDependencies(self.raw.as_ptr(), has, data, len)
+        });
     }
 
     /// ピクチャ内で最後のフレームかどうかを返す。

@@ -3,6 +3,7 @@ pub mod log {
     use crate::ffi;
     use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
     use crate::helper::non_null::expect_non_null;
+    use crate::helper::optional::get_optional_scalar;
     use std::ffi::CString;
     use std::marker::PhantomData;
     use std::os::raw::{c_char, c_void};
@@ -276,10 +277,9 @@ pub mod log {
 
         /// ログを発行したスレッド ID を返す。
         pub fn thread_id(&self) -> Option<i64> {
-            let mut has = 0;
-            let mut value = 0i64;
-            unsafe { ffi::webrtc_LogLineRef_thread_id(self.raw.as_ptr(), &mut has, &mut value) };
-            if has != 0 { Some(value) } else { None }
+            get_optional_scalar(|has, value| unsafe {
+                ffi::webrtc_LogLineRef_thread_id(self.raw.as_ptr(), has, value)
+            })
         }
 
         /// ログ発行時刻をマイクロ秒 (エポック起点) で返す。

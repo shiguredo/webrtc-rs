@@ -121,25 +121,24 @@ WEBRTC_EXPORT void webrtc_VideoFrameBuilder_set_timestamp_us(
 WEBRTC_EXPORT void webrtc_VideoFrameBuilder_set_presentation_timestamp_us(
     struct webrtc_VideoFrameBuilder* self,
     int has,
-    int64_t presentation_timestamp_us) {
+    const int64_t* presentation_timestamp_us) {
   auto builder = reinterpret_cast<webrtc::VideoFrame::Builder*>(self);
-  if (has == 0) {
-    builder->set_presentation_timestamp(std::nullopt);
-    return;
-  }
-  builder->set_presentation_timestamp(
-      webrtc::Timestamp::Micros(presentation_timestamp_us));
+  std::optional<webrtc::Timestamp> presentation_timestamp;
+  webrtc_c::OptionalSetAs(
+      presentation_timestamp, has, presentation_timestamp_us,
+      [&]() { return webrtc::Timestamp::Micros(*presentation_timestamp_us); });
+  builder->set_presentation_timestamp(presentation_timestamp);
 }
 WEBRTC_EXPORT void webrtc_VideoFrameBuilder_set_reference_time_us(
     struct webrtc_VideoFrameBuilder* self,
     int has,
-    int64_t reference_time_us) {
+    const int64_t* reference_time_us) {
   auto builder = reinterpret_cast<webrtc::VideoFrame::Builder*>(self);
-  if (has == 0) {
-    builder->set_reference_time(std::nullopt);
-    return;
-  }
-  builder->set_reference_time(webrtc::Timestamp::Micros(reference_time_us));
+  std::optional<webrtc::Timestamp> reference_time;
+  webrtc_c::OptionalSetAs(reference_time, has, reference_time_us, [&]() {
+    return webrtc::Timestamp::Micros(*reference_time_us);
+  });
+  builder->set_reference_time(reference_time);
 }
 WEBRTC_EXPORT void webrtc_VideoFrameBuilder_set_rtp_timestamp(
     struct webrtc_VideoFrameBuilder* self,
@@ -294,18 +293,10 @@ WEBRTC_EXPORT void webrtc_VideoFrame_color_space(
     int* out_has,
     struct webrtc_ColorSpace_unique** out_value) {
   auto frame = reinterpret_cast<const webrtc::VideoFrame*>(self);
-  const auto& color_space = frame->color_space();
-  const bool has_value = color_space.has_value();
-  assert(out_has != nullptr);
-  *out_has = has_value ? 1 : 0;
-  assert(out_value != nullptr);
-  if (!has_value) {
-    *out_value = nullptr;
-    return;
-  }
-  auto copied = std::make_unique<webrtc::ColorSpace>(*color_space);
-  *out_value =
-      reinterpret_cast<struct webrtc_ColorSpace_unique*>(copied.release());
+  webrtc_c::OptionalGetAs(frame->color_space(), out_has, out_value, [&]() {
+    auto copied = std::make_unique<webrtc::ColorSpace>(*frame->color_space());
+    return reinterpret_cast<struct webrtc_ColorSpace_unique*>(copied.release());
+  });
 }
 WEBRTC_EXPORT int webrtc_VideoFrame_has_update_rect(
     const struct webrtc_VideoFrame* self) {

@@ -60,6 +60,17 @@
 - `std::string` を返す関数を移植する場合は `struct std_string_unique*` にして、利用後は C アプリケーション側で `std_string_unique_delete` を呼んで解放する
 - `webrtc::Timestamp` / `webrtc::TimeDelta` は `int64_t` マイクロ秒として渡す
   - 引数・戻り値ともに値はマイクロ秒単位とし、C++ 側で `Timestamp::Micros(...)` / `TimeDelta::Micros(...)` や `.us()` を使って変換する
+- `std::optional<T>` の C 側の表現は値の種類で決める
+  - スカラーは `int has` + `const T*`、getter は `int* out_has` + `T*` とする
+  - `CppType` は `int has` + `const struct CType*`、getter は `int* out_has` + `struct CType**` とする
+    - getter が返す値が C++ 側に実体として存在する場合は借用ポインタ、値として生成される場合はコピーした `struct CType_unique**` を返す
+  - `std::string` は setter を `int has` + `const char* value, size_t value_len` とし、getter は借用した `struct std_string**` かコピーした `struct std_string_unique**` を返す
+  - `std::span<const T>` は setter を `int has` + `const T* data, size_t len` とし、getter は `int* out_has` + `const T** data, size_t* len` とする
+  - `webrtc::Timestamp` / `webrtc::TimeDelta` も値の型は `int64_t` とし、他のスカラーと同じくポインタで渡す
+- optional の `has` は 0 か 1 とし、getter は `out_has`、setter は `has` という引数名に統一する
+- optional の getter は `has == 0` のとき値の出力先を書き換えない
+- optional の setter は `has == 0` のとき C++ 側で `std::nullopt` を設定し、値の引数は読まない
+- optional の実装には `webrtc_c::OptionalGet` / `OptionalGetAs` / `OptionalSet` / `OptionalSetAs` を使う
 - `std::variant<T0, T1, ..., Tn>` はヒープ確保したコピーを `struct CType_unique*` として返す
   - `WEBRTC_DECLARE_VARIANT(type)` / `WEBRTC_DEFINE_VARIANT(type, cpptype)` マクロを利用する
   - 生成関数は `std::make_unique<CppType>(value)` を `_unique` にキャストして返し、破棄は `CType_unique_delete` で行う

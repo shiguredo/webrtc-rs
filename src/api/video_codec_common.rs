@@ -1,6 +1,8 @@
 use crate::helper::handler::{create_with_handler, destroy_handler};
 use crate::helper::non_null::expect_non_null;
-use crate::helper::optional::get_optional;
+use crate::helper::optional::{
+    get_optional_ptr, get_optional_scalar, set_optional_object, set_optional_scalar,
+};
 use crate::helper::ref_count::{
     EncodedImageBufferHandle, I420BufferHandle, NV12BufferHandle, VideoFrameBufferHandle,
 };
@@ -1323,38 +1325,30 @@ impl VideoFrameBuilder {
     }
 
     pub fn set_presentation_timestamp(&mut self, value: Option<Duration>) -> &mut Self {
-        match value {
-            Some(value) => unsafe {
+        set_optional_scalar(
+            value.map(duration_to_timestamp_us),
+            |has, timestamp_us| unsafe {
                 ffi::webrtc_VideoFrameBuilder_set_presentation_timestamp_us(
                     self.raw().as_ptr(),
-                    1,
-                    duration_to_timestamp_us(value),
+                    has,
+                    timestamp_us,
                 )
             },
-            None => unsafe {
-                ffi::webrtc_VideoFrameBuilder_set_presentation_timestamp_us(
-                    self.raw().as_ptr(),
-                    0,
-                    0,
-                )
-            },
-        }
+        );
         self
     }
 
     pub fn set_reference_time(&mut self, value: Option<Duration>) -> &mut Self {
-        match value {
-            Some(value) => unsafe {
+        set_optional_scalar(
+            value.map(duration_to_timestamp_us),
+            |has, timestamp_us| unsafe {
                 ffi::webrtc_VideoFrameBuilder_set_reference_time_us(
                     self.raw().as_ptr(),
-                    1,
-                    duration_to_timestamp_us(value),
+                    has,
+                    timestamp_us,
                 )
             },
-            None => unsafe {
-                ffi::webrtc_VideoFrameBuilder_set_reference_time_us(self.raw().as_ptr(), 0, 0)
-            },
-        }
+        );
         self
     }
 
@@ -1379,22 +1373,13 @@ impl VideoFrameBuilder {
     }
 
     pub fn set_color_space(&mut self, value: Option<&ColorSpace>) -> &mut Self {
-        match value {
-            Some(value) => unsafe {
-                ffi::webrtc_VideoFrameBuilder_set_color_space(
-                    self.raw().as_ptr(),
-                    1,
-                    value.as_ptr(),
-                )
+        set_optional_object(
+            value,
+            |color_space| color_space.as_ptr(),
+            |has, color_space| unsafe {
+                ffi::webrtc_VideoFrameBuilder_set_color_space(self.raw().as_ptr(), has, color_space)
             },
-            None => unsafe {
-                ffi::webrtc_VideoFrameBuilder_set_color_space(
-                    self.raw().as_ptr(),
-                    0,
-                    std::ptr::null(),
-                )
-            },
-        }
+        );
         self
     }
 
@@ -1404,22 +1389,13 @@ impl VideoFrameBuilder {
     }
 
     pub fn set_update_rect(&mut self, value: Option<&VideoFrameUpdateRect>) -> &mut Self {
-        match value {
-            Some(value) => unsafe {
-                ffi::webrtc_VideoFrameBuilder_set_update_rect(
-                    self.raw().as_ptr(),
-                    1,
-                    value.as_ptr(),
-                )
+        set_optional_object(
+            value,
+            |update_rect| update_rect.as_ptr(),
+            |has, update_rect| unsafe {
+                ffi::webrtc_VideoFrameBuilder_set_update_rect(self.raw().as_ptr(), has, update_rect)
             },
-            None => unsafe {
-                ffi::webrtc_VideoFrameBuilder_set_update_rect(
-                    self.raw().as_ptr(),
-                    0,
-                    std::ptr::null(),
-                )
-            },
-        }
+        );
         self
     }
 
@@ -1602,30 +1578,24 @@ impl<'a> VideoFrameRef<'a> {
     }
 
     pub fn presentation_timestamp(&self) -> Option<Duration> {
-        get_optional(|has, value| unsafe {
+        get_optional_scalar(|has, value| unsafe {
             ffi::webrtc_VideoFrame_presentation_timestamp_us(self.raw.as_ptr(), has, value)
         })
         .map(timestamp_us_to_duration)
     }
 
     pub fn reference_time(&self) -> Option<Duration> {
-        get_optional(|has, value| unsafe {
+        get_optional_scalar(|has, value| unsafe {
             ffi::webrtc_VideoFrame_reference_time_us(self.raw.as_ptr(), has, value)
         })
         .map(timestamp_us_to_duration)
     }
 
     pub fn color_space(&self) -> Option<ColorSpace> {
-        let mut has = 0;
-        let mut raw_unique: *mut ffi::webrtc_ColorSpace_unique = std::ptr::null_mut();
-        unsafe {
-            ffi::webrtc_VideoFrame_color_space(self.raw.as_ptr(), &mut has, &mut raw_unique);
-        }
-        if has == 0 {
-            return None;
-        }
-        let raw_unique = expect_non_null(raw_unique, "webrtc_VideoFrame_color_space");
-        Some(unsafe { ColorSpace::from_raw_unique(raw_unique) })
+        get_optional_ptr("webrtc_VideoFrame_color_space", |has, value| unsafe {
+            ffi::webrtc_VideoFrame_color_space(self.raw.as_ptr(), has, value)
+        })
+        .map(|raw| unsafe { ColorSpace::from_raw_unique(raw) })
     }
 
     pub fn has_update_rect(&self) -> bool {
