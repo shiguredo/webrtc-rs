@@ -1940,8 +1940,8 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     assert!(enc.adaptive_ptime());
     assert_eq!(
         enc.scalability_mode()
-            .expect("scalability_mode が未設定でした")
-            .expect("scalability_mode の取得に失敗しました"),
+            .expect("scalability_mode の取得に失敗しました")
+            .expect("scalability_mode が未設定でした"),
         "L1T3".to_string()
     );
     let enc_codec = enc.codec().expect("codec の取得に失敗しました");
@@ -1957,7 +1957,11 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     assert_eq!(codec.clock_rate(), None);
     assert_eq!(codec.num_channels(), None);
     enc.set_scalability_mode(None);
-    assert!(enc.scalability_mode().is_none());
+    assert!(
+        enc.scalability_mode()
+            .expect("scalability_mode の取得に失敗しました")
+            .is_none()
+    );
     enc.set_codec(None);
     assert!(enc.codec().is_none());
 

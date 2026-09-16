@@ -574,7 +574,7 @@ impl RtpEncodingParameters {
         self.as_ref().set_adaptive_ptime(adaptive_ptime);
     }
 
-    pub fn scalability_mode(&self) -> Option<Result<String>> {
+    pub fn scalability_mode(&self) -> Result<Option<String>> {
         self.as_ref().scalability_mode()
     }
 
@@ -793,7 +793,7 @@ impl<'a> RtpEncodingParametersRef<'a> {
         };
     }
 
-    pub fn scalability_mode(&self) -> Option<Result<String>> {
+    pub fn scalability_mode(&self) -> Result<Option<String>> {
         get_optional_ptr(
             "webrtc_RtpEncodingParameters_get_scalability_mode",
             |has, value| unsafe {
@@ -805,6 +805,7 @@ impl<'a> RtpEncodingParametersRef<'a> {
             },
         )
         .map(|raw| CxxStringRef::from_ptr(raw).to_string())
+        .transpose()
     }
 
     pub fn set_scalability_mode(&mut self, value: Option<&str>) {
