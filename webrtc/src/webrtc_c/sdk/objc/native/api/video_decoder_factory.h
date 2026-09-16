@@ -11,8 +11,7 @@ struct webrtc_VideoDecoderFactory_unique;
 
 WEBRTC_EXPORT struct webrtc_VideoDecoderFactory_unique*
 webrtc_ObjCToNativeVideoDecoderFactory(
-    const struct webrtc_objc_RTCVideoDecoderFactory*
-        objc_video_decoder_factory);
+    struct webrtc_objc_RTCVideoDecoderFactory* objc_video_decoder_factory);
 
 #if defined(__cplusplus)
 }

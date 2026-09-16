@@ -10,7 +10,7 @@ webrtc_objc_RTCDefaultVideoEncoderFactory_new(void) {
 }
 
 WEBRTC_EXPORT void webrtc_objc_RTCVideoEncoderFactory_release(
-    const struct webrtc_objc_RTCVideoEncoderFactory* self) {
+    struct webrtc_objc_RTCVideoEncoderFactory* self) {
   (void)self;
 }
 }
@@ -39,11 +39,11 @@ webrtc_objc_RTCDefaultVideoEncoderFactory_new(void) {
 }
 
 WEBRTC_EXPORT void webrtc_objc_RTCVideoEncoderFactory_release(
-    const struct webrtc_objc_RTCVideoEncoderFactory* self) {
+    struct webrtc_objc_RTCVideoEncoderFactory* self) {
   if (self == nullptr) {
     return;
   }
-  CFBridgingRelease(reinterpret_cast<const CFTypeRef>(self));
+  CFBridgingRelease(reinterpret_cast<CFTypeRef>(self));
 }
 }
 

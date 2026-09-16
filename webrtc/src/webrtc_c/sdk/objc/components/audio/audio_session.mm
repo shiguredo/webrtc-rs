@@ -42,23 +42,23 @@ webrtc_objc_RTCAudioSession_sharedInstance(void) {
 }
 
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSession_release(
-    const struct webrtc_objc_RTCAudioSession* self) {
-  CFBridgingRelease(reinterpret_cast<const CFTypeRef>(self));
+    struct webrtc_objc_RTCAudioSession* self) {
+  CFBridgingRelease(reinterpret_cast<CFTypeRef>(self));
 }
 
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSession_lockForConfiguration(
-    const struct webrtc_objc_RTCAudioSession* self) {
+    struct webrtc_objc_RTCAudioSession* self) {
   [ToRTCAudioSession(self) lockForConfiguration];
 }
 
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSession_unlockForConfiguration(
-    const struct webrtc_objc_RTCAudioSession* self) {
+    struct webrtc_objc_RTCAudioSession* self) {
   [ToRTCAudioSession(self) unlockForConfiguration];
 }
 
 WEBRTC_EXPORT int webrtc_objc_RTCAudioSession_setConfiguration_active_error(
-    const struct webrtc_objc_RTCAudioSession* self,
-    const struct webrtc_objc_RTCAudioSessionConfiguration* configuration,
+    struct webrtc_objc_RTCAudioSession* self,
+    struct webrtc_objc_RTCAudioSessionConfiguration* configuration,
     int active,
     struct objc_NSError** out_error) {
   NSError* error = nil;
@@ -73,7 +73,7 @@ WEBRTC_EXPORT int webrtc_objc_RTCAudioSession_setConfiguration_active_error(
 }
 
 WEBRTC_EXPORT int webrtc_objc_RTCAudioSession_setActive_error(
-    const struct webrtc_objc_RTCAudioSession* self,
+    struct webrtc_objc_RTCAudioSession* self,
     int active,
     struct objc_NSError** out_error) {
   NSError* error = nil;
@@ -85,7 +85,7 @@ WEBRTC_EXPORT int webrtc_objc_RTCAudioSession_setActive_error(
 }
 
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSession_initializeInput(
-    const struct webrtc_objc_RTCAudioSession* self,
+    struct webrtc_objc_RTCAudioSession* self,
     webrtc_objc_RTCAudioSession_initializeInput_callback callback,
     void* user_data) {
   RTCAudioSession* session = ToRTCAudioSession(self);
@@ -105,32 +105,32 @@ webrtc_objc_RTCAudioSessionConfiguration_webRTCConfiguration(void) {
 }
 
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSessionConfiguration_release(
-    const struct webrtc_objc_RTCAudioSessionConfiguration* self) {
-  CFBridgingRelease(reinterpret_cast<const CFTypeRef>(self));
+    struct webrtc_objc_RTCAudioSessionConfiguration* self) {
+  CFBridgingRelease(reinterpret_cast<CFTypeRef>(self));
 }
 
 WEBRTC_EXPORT void
 webrtc_objc_RTCAudioSessionConfiguration_setWebRTCConfiguration(
-    const struct webrtc_objc_RTCAudioSessionConfiguration* configuration) {
+    struct webrtc_objc_RTCAudioSessionConfiguration* configuration) {
   [RTCAudioSessionConfiguration
       setWebRTCConfiguration:ToRTCAudioSessionConfiguration(configuration)];
 }
 
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSessionConfiguration_setCategory(
-    const struct webrtc_objc_RTCAudioSessionConfiguration* self,
+    struct webrtc_objc_RTCAudioSessionConfiguration* self,
     objc_AVAudioSessionCategory category) {
   ToRTCAudioSessionConfiguration(self).category =
       (__bridge AVAudioSessionCategory)category;
 }
 
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSessionConfiguration_setMode(
-    const struct webrtc_objc_RTCAudioSessionConfiguration* self,
+    struct webrtc_objc_RTCAudioSessionConfiguration* self,
     objc_AVAudioSessionMode mode) {
   ToRTCAudioSessionConfiguration(self).mode = (__bridge AVAudioSessionMode)mode;
 }
 
 WEBRTC_EXPORT void webrtc_objc_RTCAudioSessionConfiguration_setCategoryOptions(
-    const struct webrtc_objc_RTCAudioSessionConfiguration* self,
+    struct webrtc_objc_RTCAudioSessionConfiguration* self,
     uint64_t category_options) {
   ToRTCAudioSessionConfiguration(self).categoryOptions =
       static_cast<AVAudioSessionCategoryOptions>(category_options);

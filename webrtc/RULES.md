@@ -52,6 +52,9 @@
   - `const_cast` は使わない
   - フィールドへの可変参照を返す getter（`webrtc_SdpVideoFormat_get_parameters` / `webrtc_SdpVideoFormat_get_name` 等）は非 const のままとする
     - 呼び出し側が借用先を書き換えられるため、const 化すると const 契約が壊れる
+  - ObjC のオブジェクトハンドル（`objc_*` / `webrtc_objc_*`）を扱う C API は非 const のままとする
+    - ObjC の `id` は const を表現できず、対応する ObjC メソッドにも const が無いため、非 const が元の API と一致する
+    - const 化すると `__bridge` で const を外すことになり、`release` や setter のような書き換える関数まで const になってしまう
   - 迷ったときは「C++ 側のシグネチャと同じ const 性になっているか」で判断する
 
 ## セルフチェック手順
