@@ -1,0 +1,171 @@
+# 借用型 `XxxRef` を読み取り専用にし `XxxRefMut` を新設する
+
+- Created: 2026-09-16
+- Completed: {YYYY-MM-DD}
+- Branch: feature/refactor-readonly-ref-types
+- Polished: {YYYY-MM-DD}
+
+## 目的
+
+`XxxRef` 型は C++ オブジェクトを借用するハンドルだが、現在は借用先を書き換える可変アクセサを持っている。このため所有していないオブジェクトを借用ハンドル越しに書き換えられてしまう。
+
+可変アクセサを持つハンドルを `Copy` にすると `&mut` の排他性を型で保証できず、`let mut a = r; let mut b = r;` で同一オブジェクトへの可変ハンドルが複数できてしまう。`XxxRef` はすべて `unsafe impl Send` なので、複製したハンドルを別スレッドへ送れば同一オブジェクトを同時に書き換えられる。可変アクセサと `Copy` は同じ型に同居させられない。
+
+一方で、借用先を直接書き換える操作は必要になる。`SdpVideoFormat::parameters_mut` が返す `MapStringString` の `set` のように、コピーを挟まず参照先を書き換えたい場面がある。所有型経由に一本化するとコピーが挟まり、借用先の直接書き換えが表現できなくなる。
+
+そこで借用ハンドルを「読み取り専用で `Copy` な `XxxRef`」と「書き換え可能で `Copy` でない `XxxRefMut`」に分ける。可変アクセサを持つ型を `Copy` にしないことで排他性を型で保証し、借用先の直接書き換えも維持する。
+
+## 現状
+
+### 可変アクセサを持つ借用ハンドル
+
+`XxxRef` は 39 個あり、うち 24 個に `&mut self` を取るメソッドが合計 103 個ある。
+
+- `RtpEncodingParametersRef`: `set_rid` / `set_ssrc` / `set_max_bitrate_bps` / `set_min_bitrate_bps` / `set_max_framerate` / `set_scale_resolution_down_by` / `set_scale_resolution_down_to` / `set_active` / `set_adaptive_ptime` / `set_scalability_mode` / `set_codec` / `set_bitrate_priority` / `set_network_priority` / `set_request_key_frame` / `set_num_temporal_layers` (15 個)
+- `CodecSpecificInfoRef`: `set_codec_type` / `set_end_of_picture` / VP8, VP9, H264 の各フィールドセッター (19 個)
+- `IceServerRef`: `add_url` / `set_username` / `set_password` / `set_tls_cert_policy` / `set_tls_client_identity` (5 個)
+- `SimulcastStreamRef`: `set_width` / `set_height` / `set_min_bitrate_kbps` / `set_target_bitrate_kbps` / `set_max_bitrate_kbps` (5 個)
+- `VideoCodecRef`: `set_codec_type` / `set_width` / `set_height` / 各ビットレートセッターなど (9 個)
+- `EncodedImageRef`: `set_encoded_data` / `set_rtp_timestamp` / `set_encoded_width` / `set_encoded_height` / `set_frame_type` / `set_qp` (6 個)
+- `RtpCodecRef`: `set_kind` / `set_name` / `set_clock_rate` / `set_num_channels` / `parameters` (5 個)
+- `RtpCodecCapabilityRef`: `set_kind` / `set_name` / `set_clock_rate` / `set_num_channels` / `parameters` (5 個)
+- `IceServerVectorRef`: `push` (1 個)
+- `RtpCodecCapabilityVectorRef`: `push` / `resize` / `set` (3 個)
+- `VideoFrameTypeVectorRef`: `push` (1 個)
+- `VideoEncoderFramerateFractionInlinedVectorRef`: `push` / `set` / `resize` / `clear` (4 個)
+- `VideoFrameBufferKindInlinedVectorRef`: `push` / `set` / `resize` / `clear` (4 個)
+- `VideoEncoderResolutionBitrateLimitsVectorRef`: `push` / `set` / `clear` (3 個)
+- `VideoEncoderQpThresholdsRef`: `set_low` / `set_high` (2 個)
+- `VideoEncoderScalingSettingsRef`: `set_thresholds` / `set_min_pixels_per_frame` (2 個)
+- `VideoEncoderResolutionBitrateLimitsRef`: `set_frame_size_pixels` / `set_min_start_bitrate_bps` / `set_min_bitrate_bps` / `set_max_bitrate_bps` (4 個)
+- `VideoEncoderResolutionRef`: `set_width` / `set_height` (2 個)
+- `SdpAudioFormatRef`: `parameters_mut` (1 個)
+- `SdpVideoFormatRef`: `parameters_mut` (1 個)
+- `BufferRef`: `append_data` / `clear` (2 個)
+- `BufferS16Ref`: `append_data` / `clear` (2 個)
+- `CxxStringRef`: `append` (1 個)
+- `StringVectorRef`: `push` (1 個)
+
+なお `RtpCodecRef::parameters` と `RtpCodecCapabilityRef::parameters` は `&mut self` を要求して `MapStringString<'a>` を返す。`&self` から取れる `parameters` ではないため、借用先を書き換えるには呼び出し元が可変参照を持つ必要がある。
+
+### `&self` から可変ハンドルを取得できる経路
+
+`&self` を取るメソッドが可変アクセサ付きの借用ハンドルを返しているため、共有参照しか持たない呼び出し元でも借用先を書き換えられる。
+
+- `RtpCodecCapabilityRef::cast_to_codec` は `RtpCodecRef` を返す。C 側の `WEBRTC_DEFINE_CAST` は同一オブジェクトを `static_cast` して返すだけなので、返った `RtpCodecRef` のセッターは元の `RtpCodecCapability` を書き換える
+- `RtpEncodingParametersRef::codec` は `Option<RtpCodecRef>` を返す。C API の `webrtc_RtpEncodingParameters_get_codec` は非 const の `struct webrtc_RtpCodec**` を出力する
+- `RtpCapabilities::codecs` は `RtpCodecCapabilityVectorRef` を返し、その `push` / `resize` / `set` に到達できる
+- `RTCConfiguration::servers` は `IceServerVectorRef` を返し、その `push` に到達できる
+- `SdpAudioFormatRef::parameters_mut` / `SdpVideoFormatRef::parameters_mut` は `MapStringString` を返し、その `set` に到達できる
+
+### `Copy` にできない借用ビュー
+
+`MapStringString<'a>` は C++ の `std::map<std::string, std::string>` の借用ビューで、`set(&mut self)` を持つ。`Copy` にすると同一の map への可変ハンドルが複数できてしまう。
+
+### 借用先にしか実体が無い型
+
+`SimulcastStreamRef` へのセッターは C API の `webrtc_SimulcastStream_set_width` などにしか存在しない。`SimulcastStream` の所有型は無く、C API にも copy 関数が無い。`VideoCodec::simulcast_stream` は親の `VideoCodec` が持つ配列要素を `webrtc_VideoCodec_simulcast_stream_at` で借用して返している。
+
+### 公開署名に残っている `&mut`
+
+- `AudioEncoderHandler::encode` の `encoded: &mut BufferRef<'_>`
+- `AudioDecoderHandler::generate_plc` の `concealment_audio: &mut BufferS16Ref<'_>`
+- `AudioDecoder::generate_plc` の `concealment_audio: &mut BufferS16Ref<'_>`
+
+いずれも C++ 側が作業用バッファを渡して中身を書かせる契約になっている。
+
+### 重複している読み取りアクセサ
+
+`XxxRef` と対応する owned 型 `Xxx` は同じ読み取りアクセサを持っており、owned 型側は `self.as_ref().xxx()` で委譲している。
+
+## 設計方針
+
+### 1. `XxxRef<'a>` を読み取り専用にする
+
+可変アクセサをすべて外し、`#[derive(Clone, Copy)]` を付ける。手書きの `unsafe impl Send` は維持する。
+
+`Deref` の実装で一時値への参照を返すために `Copy` であることが必要になるため、`Copy` は全型に付ける。
+
+### 2. `XxxRefMut<'a>` を全 39 型に新設する
+
+`PhantomData<&'a mut T>` を持ち、`XxxRef` から移した可変アクセサをすべてここに置く。`Copy` は付けない。取得経路は `&mut self` からだけにする。
+
+`Copy` でないため `&mut self` の排他性が型で保証され、同一オブジェクトへの可変ハンドルが複数できる経路が無くなる。将来この型に可変アクセサを足しても排他性は壊れない。
+
+### 3. 読み取りアクセサは `XxxRef` にだけ書く
+
+`XxxRefMut<'a>` に `std::ops::Deref<Target = XxxRef<'a>>` を実装する。`XxxRef` が `Copy` なので `deref` は `&XxxRef::from_raw(self.raw)` を返せる。これにより読み取りアクセサの二重管理が無くなる。
+
+`DerefMut` は付けない。`XxxRef` に可変アクセサが無いため、`&mut XxxRef` を得ても読み取りしかできない。
+
+`Deref` は標準ライブラリの既存トレイトであり、この実装は新規トレイトの作成には当たらない。同種の前例として `src/api/frame_transformer.rs` の `TransformableVideoFrame` が `TransformableFrame` に対して `std::ops::Deref` / `DerefMut` を実装している。
+
+### 4. owned 型に `as_mut` を追加する
+
+owned 型に `as_mut(&mut self) -> XxxRefMut<'_>` を追加し、`as_ref(&self) -> XxxRef<'_>` と対にする。owned 型の `&mut self` メソッド内部の `self.as_ref().set_xxx(...)` を `self.as_mut().set_xxx(...)` に置き換える。
+
+### 5. `&self` から可変ハンドルを取得できる経路を塞ぐ
+
+- `RtpCodecCapabilityRef::cast_to_codec` は読み取り専用の `RtpCodecRef` を返す形のまま残し、書き換え用の `RtpCodecCapabilityRefMut::cast_to_codec_mut` を新設する
+- `RtpEncodingParametersRef::codec` は読み取り専用のまま残し、書き換え用の `RtpEncodingParametersRefMut::codec_mut` を新設する
+- `RtpCapabilities::codecs` と `RTCConfiguration::servers` は `&self` の読み取りと `&mut self` の書き換えに分ける
+- `SdpAudioFormatRef::parameters_mut` / `SdpVideoFormatRef::parameters_mut` は `XxxRefMut` 側へ移す
+- `VideoCodec::simulcast_stream` は `&self` で `SimulcastStreamRef<'_>` を返し、書き換え用に `&mut self` で `SimulcastStreamRefMut<'_>` を返す `simulcast_stream_mut` を新設する。`SimulcastStream` の所有型や C API の copy 関数は追加しない
+- `AudioEncoderHandler::encode` / `AudioDecoderHandler::generate_plc` / `AudioDecoder::generate_plc` の `&mut BufferRef<'_>` / `&mut BufferS16Ref<'_>` を `&mut BufferRefMut<'_>` / `&mut BufferS16RefMut<'_>` に変更する
+
+### 6. `MapStringString` を `Ref` / `RefMut` に分ける
+
+`MapStringString<'a>` を `MapStringStringRef<'a>`（読み取り専用、`Copy`）と `MapStringStringRefMut<'a>`（`set(&mut self)` を持ち `Copy` でない）に分ける。`src/lib.rs` の re-export も更新する。
+
+### 7. `RawBufferWriter` は対象外
+
+`RawBufferWriter<'a, T>` は書き込み位置を自分で持つライタで、対応する C++ オブジェクトが 1 対 1 で存在しない。`Ref` / `RefMut` に分けられないため `write(&mut self)` のまま維持する。
+
+### 8. owned 型から `Ref` / `RefMut` への委譲は行わない
+
+`Deref::deref(&self)` は `self` の中に実在する値を参照で返す必要があり、その場で組み立てたハンドルを返せない。owned 型に `Ref` をフィールドとして持たせれば可能だが、`NonNull<ffi::T_unique>` と `NonNull<ffi::T>` の 2 本持ちにする全 owned 型の所有表現の作り替えになり、`ScopedRef` を持つハンドル系の型には適用できない。読み取りアクセサ 1 行分の重複は受け入れる。
+
+### 9. マクロと新規トレイトは作らない
+
+規約に従い、マクロと新規トレイトは作らない。`Deref` のような既存トレイトへの実装だけを行う。
+
+### 10. 変更履歴
+
+外部 API の破壊的変更なので `CHANGES.md` に `[CHANGE]` として記載する。C API (`webrtc/`) の変更は無い。
+
+## 完了条件
+
+- 全 39 の `XxxRef` に可変アクセサが無く、`#[derive(Clone, Copy)]` が付いている
+- 全 39 の `XxxRef` に対応する `XxxRefMut` があり、`Copy` ではなく、`std::ops::Deref<Target = XxxRef>` を実装している
+- `&self` から可変アクセサ付きのハンドルを取得できる経路が残っていない
+- `MapStringString` が `MapStringStringRef` / `MapStringStringRefMut` に分かれている
+- `XxxRefMut` を返す `as_mut` または `_mut` 付きのアクセサからしか借用先を書き換えられない
+- `cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build -- -D warnings` / `cargo test --workspace --features source-build` が通る
+- `CHANGES.md` に `[CHANGE]` として記載されている
+
+## 対象型
+
+`XxxRefMut` を新設する 39 型。既に `#[derive(Clone, Copy)]` 済みの型も対象に含める。
+
+| モジュール | 型 |
+|---|---|
+| `src/cxxstd.rs` | `CxxStringRef`, `StringVectorRef` |
+| `src/rtc_base/buffer.rs` | `BufferRef`, `BufferS16Ref` |
+| `src/rtc_base/logging.rs` | `LogLineRef` |
+| `src/rtc_base/ssl_certificate.rs` | `SSLCertificateRef`, `SSLCertChainRef` |
+| `src/api/environment.rs` | `EnvironmentRef` |
+| `src/api/audio_device_module.rs` | `AudioTransportRef` |
+| `src/api/jsep.rs` | `IceCandidateRef` |
+| `src/api/audio.rs` | `SdpAudioFormatRef` |
+| `src/api/rtp.rs` | `RtpCodecRef`, `RtpCodecCapabilityRef`, `RtpCodecCapabilityVectorRef`, `RtpEncodingParametersRef` |
+| `src/api/peer_connection.rs` | `NetworkManagerRef`, `PacketSocketFactoryRef`, `IceServerRef`, `IceServerVectorRef` |
+| `src/api/video_codec_common.rs` | `SdpVideoFormatRef`, `VideoFrameRef`, `VideoFrameTypeVectorRef`, `SimulcastStreamRef`, `VideoCodecRef`, `EncodedImageRef` |
+| `src/api/video_codec_specifics.rs` | `NaluInfoRef` |
+| `src/api/video_decoder.rs` | `VideoDecoderSettingsRef`, `VideoDecoderDecodedImageCallbackRef` |
+| `src/api/video_encoder.rs` | `VideoEncoderFramerateFractionInlinedVectorRef`, `VideoFrameBufferKindInlinedVectorRef`, `VideoEncoderQpThresholdsRef`, `VideoEncoderScalingSettingsRef`, `VideoEncoderResolutionBitrateLimitsRef`, `VideoEncoderResolutionBitrateLimitsVectorRef`, `VideoEncoderResolutionRef`, `VideoEncoderSettingsRef`, `VideoEncoderRateControlParametersRef`, `CodecSpecificInfoRef`, `VideoEncoderEncodedImageCallbackRef` |
+
+併せて `src/cxxstd.rs` の `MapStringString` を `MapStringStringRef` / `MapStringStringRefMut` に分ける。
+
+## 解決方法
+
+{実装時に記入する}
