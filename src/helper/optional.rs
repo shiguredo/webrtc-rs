@@ -134,7 +134,7 @@ pub(crate) fn set_optional_object<T, U>(
 /// 生ポインタが出力の getter。
 ///
 /// C API のシグネチャが `void get(int* out_has, U** out_value)` のときに使う。
-/// `has` が 1 なのに null なら panic する (`what` には関数名を渡す)。
+/// `out_has` が 1 なのに `out_value` が null の場合は panic する (`what` には関数名を渡す)。
 /// 返すポインタの所有 / 借用は C API の契約に従う。
 pub(crate) fn get_optional_ptr<U>(
     what: &'static str,
@@ -158,7 +158,8 @@ pub(crate) fn set_optional_ptr<U>(value: Option<NonNull<U>>, set_fn: impl FnOnce
 /// ポインタ + 長さが出力の getter。
 ///
 /// C API のシグネチャが `void get(int* out_has, const T** out_data, size_t* out_len)` のときに使う。
-/// 長さ 0 なら空スライスを返し、返すスライスの寿命は `'a` に束縛される。
+/// 返すスライスは `out_data` が指すデータを借用するため、`'a` はそのデータの寿命に合わせること。
+/// `out_len` が 0 でないのに `out_data` が null の場合は panic する。
 pub(crate) fn get_optional_slice<'a, T>(
     get_fn: impl FnOnce(*mut c_int, *mut *const T, *mut usize),
 ) -> Option<&'a [T]> {
@@ -168,10 +169,12 @@ pub(crate) fn get_optional_slice<'a, T>(
     })
     .map(|(data, len)| -> &'a [T] {
         if len == 0 {
-            // C API が null を返していても安全なように空スライスを返す。
+            // 空の場合 C API は data に null を設定しうる。`from_raw_parts` は長さ 0 でも
+            // null ポインタを受け付けないため、呼び出さずに空スライスを返す。
             return &[];
         }
-        // SAFETY: `data` / `len` は C API が `has == 1` のときだけ設定する。
+        assert!(!data.is_null(), "get_optional_slice: data is null");
+        // SAFETY: `data` は C API が設定した `len` 個の有効な要素を指す。
         unsafe { std::slice::from_raw_parts(data, len) }
     })
 }
