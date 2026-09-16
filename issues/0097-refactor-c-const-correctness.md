@@ -1,10 +1,9 @@
 # webrtc_c の C API の const 性を正しく設定する
 
 - Created: 2026-08-30
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-09-17
 - Branch: feature/refactor-c-const-correctness
 - Polished: {YYYY-MM-DD}
-- Milestone:
 
 ## 目的
 
@@ -46,4 +45,37 @@ C++ 側の引数が `const` であるにもかかわらず、C コールバッ�
 
 ## 解決方法
 
-（詳細は polish / 実装時に確定する）
+webrtc_c の C API 全体を対象に、libwebrtc の C++ シグネチャと突き合わせて const 性を是正した。`const_cast` は全廃し、読み取り専用の getter と const 引数を const ポインタに揃えた。
+
+- `self` の const 化
+  - 宣言 (`*.h`) と定義 (`*.cc`) を同時に `const struct ...* self` にし、内部の `reinterpret_cast<webrtc::Xxx*>(self)` も `reinterpret_cast<const webrtc::Xxx*>(self)` にした
+  - 全 908 個の `self` のうち 411 個を const 化した。残り 497 個は C++ 側が非 const メソッドを呼ぶ、またはフィールドへの可変参照を返すため非 const のままとした
+  - 判定は目視ではなくコンパイラで検証した。全 `self` を機械的に const 化してビルドし、const 化できない箇所だけを戻す作業を収束するまで繰り返し、最終的に非 const として残ったものが「C++ 側が書き換える」関数であることを保証している
+- 入力ポインタ引数の const 化
+  - `struct Xxx* name` 形式の入力引数を `const struct Xxx* name` にした（`out_` で始まる出力引数と `*_delete` は対象外）
+  - C++ 側が非 const 参照/ポインタで受ける引数はコンパイルエラーになるため const 化せず、`webrtc_c::OptionalSet` のようにフィールドを書き換える経路も同様に非 const のままとした
+- `const_cast` の全廃（13 箇所、4 ファイル）
+  - `webrtc_VideoDecoder_cbs.Configure` / `.Decode`、`webrtc_VideoEncoder_cbs.InitEncode` / `.Encode` / `.SetRates`、`webrtc_VideoEncoder_EncodedImageCallback_cbs.OnEncodedImage`、`webrtc_VideoEncoderFactory_cbs.Create` / `webrtc_VideoDecoderFactory_cbs.Create` の引数を `const struct ...*` にした
+  - あわせて `webrtc_VideoDecoder_Configure` / `webrtc_VideoDecoder_Decode` / `webrtc_VideoEncoder_InitEncode` / `webrtc_VideoEncoder_Encode` / `webrtc_VideoEncoder_SetRates` / `webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage` / `webrtc_VideoEncoderFactory_Create` / `webrtc_VideoDecoderFactory_Create` の引数も `const struct ...*` にした
+  - C++ 側は `const_cast` を廃止し、`reinterpret_cast<const webrtc::Xxx*>(&value)` でそのまま渡すようにした
+- マクロが生成する getter
+  - `WEBRTC_DECLARE_VECTOR` / `WEBRTC_DECLARE_VECTOR_NO_DEFAULT_CTOR` の `_vector_size`、`WEBRTC_DECLARE_REFCOUNTED_VECTOR` の `_refcounted_vector_size`、`WEBRTC_DECLARE_INLINED_VECTOR` の `_inlined_vector_size`、`WEBRTC_DECLARE_VARIANT` の `_index` を const 化した
+  - `_vector_get` などの要素への可変参照を返す getter は設計方針どおり非 const のままとした
+- 設計方針の例外
+  - `webrtc_SdpVideoFormat_get_name` / `webrtc_SdpAudioFormat_get_name` は現状の「等」に挙げられていたが、`get_parameters` と同じくフィールド (`name`) への可変参照を借用ポインタで返す getter であるため、設計方針の「フィールドへの可変参照を返す getter は既存慣例のとおり非 const のままとする」に従い非 const のままとした
+  - `webrtc_VideoFrameMetadata_GetCsrcs` のようにヒープへ複製して返す getter は const 化した
+- Rust 側
+  - bindgen が生成するポインタが `*mut` から `*const` になっても、`as_ptr()` が返す `*mut` からの implicit coercion で `src/api/*.rs` の呼び出しはそのままコンパイルできた
+  - C 側から呼ばれるコールバック関数ポインタ 8 個（`video_decoder_configure` / `video_decoder_decode` / `video_decoder_factory_create` / `video_encoder_encoded_image_callback_on_encoded_image` / `video_encoder_init_encode` / `video_encoder_encode` / `video_encoder_set_rates` / `video_encoder_factory_create`）は引数を `*const` に変更した
+  - `XxxRef` が `*mut` を保持しているため、const ポインタから `XxxRef` を作る箇所は `cast_mut()` で const を外している。C++ の `const_cast` と同じ意味になるこの変換を無くすには `XxxRef` を const ポインタベースにする必要があり、借用型を読み取り専用にする issue 0103 の設計方針に「`XxxRef` は `*const`、`XxxRefMut` は `*mut` を保持する」を追記した
+  - `cast_mut()` を使う 20 箇所すべてに、const を外している理由と「借用先を書き換えないこと」のコメントを追加した
+- ドキュメント
+  - `webrtc/RULES.md` に「C++ 側の const 性を C API でもそのまま反映する」ルールと、セルフチェック手順の確認項目を追加した
+  - `skills/libwebrtc-c/SKILL.md` に const 性の節とセルフチェック手順を追加した
+  - Rust 側の公開 API に変更が無いため `CHANGES.md` の `## develop` の `### misc` に `[UPDATE]` として記載した
+- 確認したコマンド
+  - `cargo fmt --all -- --check`
+  - `cargo clippy --workspace --features source-build -- -D warnings`
+  - `cargo test --workspace --features source-build`
+  - `python3 webrtc/run.py format --check`
+  - `cmake --build ... --target bundled_webrtc_c_bundling` / `whep_c` / `whip_cpp` / `whep_cpp`
