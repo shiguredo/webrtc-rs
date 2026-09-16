@@ -78,6 +78,23 @@
 
 `XxxRef` と対応する owned 型 `Xxx` は同じ読み取りアクセサを持っており、owned 型側は `self.as_ref().xxx()` で委譲している。
 
+### const 引数を受けるコールバックでの `cast_mut()`
+
+C API は libwebrtc の C++ シグネチャに合わせ、読み取り専用の引数を `const struct ...*` で受ける。一方 Rust 側のコールバックは `XxxRef` を作るために `expect_non_null(ptr.cast_mut(), ...)` で const を外している。
+
+- `src/api/audio.rs`: 7 箇所 (`AudioEncoderFactoryHandler::query_audio_encoder` / `create`、`AudioDecoderFactoryHandler::is_supported_decoder` / `create`、`AudioEncoderHandler::on_received_uplink_allocation`)
+- `src/api/video_decoder.rs` / `src/api/video_encoder.rs`: 13 箇所 (`VideoDecoderHandler::configure` / `decode`、`VideoDecoderFactoryHandler::create`、`VideoEncoderHandler::init_encode` / `encode` / `set_rates`、`VideoEncoderEncodedImageCallbackHandler::on_encoded_image`、`VideoEncoderFactoryHandler::create`)
+
+`cast_mut()` は型レベルの権限を戻すだけで C++ の `const_cast` と同じ意味を持つ。このため C++ 側が読み取り専用と宣言した引数を、次の借用型の可変アクセサ越しに書き換えられる状態になっている。
+
+- `EncodedImageRef` (`VideoDecoderHandler::decode` / `VideoEncoderEncodedImageCallbackHandler::on_encoded_image`): `set_encoded_data` / `set_rtp_timestamp` など
+- `CodecSpecificInfoRef` (`VideoEncoderEncodedImageCallbackHandler::on_encoded_image`): `set_codec_type` / `set_end_of_picture` など
+- `VideoCodecRef` (`VideoEncoderHandler::init_encode`): `set_codec_type` / `set_width` など
+- `VideoFrameTypeVectorRef` (`VideoEncoderHandler::encode`): `push`
+- `SdpVideoFormatRef` (`VideoEncoderFactoryHandler::create` / `VideoDecoderFactoryHandler::create`): `parameters_mut`
+
+なお `VideoDecoderSettingsRef` / `EnvironmentRef` / `VideoFrameRef` / `VideoEncoderSettingsRef` / `VideoEncoderRateControlParametersRef` は可変アクセサを持たないが、`XxxRef` が `*mut` を保持している限り同じく `cast_mut()` が必要になる。
+
 ## 設計方針
 
 ### 1. `XxxRef<'a>` を読み取り専用にする
@@ -92,19 +109,29 @@
 
 `Copy` でないため `&mut self` の排他性が型で保証され、同一オブジェクトへの可変ハンドルが複数できる経路が無くなる。将来この型に可変アクセサを足しても排他性は壊れない。
 
-### 3. 読み取りアクセサは `XxxRef` にだけ書く
+### 3. `XxxRef` は const ポインタを、`XxxRefMut` は可変ポインタを保持する
 
-`XxxRefMut<'a>` に `std::ops::Deref<Target = XxxRef<'a>>` を実装する。`XxxRef` が `Copy` なので `deref` は `&XxxRef::from_raw(self.raw)` を返せる。これにより読み取りアクセサの二重管理が無くなる。
+`XxxRef<'a>` が保持するポインタを `*const ffi::T` にし、`as_ptr()` も `*const ffi::T` を返す。`XxxRefMut<'a>` は `*mut ffi::T` を保持し、`as_mut_ptr()` を返す。
+
+- `XxxRef::from_raw` は `*const ffi::T`、`XxxRefMut::from_raw` は `*mut ffi::T` を受ける
+- `NonNull<T>` は可変ポインタを表す型で `as_mut()` を持つため const を表現できず、const 側の保持には使えない。`XxxRef` は生ポインタを持つ
+- `XxxRefMut` から `XxxRef` を作る `Deref` は const を付ける方向の変換になるため、const を外すキャストは不要になる
+
+これにより、C 側のコールバックが受け取る `*const` から `cast_mut()` で const を外さずに `XxxRef` を作れるようになる。
+
+### 4. 読み取りアクセサは `XxxRef` にだけ書く
+
+`XxxRefMut<'a>` に `std::ops::Deref<Target = XxxRef<'a>>` を実装する。`XxxRef` が `Copy` なので `deref` は `&XxxRef::from_raw(self.raw.cast_const())` を返せる。これにより読み取りアクセサの二重管理が無くなる。
 
 `DerefMut` は付けない。`XxxRef` に可変アクセサが無いため、`&mut XxxRef` を得ても読み取りしかできない。
 
 `Deref` は標準ライブラリの既存トレイトであり、この実装は新規トレイトの作成には当たらない。同種の前例として `src/api/frame_transformer.rs` の `TransformableVideoFrame` が `TransformableFrame` に対して `std::ops::Deref` / `DerefMut` を実装している。
 
-### 4. owned 型に `as_mut` を追加する
+### 5. owned 型に `as_mut` を追加する
 
 owned 型に `as_mut(&mut self) -> XxxRefMut<'_>` を追加し、`as_ref(&self) -> XxxRef<'_>` と対にする。owned 型の `&mut self` メソッド内部の `self.as_ref().set_xxx(...)` を `self.as_mut().set_xxx(...)` に置き換える。
 
-### 5. `&self` から可変ハンドルを取得できる経路を塞ぐ
+### 6. `&self` から可変ハンドルを取得できる経路を塞ぐ
 
 - `RtpCodecCapabilityRef::cast_to_codec` は読み取り専用の `RtpCodecRef` を返す形のまま残し、書き換え用の `RtpCodecCapabilityRefMut::cast_to_codec_mut` を新設する
 - `RtpEncodingParametersRef::codec` は読み取り専用のまま残し、書き換え用の `RtpEncodingParametersRefMut::codec_mut` を新設する
@@ -113,23 +140,23 @@ owned 型に `as_mut(&mut self) -> XxxRefMut<'_>` を追加し、`as_ref(&self) 
 - `VideoCodec::simulcast_stream` は `&self` で `SimulcastStreamRef<'_>` を返し、書き換え用に `&mut self` で `SimulcastStreamRefMut<'_>` を返す `simulcast_stream_mut` を新設する。`SimulcastStream` の所有型や C API の copy 関数は追加しない
 - `AudioEncoderHandler::encode` / `AudioDecoderHandler::generate_plc` / `AudioDecoder::generate_plc` の `&mut BufferRef<'_>` / `&mut BufferS16Ref<'_>` を `&mut BufferRefMut<'_>` / `&mut BufferS16RefMut<'_>` に変更する
 
-### 6. `MapStringString` を `Ref` / `RefMut` に分ける
+### 7. `MapStringString` を `Ref` / `RefMut` に分ける
 
 `MapStringString<'a>` を `MapStringStringRef<'a>`（読み取り専用、`Copy`）と `MapStringStringRefMut<'a>`（`set(&mut self)` を持ち `Copy` でない）に分ける。`src/lib.rs` の re-export も更新する。
 
-### 7. `RawBufferWriter` は対象外
+### 8. `RawBufferWriter` は対象外
 
 `RawBufferWriter<'a, T>` は書き込み位置を自分で持つライタで、対応する C++ オブジェクトが 1 対 1 で存在しない。`Ref` / `RefMut` に分けられないため `write(&mut self)` のまま維持する。
 
-### 8. owned 型から `Ref` / `RefMut` への委譲は行わない
+### 9. owned 型から `Ref` / `RefMut` への委譲は行わない
 
 `Deref::deref(&self)` は `self` の中に実在する値を参照で返す必要があり、その場で組み立てたハンドルを返せない。owned 型に `Ref` をフィールドとして持たせれば可能だが、`NonNull<ffi::T_unique>` と `NonNull<ffi::T>` の 2 本持ちにする全 owned 型の所有表現の作り替えになり、`ScopedRef` を持つハンドル系の型には適用できない。読み取りアクセサ 1 行分の重複は受け入れる。
 
-### 9. マクロと新規トレイトは作らない
+### 10. マクロと新規トレイトは作らない
 
 規約に従い、マクロと新規トレイトは作らない。`Deref` のような既存トレイトへの実装だけを行う。
 
-### 10. 変更履歴
+### 11. 変更履歴
 
 外部 API の破壊的変更なので `CHANGES.md` に `[CHANGE]` として記載する。C API (`webrtc/`) の変更は無い。
 
@@ -140,6 +167,7 @@ owned 型に `as_mut(&mut self) -> XxxRefMut<'_>` を追加し、`as_ref(&self) 
 - `&self` から可変アクセサ付きのハンドルを取得できる経路が残っていない
 - `MapStringString` が `MapStringStringRef` / `MapStringStringRefMut` に分かれている
 - `XxxRefMut` を返す `as_mut` または `_mut` 付きのアクセサからしか借用先を書き換えられない
+- `XxxRef` が `*const` を、`XxxRefMut` が `*mut` を保持しており、const を外すための `cast_mut()` が `src/` に残っていない
 - `cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build -- -D warnings` / `cargo test --workspace --features source-build` が通る
 - `CHANGES.md` に `[CHANGE]` として記載されている
 
