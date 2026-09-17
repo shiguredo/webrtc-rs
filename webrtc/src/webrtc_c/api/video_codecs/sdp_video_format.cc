@@ -114,7 +114,7 @@ WEBRTC_EXPORT struct webrtc_SdpVideoFormat_unique*
 webrtc_SdpVideoFormat_new_with_parameters(
     const char* name,
     size_t name_len,
-    struct std_map_string_string* parameters,
+    const struct std_map_string_string* parameters,
     const int* scalability_modes,
     size_t scalability_modes_len) {
   assert(name != nullptr);
@@ -122,7 +122,7 @@ webrtc_SdpVideoFormat_new_with_parameters(
   std::map<std::string, std::string> params;
   if (parameters != nullptr) {
     auto parameter_map =
-        reinterpret_cast<std::map<std::string, std::string>*>(parameters);
+        reinterpret_cast<const std::map<std::string, std::string>*>(parameters);
     params = *parameter_map;
   }
 
@@ -141,8 +141,8 @@ webrtc_SdpVideoFormat_new_with_parameters(
 }
 
 WEBRTC_EXPORT struct webrtc_SdpVideoFormat_unique* webrtc_SdpVideoFormat_copy(
-    struct webrtc_SdpVideoFormat* self) {
-  auto fmt = reinterpret_cast<webrtc::SdpVideoFormat*>(self);
+    const struct webrtc_SdpVideoFormat* self) {
+  auto fmt = reinterpret_cast<const webrtc::SdpVideoFormat*>(self);
   if (fmt == nullptr) {
     return nullptr;
   }
@@ -164,19 +164,19 @@ webrtc_SdpVideoFormat_get_parameters(struct webrtc_SdpVideoFormat* self) {
 }
 
 WEBRTC_EXPORT size_t webrtc_SdpVideoFormat_get_scalability_modes_size(
-    struct webrtc_SdpVideoFormat* self) {
-  auto fmt = reinterpret_cast<webrtc::SdpVideoFormat*>(self);
+    const struct webrtc_SdpVideoFormat* self) {
+  auto fmt = reinterpret_cast<const webrtc::SdpVideoFormat*>(self);
   if (fmt == nullptr) {
     return 0;
   }
   return fmt->scalability_modes.size();
 }
 
-WEBRTC_EXPORT size_t
-webrtc_SdpVideoFormat_copy_scalability_modes(struct webrtc_SdpVideoFormat* self,
-                                             int* out_modes,
-                                             size_t out_modes_len) {
-  auto fmt = reinterpret_cast<webrtc::SdpVideoFormat*>(self);
+WEBRTC_EXPORT size_t webrtc_SdpVideoFormat_copy_scalability_modes(
+    const struct webrtc_SdpVideoFormat* self,
+    int* out_modes,
+    size_t out_modes_len) {
+  auto fmt = reinterpret_cast<const webrtc::SdpVideoFormat*>(self);
   if (fmt == nullptr || out_modes == nullptr) {
     return 0;
   }
@@ -188,10 +188,10 @@ webrtc_SdpVideoFormat_copy_scalability_modes(struct webrtc_SdpVideoFormat* self,
 }
 
 WEBRTC_EXPORT int webrtc_SdpVideoFormat_IsSameCodec(
-    struct webrtc_SdpVideoFormat* self,
-    struct webrtc_SdpVideoFormat* other) {
-  auto format = reinterpret_cast<webrtc::SdpVideoFormat*>(self);
-  auto rhs = reinterpret_cast<webrtc::SdpVideoFormat*>(other);
+    const struct webrtc_SdpVideoFormat* self,
+    const struct webrtc_SdpVideoFormat* other) {
+  auto format = reinterpret_cast<const webrtc::SdpVideoFormat*>(self);
+  auto rhs = reinterpret_cast<const webrtc::SdpVideoFormat*>(other);
   if (format == nullptr || rhs == nullptr) {
     return 0;
   }
@@ -199,10 +199,10 @@ WEBRTC_EXPORT int webrtc_SdpVideoFormat_IsSameCodec(
 }
 
 WEBRTC_EXPORT int webrtc_SdpVideoFormat_is_equal(
-    struct webrtc_SdpVideoFormat* lhs,
-    struct webrtc_SdpVideoFormat* rhs) {
-  auto a = reinterpret_cast<webrtc::SdpVideoFormat*>(lhs);
-  auto b = reinterpret_cast<webrtc::SdpVideoFormat*>(rhs);
+    const struct webrtc_SdpVideoFormat* lhs,
+    const struct webrtc_SdpVideoFormat* rhs) {
+  auto a = reinterpret_cast<const webrtc::SdpVideoFormat*>(lhs);
+  auto b = reinterpret_cast<const webrtc::SdpVideoFormat*>(rhs);
   if (a == nullptr || b == nullptr) {
     return 0;
   }
@@ -211,11 +211,11 @@ WEBRTC_EXPORT int webrtc_SdpVideoFormat_is_equal(
 
 WEBRTC_EXPORT struct webrtc_SdpVideoFormat_unique*
 webrtc_FuzzyMatchSdpVideoFormat(
-    struct webrtc_SdpVideoFormat_vector* supported_formats,
-    struct webrtc_SdpVideoFormat* format) {
-  auto formats =
-      reinterpret_cast<std::vector<webrtc::SdpVideoFormat>*>(supported_formats);
-  auto input = reinterpret_cast<webrtc::SdpVideoFormat*>(format);
+    const struct webrtc_SdpVideoFormat_vector* supported_formats,
+    const struct webrtc_SdpVideoFormat* format) {
+  auto formats = reinterpret_cast<const std::vector<webrtc::SdpVideoFormat>*>(
+      supported_formats);
+  auto input = reinterpret_cast<const webrtc::SdpVideoFormat*>(format);
   if (formats == nullptr || input == nullptr) {
     return nullptr;
   }

@@ -30,9 +30,9 @@ WEBRTC_DECLARE_UNIQUE(webrtc_SessionDescriptionInterface);
 WEBRTC_EXPORT struct webrtc_SessionDescriptionInterface_unique*
 webrtc_CreateSessionDescription(int sdp_type, const char* sdp, size_t sdp_len);
 WEBRTC_EXPORT int webrtc_SessionDescriptionInterface_GetType(
-    struct webrtc_SessionDescriptionInterface* self);
+    const struct webrtc_SessionDescriptionInterface* self);
 WEBRTC_EXPORT int webrtc_SessionDescriptionInterface_ToString(
-    struct webrtc_SessionDescriptionInterface* self,
+    const struct webrtc_SessionDescriptionInterface* self,
     struct std_string_unique** out_sdp);
 
 // -------------------------
@@ -41,11 +41,12 @@ WEBRTC_EXPORT int webrtc_SessionDescriptionInterface_ToString(
 
 struct webrtc_IceCandidate;
 WEBRTC_DECLARE_UNIQUE(webrtc_SdpParseError);
-WEBRTC_EXPORT void webrtc_SdpParseError_line(struct webrtc_SdpParseError* self,
-                                             const char** out_line,
-                                             size_t* out_len);
+WEBRTC_EXPORT void webrtc_SdpParseError_line(
+    const struct webrtc_SdpParseError* self,
+    const char** out_line,
+    size_t* out_len);
 WEBRTC_EXPORT void webrtc_SdpParseError_description(
-    struct webrtc_SdpParseError* self,
+    const struct webrtc_SdpParseError* self,
     const char** out_description,
     size_t* out_len);
 WEBRTC_EXPORT struct webrtc_IceCandidate* webrtc_CreateIceCandidate(

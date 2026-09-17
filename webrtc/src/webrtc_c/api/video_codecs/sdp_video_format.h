@@ -59,32 +59,32 @@ WEBRTC_EXPORT struct webrtc_SdpVideoFormat_unique*
 webrtc_SdpVideoFormat_new_with_parameters(
     const char* name,
     size_t name_len,
-    struct std_map_string_string* parameters,
+    const struct std_map_string_string* parameters,
     const int* scalability_modes,
     size_t scalability_modes_len);
 WEBRTC_EXPORT struct webrtc_SdpVideoFormat_unique* webrtc_SdpVideoFormat_copy(
-    struct webrtc_SdpVideoFormat* self);
+    const struct webrtc_SdpVideoFormat* self);
 WEBRTC_EXPORT struct std_string* webrtc_SdpVideoFormat_get_name(
     struct webrtc_SdpVideoFormat* self);
 WEBRTC_EXPORT struct std_map_string_string*
 webrtc_SdpVideoFormat_get_parameters(struct webrtc_SdpVideoFormat* self);
 WEBRTC_EXPORT size_t webrtc_SdpVideoFormat_get_scalability_modes_size(
-    struct webrtc_SdpVideoFormat* self);
-WEBRTC_EXPORT size_t
-webrtc_SdpVideoFormat_copy_scalability_modes(struct webrtc_SdpVideoFormat* self,
-                                             int* out_modes,
-                                             size_t out_modes_len);
+    const struct webrtc_SdpVideoFormat* self);
+WEBRTC_EXPORT size_t webrtc_SdpVideoFormat_copy_scalability_modes(
+    const struct webrtc_SdpVideoFormat* self,
+    int* out_modes,
+    size_t out_modes_len);
 WEBRTC_EXPORT int webrtc_SdpVideoFormat_IsSameCodec(
-    struct webrtc_SdpVideoFormat* self,
-    struct webrtc_SdpVideoFormat* other);
+    const struct webrtc_SdpVideoFormat* self,
+    const struct webrtc_SdpVideoFormat* other);
 WEBRTC_EXPORT int webrtc_SdpVideoFormat_is_equal(
-    struct webrtc_SdpVideoFormat* lhs,
-    struct webrtc_SdpVideoFormat* rhs);
+    const struct webrtc_SdpVideoFormat* lhs,
+    const struct webrtc_SdpVideoFormat* rhs);
 
 WEBRTC_EXPORT struct webrtc_SdpVideoFormat_unique*
 webrtc_FuzzyMatchSdpVideoFormat(
-    struct webrtc_SdpVideoFormat_vector* supported_formats,
-    struct webrtc_SdpVideoFormat* format);
+    const struct webrtc_SdpVideoFormat_vector* supported_formats,
+    const struct webrtc_SdpVideoFormat* format);
 
 #if defined(__cplusplus)
 }

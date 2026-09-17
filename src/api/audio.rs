@@ -1838,6 +1838,8 @@ unsafe extern "C" fn audio_encoder_on_received_uplink_allocation(
         !user_data.is_null(),
         "audio_encoder_on_received_uplink_allocation: user_data is null"
     );
+    // C 側では const ポインタで渡されるが、expect_non_null は *mut を取るため const を外している。
+    // 取得した値はコピーして使うだけで、借用先は書き換えない。
     let update = expect_non_null(
         update.cast_mut(),
         "audio_encoder_on_received_uplink_allocation (update)",
@@ -2909,6 +2911,9 @@ unsafe extern "C" fn audio_encoder_factory_query_audio_encoder(
         "audio_encoder_factory_query_audio_encoder: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut AudioEncoderFactoryHandlerState) };
+    // C 側では const ポインタで渡されるが、借用型 (SdpAudioFormatRef) は
+    // 現状 *mut を保持するため const を外している。
+    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
     let format = expect_non_null(
         format.cast_mut(),
         "audio_encoder_factory_query_audio_encoder (format)",
@@ -2931,6 +2936,9 @@ unsafe extern "C" fn audio_encoder_factory_create(
         "audio_encoder_factory_create: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut AudioEncoderFactoryHandlerState) };
+    // C 側では const ポインタで渡されるが、借用型 (EnvironmentRef / SdpAudioFormatRef) は
+    // 現状 *mut を保持するため const を外している。
+    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
     let env = expect_non_null(env.cast_mut(), "audio_encoder_factory_create (env)");
     let format = expect_non_null(format.cast_mut(), "audio_encoder_factory_create (format)");
     let options = expect_non_null(options, "audio_encoder_factory_create (options)");
@@ -3069,6 +3077,9 @@ unsafe extern "C" fn audio_decoder_factory_is_supported_decoder(
         "audio_decoder_factory_is_supported_decoder: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut AudioDecoderFactoryHandlerState) };
+    // C 側では const ポインタで渡されるが、借用型 (SdpAudioFormatRef) は
+    // 現状 *mut を保持するため const を外している。
+    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
     let format = expect_non_null(
         format.cast_mut(),
         "audio_decoder_factory_is_supported_decoder (format)",
@@ -3091,6 +3102,9 @@ unsafe extern "C" fn audio_decoder_factory_create(
         "audio_decoder_factory_create: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut AudioDecoderFactoryHandlerState) };
+    // C 側では const ポインタで渡されるが、借用型 (EnvironmentRef / SdpAudioFormatRef) は
+    // 現状 *mut を保持するため const を外している。
+    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
     let env = expect_non_null(env.cast_mut(), "audio_decoder_factory_create (env)");
     let format = expect_non_null(format.cast_mut(), "audio_decoder_factory_create (format)");
     let env = unsafe { EnvironmentRef::from_raw(env) };

@@ -46,22 +46,22 @@ WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_MediaStreamTrackInterface,
                               webrtc::AudioTrackInterface);
 
 WEBRTC_EXPORT struct std_string_unique* webrtc_MediaStreamTrackInterface_kind(
-    struct webrtc_MediaStreamTrackInterface* self) {
-  auto track = reinterpret_cast<webrtc::MediaStreamTrackInterface*>(self);
+    const struct webrtc_MediaStreamTrackInterface* self) {
+  auto track = reinterpret_cast<const webrtc::MediaStreamTrackInterface*>(self);
   auto kind = std::make_unique<std::string>(track->kind());
   return reinterpret_cast<struct std_string_unique*>(kind.release());
 }
 
 WEBRTC_EXPORT struct std_string_unique* webrtc_MediaStreamTrackInterface_id(
-    struct webrtc_MediaStreamTrackInterface* self) {
-  auto track = reinterpret_cast<webrtc::MediaStreamTrackInterface*>(self);
+    const struct webrtc_MediaStreamTrackInterface* self) {
+  auto track = reinterpret_cast<const webrtc::MediaStreamTrackInterface*>(self);
   auto id = std::make_unique<std::string>(track->id());
   return reinterpret_cast<struct std_string_unique*>(id.release());
 }
 
 WEBRTC_EXPORT int8_t webrtc_MediaStreamTrackInterface_enabled(
-    struct webrtc_MediaStreamTrackInterface* self) {
-  auto track = reinterpret_cast<webrtc::MediaStreamTrackInterface*>(self);
+    const struct webrtc_MediaStreamTrackInterface* self) {
+  auto track = reinterpret_cast<const webrtc::MediaStreamTrackInterface*>(self);
   return track->enabled() ? 1 : 0;
 }
 
@@ -229,8 +229,8 @@ WEBRTC_DEFINE_REFCOUNTED_VECTOR(webrtc_VideoTrackInterface,
 WEBRTC_DEFINE_REFCOUNTED(webrtc_MediaStreamInterface,
                          webrtc::MediaStreamInterface);
 WEBRTC_EXPORT struct std_string_unique* webrtc_MediaStreamInterface_id(
-    struct webrtc_MediaStreamInterface* self) {
-  auto stream = reinterpret_cast<webrtc::MediaStreamInterface*>(self);
+    const struct webrtc_MediaStreamInterface* self) {
+  auto stream = reinterpret_cast<const webrtc::MediaStreamInterface*>(self);
   auto id = std::make_unique<std::string>(stream->id());
   return reinterpret_cast<struct std_string_unique*>(id.release());
 }

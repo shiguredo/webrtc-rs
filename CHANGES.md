@@ -29,6 +29,11 @@
 
 ### misc
 
+- [UPDATE] webrtc_c の C API の const 性を libwebrtc の C++ シグネチャに合わせる
+  - 読み取り専用の getter を `const struct ...* self` にし、引数の `const_cast` を全廃する
+  - C++ 側が `const` 参照/ポインタで受ける引数を C API でも `const struct ...*` にする
+  - Rust 側の公開 API に変更はない
+  - @melpon
 - [UPDATE] サンプルとテストで PeerConnectionFactory の worker thread に network thread を使う
   - `PeerConnectionFactoryDependencies::set_worker_thread` に network thread を渡す
   - C / C++ の whip / whep サンプルから専用 worker thread の生成を削除する

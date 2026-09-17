@@ -24,9 +24,9 @@ webrtc_EncodedImageBuffer_Create();
 WEBRTC_EXPORT struct webrtc_EncodedImageBuffer_refcounted*
 webrtc_EncodedImageBuffer_Create_from_data(const uint8_t* data, size_t size);
 WEBRTC_EXPORT size_t
-webrtc_EncodedImageBuffer_size(struct webrtc_EncodedImageBuffer* self);
+webrtc_EncodedImageBuffer_size(const struct webrtc_EncodedImageBuffer* self);
 WEBRTC_EXPORT const uint8_t* webrtc_EncodedImageBuffer_data(
-    struct webrtc_EncodedImageBuffer* self);
+    const struct webrtc_EncodedImageBuffer* self);
 
 WEBRTC_EXPORT struct webrtc_EncodedImage_unique* webrtc_EncodedImage_new();
 WEBRTC_EXPORT void webrtc_EncodedImage_set_encoded_data(
@@ -48,16 +48,17 @@ WEBRTC_EXPORT void webrtc_EncodedImage_set_qp(struct webrtc_EncodedImage* self,
                                               int qp);
 
 WEBRTC_EXPORT struct webrtc_EncodedImageBuffer_refcounted*
-webrtc_EncodedImage_encoded_data(struct webrtc_EncodedImage* self);
+webrtc_EncodedImage_encoded_data(const struct webrtc_EncodedImage* self);
 WEBRTC_EXPORT uint32_t
-webrtc_EncodedImage_rtp_timestamp(struct webrtc_EncodedImage* self);
+webrtc_EncodedImage_rtp_timestamp(const struct webrtc_EncodedImage* self);
 WEBRTC_EXPORT uint32_t
-webrtc_EncodedImage_encoded_width(struct webrtc_EncodedImage* self);
+webrtc_EncodedImage_encoded_width(const struct webrtc_EncodedImage* self);
 WEBRTC_EXPORT uint32_t
-webrtc_EncodedImage_encoded_height(struct webrtc_EncodedImage* self);
+webrtc_EncodedImage_encoded_height(const struct webrtc_EncodedImage* self);
 WEBRTC_EXPORT int webrtc_EncodedImage_frame_type(
-    struct webrtc_EncodedImage* self);
-WEBRTC_EXPORT int webrtc_EncodedImage_qp(struct webrtc_EncodedImage* self);
+    const struct webrtc_EncodedImage* self);
+WEBRTC_EXPORT int webrtc_EncodedImage_qp(
+    const struct webrtc_EncodedImage* self);
 
 #if defined(__cplusplus)
 }

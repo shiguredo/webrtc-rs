@@ -24,17 +24,17 @@ webrtc_AudioDeviceModule_Stats_new(double synthesized_samples_duration_s,
                                    uint64_t total_samples_count);
 WEBRTC_EXPORT double
 webrtc_AudioDeviceModule_Stats_get_synthesized_samples_duration_s(
-    struct webrtc_AudioDeviceModule_Stats* self);
+    const struct webrtc_AudioDeviceModule_Stats* self);
 WEBRTC_EXPORT uint64_t
 webrtc_AudioDeviceModule_Stats_get_synthesized_samples_events(
-    struct webrtc_AudioDeviceModule_Stats* self);
+    const struct webrtc_AudioDeviceModule_Stats* self);
 WEBRTC_EXPORT double
 webrtc_AudioDeviceModule_Stats_get_total_samples_duration_s(
-    struct webrtc_AudioDeviceModule_Stats* self);
+    const struct webrtc_AudioDeviceModule_Stats* self);
 WEBRTC_EXPORT double webrtc_AudioDeviceModule_Stats_get_total_playout_delay_s(
-    struct webrtc_AudioDeviceModule_Stats* self);
+    const struct webrtc_AudioDeviceModule_Stats* self);
 WEBRTC_EXPORT uint64_t webrtc_AudioDeviceModule_Stats_get_total_samples_count(
-    struct webrtc_AudioDeviceModule_Stats* self);
+    const struct webrtc_AudioDeviceModule_Stats* self);
 
 // -------------------------
 // webrtc::AudioDeviceModule
@@ -61,11 +61,12 @@ WEBRTC_EXPORT extern const int webrtc_AudioDeviceModule_kDefaultDevice;
 WEBRTC_DECLARE_REFCOUNTED(webrtc_AudioDeviceModule);
 
 WEBRTC_EXPORT struct webrtc_AudioDeviceModule_refcounted*
-webrtc_CreateAudioDeviceModule(struct webrtc_Environment* env, int audio_type);
+webrtc_CreateAudioDeviceModule(const struct webrtc_Environment* env,
+                               int audio_type);
 
-WEBRTC_EXPORT int32_t
-webrtc_AudioDeviceModule_ActiveAudioLayer(struct webrtc_AudioDeviceModule* self,
-                                          int* audio_layer);
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_ActiveAudioLayer(
+    const struct webrtc_AudioDeviceModule* self,
+    int* audio_layer);
 
 WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_RegisterAudioCallback(
     struct webrtc_AudioDeviceModule* self,
@@ -78,7 +79,7 @@ WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_Terminate(struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int webrtc_AudioDeviceModule_Initialized(
-    struct webrtc_AudioDeviceModule* self);
+    const struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int16_t
 webrtc_AudioDeviceModule_PlayoutDevices(struct webrtc_AudioDeviceModule* self);
@@ -124,7 +125,7 @@ WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_InitPlayout(struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int webrtc_AudioDeviceModule_PlayoutIsInitialized(
-    struct webrtc_AudioDeviceModule* self);
+    const struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_RecordingIsAvailable(
     struct webrtc_AudioDeviceModule* self,
@@ -134,7 +135,7 @@ WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_InitRecording(struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int webrtc_AudioDeviceModule_RecordingIsInitialized(
-    struct webrtc_AudioDeviceModule* self);
+    const struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_StartPlayout(struct webrtc_AudioDeviceModule* self);
@@ -143,7 +144,7 @@ WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_StopPlayout(struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int webrtc_AudioDeviceModule_Playing(
-    struct webrtc_AudioDeviceModule* self);
+    const struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_StartRecording(struct webrtc_AudioDeviceModule* self);
@@ -152,19 +153,19 @@ WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_StopRecording(struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int webrtc_AudioDeviceModule_Recording(
-    struct webrtc_AudioDeviceModule* self);
+    const struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_InitSpeaker(struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int webrtc_AudioDeviceModule_SpeakerIsInitialized(
-    struct webrtc_AudioDeviceModule* self);
+    const struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_InitMicrophone(struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int webrtc_AudioDeviceModule_MicrophoneIsInitialized(
-    struct webrtc_AudioDeviceModule* self);
+    const struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_SpeakerVolumeIsAvailable(
     struct webrtc_AudioDeviceModule* self,
@@ -174,17 +175,17 @@ WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_SetSpeakerVolume(struct webrtc_AudioDeviceModule* self,
                                           uint32_t volume);
 
-WEBRTC_EXPORT int32_t
-webrtc_AudioDeviceModule_SpeakerVolume(struct webrtc_AudioDeviceModule* self,
-                                       uint32_t* volume);
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_SpeakerVolume(
+    const struct webrtc_AudioDeviceModule* self,
+    uint32_t* volume);
 
-WEBRTC_EXPORT int32_t
-webrtc_AudioDeviceModule_MaxSpeakerVolume(struct webrtc_AudioDeviceModule* self,
-                                          uint32_t* max_volume);
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_MaxSpeakerVolume(
+    const struct webrtc_AudioDeviceModule* self,
+    uint32_t* max_volume);
 
-WEBRTC_EXPORT int32_t
-webrtc_AudioDeviceModule_MinSpeakerVolume(struct webrtc_AudioDeviceModule* self,
-                                          uint32_t* min_volume);
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_MinSpeakerVolume(
+    const struct webrtc_AudioDeviceModule* self,
+    uint32_t* min_volume);
 
 WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_MicrophoneVolumeIsAvailable(
     struct webrtc_AudioDeviceModule* self,
@@ -194,16 +195,16 @@ WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_SetMicrophoneVolume(
     struct webrtc_AudioDeviceModule* self,
     uint32_t volume);
 
-WEBRTC_EXPORT int32_t
-webrtc_AudioDeviceModule_MicrophoneVolume(struct webrtc_AudioDeviceModule* self,
-                                          uint32_t* volume);
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_MicrophoneVolume(
+    const struct webrtc_AudioDeviceModule* self,
+    uint32_t* volume);
 
 WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_MaxMicrophoneVolume(
-    struct webrtc_AudioDeviceModule* self,
+    const struct webrtc_AudioDeviceModule* self,
     uint32_t* max_volume);
 
 WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_MinMicrophoneVolume(
-    struct webrtc_AudioDeviceModule* self,
+    const struct webrtc_AudioDeviceModule* self,
     uint32_t* min_volume);
 
 WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_SpeakerMuteIsAvailable(
@@ -214,9 +215,9 @@ WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_SetSpeakerMute(struct webrtc_AudioDeviceModule* self,
                                         int enable);
 
-WEBRTC_EXPORT int32_t
-webrtc_AudioDeviceModule_SpeakerMute(struct webrtc_AudioDeviceModule* self,
-                                     int* enabled);
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_SpeakerMute(
+    const struct webrtc_AudioDeviceModule* self,
+    int* enabled);
 
 WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_MicrophoneMuteIsAvailable(
     struct webrtc_AudioDeviceModule* self,
@@ -226,46 +227,46 @@ WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_SetMicrophoneMute(
     struct webrtc_AudioDeviceModule* self,
     int enable);
 
-WEBRTC_EXPORT int32_t
-webrtc_AudioDeviceModule_MicrophoneMute(struct webrtc_AudioDeviceModule* self,
-                                        int* enabled);
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_MicrophoneMute(
+    const struct webrtc_AudioDeviceModule* self,
+    int* enabled);
 
 WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_StereoPlayoutIsAvailable(
-    struct webrtc_AudioDeviceModule* self,
+    const struct webrtc_AudioDeviceModule* self,
     int* available);
 
 WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_SetStereoPlayout(struct webrtc_AudioDeviceModule* self,
                                           int enable);
 
-WEBRTC_EXPORT int32_t
-webrtc_AudioDeviceModule_StereoPlayout(struct webrtc_AudioDeviceModule* self,
-                                       int* enabled);
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_StereoPlayout(
+    const struct webrtc_AudioDeviceModule* self,
+    int* enabled);
 
 WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_StereoRecordingIsAvailable(
-    struct webrtc_AudioDeviceModule* self,
+    const struct webrtc_AudioDeviceModule* self,
     int* available);
 
 WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_SetStereoRecording(
     struct webrtc_AudioDeviceModule* self,
     int enable);
 
-WEBRTC_EXPORT int32_t
-webrtc_AudioDeviceModule_StereoRecording(struct webrtc_AudioDeviceModule* self,
-                                         int* enabled);
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_StereoRecording(
+    const struct webrtc_AudioDeviceModule* self,
+    int* enabled);
 
-WEBRTC_EXPORT int32_t
-webrtc_AudioDeviceModule_PlayoutDelay(struct webrtc_AudioDeviceModule* self,
-                                      uint16_t* delay_ms);
+WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_PlayoutDelay(
+    const struct webrtc_AudioDeviceModule* self,
+    uint16_t* delay_ms);
 
 WEBRTC_EXPORT int webrtc_AudioDeviceModule_BuiltInAECIsAvailable(
-    struct webrtc_AudioDeviceModule* self);
+    const struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int webrtc_AudioDeviceModule_BuiltInAGCIsAvailable(
-    struct webrtc_AudioDeviceModule* self);
+    const struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int webrtc_AudioDeviceModule_BuiltInNSIsAvailable(
-    struct webrtc_AudioDeviceModule* self);
+    const struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int32_t
 webrtc_AudioDeviceModule_EnableBuiltInAEC(struct webrtc_AudioDeviceModule* self,
@@ -280,10 +281,10 @@ webrtc_AudioDeviceModule_EnableBuiltInNS(struct webrtc_AudioDeviceModule* self,
                                          int enable);
 
 WEBRTC_EXPORT int32_t webrtc_AudioDeviceModule_GetPlayoutUnderrunCount(
-    struct webrtc_AudioDeviceModule* self);
+    const struct webrtc_AudioDeviceModule* self);
 
 WEBRTC_EXPORT int webrtc_AudioDeviceModule_GetStats(
-    struct webrtc_AudioDeviceModule* self,
+    const struct webrtc_AudioDeviceModule* self,
     struct webrtc_AudioDeviceModule_Stats_unique** out_stats);
 
 // -------------------------

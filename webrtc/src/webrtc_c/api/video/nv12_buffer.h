@@ -34,8 +34,10 @@ WEBRTC_EXPORT uint8_t* webrtc_NV12Buffer_MutableDataY(
     struct webrtc_NV12Buffer* self);
 WEBRTC_EXPORT uint8_t* webrtc_NV12Buffer_MutableDataUV(
     struct webrtc_NV12Buffer* self);
-WEBRTC_EXPORT int webrtc_NV12Buffer_StrideY(struct webrtc_NV12Buffer* self);
-WEBRTC_EXPORT int webrtc_NV12Buffer_StrideUV(struct webrtc_NV12Buffer* self);
+WEBRTC_EXPORT int webrtc_NV12Buffer_StrideY(
+    const struct webrtc_NV12Buffer* self);
+WEBRTC_EXPORT int webrtc_NV12Buffer_StrideUV(
+    const struct webrtc_NV12Buffer* self);
 WEBRTC_EXPORT void webrtc_NV12Buffer_CropAndScaleFrom(
     struct webrtc_NV12Buffer* self,
     struct webrtc_NV12Buffer* src,

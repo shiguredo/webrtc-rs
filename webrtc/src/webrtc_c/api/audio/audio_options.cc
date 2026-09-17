@@ -18,10 +18,10 @@ WEBRTC_EXPORT void webrtc_AudioOptions_delete(
 }
 
 WEBRTC_EXPORT void webrtc_AudioOptions_get_echo_cancellation(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value) {
-  auto options = reinterpret_cast<webrtc::AudioOptions*>(self);
+  auto options = reinterpret_cast<const webrtc::AudioOptions*>(self);
   webrtc_c::OptionalGetAs(
       options->echo_cancellation, out_has, out_value,
       [&]() { return options->echo_cancellation.value() ? 1 : 0; });
@@ -37,10 +37,10 @@ WEBRTC_EXPORT void webrtc_AudioOptions_set_echo_cancellation(
 }
 
 WEBRTC_EXPORT void webrtc_AudioOptions_get_auto_gain_control(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value) {
-  auto options = reinterpret_cast<webrtc::AudioOptions*>(self);
+  auto options = reinterpret_cast<const webrtc::AudioOptions*>(self);
   webrtc_c::OptionalGetAs(
       options->auto_gain_control, out_has, out_value,
       [&]() { return options->auto_gain_control.value() ? 1 : 0; });
@@ -56,10 +56,10 @@ WEBRTC_EXPORT void webrtc_AudioOptions_set_auto_gain_control(
 }
 
 WEBRTC_EXPORT void webrtc_AudioOptions_get_noise_suppression(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value) {
-  auto options = reinterpret_cast<webrtc::AudioOptions*>(self);
+  auto options = reinterpret_cast<const webrtc::AudioOptions*>(self);
   webrtc_c::OptionalGetAs(
       options->noise_suppression, out_has, out_value,
       [&]() { return options->noise_suppression.value() ? 1 : 0; });
@@ -75,10 +75,10 @@ WEBRTC_EXPORT void webrtc_AudioOptions_set_noise_suppression(
 }
 
 WEBRTC_EXPORT void webrtc_AudioOptions_get_highpass_filter(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value) {
-  auto options = reinterpret_cast<webrtc::AudioOptions*>(self);
+  auto options = reinterpret_cast<const webrtc::AudioOptions*>(self);
   webrtc_c::OptionalGetAs(options->highpass_filter, out_has, out_value, [&]() {
     return options->highpass_filter.value() ? 1 : 0;
   });
@@ -94,10 +94,10 @@ WEBRTC_EXPORT void webrtc_AudioOptions_set_highpass_filter(
 }
 
 WEBRTC_EXPORT void webrtc_AudioOptions_get_stereo_swapping(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value) {
-  auto options = reinterpret_cast<webrtc::AudioOptions*>(self);
+  auto options = reinterpret_cast<const webrtc::AudioOptions*>(self);
   webrtc_c::OptionalGetAs(options->stereo_swapping, out_has, out_value, [&]() {
     return options->stereo_swapping.value() ? 1 : 0;
   });
@@ -113,10 +113,10 @@ WEBRTC_EXPORT void webrtc_AudioOptions_set_stereo_swapping(
 }
 
 WEBRTC_EXPORT void webrtc_AudioOptions_get_audio_jitter_buffer_max_packets(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value) {
-  auto options = reinterpret_cast<webrtc::AudioOptions*>(self);
+  auto options = reinterpret_cast<const webrtc::AudioOptions*>(self);
   webrtc_c::OptionalGetAs(
       options->audio_jitter_buffer_max_packets, out_has, out_value,
       [&]() { return options->audio_jitter_buffer_max_packets.value(); });
@@ -132,10 +132,10 @@ WEBRTC_EXPORT void webrtc_AudioOptions_set_audio_jitter_buffer_max_packets(
 }
 
 WEBRTC_EXPORT void webrtc_AudioOptions_get_audio_jitter_buffer_fast_accelerate(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value) {
-  auto options = reinterpret_cast<webrtc::AudioOptions*>(self);
+  auto options = reinterpret_cast<const webrtc::AudioOptions*>(self);
   webrtc_c::OptionalGetAs(
       options->audio_jitter_buffer_fast_accelerate, out_has, out_value, [&]() {
         return options->audio_jitter_buffer_fast_accelerate.value() ? 1 : 0;
@@ -152,10 +152,10 @@ WEBRTC_EXPORT void webrtc_AudioOptions_set_audio_jitter_buffer_fast_accelerate(
 }
 
 WEBRTC_EXPORT void webrtc_AudioOptions_get_audio_jitter_buffer_min_delay_ms(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value) {
-  auto options = reinterpret_cast<webrtc::AudioOptions*>(self);
+  auto options = reinterpret_cast<const webrtc::AudioOptions*>(self);
   webrtc_c::OptionalGetAs(
       options->audio_jitter_buffer_min_delay_ms, out_has, out_value,
       [&]() { return options->audio_jitter_buffer_min_delay_ms.value(); });

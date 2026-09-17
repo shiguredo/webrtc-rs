@@ -1862,8 +1862,8 @@ unsafe extern "C" fn video_encoder_encoded_image_callback_on_destroy(user_data: 
 }
 
 unsafe extern "C" fn video_encoder_encoded_image_callback_on_encoded_image(
-    encoded_image: *mut ffi::webrtc_EncodedImage,
-    codec_specific_info: *mut ffi::webrtc_CodecSpecificInfo,
+    encoded_image: *const ffi::webrtc_EncodedImage,
+    codec_specific_info: *const ffi::webrtc_CodecSpecificInfo,
     user_data: *mut c_void,
 ) -> *mut ffi::webrtc_VideoEncoder_EncodedImageCallback_Result_unique {
     assert!(
@@ -1871,13 +1871,19 @@ unsafe extern "C" fn video_encoder_encoded_image_callback_on_encoded_image(
         "video_encoder_encoded_image_callback_on_encoded_image: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut VideoEncoderEncodedImageHandlerState) };
+    // C 側では const ポインタで渡されるが、借用型 (EncodedImageRef) は
+    // 現状 *mut を保持するため const を外している。
+    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
     let encoded_image = expect_non_null(
-        encoded_image,
+        encoded_image.cast_mut(),
         "video_encoder_encoded_image_callback_on_encoded_image (encoded_image)",
     );
     let encoded_image = unsafe { EncodedImageRef::from_raw(encoded_image) };
-    let codec_specific_info =
-        NonNull::new(codec_specific_info).map(|v| unsafe { CodecSpecificInfoRef::from_raw(v) });
+    // C 側では const ポインタで渡されるが、借用型 (CodecSpecificInfoRef) は
+    // 現状 *mut を保持するため const を外している。
+    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
+    let codec_specific_info = NonNull::new(codec_specific_info.cast_mut())
+        .map(|v| unsafe { CodecSpecificInfoRef::from_raw(v) });
     let result = state
         .handler
         .on_encoded_image(encoded_image, codec_specific_info);
@@ -1885,8 +1891,8 @@ unsafe extern "C" fn video_encoder_encoded_image_callback_on_encoded_image(
 }
 
 unsafe extern "C" fn video_encoder_init_encode(
-    codec_settings: *mut ffi::webrtc_VideoCodec,
-    settings: *mut ffi::webrtc_VideoEncoder_Settings,
+    codec_settings: *const ffi::webrtc_VideoCodec,
+    settings: *const ffi::webrtc_VideoEncoder_Settings,
     user_data: *mut c_void,
 ) -> i32 {
     assert!(
@@ -1894,17 +1900,22 @@ unsafe extern "C" fn video_encoder_init_encode(
         "video_encoder_init_encode: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut VideoEncoderHandlerState) };
-    let codec_settings =
-        expect_non_null(codec_settings, "video_encoder_init_encode (codec_settings)");
-    let settings = expect_non_null(settings, "video_encoder_init_encode (settings)");
+    // C 側では const ポインタで渡されるが、借用型 (VideoCodecRef / VideoEncoderSettingsRef) は
+    // 現状 *mut を保持するため const を外している。
+    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
+    let codec_settings = expect_non_null(
+        codec_settings.cast_mut(),
+        "video_encoder_init_encode (codec_settings)",
+    );
+    let settings = expect_non_null(settings.cast_mut(), "video_encoder_init_encode (settings)");
     let codec_settings = unsafe { VideoCodecRef::from_raw(codec_settings) };
     let settings = unsafe { VideoEncoderSettingsRef::from_raw(settings) };
     state.handler.init_encode(codec_settings, settings).to_raw()
 }
 
 unsafe extern "C" fn video_encoder_encode(
-    frame: *mut ffi::webrtc_VideoFrame,
-    frame_types: *mut ffi::webrtc_VideoFrameType_vector,
+    frame: *const ffi::webrtc_VideoFrame,
+    frame_types: *const ffi::webrtc_VideoFrameType_vector,
     user_data: *mut c_void,
 ) -> i32 {
     assert!(
@@ -1912,9 +1923,15 @@ unsafe extern "C" fn video_encoder_encode(
         "video_encoder_encode: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut VideoEncoderHandlerState) };
-    let frame = expect_non_null(frame, "video_encoder_encode (frame)");
+    // C 側では const ポインタで渡されるが、借用型 (VideoFrameRef) は
+    // 現状 *mut を保持するため const を外している。
+    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
+    let frame = expect_non_null(frame.cast_mut(), "video_encoder_encode (frame)");
     let frame = unsafe { VideoFrameRef::from_raw(frame) };
-    let frame_types = NonNull::new(frame_types)
+    // C 側では const ポインタで渡されるが、借用型 (VideoFrameTypeVectorRef) は
+    // 現状 *mut を保持するため const を外している。
+    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
+    let frame_types = NonNull::new(frame_types.cast_mut())
         .map(|frame_types| unsafe { VideoFrameTypeVectorRef::from_raw(frame_types) });
     state.handler.encode(frame, frame_types).to_raw()
 }
@@ -1946,7 +1963,7 @@ unsafe extern "C" fn video_encoder_release(user_data: *mut c_void) -> i32 {
 }
 
 unsafe extern "C" fn video_encoder_set_rates(
-    parameters: *mut ffi::webrtc_VideoEncoder_RateControlParameters,
+    parameters: *const ffi::webrtc_VideoEncoder_RateControlParameters,
     user_data: *mut c_void,
 ) {
     assert!(
@@ -1954,7 +1971,13 @@ unsafe extern "C" fn video_encoder_set_rates(
         "video_encoder_set_rates: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut VideoEncoderHandlerState) };
-    let parameters = expect_non_null(parameters, "video_encoder_set_rates (parameters)");
+    // C 側では const ポインタで渡されるが、借用型 (VideoEncoderRateControlParametersRef) は
+    // 現状 *mut を保持するため const を外している。
+    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
+    let parameters = expect_non_null(
+        parameters.cast_mut(),
+        "video_encoder_set_rates (parameters)",
+    );
     let parameters = unsafe { VideoEncoderRateControlParametersRef::from_raw(parameters) };
     state.handler.set_rates(parameters);
 }
@@ -2000,8 +2023,8 @@ unsafe extern "C" fn video_encoder_factory_get_supported_formats(
 }
 
 unsafe extern "C" fn video_encoder_factory_create(
-    env: *mut ffi::webrtc_Environment,
-    format: *mut ffi::webrtc_SdpVideoFormat,
+    env: *const ffi::webrtc_Environment,
+    format: *const ffi::webrtc_SdpVideoFormat,
     user_data: *mut c_void,
 ) -> *mut ffi::webrtc_VideoEncoder_unique {
     assert!(
@@ -2009,8 +2032,11 @@ unsafe extern "C" fn video_encoder_factory_create(
         "video_encoder_factory_create: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut VideoEncoderFactoryHandlerState) };
-    let env = expect_non_null(env, "video_encoder_factory_create (env)");
-    let format = expect_non_null(format, "video_encoder_factory_create (format)");
+    // C 側では const ポインタで渡されるが、借用型 (EnvironmentRef / SdpVideoFormatRef) は
+    // 現状 *mut を保持するため const を外している。
+    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
+    let env = expect_non_null(env.cast_mut(), "video_encoder_factory_create (env)");
+    let format = expect_non_null(format.cast_mut(), "video_encoder_factory_create (format)");
     let env = unsafe { EnvironmentRef::from_raw(env) };
     let format = unsafe { SdpVideoFormatRef::from_raw(format) };
     match state.handler.create(env, format) {

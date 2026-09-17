@@ -11,7 +11,7 @@ extern "C" {
 
 WEBRTC_EXPORT struct webrtc_AudioDeviceModule_refcounted*
 webrtc_CreateJavaAudioDeviceModule(JNIEnv* env,
-                                   struct webrtc_Environment* webrtc_env,
+                                   const struct webrtc_Environment* webrtc_env,
                                    jobject application_context);
 
 #if defined(__cplusplus)

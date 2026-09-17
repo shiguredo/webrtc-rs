@@ -12,9 +12,9 @@ extern "C" {
 
 struct webrtc_RefCountInterface_ref;
 WEBRTC_EXPORT void webrtc_RefCountInterface_AddRef(
-    struct webrtc_RefCountInterface_ref* ref);
+    const struct webrtc_RefCountInterface_ref* ref);
 WEBRTC_EXPORT void webrtc_RefCountInterface_Release(
-    struct webrtc_RefCountInterface_ref* ref);
+    const struct webrtc_RefCountInterface_ref* ref);
 WEBRTC_EXPORT struct webrtc_RefCountInterface_ref*
 webrtc_RefCountInterface_Create(void (*dtor)(void*), void* user_data);
 

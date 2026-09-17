@@ -24,7 +24,7 @@ webrtc_AudioEncoder_unique_vector_new();
 WEBRTC_EXPORT void webrtc_AudioEncoder_unique_vector_delete(
     struct webrtc_AudioEncoder_unique_vector* self);
 WEBRTC_EXPORT size_t webrtc_AudioEncoder_unique_vector_size(
-    struct webrtc_AudioEncoder_unique_vector* self);
+    const struct webrtc_AudioEncoder_unique_vector* self);
 // 所有権を呼び出し側へ移す (release)。`index` の要素は vector からは失われる。
 WEBRTC_EXPORT struct webrtc_AudioEncoder_unique*
 webrtc_AudioEncoder_unique_vector_take(
@@ -80,32 +80,32 @@ WEBRTC_DECLARE_UNIQUE(webrtc_AudioEncoder_EncodedInfo);
 WEBRTC_EXPORT struct webrtc_AudioEncoder_EncodedInfo_unique*
 webrtc_AudioEncoder_EncodedInfo_new();
 WEBRTC_EXPORT size_t webrtc_AudioEncoder_EncodedInfo_get_encoded_bytes(
-    struct webrtc_AudioEncoder_EncodedInfo* self);
+    const struct webrtc_AudioEncoder_EncodedInfo* self);
 WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_encoded_bytes(
     struct webrtc_AudioEncoder_EncodedInfo* self,
     size_t value);
 WEBRTC_EXPORT uint32_t webrtc_AudioEncoder_EncodedInfo_get_encoded_timestamp(
-    struct webrtc_AudioEncoder_EncodedInfo* self);
+    const struct webrtc_AudioEncoder_EncodedInfo* self);
 WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_encoded_timestamp(
     struct webrtc_AudioEncoder_EncodedInfo* self,
     uint32_t value);
 WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfo_get_payload_type(
-    struct webrtc_AudioEncoder_EncodedInfo* self);
+    const struct webrtc_AudioEncoder_EncodedInfo* self);
 WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_payload_type(
     struct webrtc_AudioEncoder_EncodedInfo* self,
     int value);
 WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfo_get_send_even_if_empty(
-    struct webrtc_AudioEncoder_EncodedInfo* self);
+    const struct webrtc_AudioEncoder_EncodedInfo* self);
 WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_send_even_if_empty(
     struct webrtc_AudioEncoder_EncodedInfo* self,
     int value);
 WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfo_get_speech(
-    struct webrtc_AudioEncoder_EncodedInfo* self);
+    const struct webrtc_AudioEncoder_EncodedInfo* self);
 WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_speech(
     struct webrtc_AudioEncoder_EncodedInfo* self,
     int value);
 WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfo_get_encoder_type(
-    struct webrtc_AudioEncoder_EncodedInfo* self);
+    const struct webrtc_AudioEncoder_EncodedInfo* self);
 WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_encoder_type(
     struct webrtc_AudioEncoder_EncodedInfo* self,
     int value);

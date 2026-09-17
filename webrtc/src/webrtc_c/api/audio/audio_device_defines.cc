@@ -28,20 +28,20 @@ WEBRTC_EXPORT struct webrtc_AudioParameters_unique* webrtc_AudioParameters_new(
 }
 
 WEBRTC_EXPORT int webrtc_AudioParameters_get_sample_rate(
-    struct webrtc_AudioParameters* self) {
-  auto params = reinterpret_cast<webrtc::AudioParameters*>(self);
+    const struct webrtc_AudioParameters* self) {
+  auto params = reinterpret_cast<const webrtc::AudioParameters*>(self);
   return params->sample_rate();
 }
 
 WEBRTC_EXPORT size_t
-webrtc_AudioParameters_get_channels(struct webrtc_AudioParameters* self) {
-  auto params = reinterpret_cast<webrtc::AudioParameters*>(self);
+webrtc_AudioParameters_get_channels(const struct webrtc_AudioParameters* self) {
+  auto params = reinterpret_cast<const webrtc::AudioParameters*>(self);
   return params->channels();
 }
 
 WEBRTC_EXPORT size_t webrtc_AudioParameters_get_frames_per_buffer(
-    struct webrtc_AudioParameters* self) {
-  auto params = reinterpret_cast<webrtc::AudioParameters*>(self);
+    const struct webrtc_AudioParameters* self) {
+  auto params = reinterpret_cast<const webrtc::AudioParameters*>(self);
   return params->frames_per_buffer();
 }
 

@@ -73,16 +73,19 @@ WEBRTC_EXPORT uint8_t* webrtc_I420Buffer_MutableDataV(
   auto buf = reinterpret_cast<webrtc::I420Buffer*>(self);
   return buf->MutableDataV();
 }
-WEBRTC_EXPORT int webrtc_I420Buffer_StrideY(struct webrtc_I420Buffer* self) {
-  auto buf = reinterpret_cast<webrtc::I420Buffer*>(self);
+WEBRTC_EXPORT int webrtc_I420Buffer_StrideY(
+    const struct webrtc_I420Buffer* self) {
+  auto buf = reinterpret_cast<const webrtc::I420Buffer*>(self);
   return buf->StrideY();
 }
-WEBRTC_EXPORT int webrtc_I420Buffer_StrideU(struct webrtc_I420Buffer* self) {
-  auto buf = reinterpret_cast<webrtc::I420Buffer*>(self);
+WEBRTC_EXPORT int webrtc_I420Buffer_StrideU(
+    const struct webrtc_I420Buffer* self) {
+  auto buf = reinterpret_cast<const webrtc::I420Buffer*>(self);
   return buf->StrideU();
 }
-WEBRTC_EXPORT int webrtc_I420Buffer_StrideV(struct webrtc_I420Buffer* self) {
-  auto buf = reinterpret_cast<webrtc::I420Buffer*>(self);
+WEBRTC_EXPORT int webrtc_I420Buffer_StrideV(
+    const struct webrtc_I420Buffer* self) {
+  auto buf = reinterpret_cast<const webrtc::I420Buffer*>(self);
   return buf->StrideV();
 }
 WEBRTC_EXPORT void webrtc_I420Buffer_ScaleFrom(struct webrtc_I420Buffer* self,

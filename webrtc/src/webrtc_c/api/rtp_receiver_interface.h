@@ -16,7 +16,8 @@ extern "C" {
 WEBRTC_DECLARE_REFCOUNTED(webrtc_RtpReceiverInterface);
 
 WEBRTC_EXPORT struct webrtc_MediaStreamTrackInterface_refcounted*
-webrtc_RtpReceiverInterface_track(struct webrtc_RtpReceiverInterface* self);
+webrtc_RtpReceiverInterface_track(
+    const struct webrtc_RtpReceiverInterface* self);
 // 受信器に関連付けられた Stream ID 群を新規確保したベクタで返す。
 // 呼び出し側が所有権を持ち、std_string_vector_delete で破棄する必要がある。
 WEBRTC_EXPORT struct std_string_vector* webrtc_RtpReceiverInterface_stream_ids(

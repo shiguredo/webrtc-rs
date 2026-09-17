@@ -41,13 +41,13 @@ webrtc_SdpAudioFormat_new_with_parameters(
     size_t name_len,
     int clockrate_hz,
     size_t num_channels,
-    struct std_map_string_string* parameters) {
+    const struct std_map_string_string* parameters) {
   assert(name != nullptr);
   std::string n(name, name_len);
   webrtc::CodecParameterMap params;
   if (parameters != nullptr) {
     auto parameter_map =
-        reinterpret_cast<std::map<std::string, std::string>*>(parameters);
+        reinterpret_cast<const std::map<std::string, std::string>*>(parameters);
     params = *parameter_map;
   }
   auto fmt = std::make_unique<webrtc::SdpAudioFormat>(
@@ -268,10 +268,10 @@ WEBRTC_EXPORT void webrtc_AudioCodecInfo_set_supports_network_adaption(
 WEBRTC_DEFINE_VECTOR_NO_DEFAULT_CTOR(webrtc_AudioCodecSpec,
                                      webrtc::AudioCodecSpec);
 WEBRTC_EXPORT struct webrtc_AudioCodecSpec* webrtc_AudioCodecSpec_new(
-    struct webrtc_SdpAudioFormat* format,
-    struct webrtc_AudioCodecInfo* info) {
-  auto cpp_format = reinterpret_cast<webrtc::SdpAudioFormat*>(format);
-  auto cpp_info = reinterpret_cast<webrtc::AudioCodecInfo*>(info);
+    const struct webrtc_SdpAudioFormat* format,
+    const struct webrtc_AudioCodecInfo* info) {
+  auto cpp_format = reinterpret_cast<const webrtc::SdpAudioFormat*>(format);
+  auto cpp_info = reinterpret_cast<const webrtc::AudioCodecInfo*>(info);
   auto spec = new webrtc::AudioCodecSpec(
       webrtc::AudioCodecSpec{*cpp_format, *cpp_info});
   return reinterpret_cast<struct webrtc_AudioCodecSpec*>(spec);

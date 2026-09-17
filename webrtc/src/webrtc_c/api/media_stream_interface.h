@@ -28,11 +28,11 @@ WEBRTC_DECLARE_CAST_REFCOUNTED(webrtc_MediaStreamTrackInterface,
 WEBRTC_DECLARE_CAST_REFCOUNTED(webrtc_MediaStreamTrackInterface,
                                webrtc_AudioTrackInterface);
 WEBRTC_EXPORT struct std_string_unique* webrtc_MediaStreamTrackInterface_kind(
-    struct webrtc_MediaStreamTrackInterface* self);
+    const struct webrtc_MediaStreamTrackInterface* self);
 WEBRTC_EXPORT struct std_string_unique* webrtc_MediaStreamTrackInterface_id(
-    struct webrtc_MediaStreamTrackInterface* self);
+    const struct webrtc_MediaStreamTrackInterface* self);
 WEBRTC_EXPORT int8_t webrtc_MediaStreamTrackInterface_enabled(
-    struct webrtc_MediaStreamTrackInterface* self);
+    const struct webrtc_MediaStreamTrackInterface* self);
 WEBRTC_EXPORT int8_t webrtc_MediaStreamTrackInterface_set_enabled(
     struct webrtc_MediaStreamTrackInterface* self,
     int8_t enable);
@@ -125,7 +125,7 @@ WEBRTC_DECLARE_REFCOUNTED_VECTOR(webrtc_VideoTrackInterface);
 
 WEBRTC_DECLARE_REFCOUNTED(webrtc_MediaStreamInterface);
 WEBRTC_EXPORT struct std_string_unique* webrtc_MediaStreamInterface_id(
-    struct webrtc_MediaStreamInterface* self);
+    const struct webrtc_MediaStreamInterface* self);
 WEBRTC_EXPORT struct webrtc_AudioTrackInterface_refcounted_vector*
 webrtc_MediaStreamInterface_GetAudioTracks(
     struct webrtc_MediaStreamInterface* self);

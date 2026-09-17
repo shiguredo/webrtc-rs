@@ -133,6 +133,19 @@ C++ でスタック配置するクラスは C 側ではヒープに置いて明�
   - `AudioDeviceModule_cbs` (デフォルト実装 + 部分上書き方式のため適用外)
   - `RTCStatsCollectorCallback_cbs` は `OnDestroy` を持たないが、それ以外は他と同様に扱う
 
+## const 性
+
+- **C++ 側の const 性を C API でもそのまま反映する**
+- C++ 側が const メソッド、または読み取り専用のフィールド参照で済む操作の `self` は `const struct webrtc_Xxx* self` にする
+  - 値返しの getter (`webrtc_VideoFrameMetadata_GetFrameType` 等)、`int` を返す `_vector_size` / `_index` が該当する
+- C++ 側が `const T&` / `const T*` で受ける引数は `const struct webrtc_Xxx*` にする
+  - Cbs 構造体の関数ポインタも同じ規則に従う (`webrtc_VideoDecoder_cbs.Configure` 等)
+- `const_cast` は使わない
+- フィールドへの可変参照を返す getter (`webrtc_SdpVideoFormat_get_parameters` / `webrtc_SdpVideoFormat_get_name` 等) は非 const のままとする
+  - 呼び出し側が借用先を書き換えられるため、const 化すると const 契約が壊れる
+- `std::variant` / `std::vector` / `absl::InlinedVector` の `_get` は要素への可変参照を返すため非 const、`_size` / `_index` は const になる (`common.h` / `common.impl.h` のマクロ)
+- Rust 側は bindgen が `*const` を生成しても `as_ptr()` の `*mut` からの implicit coercion でそのまま呼べる。Cbs のコールバックを Rust で実装する場合は引数を `*const` にし、`XxxRef` へ渡すときに `cast_mut()` を使う
+
 ## 戻り値の扱い
 
 ### `RTCErrorOr<T>`
@@ -153,11 +166,12 @@ C++ でスタック配置するクラスは C 側ではヒープに置いて明�
 
 新規 API 追加時・変更時は **必ず** 以下を実施する。
 
-1. 作業開始前に RULES.md を読み直し、関係するルール (薄いラッパー、元の C++ パスと名前、命名規則、`*_unique` / `*_refcounted` の扱い、null チェック方針、Cbs の null 非許容) を箇条書きにする
+1. 作業開始前に RULES.md を読み直し、関係するルール (薄いラッパー、元の C++ パスと名前、命名規則、`*_unique` / `*_refcounted` の扱い、null チェック方針、Cbs の null 非許容、const 性) を箇条書きにする
 2. 対応する C++ パスと型名を必ず開いて照合し、C 側のファイル・シンボル名が元の C++ に一致しているか確認する
 3. `*_unique` / `*_refcounted` へのキャストが必ず `*_unique_get` / `*_refcounted_get` / `release` 経由になっているか `rg` でチェックする
-4. 便利関数やパラメータ展開を追加していないか、各変更ブロックごとに「薄いラッパーか」を自問する
-5. 変更後に再度 RULES.md を読み直し、全ルール順守をチェックリスト形式で確認してから回答する
+4. `const_cast` が残っていないか、`self` と引数の const 性が元の C++ シグネチャと一致しているかを `rg` でチェックする
+5. 便利関数やパラメータ展開を追加していないか、各変更ブロックごとに「薄いラッパーか」を自問する
+6. 変更後に再度 RULES.md を読み直し、全ルール順守をチェックリスト形式で確認してから回答する
 
 ## 統合ヘッダ `src/webrtc_c.h`
 

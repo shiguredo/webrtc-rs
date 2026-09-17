@@ -20,7 +20,7 @@ WEBRTC_EXPORT void webrtc_AudioOptions_delete(struct webrtc_AudioOptions* self);
 
 // エコーキャンセルの有効/無効 (std::optional<bool>)。
 WEBRTC_EXPORT void webrtc_AudioOptions_get_echo_cancellation(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value);
 WEBRTC_EXPORT void webrtc_AudioOptions_set_echo_cancellation(
@@ -30,7 +30,7 @@ WEBRTC_EXPORT void webrtc_AudioOptions_set_echo_cancellation(
 
 // 自動ゲインコントロールの有効/無効 (std::optional<bool>)。
 WEBRTC_EXPORT void webrtc_AudioOptions_get_auto_gain_control(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value);
 WEBRTC_EXPORT void webrtc_AudioOptions_set_auto_gain_control(
@@ -40,7 +40,7 @@ WEBRTC_EXPORT void webrtc_AudioOptions_set_auto_gain_control(
 
 // ノイズサプレッションの有効/無効 (std::optional<bool>)。
 WEBRTC_EXPORT void webrtc_AudioOptions_get_noise_suppression(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value);
 WEBRTC_EXPORT void webrtc_AudioOptions_set_noise_suppression(
@@ -50,7 +50,7 @@ WEBRTC_EXPORT void webrtc_AudioOptions_set_noise_suppression(
 
 // ハイパスフィルタの有効/無効 (std::optional<bool>)。
 WEBRTC_EXPORT void webrtc_AudioOptions_get_highpass_filter(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value);
 WEBRTC_EXPORT void webrtc_AudioOptions_set_highpass_filter(
@@ -60,7 +60,7 @@ WEBRTC_EXPORT void webrtc_AudioOptions_set_highpass_filter(
 
 // 左右チャンネルの入れ替えの有効/無効 (std::optional<bool>)。
 WEBRTC_EXPORT void webrtc_AudioOptions_get_stereo_swapping(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value);
 WEBRTC_EXPORT void webrtc_AudioOptions_set_stereo_swapping(
@@ -70,7 +70,7 @@ WEBRTC_EXPORT void webrtc_AudioOptions_set_stereo_swapping(
 
 // 受信側 jitter buffer (NetEq) の最大パケット数 (std::optional<int>)。
 WEBRTC_EXPORT void webrtc_AudioOptions_get_audio_jitter_buffer_max_packets(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value);
 WEBRTC_EXPORT void webrtc_AudioOptions_set_audio_jitter_buffer_max_packets(
@@ -80,7 +80,7 @@ WEBRTC_EXPORT void webrtc_AudioOptions_set_audio_jitter_buffer_max_packets(
 
 // 受信側 jitter buffer (NetEq) の fast accelerate モードの有効/無効 (std::optional<bool>)。
 WEBRTC_EXPORT void webrtc_AudioOptions_get_audio_jitter_buffer_fast_accelerate(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value);
 WEBRTC_EXPORT void webrtc_AudioOptions_set_audio_jitter_buffer_fast_accelerate(
@@ -90,7 +90,7 @@ WEBRTC_EXPORT void webrtc_AudioOptions_set_audio_jitter_buffer_fast_accelerate(
 
 // 受信側 jitter buffer (NetEq) の最小ターゲット遅延 (ミリ秒) (std::optional<int>)。
 WEBRTC_EXPORT void webrtc_AudioOptions_get_audio_jitter_buffer_min_delay_ms(
-    struct webrtc_AudioOptions* self,
+    const struct webrtc_AudioOptions* self,
     int* out_has,
     int* out_value);
 WEBRTC_EXPORT void webrtc_AudioOptions_set_audio_jitter_buffer_min_delay_ms(

@@ -37,16 +37,16 @@ class VideoDecoderImpl : public webrtc::VideoDecoder {
 
   bool Configure(const webrtc::VideoDecoder::Settings& settings) override {
     return cbs_.Configure(
-               reinterpret_cast<struct webrtc_VideoDecoder_Settings*>(
-                   const_cast<webrtc::VideoDecoder::Settings*>(&settings)),
+               reinterpret_cast<const struct webrtc_VideoDecoder_Settings*>(
+                   &settings),
                user_data_) != 0;
   }
 
   int32_t Decode(const webrtc::EncodedImage& input_image,
                  int64_t render_time_ms) override {
-    return cbs_.Decode(reinterpret_cast<struct webrtc_EncodedImage*>(
-                           const_cast<webrtc::EncodedImage*>(&input_image)),
-                       render_time_ms, user_data_);
+    return cbs_.Decode(
+        reinterpret_cast<const struct webrtc_EncodedImage*>(&input_image),
+        render_time_ms, user_data_);
   }
 
   int32_t RegisterDecodeCompleteCallback(
@@ -97,8 +97,8 @@ webrtc_VideoDecoder_DecoderInfo_new() {
 
 WEBRTC_EXPORT struct std_string_unique*
 webrtc_VideoDecoder_DecoderInfo_get_implementation_name(
-    struct webrtc_VideoDecoder_DecoderInfo* self) {
-  auto info = reinterpret_cast<webrtc::VideoDecoder::DecoderInfo*>(self);
+    const struct webrtc_VideoDecoder_DecoderInfo* self) {
+  auto info = reinterpret_cast<const webrtc::VideoDecoder::DecoderInfo*>(self);
   auto out = std::make_unique<std::string>(info->implementation_name);
   return reinterpret_cast<struct std_string_unique*>(out.release());
 }
@@ -114,8 +114,8 @@ WEBRTC_EXPORT void webrtc_VideoDecoder_DecoderInfo_set_implementation_name(
 }
 
 WEBRTC_EXPORT int webrtc_VideoDecoder_DecoderInfo_get_is_hardware_accelerated(
-    struct webrtc_VideoDecoder_DecoderInfo* self) {
-  auto info = reinterpret_cast<webrtc::VideoDecoder::DecoderInfo*>(self);
+    const struct webrtc_VideoDecoder_DecoderInfo* self) {
+  auto info = reinterpret_cast<const webrtc::VideoDecoder::DecoderInfo*>(self);
   return info->is_hardware_accelerated ? 1 : 0;
 }
 
@@ -127,38 +127,38 @@ WEBRTC_EXPORT void webrtc_VideoDecoder_DecoderInfo_set_is_hardware_accelerated(
 }
 
 WEBRTC_EXPORT int webrtc_VideoDecoder_Settings_number_of_cores(
-    struct webrtc_VideoDecoder_Settings* self) {
-  auto settings = reinterpret_cast<webrtc::VideoDecoder::Settings*>(self);
+    const struct webrtc_VideoDecoder_Settings* self) {
+  auto settings = reinterpret_cast<const webrtc::VideoDecoder::Settings*>(self);
   return settings->number_of_cores();
 }
 
 WEBRTC_EXPORT int webrtc_VideoDecoder_Settings_codec_type(
-    struct webrtc_VideoDecoder_Settings* self) {
-  auto settings = reinterpret_cast<webrtc::VideoDecoder::Settings*>(self);
+    const struct webrtc_VideoDecoder_Settings* self) {
+  auto settings = reinterpret_cast<const webrtc::VideoDecoder::Settings*>(self);
   return static_cast<int>(settings->codec_type());
 }
 
 WEBRTC_EXPORT int webrtc_VideoDecoder_Settings_has_buffer_pool_size(
-    struct webrtc_VideoDecoder_Settings* self) {
-  auto settings = reinterpret_cast<webrtc::VideoDecoder::Settings*>(self);
+    const struct webrtc_VideoDecoder_Settings* self) {
+  auto settings = reinterpret_cast<const webrtc::VideoDecoder::Settings*>(self);
   return settings->buffer_pool_size().has_value() ? 1 : 0;
 }
 
 WEBRTC_EXPORT int webrtc_VideoDecoder_Settings_buffer_pool_size(
-    struct webrtc_VideoDecoder_Settings* self) {
-  auto settings = reinterpret_cast<webrtc::VideoDecoder::Settings*>(self);
+    const struct webrtc_VideoDecoder_Settings* self) {
+  auto settings = reinterpret_cast<const webrtc::VideoDecoder::Settings*>(self);
   return settings->buffer_pool_size().value_or(0);
 }
 
 WEBRTC_EXPORT int webrtc_VideoDecoder_Settings_max_render_resolution_width(
-    struct webrtc_VideoDecoder_Settings* self) {
-  auto settings = reinterpret_cast<webrtc::VideoDecoder::Settings*>(self);
+    const struct webrtc_VideoDecoder_Settings* self) {
+  auto settings = reinterpret_cast<const webrtc::VideoDecoder::Settings*>(self);
   return settings->max_render_resolution().Width();
 }
 
 WEBRTC_EXPORT int webrtc_VideoDecoder_Settings_max_render_resolution_height(
-    struct webrtc_VideoDecoder_Settings* self) {
-  auto settings = reinterpret_cast<webrtc::VideoDecoder::Settings*>(self);
+    const struct webrtc_VideoDecoder_Settings* self) {
+  auto settings = reinterpret_cast<const webrtc::VideoDecoder::Settings*>(self);
   return settings->max_render_resolution().Height();
 }
 
@@ -181,23 +181,24 @@ WEBRTC_EXPORT struct webrtc_VideoDecoder_unique* webrtc_VideoDecoder_new(
 
 WEBRTC_EXPORT int webrtc_VideoDecoder_Configure(
     struct webrtc_VideoDecoder* self,
-    struct webrtc_VideoDecoder_Settings* settings) {
+    const struct webrtc_VideoDecoder_Settings* settings) {
   assert(self != nullptr);
   assert(settings != nullptr);
   auto decoder = reinterpret_cast<webrtc::VideoDecoder*>(self);
   auto decoder_settings =
-      reinterpret_cast<webrtc::VideoDecoder::Settings*>(settings);
+      reinterpret_cast<const webrtc::VideoDecoder::Settings*>(settings);
   return decoder->Configure(*decoder_settings) ? 1 : 0;
 }
 
 WEBRTC_EXPORT int32_t
 webrtc_VideoDecoder_Decode(struct webrtc_VideoDecoder* self,
-                           struct webrtc_EncodedImage* input_image,
+                           const struct webrtc_EncodedImage* input_image,
                            int64_t render_time_ms) {
   assert(self != nullptr);
   assert(input_image != nullptr);
   auto decoder = reinterpret_cast<webrtc::VideoDecoder*>(self);
-  auto cpp_input_image = reinterpret_cast<webrtc::EncodedImage*>(input_image);
+  auto cpp_input_image =
+      reinterpret_cast<const webrtc::EncodedImage*>(input_image);
   return decoder->Decode(*cpp_input_image, render_time_ms);
 }
 
@@ -219,9 +220,9 @@ webrtc_VideoDecoder_Release(struct webrtc_VideoDecoder* self) {
 }
 
 WEBRTC_EXPORT struct webrtc_VideoDecoder_DecoderInfo_unique*
-webrtc_VideoDecoder_GetDecoderInfo(struct webrtc_VideoDecoder* self) {
+webrtc_VideoDecoder_GetDecoderInfo(const struct webrtc_VideoDecoder* self) {
   assert(self != nullptr);
-  auto decoder = reinterpret_cast<webrtc::VideoDecoder*>(self);
+  auto decoder = reinterpret_cast<const webrtc::VideoDecoder*>(self);
   auto info = std::make_unique<webrtc::VideoDecoder::DecoderInfo>(
       decoder->GetDecoderInfo());
   return reinterpret_cast<struct webrtc_VideoDecoder_DecoderInfo_unique*>(
