@@ -1,3 +1,4 @@
+use crate::const_non_null::ConstNonNull;
 use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
 use crate::helper::non_null::expect_non_null;
 use crate::helper::ref_count::AudioDeviceModuleHandle;
@@ -243,20 +244,42 @@ impl AudioDeviceModuleAudioLayer {
     }
 }
 
-/// webrtc::AudioTransport の参照ラッパー。
+/// webrtc::AudioTransport の借用ラッパー。
 #[derive(Debug, Clone, Copy)]
 pub struct AudioTransportRef {
-    raw: NonNull<ffi::webrtc_AudioTransport>,
+    raw: ConstNonNull<ffi::webrtc_AudioTransport>,
 }
 
 unsafe impl Send for AudioTransportRef {}
 
 impl AudioTransportRef {
-    fn from_raw(raw: *mut ffi::webrtc_AudioTransport) -> Option<Self> {
-        NonNull::new(raw).map(|raw| Self { raw })
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_AudioTransport>) -> Self {
+        Self { raw }
     }
 
-    pub fn as_ptr(&self) -> *mut ffi::webrtc_AudioTransport {
+    pub fn as_ptr(&self) -> *const ffi::webrtc_AudioTransport {
+        self.raw.as_ptr()
+    }
+}
+
+/// webrtc::AudioTransport の可変借用ラッパー。
+#[derive(Debug)]
+pub struct AudioTransportRefMut {
+    raw: NonNull<ffi::webrtc_AudioTransport>,
+    cref: AudioTransportRef,
+}
+
+unsafe impl Send for AudioTransportRefMut {}
+
+impl AudioTransportRefMut {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_AudioTransport>) -> Self {
+        Self {
+            raw,
+            cref: AudioTransportRef::from_raw(ConstNonNull::from(raw)),
+        }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_AudioTransport {
         self.raw.as_ptr()
     }
 
@@ -266,7 +289,7 @@ impl AudioTransportRef {
     /// `new_mic_level` は書き込み可能なポインタである必要がある。
     #[expect(clippy::too_many_arguments)]
     pub unsafe fn recorded_data_is_available(
-        &self,
+        &mut self,
         audio_samples: *const u8,
         n_samples: usize,
         n_bytes_per_sample: usize,
@@ -312,7 +335,7 @@ impl AudioTransportRef {
     /// `elapsed_time_ms` と `ntp_time_ms` は null または書き込み可能なポインタである必要がある。
     #[expect(clippy::too_many_arguments)]
     pub unsafe fn need_more_play_data(
-        &self,
+        &mut self,
         n_samples: usize,
         n_bytes_per_sample: usize,
         n_channels: usize,
@@ -343,7 +366,7 @@ impl AudioTransportRef {
     /// `elapsed_time_ms` と `ntp_time_ms` は null または書き込み可能なポインタである必要がある。
     #[expect(clippy::too_many_arguments)]
     pub unsafe fn pull_render_data(
-        &self,
+        &mut self,
         bits_per_sample: i32,
         sample_rate: i32,
         number_of_channels: usize,
@@ -364,6 +387,14 @@ impl AudioTransportRef {
                 ntp_time_ms,
             )
         }
+    }
+}
+
+impl std::ops::Deref for AudioTransportRefMut {
+    type Target = AudioTransportRef;
+
+    fn deref(&self) -> &AudioTransportRef {
+        &self.cref
     }
 }
 
@@ -394,14 +425,20 @@ impl AudioTransport {
     }
 
     pub fn as_ref(&self) -> AudioTransportRef {
-        AudioTransportRef { raw: self.raw }
+        // Safety: self.raw は AudioTransport の生存中は常に有効です。
+        AudioTransportRef::from_raw(ConstNonNull::from(self.raw))
+    }
+
+    pub fn as_mut(&mut self) -> AudioTransportRefMut {
+        // Safety: self.raw は AudioTransport の生存中は常に有効です。
+        AudioTransportRefMut::from_raw(self.raw)
     }
 
     /// # Safety
     /// `AudioTransportRef::recorded_data_is_available` と同じ前提条件を満たす必要がある。
     #[expect(clippy::too_many_arguments)]
     pub unsafe fn recorded_data_is_available(
-        &self,
+        &mut self,
         audio_samples: *const u8,
         n_samples: usize,
         n_bytes_per_sample: usize,
@@ -415,7 +452,7 @@ impl AudioTransport {
         estimated_capture_time_ns: Option<i64>,
     ) -> i32 {
         unsafe {
-            self.as_ref().recorded_data_is_available(
+            self.as_mut().recorded_data_is_available(
                 audio_samples,
                 n_samples,
                 n_bytes_per_sample,
@@ -435,7 +472,7 @@ impl AudioTransport {
     /// `AudioTransportRef::need_more_play_data` と同じ前提条件を満たす必要がある。
     #[expect(clippy::too_many_arguments)]
     pub unsafe fn need_more_play_data(
-        &self,
+        &mut self,
         n_samples: usize,
         n_bytes_per_sample: usize,
         n_channels: usize,
@@ -446,7 +483,7 @@ impl AudioTransport {
         ntp_time_ms: *mut i64,
     ) -> i32 {
         unsafe {
-            self.as_ref().need_more_play_data(
+            self.as_mut().need_more_play_data(
                 n_samples,
                 n_bytes_per_sample,
                 n_channels,
@@ -463,7 +500,7 @@ impl AudioTransport {
     /// `AudioTransportRef::pull_render_data` と同じ前提条件を満たす必要がある。
     #[expect(clippy::too_many_arguments)]
     pub unsafe fn pull_render_data(
-        &self,
+        &mut self,
         bits_per_sample: i32,
         sample_rate: i32,
         number_of_channels: usize,
@@ -473,7 +510,7 @@ impl AudioTransport {
         ntp_time_ms: *mut i64,
     ) {
         unsafe {
-            self.as_ref().pull_render_data(
+            self.as_mut().pull_render_data(
                 bits_per_sample,
                 sample_rate,
                 number_of_channels,
@@ -772,7 +809,7 @@ pub trait AudioDeviceModuleHandler: Send {
         0
     }
     #[expect(unused_variables)]
-    fn register_audio_callback(&mut self, audio_transport: Option<AudioTransportRef>) -> i32 {
+    fn register_audio_callback(&mut self, audio_transport: Option<AudioTransportRefMut>) -> i32 {
         0
     }
     fn init(&mut self) -> i32 {
@@ -1072,7 +1109,7 @@ unsafe extern "C" fn adm_register_audio_callback(
     user_data: *mut c_void,
 ) -> i32 {
     let state = unsafe { adm_state(user_data) };
-    let transport = AudioTransportRef::from_raw(audio_transport);
+    let transport = NonNull::new(audio_transport).map(AudioTransportRefMut::from_raw);
     state.handler.register_audio_callback(transport)
 }
 

@@ -43,8 +43,9 @@ WEBRTC_EXPORT int webrtc_I420Buffer_StrideU(
     const struct webrtc_I420Buffer* self);
 WEBRTC_EXPORT int webrtc_I420Buffer_StrideV(
     const struct webrtc_I420Buffer* self);
-WEBRTC_EXPORT void webrtc_I420Buffer_ScaleFrom(struct webrtc_I420Buffer* self,
-                                               struct webrtc_I420Buffer* src);
+WEBRTC_EXPORT void webrtc_I420Buffer_ScaleFrom(
+    struct webrtc_I420Buffer* self,
+    const struct webrtc_I420Buffer* src);
 WEBRTC_DECLARE_CAST_REFCOUNTED(webrtc_I420Buffer, webrtc_VideoFrameBuffer);
 
 #if defined(__cplusplus)

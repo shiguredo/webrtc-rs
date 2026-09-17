@@ -104,11 +104,11 @@ WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_VideoTrackInterface,
 WEBRTC_EXPORT void webrtc_VideoTrackInterface_AddOrUpdateSink(
     struct webrtc_VideoTrackInterface* self,
     struct webrtc_VideoSinkInterface* sink,
-    struct webrtc_VideoSinkWants* wants) {
+    const struct webrtc_VideoSinkWants* wants) {
   auto track = reinterpret_cast<webrtc::VideoTrackInterface*>(self);
   auto sink_impl =
       reinterpret_cast<webrtc::VideoSinkInterface<webrtc::VideoFrame>*>(sink);
-  auto wants_impl = reinterpret_cast<webrtc::VideoSinkWants*>(wants);
+  auto wants_impl = reinterpret_cast<const webrtc::VideoSinkWants*>(wants);
   track->AddOrUpdateSink(sink_impl, *wants_impl);
 }
 

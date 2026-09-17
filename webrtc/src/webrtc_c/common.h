@@ -14,9 +14,23 @@
 #define WEBRTC_CONCAT(a, b) WEBRTC_CONCAT_I(a, b)
 #define WEBRTC_CONCAT_I(a, b) a##b
 
+// -------------------------
+// 読み取り専用の借用を返す getter
+// -------------------------
+
+// 借用先への可変参照を返す getter は、呼び出し側が借用先を書き換えられるため const に
+// できない。そこで読み取り専用の借用を返す getter を、名前に _const を付けた別の関数と
+// して用意する。Rust 側の XxxRef (*const を保持) は _const 版を、XxxRefMut (*mut を
+// 保持) は可変参照を返す通常版を使う。
+
 #define WEBRTC_DECLARE_CAST(type, cast_to)     \
   WEBRTC_EXPORT struct cast_to* WEBRTC_CONCAT( \
       type, WEBRTC_CONCAT(_cast_to_, cast_to))(struct type * self)
+
+#define WEBRTC_DECLARE_CAST_CONST(type, cast_to)                       \
+  WEBRTC_EXPORT const struct cast_to* WEBRTC_CONCAT(                   \
+      type, WEBRTC_CONCAT(_cast_to_, WEBRTC_CONCAT(cast_to, _const)))( \
+      const struct type* self)
 
 #define WEBRTC_DECLARE_CAST_REFCOUNTED(type, cast_to)                    \
   WEBRTC_EXPORT struct WEBRTC_CONCAT(cast_to, _refcounted) *             \
@@ -27,13 +41,15 @@
 // webrtc::RefCountedInterface based types
 // -------------------------
 
-#define WEBRTC_DECLARE_REFCOUNTED(type)                                    \
-  struct type;                                                             \
-  struct WEBRTC_CONCAT(type, _refcounted);                                 \
-  WEBRTC_EXPORT struct type* WEBRTC_CONCAT(                                \
-      type, _refcounted_get)(struct WEBRTC_CONCAT(type, _refcounted) * p); \
-  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _AddRef)(struct type * p);        \
-  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _Release)(struct type * p)
+#define WEBRTC_DECLARE_REFCOUNTED(type)                                        \
+  struct type;                                                                 \
+  struct WEBRTC_CONCAT(type, _refcounted);                                     \
+  WEBRTC_EXPORT struct type* WEBRTC_CONCAT(                                    \
+      type, _refcounted_get)(struct WEBRTC_CONCAT(type, _refcounted) * p);     \
+  WEBRTC_EXPORT const struct type* WEBRTC_CONCAT(type, _refcounted_get_const)( \
+      const struct WEBRTC_CONCAT(type, _refcounted) * p);                      \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _AddRef)(const struct type* p);       \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _Release)(const struct type* p)
 
 // -------------------------
 // std::unique_ptr<T>
@@ -68,15 +84,17 @@
       type, _vector_delete)(struct WEBRTC_CONCAT(type, _vector) * self);     \
   WEBRTC_EXPORT struct type* WEBRTC_CONCAT(type, _vector_get)(               \
       struct WEBRTC_CONCAT(type, _vector) * self, int index);                \
+  WEBRTC_EXPORT const struct type* WEBRTC_CONCAT(type, _vector_get_const)(   \
+      const struct WEBRTC_CONCAT(type, _vector) * self, int index);          \
   WEBRTC_EXPORT int WEBRTC_CONCAT(                                           \
       type, _vector_size)(const struct WEBRTC_CONCAT(type, _vector) * self); \
   WEBRTC_EXPORT void WEBRTC_CONCAT(type, _vector_resize)(                    \
       struct WEBRTC_CONCAT(type, _vector) * self, size_t size);              \
   WEBRTC_EXPORT void WEBRTC_CONCAT(type, _vector_set)(                       \
       struct WEBRTC_CONCAT(type, _vector) * self, int index,                 \
-      struct type* caps);                                                    \
+      const struct type* value);                                             \
   WEBRTC_EXPORT void WEBRTC_CONCAT(type, _vector_push_back)(                 \
-      struct WEBRTC_CONCAT(type, _vector) * self, struct type * value);
+      struct WEBRTC_CONCAT(type, _vector) * self, const struct type* value);
 
 // -------------------------
 // std::vector<T> (T does not have default constructor)
@@ -91,15 +109,17 @@
       type, _vector_delete)(struct WEBRTC_CONCAT(type, _vector) * self);     \
   WEBRTC_EXPORT struct type* WEBRTC_CONCAT(type, _vector_get)(               \
       struct WEBRTC_CONCAT(type, _vector) * self, int index);                \
+  WEBRTC_EXPORT const struct type* WEBRTC_CONCAT(type, _vector_get_const)(   \
+      const struct WEBRTC_CONCAT(type, _vector) * self, int index);          \
   WEBRTC_EXPORT int WEBRTC_CONCAT(                                           \
       type, _vector_size)(const struct WEBRTC_CONCAT(type, _vector) * self); \
   WEBRTC_EXPORT void WEBRTC_CONCAT(                                          \
       type, _vector_clear)(struct WEBRTC_CONCAT(type, _vector) * self);      \
   WEBRTC_EXPORT void WEBRTC_CONCAT(type, _vector_set)(                       \
       struct WEBRTC_CONCAT(type, _vector) * self, int index,                 \
-      struct type* caps);                                                    \
+      const struct type* value);                                             \
   WEBRTC_EXPORT void WEBRTC_CONCAT(type, _vector_push_back)(                 \
-      struct WEBRTC_CONCAT(type, _vector) * self, struct type * value);
+      struct WEBRTC_CONCAT(type, _vector) * self, const struct type* value);
 
 // -------------------------
 // std::vector<webrtc::scoped_refptr<T>>
@@ -131,24 +151,27 @@
 // absl::InlinedVector<T, N>
 // -------------------------
 
-#define WEBRTC_DECLARE_INLINED_VECTOR(type)                             \
-  struct type;                                                          \
-  struct WEBRTC_CONCAT(type, _inlined_vector);                          \
-  WEBRTC_EXPORT struct WEBRTC_CONCAT(type, _inlined_vector) *           \
-      WEBRTC_CONCAT(type, _inlined_vector_new)(size_t size);            \
-  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _inlined_vector_delete)(       \
-      struct WEBRTC_CONCAT(type, _inlined_vector) * self);              \
-  WEBRTC_EXPORT struct type* WEBRTC_CONCAT(type, _inlined_vector_get)(  \
-      struct WEBRTC_CONCAT(type, _inlined_vector) * self, int index);   \
-  WEBRTC_EXPORT int WEBRTC_CONCAT(type, _inlined_vector_size)(          \
-      const struct WEBRTC_CONCAT(type, _inlined_vector) * self);        \
-  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _inlined_vector_resize)(       \
-      struct WEBRTC_CONCAT(type, _inlined_vector) * self, size_t size); \
-  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _inlined_vector_set)(          \
-      struct WEBRTC_CONCAT(type, _inlined_vector) * self, int index,    \
-      struct type* value);                                              \
-  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _inlined_vector_push_back)(    \
-      struct WEBRTC_CONCAT(type, _inlined_vector) * self,               \
-      struct type * value);                                             \
-  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _inlined_vector_clear)(        \
+#define WEBRTC_DECLARE_INLINED_VECTOR(type)                                  \
+  struct type;                                                               \
+  struct WEBRTC_CONCAT(type, _inlined_vector);                               \
+  WEBRTC_EXPORT struct WEBRTC_CONCAT(type, _inlined_vector) *                \
+      WEBRTC_CONCAT(type, _inlined_vector_new)(size_t size);                 \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _inlined_vector_delete)(            \
+      struct WEBRTC_CONCAT(type, _inlined_vector) * self);                   \
+  WEBRTC_EXPORT struct type* WEBRTC_CONCAT(type, _inlined_vector_get)(       \
+      struct WEBRTC_CONCAT(type, _inlined_vector) * self, int index);        \
+  WEBRTC_EXPORT const struct type* WEBRTC_CONCAT(type,                       \
+                                                 _inlined_vector_get_const)( \
+      const struct WEBRTC_CONCAT(type, _inlined_vector) * self, int index);  \
+  WEBRTC_EXPORT int WEBRTC_CONCAT(type, _inlined_vector_size)(               \
+      const struct WEBRTC_CONCAT(type, _inlined_vector) * self);             \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _inlined_vector_resize)(            \
+      struct WEBRTC_CONCAT(type, _inlined_vector) * self, size_t size);      \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _inlined_vector_set)(               \
+      struct WEBRTC_CONCAT(type, _inlined_vector) * self, int index,         \
+      const struct type* value);                                             \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _inlined_vector_push_back)(         \
+      struct WEBRTC_CONCAT(type, _inlined_vector) * self,                    \
+      const struct type* value);                                             \
+  WEBRTC_EXPORT void WEBRTC_CONCAT(type, _inlined_vector_clear)(             \
       struct WEBRTC_CONCAT(type, _inlined_vector) * self);

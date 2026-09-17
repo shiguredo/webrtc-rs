@@ -70,6 +70,12 @@ WEBRTC_EXPORT struct std_string* webrtc_SdpAudioFormat_get_name(
   return reinterpret_cast<struct std_string*>(&fmt->name);
 }
 
+WEBRTC_EXPORT const struct std_string* webrtc_SdpAudioFormat_get_name_const(
+    const struct webrtc_SdpAudioFormat* self) {
+  auto fmt = reinterpret_cast<const webrtc::SdpAudioFormat*>(self);
+  return reinterpret_cast<const struct std_string*>(&fmt->name);
+}
+
 WEBRTC_EXPORT void webrtc_SdpAudioFormat_set_name(
     struct webrtc_SdpAudioFormat* self,
     const struct std_string* name) {
@@ -112,12 +118,20 @@ webrtc_SdpAudioFormat_get_parameters(struct webrtc_SdpAudioFormat* self) {
   return reinterpret_cast<struct std_map_string_string*>(&fmt->parameters);
 }
 
+WEBRTC_EXPORT const struct std_map_string_string*
+webrtc_SdpAudioFormat_get_parameters_const(
+    const struct webrtc_SdpAudioFormat* self) {
+  auto fmt = reinterpret_cast<const webrtc::SdpAudioFormat*>(self);
+  return reinterpret_cast<const struct std_map_string_string*>(
+      &fmt->parameters);
+}
+
 WEBRTC_EXPORT void webrtc_SdpAudioFormat_set_parameters(
     struct webrtc_SdpAudioFormat* self,
-    struct std_map_string_string* parameters) {
+    const struct std_map_string_string* parameters) {
   auto fmt = reinterpret_cast<webrtc::SdpAudioFormat*>(self);
   auto cpp_params =
-      reinterpret_cast<std::map<std::string, std::string>*>(parameters);
+      reinterpret_cast<const std::map<std::string, std::string>*>(parameters);
   fmt->parameters = *cpp_params;
 }
 
@@ -293,9 +307,9 @@ WEBRTC_EXPORT struct webrtc_AudioCodecSpec* webrtc_AudioCodecSpec_copy(
 
 WEBRTC_EXPORT void webrtc_AudioCodecSpec_set_format(
     struct webrtc_AudioCodecSpec* self,
-    struct webrtc_SdpAudioFormat* format) {
+    const struct webrtc_SdpAudioFormat* format) {
   auto spec = reinterpret_cast<webrtc::AudioCodecSpec*>(self);
-  auto cpp_format = reinterpret_cast<webrtc::SdpAudioFormat*>(format);
+  auto cpp_format = reinterpret_cast<const webrtc::SdpAudioFormat*>(format);
   spec->format = *cpp_format;
 }
 
@@ -307,9 +321,9 @@ WEBRTC_EXPORT struct webrtc_SdpAudioFormat* webrtc_AudioCodecSpec_get_format(
 
 WEBRTC_EXPORT void webrtc_AudioCodecSpec_set_info(
     struct webrtc_AudioCodecSpec* self,
-    struct webrtc_AudioCodecInfo* info) {
+    const struct webrtc_AudioCodecInfo* info) {
   auto spec = reinterpret_cast<webrtc::AudioCodecSpec*>(self);
-  auto cpp_info = reinterpret_cast<webrtc::AudioCodecInfo*>(info);
+  auto cpp_info = reinterpret_cast<const webrtc::AudioCodecInfo*>(info);
   spec->info = *cpp_info;
 }
 

@@ -31,6 +31,8 @@ WEBRTC_EXPORT struct webrtc_SdpAudioFormat_unique* webrtc_SdpAudioFormat_copy(
     const struct webrtc_SdpAudioFormat* self);
 WEBRTC_EXPORT struct std_string* webrtc_SdpAudioFormat_get_name(
     struct webrtc_SdpAudioFormat* self);
+WEBRTC_EXPORT const struct std_string* webrtc_SdpAudioFormat_get_name_const(
+    const struct webrtc_SdpAudioFormat* self);
 WEBRTC_EXPORT void webrtc_SdpAudioFormat_set_name(
     struct webrtc_SdpAudioFormat* self,
     const struct std_string* name);
@@ -46,9 +48,12 @@ WEBRTC_EXPORT void webrtc_SdpAudioFormat_set_num_channels(
     size_t value);
 WEBRTC_EXPORT struct std_map_string_string*
 webrtc_SdpAudioFormat_get_parameters(struct webrtc_SdpAudioFormat* self);
+WEBRTC_EXPORT const struct std_map_string_string*
+webrtc_SdpAudioFormat_get_parameters_const(
+    const struct webrtc_SdpAudioFormat* self);
 WEBRTC_EXPORT void webrtc_SdpAudioFormat_set_parameters(
     struct webrtc_SdpAudioFormat* self,
-    struct std_map_string_string* parameters);
+    const struct std_map_string_string* parameters);
 WEBRTC_EXPORT int webrtc_SdpAudioFormat_is_equal(
     const struct webrtc_SdpAudioFormat* lhs,
     const struct webrtc_SdpAudioFormat* rhs);
@@ -122,12 +127,12 @@ WEBRTC_EXPORT struct webrtc_AudioCodecSpec* webrtc_AudioCodecSpec_copy(
     const struct webrtc_AudioCodecSpec* self);
 WEBRTC_EXPORT void webrtc_AudioCodecSpec_set_format(
     struct webrtc_AudioCodecSpec* self,
-    struct webrtc_SdpAudioFormat* format);
+    const struct webrtc_SdpAudioFormat* format);
 WEBRTC_EXPORT struct webrtc_SdpAudioFormat* webrtc_AudioCodecSpec_get_format(
     struct webrtc_AudioCodecSpec* self);
 WEBRTC_EXPORT void webrtc_AudioCodecSpec_set_info(
     struct webrtc_AudioCodecSpec* self,
-    struct webrtc_AudioCodecInfo* info);
+    const struct webrtc_AudioCodecInfo* info);
 WEBRTC_EXPORT struct webrtc_AudioCodecInfo* webrtc_AudioCodecSpec_get_info(
     struct webrtc_AudioCodecSpec* self);
 

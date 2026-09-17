@@ -86,6 +86,14 @@ WEBRTC_DEFINE_REFCOUNTED(webrtc_FrameTransformerInterface,
                          webrtc::FrameTransformerInterface);
 WEBRTC_DEFINE_UNIQUE(webrtc_TransformableFrameInterface,
                      webrtc::TransformableFrameInterface);
+WEBRTC_DEFINE_CAST(webrtc_TransformableFrameInterface,
+                   webrtc_TransformableVideoFrameInterface,
+                   webrtc::TransformableFrameInterface,
+                   webrtc::TransformableVideoFrameInterface);
+WEBRTC_DEFINE_CAST_CONST(webrtc_TransformableFrameInterface,
+                         webrtc_TransformableVideoFrameInterface,
+                         webrtc::TransformableFrameInterface,
+                         webrtc::TransformableVideoFrameInterface);
 WEBRTC_DEFINE_REFCOUNTED(webrtc_TransformedFrameCallback,
                          webrtc::TransformedFrameCallback);
 WEBRTC_DEFINE_VARIANT(webrtc_RtpTimestampInfo, webrtc::RtpTimestampInfo);

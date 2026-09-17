@@ -139,6 +139,8 @@ impl FactoryHolder {
 
 ## 対応 API
 
+借用ハンドルは読み取り専用の `XxxRef` と書き換え用の `XxxRefMut` に分かれている。所有型の `as_ref()` は `XxxRef` を、`as_mut()` は `XxxRefMut` を返す。借用先を書き換える場合は `XxxRefMut` を取得すること。
+
 ### PeerConnection
 
 - `PeerConnectionFactory`

@@ -29,6 +29,10 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 - マイナーバージョンは libwebrtc の m バージョンと一致 (例: 0.154.x は m154)
 - パッチバージョンは同一 m バージョン内での変更時にインクリメント
 
+## テスト
+
+`cargo test --workspace --features source-build` で C API の薄いラッパーまでを含めた単体テストを実行する。実際に映像・音声フレームが流れる統合テストは webrtc-rs 単体では扱わず、`sora-rust-sdk` 経由で行う。
+
 ## ビルド設定 (`Cargo.toml` メタデータ)
 
 - `[package.metadata.external-dependencies.webrtc-build]` で libwebrtc バージョンと URL を管理
@@ -56,7 +60,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 | `rtp` | `RtpTransceiver`, `RtpSender`, `RtpReceiver`, `RtpTransceiverInit`, `RtpTransceiverDirection`, `RtpCapabilities`, `RtpCodec`, `RtpCodecRef`, `RtpCodecCapability`, `RtpCodecCapabilityRef`, `RtpCodecCapabilityVector`, `RtpCodecCapabilityVectorRef`, `RtpEncodingParameters`, `RtpEncodingParametersRef`, `RtpEncodingParametersVector`, `RtpParameters`, `Resolution`, `Priority`, `DegradationPreference`, `default_bitrate_priority` | RTP 層の送受信 |
 | `video_codec_common` | `VideoFrame`, `VideoFrameRef`, `VideoFrameBuilder`, `VideoFrameBuffer`, `VideoFrameBufferKind`, `VideoFrameBufferHandler`, `VideoFrameBufferHandlerAny`, `VideoFrameUpdateRect`, `VideoRotation`, `ColorSpace`, `I420Buffer`, `NV12Buffer`, `SdpVideoFormat`, `SdpVideoFormatRef`, `ScalabilityMode`, `VideoCodecRef`, `VideoCodecType`, `VideoCodecStatus`, `VideoFrameType`, `VideoFrameTypeVector`, `VideoFrameTypeVectorRef`, `EncodedImage`, `EncodedImageRef`, `EncodedImageBuffer`, `CodecSpecificInfo`, `CodecSpecificInfoRef`, `H264PacketizationMode` | フレーム・バッファ・コーデック共通 |
 | `video_encoder` | `VideoEncoder`, `VideoEncoderHandler`, `VideoEncoderFactory`, `VideoEncoderFactoryHandler`, `VideoEncoderEncoderInfo`, `VideoEncoderSettingsRef`, `VideoEncoderRateControlParametersRef`, `VideoEncoderQpThresholds`, `VideoEncoderScalingSettings`, `VideoEncoderResolution`, `VideoEncoderResolutionBitrateLimits`, `VideoEncoderEncodedImageCallback`, `VideoEncoderEncodedImageCallbackRef`, `VideoEncoderEncodedImageCallbackHandler`, `VideoEncoderEncodedImageCallbackResult`, `VideoEncoderEncodedImageCallbackResultError`, `VideoEncoderEncodedImageCallbackPtr` ほか参照型 | 映像エンコーダー (組み込み + カスタム) |
-| `video_decoder` | `VideoDecoder`, `VideoDecoderHandler`, `VideoDecoderFactory`, `VideoDecoderFactoryHandler`, `VideoDecoderDecoderInfo`, `VideoDecoderSettingsRef`, `VideoDecoderDecodedImageCallbackRef`, `VideoDecoderDecodedImageCallbackPtr` | 映像デコーダー (組み込み + カスタム) |
+| `video_decoder` | `VideoDecoder`, `VideoDecoderHandler`, `VideoDecoderFactory`, `VideoDecoderFactoryHandler`, `VideoDecoderDecoderInfo`, `VideoDecoderSettingsRef`, `VideoDecoderDecodedImageCallbackPtr` | 映像デコーダー (組み込み + カスタム) |
 | `dtls_transport` | `DtlsTransport`, `DtlsTransportState`, `DtlsTransportObserver`, `DtlsTransportObserverHandler` | DTLS トランスポートと証明書検証連携 |
 | `environment` | `Environment`, `EnvironmentRef` | WebRTC 環境 |
 | `rtc_error` | `RtcError` | libwebrtc の `RTCError` ラッパー |
@@ -71,9 +75,9 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 |------|---------|
 | バージョン | `version()` |
 | エラー | `Error`, `Result` |
-| C++ 標準型ラッパー (`cxxstd`) | `CxxString`, `CxxStringRef`, `MapStringString`, `MapStringStringIter`, `StringVector`, `StringVectorRef` |
+| C++ 標準型ラッパー (`cxxstd`) | `CxxString`, `CxxStringRef`, `CxxStringRefMut`, `MapStringStringIter`, `MapStringStringRef`, `MapStringStringRefMut`, `StringVector`, `StringVectorRef`, `StringVectorRefMut` |
 | libyuv | `LibyuvFourcc`, `LibyuvRotationMode`, `abgr_to_i420()`, `convert_from_i420()`, `convert_to_i420()`, `i420_copy()`, `i420_to_nv12()`, `mjpg_size()`, `mjpg_to_i420()`, `mjpg_to_nv12()`, `nv12_copy()`, `nv12_to_i420()`, `yuy2_to_i420()` |
-| 参照カウント | `RefCountedHandle`, `ScopedRef` |
+| 非 null ポインタ | `ConstNonNull` |
 | rtc_base | `Thread`, `TimestampAligner`, `SSLCertChainRef`, `SSLCertificateRef`, `SSLCertificateVerifier`, `SSLCertificateVerifierHandler`, `SSLIdentity`, `log` (モジュール: `Severity`, `LoggingConfig`, `initialize_logging`, `print`), `random_bytes()`, `random_string()`, `rtc_log_format_file()`, `time_millis()` |
 | ログマクロ (`#[macro_export]`) | `rtc_log_verbose!`, `rtc_log_info!`, `rtc_log_warning!`, `rtc_log_error!` |
 | FFI | `ffi` (`bindgen` 生成の raw バインディング。通常は利用者が直接触らない) |
@@ -151,12 +155,25 @@ let (factory, context) =
 - `RtcError`: libwebrtc の `RTCError` ラッパー (コードと詳細メッセージを保持)
 - `Result<T>`: `std::result::Result<T, Error>` のエイリアス
 
+## 借用型と非 null ポインタ
+
+C API のオブジェクトは、所有型と 2 種類の借用型で扱う。
+
+- 読み取り専用借用 `XxxRef<'a>`: `Copy` で、非 null の `*const` を保持する。書き換えメソッドは持たない
+- 書き換え用借用 `XxxRefMut<'a>`: `Copy` ではなく、非 null の `*mut` と `Deref` 用の `XxxRef` を保持する
+- 所有型は `as_ref()` / `as_mut()` で借用型を返す
+
+非 null ポインタは `NonNull` と `ConstNonNull` で表す。`ConstNonNull` は std の `NonNull` が `*mut T` 用の API しか持たないため crate 側で用意している非 null の `*const T` で、クレートルートから参照できる。
+
+- C API が返すポインタは `expect_non_null` / `expect_non_null_const` で null 検査してから保持する
+- 借用型の `from_raw` / `from_ptr` と、所有権を受け取る `from_unique_ptr` は借用先の寿命や所有権を型で保証できないため `pub(crate)` にしてある。クレート外からは `as_ref()` / `as_mut()` と通常の API を使う
+- C API の読み取り専用の借用を返す getter は `XxxRef` が、可変参照を返す getter は `XxxRefMut` が使う (`cast_mut()` は使わない)
+
 ## 参照カウント管理
 
 libwebrtc の `scoped_refptr` 相当を Rust 側で安全に扱うための型:
 
-- `RefCountedHandle`: refcounted オブジェクトへのハンドル trait
-- `ScopedRef<H>`: `H: RefCountedHandle` に対するスコープ付き参照
+- refcounted ハンドル (`RefCountedHandle` / `ScopedRef` / `ScopedRefConst`) はクレート内部の機構で、`pub(crate)` として扱う
 - 生ポインタを保持する型 (`PeerConnection`, `DataChannel`, `RtpTransceiver` 等) は `Send` / 適切な場合 `Sync` が実装されている
 
 ## libyuv

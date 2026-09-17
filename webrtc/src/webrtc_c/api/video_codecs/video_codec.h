@@ -94,6 +94,10 @@ WEBRTC_EXPORT void webrtc_VideoCodec_set_number_of_simulcast_streams(
 WEBRTC_EXPORT struct webrtc_SimulcastStream*
 webrtc_VideoCodec_simulcast_stream_at(struct webrtc_VideoCodec* self,
                                       int index);
+WEBRTC_EXPORT const struct webrtc_SimulcastStream*
+webrtc_VideoCodec_simulcast_stream_at_const(
+    const struct webrtc_VideoCodec* self,
+    int index);
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_Settings_number_of_cores(
     const struct webrtc_VideoEncoder_Settings* self);

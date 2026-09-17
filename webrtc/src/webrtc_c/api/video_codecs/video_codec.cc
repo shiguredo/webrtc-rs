@@ -196,6 +196,15 @@ webrtc_VideoCodec_simulcast_stream_at(struct webrtc_VideoCodec* self,
       &codec->simulcastStream[index]);
 }
 
+WEBRTC_EXPORT const struct webrtc_SimulcastStream*
+webrtc_VideoCodec_simulcast_stream_at_const(
+    const struct webrtc_VideoCodec* self,
+    int index) {
+  auto codec = reinterpret_cast<const webrtc::VideoCodec*>(self);
+  return reinterpret_cast<const struct webrtc_SimulcastStream*>(
+      &codec->simulcastStream[index]);
+}
+
 WEBRTC_EXPORT int webrtc_VideoEncoder_Settings_number_of_cores(
     const struct webrtc_VideoEncoder_Settings* self) {
   auto settings = reinterpret_cast<const webrtc::VideoEncoder::Settings*>(self);

@@ -1,5 +1,6 @@
+use crate::const_non_null::ConstNonNull;
 use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
-use crate::helper::non_null::expect_non_null;
+use crate::helper::non_null::{expect_non_null, expect_non_null_const};
 use crate::{CxxString, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -8,21 +9,21 @@ use std::ptr::NonNull;
 /// webrtc::SSLCertificate の借用ラッパー。
 #[derive(Clone, Copy)]
 pub struct SSLCertificateRef<'a> {
-    raw: NonNull<ffi::webrtc_SSLCertificate>,
+    raw: ConstNonNull<ffi::webrtc_SSLCertificate>,
     _marker: PhantomData<&'a ffi::webrtc_SSLCertificate>,
 }
 
 unsafe impl<'a> Send for SSLCertificateRef<'a> {}
 
 impl<'a> SSLCertificateRef<'a> {
-    pub fn from_raw(raw: NonNull<ffi::webrtc_SSLCertificate>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_SSLCertificate>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
         }
     }
 
-    pub fn as_ptr(&self) -> *mut ffi::webrtc_SSLCertificate {
+    pub fn as_ptr(&self) -> *const ffi::webrtc_SSLCertificate {
         self.raw.as_ptr()
     }
 
@@ -50,21 +51,21 @@ impl<'a> SSLCertificateRef<'a> {
 /// webrtc::SSLCertChain の借用ラッパー。
 #[derive(Clone, Copy)]
 pub struct SSLCertChainRef<'a> {
-    raw: NonNull<ffi::webrtc_SSLCertChain>,
+    raw: ConstNonNull<ffi::webrtc_SSLCertChain>,
     _marker: PhantomData<&'a ffi::webrtc_SSLCertChain>,
 }
 
 unsafe impl<'a> Send for SSLCertChainRef<'a> {}
 
 impl<'a> SSLCertChainRef<'a> {
-    pub fn from_raw(raw: NonNull<ffi::webrtc_SSLCertChain>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_SSLCertChain>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
         }
     }
 
-    pub fn as_ptr(&self) -> *mut ffi::webrtc_SSLCertChain {
+    pub fn as_ptr(&self) -> *const ffi::webrtc_SSLCertChain {
         self.raw.as_ptr()
     }
 
@@ -81,11 +82,8 @@ impl<'a> SSLCertChainRef<'a> {
         if index >= self.len() {
             return None;
         }
-        let raw = expect_non_null(
-            unsafe {
-                ffi::webrtc_SSLCertChain_Get(self.raw.as_ptr(), index as i32)
-                    as *mut ffi::webrtc_SSLCertificate
-            },
+        let raw = expect_non_null_const(
+            unsafe { ffi::webrtc_SSLCertChain_Get(self.raw.as_ptr(), index as i32) },
             "webrtc_SSLCertChain_Get",
         );
         Some(SSLCertificateRef::from_raw(raw))
@@ -110,7 +108,7 @@ unsafe extern "C" fn ssl_certificate_verifier_verify_chain(
         "ssl_certificate_verifier_verify_chain: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut SSLCertificateVerifierHandlerState) };
-    let chain = expect_non_null(chain as *mut ffi::webrtc_SSLCertChain, "SSLCertChain");
+    let chain = expect_non_null_const(chain, "SSLCertChain");
     let chain = SSLCertChainRef::from_raw(chain);
     if state.handler.verify_chain(chain) {
         1

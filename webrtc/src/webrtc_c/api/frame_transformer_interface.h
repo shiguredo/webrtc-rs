@@ -135,6 +135,11 @@ WEBRTC_EXPORT void webrtc_TransformableFrameInterface_SenderCaptureTimeOffset(
 
 struct webrtc_TransformableVideoFrameInterface;
 
+WEBRTC_DECLARE_CAST(webrtc_TransformableFrameInterface,
+                    webrtc_TransformableVideoFrameInterface);
+WEBRTC_DECLARE_CAST_CONST(webrtc_TransformableFrameInterface,
+                          webrtc_TransformableVideoFrameInterface);
+
 WEBRTC_EXPORT int webrtc_TransformableVideoFrameInterface_IsKeyFrame(
     const struct webrtc_TransformableVideoFrameInterface* self);
 // std::optional<std::string>。値がある場合はヒープ確保したコピーを

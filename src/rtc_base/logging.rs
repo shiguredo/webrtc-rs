@@ -1,8 +1,9 @@
 pub mod log {
     use crate::Result;
+    use crate::const_non_null::ConstNonNull;
     use crate::ffi;
     use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
-    use crate::helper::non_null::expect_non_null;
+    use crate::helper::non_null::{expect_non_null, expect_non_null_const};
     use crate::helper::optional::get_optional_scalar;
     use std::ffi::CString;
     use std::marker::PhantomData;
@@ -225,21 +226,21 @@ pub mod log {
     /// 一時的な文字列ビューを返す。
     #[derive(Clone, Copy)]
     pub struct LogLineRef<'a> {
-        raw: NonNull<ffi::webrtc_LogLineRef>,
+        raw: ConstNonNull<ffi::webrtc_LogLineRef>,
         _marker: PhantomData<&'a ffi::webrtc_LogLineRef>,
     }
 
     unsafe impl<'a> Send for LogLineRef<'a> {}
 
     impl<'a> LogLineRef<'a> {
-        pub fn from_raw(raw: NonNull<ffi::webrtc_LogLineRef>) -> Self {
+        pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_LogLineRef>) -> Self {
             Self {
                 raw,
                 _marker: PhantomData,
             }
         }
 
-        pub fn as_ptr(&self) -> *mut ffi::webrtc_LogLineRef {
+        pub fn as_ptr(&self) -> *const ffi::webrtc_LogLineRef {
             self.raw.as_ptr()
         }
 
@@ -388,7 +389,7 @@ pub mod log {
         user_data: *mut c_void,
     ) {
         let state = handler_state(user_data);
-        let line = expect_non_null(line as *mut ffi::webrtc_LogLineRef, "webrtc_LogLineRef");
+        let line = expect_non_null_const(line, "webrtc_LogLineRef");
         state.handler.on_log_message(LogLineRef::from_raw(line));
     }
 }

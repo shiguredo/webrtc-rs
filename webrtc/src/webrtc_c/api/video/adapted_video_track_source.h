@@ -29,7 +29,7 @@ WEBRTC_EXPORT int webrtc_AdaptedVideoTrackSource_AdaptFrame(
     int* out_crop_y);
 WEBRTC_EXPORT void webrtc_AdaptedVideoTrackSource_OnFrame(
     struct webrtc_AdaptedVideoTrackSource* self,
-    struct webrtc_VideoFrame* frame);
+    const struct webrtc_VideoFrame* frame);
 WEBRTC_DECLARE_CAST_REFCOUNTED(webrtc_AdaptedVideoTrackSource,
                                webrtc_VideoTrackSourceInterface);
 

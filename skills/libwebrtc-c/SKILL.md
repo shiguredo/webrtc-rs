@@ -103,11 +103,11 @@ C++ でスタック配置するクラスは C 側ではヒープに置いて明�
 
 ### 4. `std::vector<T>` → `T_vector*`
 
-`WEBRTC_DECLARE_VECTOR(T)` で宣言。`_new(size)` / `_delete` / `_get(i)` / `_size` / `_resize(size)` / `_set(i, val)` / `_push_back(val)` を提供する。デフォルトコンストラクタを持たない型向けには `WEBRTC_DECLARE_VECTOR_NO_DEFAULT_CTOR(T)` を使い、`_new()` が引数なしになる代わりに `_clear` が追加される。`scoped_refptr` の vector 用には `WEBRTC_DECLARE_REFCOUNTED_VECTOR(T)` を使い、要素は `T_refcounted*` として扱う。
+`WEBRTC_DECLARE_VECTOR(T)` で宣言。`_new(size)` / `_delete` / `_get(i)` / `_get_const(i)` / `_size` / `_resize(size)` / `_set(i, val)` / `_push_back(val)` を提供する。`_get` は要素への可変参照を、`_get_const` は読み取り専用の参照を返す。デフォルトコンストラクタを持たない型向けには `WEBRTC_DECLARE_VECTOR_NO_DEFAULT_CTOR(T)` を使い、`_new()` が引数なしになる代わりに `_clear` が追加される。`scoped_refptr` の vector 用には `WEBRTC_DECLARE_REFCOUNTED_VECTOR(T)` を使い、要素は `T_refcounted*` として扱う。
 
 ### 5. `absl::InlinedVector<T, N>` → `T_inlined_vector*`
 
-`WEBRTC_DECLARE_INLINED_VECTOR(T)` で宣言。`_new(size)` / `_delete` / `_get(i)` / `_size` / `_resize(size)` / `_set(i, val)` / `_push_back(val)` / `_clear` を提供する。
+`WEBRTC_DECLARE_INLINED_VECTOR(T)` で宣言。`_new(size)` / `_delete` / `_get(i)` / `_get_const(i)` / `_size` / `_resize(size)` / `_set(i, val)` / `_push_back(val)` / `_clear` を提供する。`_get` は要素への可変参照を、`_get_const` は読み取り専用の参照を返す。
 
 ### `std::optional<CppType>` の扱い
 
@@ -143,8 +143,17 @@ C++ でスタック配置するクラスは C 側ではヒープに置いて明�
 - `const_cast` は使わない
 - フィールドへの可変参照を返す getter (`webrtc_SdpVideoFormat_get_parameters` / `webrtc_SdpVideoFormat_get_name` 等) は非 const のままとする
   - 呼び出し側が借用先を書き換えられるため、const 化すると const 契約が壊れる
-- `std::variant` / `std::vector` / `absl::InlinedVector` の `_get` は要素への可変参照を返すため非 const、`_size` / `_index` は const になる (`common.h` / `common.impl.h` のマクロ)
-- Rust 側は bindgen が `*const` を生成しても `as_ptr()` の `*mut` からの implicit coercion でそのまま呼べる。Cbs のコールバックを Rust で実装する場合は引数を `*const` にし、`XxxRef` へ渡すときに `cast_mut()` を使う
+- 借用を返す getter は、C++ 側のオーバーロードに合わせて必要な分だけ用意する
+  - C++ 側に const 参照 (`const T&` / `const T*`) を返す getter しか無い場合は `_get_xxx` を 1 つだけ用意する (`_const` は付けない)
+    - 例: `webrtc_SSLCertChain_Get` (`const SSLCertificate& Get(size_t pos) const`) / `webrtc_Buffer_data` (`const U* data() const`)
+  - C++ 側に可変参照 (`T&` / `T*`) を返す getter と const 参照を返す getter の両方がある場合は、`_get_xxx` (可変参照を返す) と `_get_xxx_const` (読み取り専用を返す) の 2 つを用意する
+    - 例: `webrtc_SdpVideoFormat_get_name` (可変参照を返す) と `webrtc_SdpVideoFormat_get_name_const` (`const struct std_string*` を返す)
+  - 読み取り専用の借用に対するダウンキャストは `WEBRTC_DECLARE_CAST_CONST` を用意する
+    - 例: `webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec` (可変参照を返す) と `webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec_const` (読み取り専用を返す)
+  - 借用ではなくコピーする引数 (`_vector_set` / `_vector_push_back` / `_inlined_vector_set` / `_inlined_vector_push_back` の値) は `const struct webrtc_Xxx*` にする
+- `std::variant` / `std::vector` / `absl::InlinedVector` の `_get` は要素への可変参照を返すため非 const、`_get_const` / `_size` / `_index` は const になる (`common.h` / `common.impl.h` のマクロ)
+- `*_refcounted` は `WEBRTC_DECLARE_REFCOUNTED` / `WEBRTC_DEFINE_REFCOUNTED` マクロで `_refcounted_get` (非 const) と `_refcounted_get_const` (const) の両方を宣言する
+  - `*_AddRef` / `*_Release` は C++ 側の `AddRef()` / `Release()` が const メソッドであるため `const struct webrtc_Xxx*` を受け取る
 
 ## 戻り値の扱い
 

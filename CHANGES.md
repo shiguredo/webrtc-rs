@@ -11,6 +11,18 @@
 
 ## develop
 
+- [CHANGE] 借用型 `XxxRef` を読み取り専用にし、書き換え用の `XxxRefMut` を追加する
+  - `XxxRef` から可変アクセサを外して `Copy` にし、`XxxRefMut` に移す
+  - `XxxRef` は `ConstNonNull`、`XxxRefMut` は `NonNull` を保持し、`const` を外すキャストを全廃する
+  - 読み取り専用の借用を返す C API の getter に `_const` 版を追加し、`MapStringString` を `MapStringStringRef` / `MapStringStringRefMut` に分ける
+  - 所有型に `as_mut` を追加し、`RtpCapabilities::codecs` / `PeerConnectionRtcConfiguration::servers` などを `&self` の読み取りと `&mut self` の書き換えに分ける
+  - `XxxRef::from_raw` / `CxxStringRef::from_ptr` は `pub(crate)` になり、`NonNull` ではなく `ConstNonNull` を受け取るようになる
+    - 借用先の寿命を型で保証できないため、外部に公開しない
+  - @melpon
+- [CHANGE] 所有権を受け取る `from_unique_ptr` を `pub(crate)` にする
+  - `RtcError` / `SdpParseError` / `SessionDescription` の `from_unique_ptr` を外部公開 API から外し、C API の内部機構として限定する
+  - 所有権を移譲する safe な関数を外部に公開すると、二重解放や use-after-free を safe Rust で起こせてしまう
+  - @melpon
 - [CHANGE] `RtpEncodingParameters::scalability_mode` の戻り値を `Option<Result<String>>` から `Result<Option<String>>` に変更する
   - 未設定は `Ok(None)`、UTF-8 への変換失敗は `Err` で表す
   - @melpon
@@ -37,6 +49,38 @@
 
 ### misc
 
+- [ADD] 非 null が保証された `*const T` を表す `ConstNonNull` を追加する
+  - `NonNull` は `*mut T` を扱う API しか持たないため、読み取り専用ポインタ用に用意する
+  - @melpon
+- [UPDATE] 借用ハンドルが保持するポインタを非 null 型にする
+  - `XxxRef` は `ConstNonNull`、`XxxRefMut` は `NonNull` を保持し、null でないことが型で分かるようにする
+  - `XxxRef::from_raw` / `CxxStringRef::from_ptr` は `ConstNonNull`、`XxxRefMut::from_raw` は `NonNull` を受け取る
+  - 借用ハンドルの `from_raw` / `from_ptr` は `unsafe fn` と `fn` が混在していたのを安全関数に統一する
+  - 使われていない可変借用ハンドル (`NaluInfoRefMut` / `VideoDecoderSettingsRefMut` / `VideoEncoderSettingsRefMut` / `VideoEncoderRateControlParametersRefMut` / `SSLCertificateRefMut` / `SSLCertChainRefMut` / `LogLineRefMut` / `VideoDecoderDecodedImageCallbackRef` 系) を削除する
+  - @melpon
+- [UPDATE] rustdoc の警告を修正する
+  - `std::vector<T>` などをバッククォートで囲み、未解決だったドキュメントリンクを `crate::` 付きのパスにする
+  - @melpon
+- [ADD] webrtc_c に `webrtc_TransformableFrameInterface` から `webrtc_TransformableVideoFrameInterface` への cast を追加する
+  - `WEBRTC_DECLARE_CAST` / `WEBRTC_DECLARE_CAST_CONST` マクロで宣言し、C++ 側の `static_cast` でダウンキャストする
+  - Rust 側の生のポインタキャストを削除する
+  - `TransformableFrame` は `as_ptr` を `*const`、書き換え用の `as_mut_ptr` を `*mut` に分ける
+  - @melpon
+- [ADD] webrtc_c の refcounted ハンドルを const で扱えるようにする
+  - `WEBRTC_DECLARE_REFCOUNTED` / `WEBRTC_DEFINE_REFCOUNTED` に `CType_refcounted_get_const` を追加し、const な `CType_refcounted*` から `const struct CType*` を取得できるようにする
+  - Rust 側は const な refcounted ハンドル用に `ScopedRefConst` を追加し、`RTCStatsReport` をこれで保持する
+  - `ScopedRefConst::from_raw` / `RTCStatsReport::from_refcounted_ptr` は `NonNull` ではなく `ConstNonNull` を受け取る
+  - `RTCStatsReport` を受け取るコールバックから const を外すキャストが消える
+  - @melpon
+- [UPDATE] webrtc_c の `CType_AddRef` / `CType_Release` の引数を `const struct CType*` にする
+  - C++ 側の `AddRef()` / `Release()` が const メソッドであるため、C API 側の引数も const にする
+  - 呼び出し側は非 const のポインタをそのまま渡せるため変更は不要
+  - @melpon
+- [UPDATE] webrtc_c の C API の入力引数に残っていた const 漏れを修正する
+  - `webrtc_PeerConnectionInterface_CreateDataChannelOrError` / `webrtc_AudioCodecSpec_set_format` などの引数を `const struct ...*` にする
+  - C++ 側が書き換える、または保持して非 const メソッドを呼ぶ引数は非 const のままとする
+  - Rust 側の公開 API に変更はない
+  - @melpon
 - [UPDATE] webrtc_c の C API の const 性を libwebrtc の C++ シグネチャに合わせる
   - 読み取り専用の getter を `const struct ...* self` にし、引数の `const_cast` を全廃する
   - C++ 側が `const` 参照/ポインタで受ける引数を C API でも `const struct ...*` にする

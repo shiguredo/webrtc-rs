@@ -453,7 +453,7 @@ impl SignalingWhep {
         if let Some(pass) = body.credential {
             server.set_password(&pass);
         }
-        config.servers().push(&server);
+        config.servers_mut().push(&server);
         config.set_type(IceTransportsType::Relay);
         pc.set_configuration(&config)
             .map_err(|e| format!("set config failed: {e}"))?;

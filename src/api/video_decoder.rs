@@ -1,9 +1,10 @@
 use super::video_codec_common::{
     EncodedImageRef, SdpVideoFormat, SdpVideoFormatRef, VideoCodecStatus, VideoCodecType,
-    VideoFrameRef,
+    VideoFrameRefMut,
 };
+use crate::const_non_null::ConstNonNull;
 use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
-use crate::helper::non_null::expect_non_null;
+use crate::helper::non_null::{expect_non_null, expect_non_null_const};
 use crate::{CxxString, EnvironmentRef, Result, ffi};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -80,17 +81,16 @@ impl Drop for VideoDecoderDecoderInfo {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct VideoDecoderSettingsRef<'a> {
-    raw: NonNull<ffi::webrtc_VideoDecoder_Settings>,
+    raw: ConstNonNull<ffi::webrtc_VideoDecoder_Settings>,
     _marker: PhantomData<&'a ffi::webrtc_VideoDecoder_Settings>,
 }
 
 unsafe impl<'a> Send for VideoDecoderSettingsRef<'a> {}
 
 impl<'a> VideoDecoderSettingsRef<'a> {
-    /// # Safety
-    /// `raw` は有効な `webrtc_VideoDecoder_Settings` を指している必要があります。
-    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoDecoder_Settings>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_VideoDecoder_Settings>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -122,43 +122,17 @@ impl<'a> VideoDecoderSettingsRef<'a> {
         unsafe { ffi::webrtc_VideoDecoder_Settings_max_render_resolution_height(self.raw.as_ptr()) }
     }
 
-    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoDecoder_Settings {
+    pub(crate) fn as_ptr(&self) -> *const ffi::webrtc_VideoDecoder_Settings {
         self.raw.as_ptr()
     }
 }
 
-pub struct VideoDecoderDecodedImageCallbackRef<'a> {
-    raw: NonNull<ffi::webrtc_VideoDecoder_DecodedImageCallback>,
-    _marker: PhantomData<&'a ffi::webrtc_VideoDecoder_DecodedImageCallback>,
-}
-
-unsafe impl<'a> Send for VideoDecoderDecodedImageCallbackRef<'a> {}
-
-impl<'a> VideoDecoderDecodedImageCallbackRef<'a> {
-    /// # Safety
-    /// `raw` は有効な `webrtc_VideoDecoder_DecodedImageCallback` を指している必要があります。
-    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoDecoder_DecodedImageCallback>) -> Self {
-        Self {
-            raw,
-            _marker: PhantomData,
-        }
-    }
-
-    #[expect(dead_code)]
-    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoDecoder_DecodedImageCallback {
-        self.raw.as_ptr()
-    }
-
-    pub fn decoded(&self, decoded_image: VideoFrameRef<'_>) {
-        unsafe {
-            ffi::webrtc_VideoDecoder_DecodedImageCallback_Decoded(
-                self.raw.as_ptr(),
-                decoded_image.as_ptr(),
-            )
-        };
-    }
-}
-
+/// webrtc::VideoDecoder::DecodedImageCallback へのライフタイムを持たないポインタ。
+///
+/// [VideoDecoderHandler::register_decode_complete_callback] で渡され、ハンドラが自身の状態として
+/// 保持したあと、デコード完了時に [VideoDecoderDecodedImageCallbackPtr::decoded] を呼ぶ。
+/// C 側の callback がいつまで生存するかはハンドラの状態からは辿れないためライフタイムを持つ
+/// 借用型では保持できず、生存していることの保証を unsafe として呼び出し側に求めるこの型を使う。
 #[derive(Clone, Copy)]
 pub struct VideoDecoderDecodedImageCallbackPtr {
     raw: NonNull<ffi::webrtc_VideoDecoder_DecodedImageCallback>,
@@ -168,26 +142,20 @@ unsafe impl Send for VideoDecoderDecodedImageCallbackPtr {}
 
 impl VideoDecoderDecodedImageCallbackPtr {
     /// # Safety
-    /// `callback` が指すオブジェクトは有効であり続ける必要があります。
-    pub unsafe fn from_ref(callback: VideoDecoderDecodedImageCallbackRef<'_>) -> Self {
-        Self { raw: callback.raw }
-    }
-
-    /// # Safety
     /// `raw` は有効な `webrtc_VideoDecoder_DecodedImageCallback` を指し、
     /// 呼び出し時点でも破棄されていない必要があります。
-    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoDecoder_DecodedImageCallback>) -> Self {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_VideoDecoder_DecodedImageCallback>) -> Self {
         Self { raw }
     }
 
     /// # Safety
     /// `self` が保持するポインタは有効である必要があります。
     /// `register` の再呼び出しや `release` 後に使ってはいけません。
-    pub unsafe fn decoded(&self, decoded_image: VideoFrameRef<'_>) {
+    pub unsafe fn decoded(&self, decoded_image: VideoFrameRefMut<'_>) {
         unsafe {
             ffi::webrtc_VideoDecoder_DecodedImageCallback_Decoded(
                 self.raw.as_ptr(),
-                decoded_image.as_ptr(),
+                decoded_image.as_mut_ptr(),
             )
         };
     }
@@ -251,11 +219,8 @@ unsafe extern "C" fn video_decoder_configure(
         "video_decoder_configure: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut VideoDecoderHandlerState) };
-    // C 側では const ポインタで渡されるが、借用型 (VideoDecoderSettingsRef) は
-    // 現状 *mut を保持するため const を外している。
-    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
-    let settings = expect_non_null(settings.cast_mut(), "video_decoder_configure (settings)");
-    let settings = unsafe { VideoDecoderSettingsRef::from_raw(settings) };
+    let settings = expect_non_null_const(settings, "video_decoder_configure (settings)");
+    let settings = VideoDecoderSettingsRef::from_raw(settings);
     if state.handler.configure(settings) {
         1
     } else {
@@ -273,11 +238,8 @@ unsafe extern "C" fn video_decoder_decode(
         "video_decoder_decode: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut VideoDecoderHandlerState) };
-    // C 側では const ポインタで渡されるが、借用型 (EncodedImageRef) は
-    // 現状 *mut を保持するため const を外している。
-    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
-    let input_image = expect_non_null(input_image.cast_mut(), "video_decoder_decode (input_image)");
-    let input_image = unsafe { EncodedImageRef::from_raw(input_image) };
+    let input_image = expect_non_null_const(input_image, "video_decoder_decode (input_image)");
+    let input_image = EncodedImageRef::from_raw(input_image);
     state.handler.decode(input_image, render_time_ms).to_raw()
 }
 
@@ -290,8 +252,7 @@ unsafe extern "C" fn video_decoder_register_decode_complete_callback(
         "video_decoder_register_decode_complete_callback: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut VideoDecoderHandlerState) };
-    let callback = NonNull::new(callback)
-        .map(|callback| unsafe { VideoDecoderDecodedImageCallbackPtr::from_raw(callback) });
+    let callback = NonNull::new(callback).map(VideoDecoderDecodedImageCallbackPtr::from_raw);
     state
         .handler
         .register_decode_complete_callback(callback)
@@ -357,13 +318,10 @@ unsafe extern "C" fn video_decoder_factory_create(
         "video_decoder_factory_create: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut VideoDecoderFactoryHandlerState) };
-    // C 側では const ポインタで渡されるが、借用型 (EnvironmentRef / SdpVideoFormatRef) は
-    // 現状 *mut を保持するため const を外している。
-    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
-    let env = expect_non_null(env.cast_mut(), "video_decoder_factory_create (env)");
-    let format = expect_non_null(format.cast_mut(), "video_decoder_factory_create (format)");
-    let env = unsafe { EnvironmentRef::from_raw(env) };
-    let format = unsafe { SdpVideoFormatRef::from_raw(format) };
+    let env = expect_non_null_const(env, "video_decoder_factory_create (env)");
+    let format = expect_non_null_const(format, "video_decoder_factory_create (format)");
+    let env = EnvironmentRef::from_raw(env);
+    let format = SdpVideoFormatRef::from_raw(format);
     match state.handler.create(env, format) {
         Some(decoder) => decoder.into_raw(),
         None => std::ptr::null_mut(),
@@ -588,7 +546,7 @@ impl VideoDecoderFactory {
         for i in 0..size {
             let raw_format = unsafe { ffi::webrtc_SdpVideoFormat_vector_get(raw_vec.as_ptr(), i) };
             let raw_format = expect_non_null(raw_format, "webrtc_SdpVideoFormat_vector_get");
-            let format_ref = unsafe { SdpVideoFormatRef::from_raw(raw_format) };
+            let format_ref = SdpVideoFormatRef::from_raw(ConstNonNull::from(raw_format));
             formats.push(format_ref.to_owned());
         }
         unsafe { ffi::webrtc_SdpVideoFormat_vector_delete(raw_vec.as_ptr()) };

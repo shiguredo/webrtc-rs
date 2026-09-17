@@ -566,9 +566,8 @@ impl SignalingWhip {
         if let Some(encodings) = &self.config.send_encodings {
             init.set_send_encodings(encodings);
         }
-        let mut stream_ids = init.stream_ids();
         let stream_id = random_string(16);
-        stream_ids.push(&CxxString::from_str(&stream_id));
+        init.stream_ids_mut().push(&CxxString::from_str(&stream_id));
         let source = match &self.config.video_source {
             Some(s) => s.clone(),
             None => return Ok(()),
@@ -660,7 +659,7 @@ impl SignalingWhip {
         if let Some(pass) = body.credential {
             server.set_password(&pass);
         }
-        config.servers().push(&server);
+        config.servers_mut().push(&server);
         config.set_type(IceTransportsType::Relay);
         pc.set_configuration(&config)
             .map_err(|e| format!("set config failed: {e}"))?;
@@ -973,7 +972,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     av1.set_kind(MediaType::Video);
     av1.set_name("AV1");
     av1.set_clock_rate(Some(90_000));
-    let mut params = av1.parameters();
+    let mut params = av1.parameters_mut();
     params.set("level-idx", "5");
     params.set("profile", "0");
     params.set("tier", "0");

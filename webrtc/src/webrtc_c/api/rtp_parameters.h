@@ -21,6 +21,8 @@ WEBRTC_EXPORT void webrtc_RtpCodec_set_kind(struct webrtc_RtpCodec* self,
                                             int kind);
 WEBRTC_EXPORT struct std_string* webrtc_RtpCodec_get_name(
     struct webrtc_RtpCodec* self);
+WEBRTC_EXPORT const struct std_string* webrtc_RtpCodec_get_name_const(
+    const struct webrtc_RtpCodec* self);
 WEBRTC_EXPORT void webrtc_RtpCodec_set_name(struct webrtc_RtpCodec* self,
                                             const char* name,
                                             size_t name_len);
@@ -41,6 +43,8 @@ WEBRTC_EXPORT void webrtc_RtpCodec_set_num_channels(
     const int* value);
 WEBRTC_EXPORT struct std_map_string_string* webrtc_RtpCodec_get_parameters(
     struct webrtc_RtpCodec* self);
+WEBRTC_EXPORT const struct std_map_string_string*
+webrtc_RtpCodec_get_parameters_const(const struct webrtc_RtpCodec* self);
 
 // -------------------------
 // webrtc::RtpCodecCapability
@@ -48,6 +52,7 @@ WEBRTC_EXPORT struct std_map_string_string* webrtc_RtpCodec_get_parameters(
 
 WEBRTC_DECLARE_VECTOR(webrtc_RtpCodecCapability);
 WEBRTC_DECLARE_CAST(webrtc_RtpCodecCapability, webrtc_RtpCodec);
+WEBRTC_DECLARE_CAST_CONST(webrtc_RtpCodecCapability, webrtc_RtpCodec);
 WEBRTC_EXPORT struct webrtc_RtpCodecCapability* webrtc_RtpCodecCapability_new();
 WEBRTC_EXPORT void webrtc_RtpCodecCapability_delete(
     struct webrtc_RtpCodecCapability* self);
@@ -94,6 +99,9 @@ WEBRTC_EXPORT void webrtc_RtpEncodingParameters_set_rid(
     size_t rid_len);
 WEBRTC_EXPORT struct std_string* webrtc_RtpEncodingParameters_get_rid(
     struct webrtc_RtpEncodingParameters* self);
+WEBRTC_EXPORT const struct std_string*
+webrtc_RtpEncodingParameters_get_rid_const(
+    const struct webrtc_RtpEncodingParameters* self);
 
 WEBRTC_EXPORT void webrtc_RtpEncodingParameters_get_ssrc(
     const struct webrtc_RtpEncodingParameters* self,
@@ -165,6 +173,10 @@ WEBRTC_EXPORT void webrtc_RtpEncodingParameters_get_scalability_mode(
     struct webrtc_RtpEncodingParameters* self,
     int* out_has,
     struct std_string** out_value);
+WEBRTC_EXPORT void webrtc_RtpEncodingParameters_get_scalability_mode_const(
+    const struct webrtc_RtpEncodingParameters* self,
+    int* out_has,
+    const struct std_string** out_value);
 WEBRTC_EXPORT void webrtc_RtpEncodingParameters_set_scalability_mode(
     struct webrtc_RtpEncodingParameters* self,
     int has,
@@ -175,6 +187,10 @@ WEBRTC_EXPORT void webrtc_RtpEncodingParameters_get_codec(
     struct webrtc_RtpEncodingParameters* self,
     int* out_has,
     struct webrtc_RtpCodec** out_value);
+WEBRTC_EXPORT void webrtc_RtpEncodingParameters_get_codec_const(
+    const struct webrtc_RtpEncodingParameters* self,
+    int* out_has,
+    const struct webrtc_RtpCodec** out_value);
 WEBRTC_EXPORT void webrtc_RtpEncodingParameters_set_codec(
     struct webrtc_RtpEncodingParameters* self,
     int has,
@@ -250,7 +266,7 @@ WEBRTC_EXPORT struct webrtc_RtpEncodingParameters_vector*
 webrtc_RtpParameters_get_encodings(struct webrtc_RtpParameters* self);
 WEBRTC_EXPORT void webrtc_RtpParameters_set_encodings(
     struct webrtc_RtpParameters* self,
-    struct webrtc_RtpEncodingParameters_vector* encodings);
+    const struct webrtc_RtpEncodingParameters_vector* encodings);
 
 WEBRTC_EXPORT void webrtc_RtpParameters_get_degradation_preference(
     const struct webrtc_RtpParameters* self,

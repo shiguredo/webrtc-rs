@@ -12,8 +12,8 @@ pub struct RtcError {
 unsafe impl Send for RtcError {}
 
 impl RtcError {
-    // 生ポインタから生成する。null ポインタの場合はエラーを返す。
-    pub fn from_unique_ptr(raw: NonNull<ffi::webrtc_RTCError_unique>) -> Self {
+    // 生ポインタから生成する。所有権を受け取る。
+    pub(crate) fn from_unique_ptr(raw: NonNull<ffi::webrtc_RTCError_unique>) -> Self {
         Self { raw_unique: raw }
     }
 

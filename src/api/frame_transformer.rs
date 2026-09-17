@@ -3,7 +3,7 @@ use super::video_codec_specifics::{
     RTPVideoHeaderCodecSpecifics, RTPVideoHeaderH264, RTPVideoHeaderVP8, RTPVideoHeaderVP9,
 };
 use crate::helper::handler::{create_with_handler, destroy_handler};
-use crate::helper::non_null::expect_non_null;
+use crate::helper::non_null::{expect_non_null, expect_non_null_const};
 use crate::helper::optional::{
     get_optional_ptr, get_optional_scalar, get_optional_slice, set_optional_scalar,
     set_optional_slice,
@@ -309,7 +309,7 @@ unsafe extern "C" fn frame_transformer_on_destroy(user_data: *mut c_void) {
 ///
 /// エンコード済みフレームを [FrameTransformerHandler] で変換して
 /// libwebrtc へ返す。生成したフレーム変換は
-/// [RtpSender::set_frame_transformer] または [RtpReceiver::set_frame_transformer]
+/// [crate::RtpSender::set_frame_transformer] または [crate::RtpReceiver::set_frame_transformer]
 /// で適用する。
 ///
 /// 1 つの [FrameTransformer] は 1 エンドポイントにだけ設定すること。
@@ -381,7 +381,11 @@ impl TransformableFrame {
         Self { raw_unique }
     }
 
-    fn as_ptr(&self) -> *mut ffi::webrtc_TransformableFrameInterface {
+    fn as_ptr(&self) -> *const ffi::webrtc_TransformableFrameInterface {
+        unsafe { ffi::webrtc_TransformableFrameInterface_unique_get(self.raw_unique.as_ptr()) }
+    }
+
+    fn as_mut_ptr(&mut self) -> *mut ffi::webrtc_TransformableFrameInterface {
         unsafe { ffi::webrtc_TransformableFrameInterface_unique_get(self.raw_unique.as_ptr()) }
     }
 
@@ -413,7 +417,7 @@ impl TransformableFrame {
     pub fn set_data(&mut self, data: &[u8]) {
         unsafe {
             ffi::webrtc_TransformableFrameInterface_SetData(
-                self.as_ptr(),
+                self.as_mut_ptr(),
                 data.as_ptr(),
                 data.len(),
             )
@@ -433,7 +437,7 @@ impl TransformableFrame {
     /// ペイロードタイプを設定する。
     pub fn set_payload_type(&mut self, payload_type: u8) {
         unsafe {
-            ffi::webrtc_TransformableFrameInterface_SetPayloadType(self.as_ptr(), payload_type)
+            ffi::webrtc_TransformableFrameInterface_SetPayloadType(self.as_mut_ptr(), payload_type)
         };
     }
 
@@ -480,7 +484,7 @@ impl TransformableFrame {
     pub fn set_rtp_timestamp(&mut self, rtp_timestamp_with_offset: u32) {
         unsafe {
             ffi::webrtc_TransformableFrameInterface_SetRTPTimestamp(
-                self.as_ptr(),
+                self.as_mut_ptr(),
                 rtp_timestamp_with_offset,
             )
         };
@@ -540,7 +544,11 @@ impl TransformableFrame {
     /// `None` を指定するとキャプチャ時間を未設定にする。
     pub fn set_capture_time(&mut self, capture_time: Option<i64>) {
         set_optional_scalar(capture_time, |has, timestamp_us| unsafe {
-            ffi::webrtc_TransformableFrameInterface_SetCaptureTime(self.as_ptr(), has, timestamp_us)
+            ffi::webrtc_TransformableFrameInterface_SetCaptureTime(
+                self.as_mut_ptr(),
+                has,
+                timestamp_us,
+            )
         });
     }
 
@@ -575,8 +583,30 @@ pub struct TransformableVideoFrame {
 unsafe impl Send for TransformableVideoFrame {}
 
 impl TransformableVideoFrame {
-    fn as_video_ptr(&self) -> *mut ffi::webrtc_TransformableVideoFrameInterface {
-        self.base.as_ptr() as *mut ffi::webrtc_TransformableVideoFrameInterface
+    fn as_video_ptr(&self) -> *const ffi::webrtc_TransformableVideoFrameInterface {
+        let raw = unsafe {
+            ffi::webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface_const(
+                self.base.as_ptr(),
+            )
+        };
+        expect_non_null_const(
+            raw,
+            "webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface_const",
+        )
+        .as_ptr()
+    }
+
+    fn as_video_mut_ptr(&mut self) -> *mut ffi::webrtc_TransformableVideoFrameInterface {
+        let raw = unsafe {
+            ffi::webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface(
+                self.base.as_mut_ptr(),
+            )
+        };
+        expect_non_null(
+            raw,
+            "webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface",
+        )
+        .as_ptr()
     }
 
     /// 基底フレームへ戻す。
@@ -623,7 +653,7 @@ impl TransformableVideoFrame {
     pub fn set_metadata(&mut self, metadata: &VideoFrameMetadata) {
         unsafe {
             ffi::webrtc_TransformableVideoFrameInterface_SetMetadata(
-                self.as_video_ptr(),
+                self.as_video_mut_ptr(),
                 metadata.raw.as_ptr(),
             )
         };

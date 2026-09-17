@@ -82,8 +82,8 @@ WEBRTC_EXPORT void webrtc_uint32_vector_push_back_value(
 
 extern "C" {
 struct std_map_string_string_iter {
-  std::map<std::string, std::string>* map;
-  std::map<std::string, std::string>::iterator it;
+  const std::map<std::string, std::string>* map;
+  std::map<std::string, std::string>::const_iterator it;
   bool started;
 };
 
@@ -101,11 +101,11 @@ WEBRTC_EXPORT int std_map_string_string_size(
   return static_cast<int>(map->size());
 }
 WEBRTC_EXPORT struct std_map_string_string_iter* std_map_string_string_iter_new(
-    struct std_map_string_string* map) {
+    const struct std_map_string_string* map) {
   if (map == nullptr) {
     return nullptr;
   }
-  auto m = reinterpret_cast<std::map<std::string, std::string>*>(map);
+  auto m = reinterpret_cast<const std::map<std::string, std::string>*>(map);
   auto iter = new std_map_string_string_iter{m, {}, false};
   return reinterpret_cast<struct std_map_string_string_iter*>(iter);
 }

@@ -1,6 +1,6 @@
 use super::video_codec_common::{VideoFrame, VideoFrameRef};
 use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
-use crate::helper::non_null::expect_non_null;
+use crate::helper::non_null::{expect_non_null, expect_non_null_const};
 use crate::helper::ref_count::{
     AdaptedVideoTrackSourceHandle, MediaStreamTrackHandle, VideoTrackHandle, VideoTrackSourceHandle,
 };
@@ -20,8 +20,8 @@ unsafe extern "C" fn video_sink_on_frame(
     user_data: *mut c_void,
 ) {
     let state = unsafe { &mut *(user_data as *mut VideoSinkHandlerState) };
-    let frame = expect_non_null(frame as *mut ffi::webrtc_VideoFrame, "VideoFrame");
-    let frame = unsafe { VideoFrameRef::from_raw(frame) };
+    let frame = expect_non_null_const(frame, "VideoFrame");
+    let frame = VideoFrameRef::from_raw(frame);
     state.handler.on_frame(frame);
 }
 

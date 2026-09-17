@@ -157,10 +157,24 @@ WEBRTC_EXPORT struct std_string* webrtc_SdpVideoFormat_get_name(
   return reinterpret_cast<struct std_string*>(&fmt->name);
 }
 
+WEBRTC_EXPORT const struct std_string* webrtc_SdpVideoFormat_get_name_const(
+    const struct webrtc_SdpVideoFormat* self) {
+  auto fmt = reinterpret_cast<const webrtc::SdpVideoFormat*>(self);
+  return reinterpret_cast<const struct std_string*>(&fmt->name);
+}
+
 WEBRTC_EXPORT struct std_map_string_string*
 webrtc_SdpVideoFormat_get_parameters(struct webrtc_SdpVideoFormat* self) {
   auto fmt = reinterpret_cast<webrtc::SdpVideoFormat*>(self);
   return reinterpret_cast<struct std_map_string_string*>(&fmt->parameters);
+}
+
+WEBRTC_EXPORT const struct std_map_string_string*
+webrtc_SdpVideoFormat_get_parameters_const(
+    const struct webrtc_SdpVideoFormat* self) {
+  auto fmt = reinterpret_cast<const webrtc::SdpVideoFormat*>(self);
+  return reinterpret_cast<const struct std_map_string_string*>(
+      &fmt->parameters);
 }
 
 WEBRTC_EXPORT size_t webrtc_SdpVideoFormat_get_scalability_modes_size(

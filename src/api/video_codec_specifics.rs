@@ -1,3 +1,4 @@
+use crate::const_non_null::ConstNonNull;
 use crate::ffi;
 use crate::helper::non_null::expect_non_null;
 use std::marker::PhantomData;
@@ -892,17 +893,16 @@ impl Drop for NaluInfo {
 }
 
 /// webrtc::NaluInfo の借用ラッパー。
+#[derive(Clone, Copy)]
 pub struct NaluInfoRef<'a> {
-    raw: NonNull<ffi::webrtc_NaluInfo>,
+    raw: ConstNonNull<ffi::webrtc_NaluInfo>,
     _marker: PhantomData<&'a ffi::webrtc_NaluInfo>,
 }
 
 unsafe impl<'a> Send for NaluInfoRef<'a> {}
 
 impl<'a> NaluInfoRef<'a> {
-    /// # Safety
-    /// `raw` は有効な `webrtc_NaluInfo` を指し、この参照の利用中は破棄されない必要があります。
-    pub(crate) unsafe fn from_raw(raw: NonNull<ffi::webrtc_NaluInfo>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_NaluInfo>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -932,7 +932,7 @@ impl std::fmt::Debug for NaluInfoRef<'_> {
     }
 }
 
-/// std::vector<webrtc::NaluInfo> の所有ラッパー。
+/// `std::vector<webrtc::NaluInfo>` の所有ラッパー。
 pub struct NaluInfoVector {
     raw: NonNull<ffi::webrtc_NaluInfo_vector>,
 }
@@ -964,7 +964,7 @@ impl NaluInfoVector {
         }
         let raw = unsafe { ffi::webrtc_NaluInfo_vector_get(self.raw.as_ptr(), index as i32) };
         let raw = NonNull::new(raw)?;
-        Some(unsafe { NaluInfoRef::from_raw(raw) })
+        Some(NaluInfoRef::from_raw(ConstNonNull::from(raw)))
     }
 
     pub fn push(&mut self, value: &NaluInfo) {

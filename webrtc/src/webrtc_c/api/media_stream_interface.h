@@ -57,7 +57,7 @@ WEBRTC_DECLARE_CAST_REFCOUNTED(webrtc_VideoTrackInterface,
 WEBRTC_EXPORT void webrtc_VideoTrackInterface_AddOrUpdateSink(
     struct webrtc_VideoTrackInterface* self,
     struct webrtc_VideoSinkInterface* sink,
-    struct webrtc_VideoSinkWants* wants);
+    const struct webrtc_VideoSinkWants* wants);
 WEBRTC_EXPORT void webrtc_VideoTrackInterface_RemoveSink(
     struct webrtc_VideoTrackInterface* self,
     struct webrtc_VideoSinkInterface* sink);

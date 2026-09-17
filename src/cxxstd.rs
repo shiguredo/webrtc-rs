@@ -1,5 +1,6 @@
+use crate::const_non_null::ConstNonNull;
 use crate::ffi;
-use crate::helper::non_null::expect_non_null;
+use crate::helper::non_null::{expect_non_null, expect_non_null_const};
 use crate::{Error, Result};
 use std::marker::PhantomData;
 use std::ptr::NonNull;
@@ -59,7 +60,7 @@ impl CxxString {
     /// 末尾に追記する。
     /// s に null バイトが含まれていてもエラーにしない。
     pub fn append(&mut self, s: &str) {
-        self.as_ref().append(s);
+        self.as_mut().append(s);
     }
 
     /// FFI に渡す生ポインタ。
@@ -68,7 +69,11 @@ impl CxxString {
     }
 
     pub fn as_ref(&self) -> CxxStringRef<'_> {
-        CxxStringRef::from_ptr(self.raw_string())
+        CxxStringRef::from_ptr(ConstNonNull::from(self.raw_string()))
+    }
+
+    pub fn as_mut(&mut self) -> CxxStringRefMut<'_> {
+        CxxStringRefMut::from_raw(self.raw_string())
     }
 
     /// FFI へ所有権を移譲する。
@@ -94,15 +99,16 @@ impl Drop for CxxString {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct CxxStringRef<'a> {
-    raw: NonNull<ffi::std_string>,
+    raw: ConstNonNull<ffi::std_string>,
     _marker: PhantomData<&'a ffi::std_string>,
 }
 
 unsafe impl<'a> Send for CxxStringRef<'a> {}
 
 impl<'a> CxxStringRef<'a> {
-    pub fn from_ptr(raw: NonNull<ffi::std_string>) -> Self {
+    pub(crate) fn from_ptr(raw: ConstNonNull<ffi::std_string>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -137,21 +143,52 @@ impl<'a> CxxStringRef<'a> {
         unsafe { slice::from_raw_parts(ptr, len) }.to_vec()
     }
 
-    /// 末尾に追記する。
-    /// s に null バイトが含まれていてもエラーにしない。
-    pub fn append(&mut self, s: &str) {
-        unsafe {
-            ffi::std_string_append(self.as_ptr(), s.as_ptr() as *const _, s.len());
-        }
-    }
-
     /// FFI に渡す生ポインタ。
-    pub fn as_ptr(&self) -> *mut ffi::std_string {
+    pub fn as_ptr(&self) -> *const ffi::std_string {
         self.raw.as_ptr()
     }
 }
 
-/// std::vector<std::string> の安全ラッパー。
+/// std_string の可変借用ラッパー。
+pub struct CxxStringRefMut<'a> {
+    raw: NonNull<ffi::std_string>,
+    _marker: PhantomData<&'a mut ffi::std_string>,
+    cref: CxxStringRef<'a>,
+}
+
+unsafe impl<'a> Send for CxxStringRefMut<'a> {}
+
+impl<'a> CxxStringRefMut<'a> {
+    pub(crate) fn from_raw(raw: NonNull<ffi::std_string>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+            cref: CxxStringRef::from_ptr(ConstNonNull::from(raw)),
+        }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut ffi::std_string {
+        self.raw.as_ptr()
+    }
+
+    /// 末尾に追記する。
+    /// s に null バイトが含まれていてもエラーにしない。
+    pub fn append(&mut self, s: &str) {
+        unsafe {
+            ffi::std_string_append(self.as_mut_ptr(), s.as_ptr() as *const _, s.len());
+        }
+    }
+}
+
+impl<'a> std::ops::Deref for CxxStringRefMut<'a> {
+    type Target = CxxStringRef<'a>;
+
+    fn deref(&self) -> &CxxStringRef<'a> {
+        &self.cref
+    }
+}
+
+/// `std::vector<std::string>` の安全ラッパー。
 pub struct StringVector {
     raw: NonNull<ffi::std_string_vector>,
 }
@@ -179,7 +216,7 @@ impl StringVector {
 
     /// 末尾に要素を追加する。
     pub fn push(&mut self, value: &CxxString) {
-        self.as_ref().push(value);
+        self.as_mut().push(value);
     }
 
     pub fn as_ptr(&self) -> *mut ffi::std_string_vector {
@@ -197,7 +234,11 @@ impl StringVector {
     }
 
     pub fn as_ref(&self) -> StringVectorRef<'_> {
-        StringVectorRef::from_raw(self.raw)
+        StringVectorRef::from_raw(ConstNonNull::from(self.raw))
+    }
+
+    pub fn as_mut(&mut self) -> StringVectorRefMut<'_> {
+        StringVectorRefMut::from_raw(self.raw)
     }
 }
 
@@ -207,16 +248,17 @@ impl Drop for StringVector {
     }
 }
 
-/// std::vector<std::string> への借用ラッパー。
+/// `std::vector<std::string>` への借用ラッパー。
+#[derive(Clone, Copy)]
 pub struct StringVectorRef<'a> {
-    raw: NonNull<ffi::std_string_vector>,
+    raw: ConstNonNull<ffi::std_string_vector>,
     _marker: PhantomData<&'a ()>,
 }
 
 unsafe impl<'a> Send for StringVectorRef<'a> {}
 
 impl<'a> StringVectorRef<'a> {
-    pub fn from_raw(raw: NonNull<ffi::std_string_vector>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::std_string_vector>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -232,38 +274,72 @@ impl<'a> StringVectorRef<'a> {
         self.len() == 0
     }
 
-    pub fn push(&mut self, value: &CxxString) {
-        unsafe { ffi::std_string_vector_push_back(self.raw.as_ptr(), value.as_ptr()) };
-    }
-
     pub fn get(&self, index: usize) -> Result<String> {
         let len = self.len();
         if index >= len {
             return Err(Error::OutOfIndex(index));
         }
-        let ptr = unsafe { ffi::std_string_vector_get(self.raw.as_ptr(), index as i32) };
-        CxxStringRef::from_ptr(expect_non_null(ptr, "std_string_vector_get")).to_string()
+        let ptr = unsafe { ffi::std_string_vector_get_const(self.raw.as_ptr(), index as i32) };
+        CxxStringRef::from_ptr(expect_non_null_const(ptr, "std_string_vector_get_const"))
+            .to_string()
+    }
+}
+
+/// `std::vector<std::string>` への可変借用ラッパー。
+pub struct StringVectorRefMut<'a> {
+    raw: NonNull<ffi::std_string_vector>,
+    _marker: PhantomData<&'a mut ffi::std_string_vector>,
+    cref: StringVectorRef<'a>,
+}
+
+unsafe impl<'a> Send for StringVectorRefMut<'a> {}
+
+impl<'a> StringVectorRefMut<'a> {
+    pub(crate) fn from_raw(raw: NonNull<ffi::std_string_vector>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+            cref: StringVectorRef::from_raw(ConstNonNull::from(raw)),
+        }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut ffi::std_string_vector {
+        self.raw.as_ptr()
+    }
+
+    pub fn push(&mut self, value: &CxxString) {
+        unsafe { ffi::std_string_vector_push_back(self.raw.as_ptr(), value.as_ptr()) };
+    }
+}
+
+impl<'a> std::ops::Deref for StringVectorRefMut<'a> {
+    type Target = StringVectorRef<'a>;
+
+    fn deref(&self) -> &StringVectorRef<'a> {
+        &self.cref
     }
 }
 
 /// std::map<std::string, std::string> の借用ラッパー。
-pub struct MapStringString<'a> {
-    raw: NonNull<ffi::std_map_string_string>,
-    _marker: PhantomData<&'a mut ffi::std_map_string_string>,
+#[derive(Clone, Copy)]
+pub struct MapStringStringRef<'a> {
+    raw: ConstNonNull<ffi::std_map_string_string>,
+    _marker: PhantomData<&'a ffi::std_map_string_string>,
 }
 
-unsafe impl<'a> Send for MapStringString<'a> {}
+unsafe impl<'a> Send for MapStringStringRef<'a> {}
 
-impl<'a> MapStringString<'a> {
+impl<'a> MapStringStringRef<'a> {
     /// C 側のポインタから生成する。
-    pub fn from_raw(raw: NonNull<ffi::std_map_string_string>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::std_map_string_string>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
         }
     }
 
-    pub(crate) fn raw(&self) -> *mut ffi::std_map_string_string {
+    /// FFI に渡す生ポインタ。
+    pub(crate) fn as_ptr(&self) -> *const ffi::std_map_string_string {
         self.raw.as_ptr()
     }
 
@@ -278,20 +354,6 @@ impl<'a> MapStringString<'a> {
         self.len() == 0
     }
 
-    /// キーと値を設定する。
-    /// null バイトを含んでいてもエラーにしない。
-    pub fn set(&mut self, key: &str, value: &str) {
-        unsafe {
-            ffi::std_map_string_string_set(
-                self.raw.as_ptr(),
-                key.as_ptr() as *const _,
-                key.len(),
-                value.as_ptr() as *const _,
-                value.len(),
-            );
-        }
-    }
-
     /// イテレータを生成する。
     pub fn iter(&self) -> MapStringStringIter<'_> {
         let iter = unsafe { ffi::std_map_string_string_iter_new(self.raw.as_ptr()) };
@@ -303,7 +365,55 @@ impl<'a> MapStringString<'a> {
     }
 }
 
-/// MapStringString のイテレータ。
+/// std::map<std::string, std::string> の可変借用ラッパー。
+pub struct MapStringStringRefMut<'a> {
+    raw: NonNull<ffi::std_map_string_string>,
+    _marker: PhantomData<&'a mut ffi::std_map_string_string>,
+    cref: MapStringStringRef<'a>,
+}
+
+unsafe impl<'a> Send for MapStringStringRefMut<'a> {}
+
+impl<'a> MapStringStringRefMut<'a> {
+    /// C 側のポインタから生成する。
+    ///
+    pub(crate) fn from_raw(raw: NonNull<ffi::std_map_string_string>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+            cref: MapStringStringRef::from_raw(ConstNonNull::from(raw)),
+        }
+    }
+
+    /// FFI に渡す生ポインタ。
+    pub(crate) fn as_mut_ptr(&self) -> *mut ffi::std_map_string_string {
+        self.raw.as_ptr()
+    }
+
+    /// キーと値を設定する。
+    /// null バイトを含んでいてもエラーにしない。
+    pub fn set(&mut self, key: &str, value: &str) {
+        unsafe {
+            ffi::std_map_string_string_set(
+                self.as_mut_ptr(),
+                key.as_ptr() as *const _,
+                key.len(),
+                value.as_ptr() as *const _,
+                value.len(),
+            );
+        }
+    }
+}
+
+impl<'a> std::ops::Deref for MapStringStringRefMut<'a> {
+    type Target = MapStringStringRef<'a>;
+
+    fn deref(&self) -> &MapStringStringRef<'a> {
+        &self.cref
+    }
+}
+
+/// MapStringStringRef のイテレータ。
 pub struct MapStringStringIter<'a> {
     raw: NonNull<ffi::std_map_string_string_iter>,
     _marker: PhantomData<&'a ffi::std_map_string_string>,
