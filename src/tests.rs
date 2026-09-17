@@ -1,4 +1,5 @@
 use super::*;
+use std::cell::Cell;
 use std::ptr::NonNull;
 use std::sync::{
     Arc, Mutex,
@@ -1553,15 +1554,15 @@ fn audio_device_module_recording_device_name_roundtrip() {
     }
 
     impl AudioDeviceModuleHandler for TestAudioDeviceModuleHandler {
-        fn init(&self) -> i32 {
+        fn init(&mut self) -> i32 {
             0
         }
 
-        fn recording_devices(&self) -> i16 {
+        fn recording_devices(&mut self) -> i16 {
             1
         }
 
-        fn recording_device_name(&self, index: u16) -> Option<(String, String)> {
+        fn recording_device_name(&mut self, index: u16) -> Option<(String, String)> {
             if index == 0 {
                 Some((self.name.clone(), self.guid.clone()))
             } else {
@@ -1592,6 +1593,31 @@ fn audio_device_module_recording_device_name_roundtrip() {
         assert_eq!(got_name, expected_name);
         assert_eq!(got_guid, expected_guid);
     }
+}
+
+#[test]
+fn audio_device_module_handler_requires_only_send() {
+    // AudioDeviceModuleHandler は Send だけを要求し、各メソッドは &mut self を取る。
+    // Cell<i32> は Send だが Sync ではないため、Sync を要求していたらこの実装は
+    // コンパイルできない。これにより bound が Send だけであることを型で確認する。
+    struct NotSyncHandler {
+        count: Cell<i32>,
+    }
+
+    impl AudioDeviceModuleHandler for NotSyncHandler {
+        // &mut self で呼ばれるため、ハンドラは状態を直接更新できる。
+        fn recording_devices(&mut self) -> i16 {
+            self.count.set(self.count.get() + 1);
+            self.count.get() as i16
+        }
+    }
+
+    let adm = AudioDeviceModule::new_with_handler(Box::new(NotSyncHandler {
+        count: Cell::new(0),
+    }));
+    // 呼び出しごとに trampoline が &mut self でハンドラを呼ぶため、状態が保持される。
+    assert_eq!(adm.recording_devices(), 1);
+    assert_eq!(adm.recording_devices(), 2);
 }
 
 #[test]
@@ -1649,7 +1675,7 @@ fn audio_device_module_get_stats_returns_unique() {
     struct TestAudioDeviceModuleGetStatsHandler;
 
     impl AudioDeviceModuleHandler for TestAudioDeviceModuleGetStatsHandler {
-        fn get_stats(&self) -> Option<AudioDeviceModuleStats> {
+        fn get_stats(&mut self) -> Option<AudioDeviceModuleStats> {
             Some(AudioDeviceModuleStats::new(1.0, 2, 3.0, 4.0, 5))
         }
     }

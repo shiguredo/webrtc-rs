@@ -762,229 +762,233 @@ impl Drop for AudioDeviceModuleStats {
     }
 }
 
-pub trait AudioDeviceModuleHandler: Send + Sync {
-    fn active_audio_layer(&self, audio_layer: &mut i32) -> i32 {
+/// Rust 側で実装を差し替えられる webrtc::AudioDeviceModule。
+///
+/// このトレイトを実装したオブジェクトを [AudioDeviceModule::new_with_handler] に渡して利用する。
+/// ADM を `PeerConnectionFactory` に渡した後は、同じ ADM のメソッドを別スレッドから呼ばないこと。
+pub trait AudioDeviceModuleHandler: Send {
+    fn active_audio_layer(&mut self, audio_layer: &mut i32) -> i32 {
         *audio_layer = 0;
         0
     }
     #[expect(unused_variables)]
-    fn register_audio_callback(&self, audio_transport: Option<AudioTransportRef>) -> i32 {
+    fn register_audio_callback(&mut self, audio_transport: Option<AudioTransportRef>) -> i32 {
         0
     }
-    fn init(&self) -> i32 {
+    fn init(&mut self) -> i32 {
         0
     }
-    fn terminate(&self) -> i32 {
+    fn terminate(&mut self) -> i32 {
         0
     }
-    fn initialized(&self) -> bool {
+    fn initialized(&mut self) -> bool {
         false
     }
-    fn playout_devices(&self) -> i16 {
+    fn playout_devices(&mut self) -> i16 {
         0
     }
-    fn recording_devices(&self) -> i16 {
+    fn recording_devices(&mut self) -> i16 {
         0
     }
     #[expect(unused_variables)]
-    fn playout_device_name(&self, index: u16) -> Option<(String, String)> {
+    fn playout_device_name(&mut self, index: u16) -> Option<(String, String)> {
         Some((String::new(), String::new()))
     }
     #[expect(unused_variables)]
-    fn recording_device_name(&self, index: u16) -> Option<(String, String)> {
+    fn recording_device_name(&mut self, index: u16) -> Option<(String, String)> {
         Some((String::new(), String::new()))
     }
     #[expect(unused_variables)]
-    fn set_playout_device(&self, index: u16) -> i32 {
+    fn set_playout_device(&mut self, index: u16) -> i32 {
         0
     }
     #[expect(unused_variables)]
-    fn set_playout_device_with_windows_device_type(&self, device: i32) -> i32 {
+    fn set_playout_device_with_windows_device_type(&mut self, device: i32) -> i32 {
         0
     }
     #[expect(unused_variables)]
-    fn set_recording_device(&self, index: u16) -> i32 {
+    fn set_recording_device(&mut self, index: u16) -> i32 {
         0
     }
     #[expect(unused_variables)]
-    fn set_recording_device_with_windows_device_type(&self, device: i32) -> i32 {
+    fn set_recording_device_with_windows_device_type(&mut self, device: i32) -> i32 {
         0
     }
-    fn playout_is_available(&self, available: &mut bool) -> i32 {
+    fn playout_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
-    fn init_playout(&self) -> i32 {
+    fn init_playout(&mut self) -> i32 {
         0
     }
-    fn playout_is_initialized(&self) -> bool {
+    fn playout_is_initialized(&mut self) -> bool {
         true
     }
-    fn recording_is_available(&self, available: &mut bool) -> i32 {
+    fn recording_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
-    fn init_recording(&self) -> i32 {
+    fn init_recording(&mut self) -> i32 {
         0
     }
-    fn recording_is_initialized(&self) -> bool {
+    fn recording_is_initialized(&mut self) -> bool {
         true
     }
-    fn start_playout(&self) -> i32 {
+    fn start_playout(&mut self) -> i32 {
         0
     }
-    fn stop_playout(&self) -> i32 {
+    fn stop_playout(&mut self) -> i32 {
         0
     }
-    fn playing(&self) -> bool {
+    fn playing(&mut self) -> bool {
         false
     }
-    fn start_recording(&self) -> i32 {
+    fn start_recording(&mut self) -> i32 {
         0
     }
-    fn stop_recording(&self) -> i32 {
+    fn stop_recording(&mut self) -> i32 {
         0
     }
-    fn recording(&self) -> bool {
+    fn recording(&mut self) -> bool {
         false
     }
-    fn init_speaker(&self) -> i32 {
+    fn init_speaker(&mut self) -> i32 {
         0
     }
-    fn speaker_is_initialized(&self) -> bool {
+    fn speaker_is_initialized(&mut self) -> bool {
         true
     }
-    fn init_microphone(&self) -> i32 {
+    fn init_microphone(&mut self) -> i32 {
         0
     }
-    fn microphone_is_initialized(&self) -> bool {
+    fn microphone_is_initialized(&mut self) -> bool {
         true
     }
-    fn speaker_volume_is_available(&self, available: &mut bool) -> i32 {
+    fn speaker_volume_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
     #[expect(unused_variables)]
-    fn set_speaker_volume(&self, volume: u32) -> i32 {
+    fn set_speaker_volume(&mut self, volume: u32) -> i32 {
         0
     }
-    fn speaker_volume(&self, volume: &mut u32) -> i32 {
+    fn speaker_volume(&mut self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn max_speaker_volume(&self, volume: &mut u32) -> i32 {
+    fn max_speaker_volume(&mut self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn min_speaker_volume(&self, volume: &mut u32) -> i32 {
+    fn min_speaker_volume(&mut self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn microphone_volume_is_available(&self, available: &mut bool) -> i32 {
+    fn microphone_volume_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
     #[expect(unused_variables)]
-    fn set_microphone_volume(&self, volume: u32) -> i32 {
+    fn set_microphone_volume(&mut self, volume: u32) -> i32 {
         0
     }
-    fn microphone_volume(&self, volume: &mut u32) -> i32 {
+    fn microphone_volume(&mut self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn max_microphone_volume(&self, volume: &mut u32) -> i32 {
+    fn max_microphone_volume(&mut self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn min_microphone_volume(&self, volume: &mut u32) -> i32 {
+    fn min_microphone_volume(&mut self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn speaker_mute_is_available(&self, available: &mut bool) -> i32 {
+    fn speaker_mute_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
     #[expect(unused_variables)]
-    fn set_speaker_mute(&self, enable: bool) -> i32 {
+    fn set_speaker_mute(&mut self, enable: bool) -> i32 {
         0
     }
-    fn speaker_mute(&self, enabled: &mut bool) -> i32 {
+    fn speaker_mute(&mut self, enabled: &mut bool) -> i32 {
         *enabled = false;
         0
     }
-    fn microphone_mute_is_available(&self, available: &mut bool) -> i32 {
+    fn microphone_mute_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
     #[expect(unused_variables)]
-    fn set_microphone_mute(&self, enable: bool) -> i32 {
+    fn set_microphone_mute(&mut self, enable: bool) -> i32 {
         0
     }
-    fn microphone_mute(&self, enabled: &mut bool) -> i32 {
+    fn microphone_mute(&mut self, enabled: &mut bool) -> i32 {
         *enabled = false;
         0
     }
-    fn stereo_playout_is_available(&self, available: &mut bool) -> i32 {
+    fn stereo_playout_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
     #[expect(unused_variables)]
-    fn set_stereo_playout(&self, enable: bool) -> i32 {
+    fn set_stereo_playout(&mut self, enable: bool) -> i32 {
         0
     }
-    fn stereo_playout(&self, enabled: &mut bool) -> i32 {
+    fn stereo_playout(&mut self, enabled: &mut bool) -> i32 {
         *enabled = false;
         0
     }
-    fn stereo_recording_is_available(&self, available: &mut bool) -> i32 {
+    fn stereo_recording_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
     #[expect(unused_variables)]
-    fn set_stereo_recording(&self, enable: bool) -> i32 {
+    fn set_stereo_recording(&mut self, enable: bool) -> i32 {
         0
     }
-    fn stereo_recording(&self, enabled: &mut bool) -> i32 {
+    fn stereo_recording(&mut self, enabled: &mut bool) -> i32 {
         *enabled = false;
         0
     }
-    fn playout_delay(&self, delay_ms: &mut u16) -> i32 {
+    fn playout_delay(&mut self, delay_ms: &mut u16) -> i32 {
         *delay_ms = 0;
         0
     }
-    fn built_in_aec_is_available(&self) -> bool {
+    fn built_in_aec_is_available(&mut self) -> bool {
         false
     }
-    fn built_in_agc_is_available(&self) -> bool {
+    fn built_in_agc_is_available(&mut self) -> bool {
         false
     }
-    fn built_in_ns_is_available(&self) -> bool {
+    fn built_in_ns_is_available(&mut self) -> bool {
         false
     }
     #[expect(unused_variables)]
-    fn enable_built_in_aec(&self, enable: bool) -> i32 {
+    fn enable_built_in_aec(&mut self, enable: bool) -> i32 {
         -1
     }
     #[expect(unused_variables)]
-    fn enable_built_in_agc(&self, enable: bool) -> i32 {
+    fn enable_built_in_agc(&mut self, enable: bool) -> i32 {
         -1
     }
     #[expect(unused_variables)]
-    fn enable_built_in_ns(&self, enable: bool) -> i32 {
+    fn enable_built_in_ns(&mut self, enable: bool) -> i32 {
         -1
     }
-    fn get_playout_underrun_count(&self) -> i32 {
+    fn get_playout_underrun_count(&mut self) -> i32 {
         -1
     }
-    fn get_playout_audio_parameters(&self, params: &mut Option<AudioParameters>) -> i32 {
+    fn get_playout_audio_parameters(&mut self, params: &mut Option<AudioParameters>) -> i32 {
         *params = None;
         -1
     }
-    fn get_record_audio_parameters(&self, params: &mut Option<AudioParameters>) -> i32 {
+    fn get_record_audio_parameters(&mut self, params: &mut Option<AudioParameters>) -> i32 {
         *params = None;
         -1
     }
-    fn get_stats(&self) -> Option<AudioDeviceModuleStats> {
+    fn get_stats(&mut self) -> Option<AudioDeviceModuleStats> {
         None
     }
 }
@@ -1011,8 +1015,17 @@ fn write_c_string(dest: &mut [c_char], value: &str) {
     }
 }
 
-unsafe fn adm_state(user_data: *mut c_void) -> &'static AudioDeviceModuleHandlerState {
-    unsafe { &*(user_data as *const AudioDeviceModuleHandlerState) }
+/// `user_data` が指す ADM ハンドラの状態を返す。
+///
+/// ADM の各 trampoline が先頭で呼び出し、ハンドラのメソッドを実行するために使う。
+///
+/// # Safety
+///
+/// `user_data` は `Box::into_raw` で変換した `Box<AudioDeviceModuleHandlerState>` の
+/// 生ポインタであり有効なメモリを指していること。同じ状態を同時に借用する
+/// 別の trampoline が動いていないこと。
+unsafe fn adm_state(user_data: *mut c_void) -> &'static mut AudioDeviceModuleHandlerState {
+    unsafe { &mut *(user_data as *mut AudioDeviceModuleHandlerState) }
 }
 
 fn write_i32(out: *mut i32, value: i32) {
