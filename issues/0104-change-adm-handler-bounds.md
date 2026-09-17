@@ -1,7 +1,7 @@
 # AudioDeviceModuleHandler の Send + Sync 要求を見直す
 
 - Created: 2026-09-17
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-09-18
 - Branch: feature/change-adm-handler-bounds
 - Polished: {YYYY-MM-DD}
 
@@ -107,4 +107,9 @@
 
 ## 解決方法
 
-{実装時に記入する}
+- `AudioDeviceModuleHandler` の要求を `Send + Sync` から `Send` に変更し、全 62 メソッドの `&self` を `&mut self` にした
+- ADM の trampoline を `&mut` ベースに変更した。`adm_state` が `user_data` から `&mut AudioDeviceModuleHandlerState` を返し、各 trampoline がハンドラの `&mut self` メソッドを呼ぶ
+- `src/tests.rs` に `audio_device_module_handler_requires_only_send` を追加した。`Cell<i32>` を持つ `!Sync` なハンドラを実装できることで `Sync` が要求されていないことを型で確認し、呼び出しごとに `&mut self` で状態が保持されることを確認する
+- 利用側が `PeerConnectionFactory` に渡した後に同じ ADM を別スレッドから呼ぶと libwebrtc の呼び出しと同時になり得る点を、ハンドラの doc コメントに禁止事項として記載した。これは libwebrtc の ADM が持つ単一スレッド契約と同じ制約で型では防げないため、`Mutex` による排他や `unsafe` 化はしない
+- `CHANGES.md` の `## develop` に `[CHANGE]` エントリを追加した
+- `cargo fmt --all -- --check`、`cargo clippy --workspace --features source-build -- -D warnings`、`cargo test --workspace --features source-build` の成功を確認した
