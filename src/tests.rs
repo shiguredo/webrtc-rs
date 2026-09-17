@@ -1795,6 +1795,31 @@ fn rtc_configuration_and_ice_server() {
 }
 
 #[test]
+fn rtc_configuration_cpu_adaptation_round_trip() {
+    let mut config = PeerConnectionRtcConfiguration::new();
+
+    // 既定値は libwebrtc の既定値 (有効) がそのまま見えることを確認する。
+    assert!(
+        config.cpu_adaptation(),
+        "生成直後の cpu_adaptation が true ではありません"
+    );
+
+    // 無効にすると false が見えることを確認する。
+    config.set_cpu_adaptation(false);
+    assert!(
+        !config.cpu_adaptation(),
+        "set_cpu_adaptation(false) 後の cpu_adaptation が false ではありません"
+    );
+
+    // 有効に戻すと true に戻ることを確認する。
+    config.set_cpu_adaptation(true);
+    assert!(
+        config.cpu_adaptation(),
+        "set_cpu_adaptation(true) 後の cpu_adaptation が true ではありません"
+    );
+}
+
+#[test]
 fn tls_cert_policy_round_trip() {
     assert_eq!(
         TlsCertPolicy::from_int(TlsCertPolicy::Secure.to_int()),

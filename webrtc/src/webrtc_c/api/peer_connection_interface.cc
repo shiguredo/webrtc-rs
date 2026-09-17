@@ -390,6 +390,22 @@ webrtc_PeerConnectionInterface_RTCConfiguration_set_always_negotiate_data_channe
           self);
   config->always_negotiate_data_channels = always_negotiate_data_channels != 0;
 }
+WEBRTC_EXPORT int
+webrtc_PeerConnectionInterface_RTCConfiguration_cpu_adaptation(
+    const struct webrtc_PeerConnectionInterface_RTCConfiguration* self) {
+  auto config = reinterpret_cast<
+      const webrtc::PeerConnectionInterface::RTCConfiguration*>(self);
+  return config->cpu_adaptation() ? 1 : 0;
+}
+WEBRTC_EXPORT void
+webrtc_PeerConnectionInterface_RTCConfiguration_set_cpu_adaptation(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    int cpu_adaptation) {
+  auto config =
+      reinterpret_cast<webrtc::PeerConnectionInterface::RTCConfiguration*>(
+          self);
+  config->set_cpu_adaptation(cpu_adaptation != 0);
+}
 WEBRTC_EXPORT struct webrtc_PeerConnectionDependencies*
 webrtc_PeerConnectionDependencies_new(
     struct webrtc_PeerConnectionObserver* observer) {
