@@ -97,6 +97,13 @@ WEBRTC_EXPORT void
 webrtc_PeerConnectionInterface_RTCConfiguration_set_always_negotiate_data_channels(
     struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
     int always_negotiate_data_channels);
+WEBRTC_EXPORT int
+webrtc_PeerConnectionInterface_RTCConfiguration_cpu_adaptation(
+    const struct webrtc_PeerConnectionInterface_RTCConfiguration* self);
+WEBRTC_EXPORT void
+webrtc_PeerConnectionInterface_RTCConfiguration_set_cpu_adaptation(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    int cpu_adaptation);
 struct webrtc_PeerConnectionDependencies;
 WEBRTC_EXPORT struct webrtc_PeerConnectionDependencies*
 webrtc_PeerConnectionDependencies_new(

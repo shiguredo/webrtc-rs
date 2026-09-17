@@ -486,6 +486,25 @@ impl PeerConnectionRtcConfiguration {
         }
     }
 
+    /// CPU アダプテーション（負荷に応じて映像のフレームレートや解像度を自動調整する機能）が
+    /// 有効かどうかを返す。
+    pub fn cpu_adaptation(&self) -> bool {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_RTCConfiguration_cpu_adaptation(self.raw.as_ptr())
+                != 0
+        }
+    }
+
+    /// CPU アダプテーションの有効 / 無効を設定する。
+    pub fn set_cpu_adaptation(&mut self, enable: bool) {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_RTCConfiguration_set_cpu_adaptation(
+                self.raw.as_ptr(),
+                enable as i32,
+            );
+        }
+    }
+
     /// servers への可変参照を取得する。寿命は self に束縛される。
     pub fn servers(&mut self) -> IceServerVectorRef<'_> {
         let raw = expect_non_null(

@@ -22,6 +22,10 @@
   - C API の `webrtc_MediaStreamTrackInterface_state` を追加し、トラック自体の生死を返す
   - `MediaStreamTrackState` を追加し、`MediaStreamTrack::state` で生死を取得できるようにする
   - @voluntas
+- [ADD] `PeerConnectionRtcConfiguration::cpu_adaptation` / `set_cpu_adaptation` を追加する
+  - C API の `webrtc_PeerConnectionInterface_RTCConfiguration_cpu_adaptation` / `set_cpu_adaptation` を追加し、libwebrtc のアクセサに委譲する
+  - CPU アダプテーションの有効 / 無効を Rust SDK から設定できるようにする
+  - @voluntas
 - [FIX] C の関数名が間違っていたのを修正する
   - `webrtc_AudioDecoderFactory_MakeAudioDecoder` → `webrtc_AudioDecoderFactory_Create`
   - `webrtc_AudioEncoderFactory_MakeAudioEncoder` → `webrtc_AudioEncoderFactory_Create`
