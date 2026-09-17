@@ -1,7 +1,7 @@
 # PeerConnectionRtcConfiguration に cpu_adaptation の取得・設定口を追加する
 
 - Created: 2026-09-10
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-09-17
 - Branch: feature/add-cpu-adaptation
 - Polished: {YYYY-MM-DD}
 
@@ -34,4 +34,10 @@ C++ SDK の `SoraSignalingConfig` には `cpu_adaptation` フィールドがあ�
 
 ## 解決方法
 
-（詳細は polish / 実装時に確定する）
+- `webrtc_c` に `webrtc_PeerConnectionInterface_RTCConfiguration_cpu_adaptation`（読み取り専用のため `const struct webrtc_PeerConnectionInterface_RTCConfiguration* self`）と `webrtc_PeerConnectionInterface_RTCConfiguration_set_cpu_adaptation` を追加し、libwebrtc の `RTCConfiguration::cpu_adaptation()` / `set_cpu_adaptation()` に薄く委譲するようにした
+- `src/api/peer_connection.rs` の `PeerConnectionRtcConfiguration` に `cpu_adaptation` / `set_cpu_adaptation` を追加した
+- bool は既存の bool 系 API と同じく `int` の 0/1 で受け渡し、設定時は `!= 0` で真偽に変換するようにした
+- 既定値は libwebrtc の `media_config.video.enable_cpu_adaptation`（`true`）に任せ、webrtc-rs 側では上書きしないようにした
+- `src/tests.rs` にテスト `rtc_configuration_cpu_adaptation_round_trip` を追加し、既定値 `true`、`set_cpu_adaptation(false)` で `false`、`set_cpu_adaptation(true)` で `true` に戻る往復を確認した
+- `CHANGES.md` の `## develop` 節に `[ADD]` エントリを追加した
+- `cargo test --workspace --features source-build` と `cargo clippy --workspace --features source-build -- -D warnings` の成功を確認した（完了条件の `cargo clippy --all-targets -- -D warnings` は、clippy 1.98 の `chunks_exact_to_as_chunks` が `src/tests.rs` の既存テスト 3 箇所で発生して失敗するため、リポジトリの CI と prek と同じコマンドで確認した。既存テストの指摘は develop でも発生し、今回の変更とは無関係）
