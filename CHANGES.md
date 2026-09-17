@@ -14,6 +14,10 @@
 - [CHANGE] `RtpEncodingParameters::scalability_mode` の戻り値を `Option<Result<String>>` から `Result<Option<String>>` に変更する
   - 未設定は `Ok(None)`、UTF-8 への変換失敗は `Err` で表す
   - @melpon
+- [CHANGE] `AudioDeviceModuleHandler` の要求を `Send + Sync` から `Send` に変更し、各メソッドを `&mut self` にする
+  - libwebrtc は ADM の公開メソッドを同時に呼び出さないため、`Sync` と `&self` は要求しない
+  - `Mutex` などの内部可変性を用意しなくても、ハンドラが `&mut self` を通して状態を保持できる
+  - @melpon
 - [ADD] `RtpReceiver::stream_ids` を追加する
   - C API の `webrtc_RtpReceiverInterface_stream_ids` を追加し、受信器に関連付けられた Stream ID 群を複製して返す
   - `RtpReceiver::stream_ids` を追加し、所有権付きの `StringVector` で Stream ID 群を取得できるようにする
