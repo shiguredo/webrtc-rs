@@ -1,7 +1,7 @@
 # 借用型 `XxxRef` を読み取り専用にし `XxxRefMut` を新設する
 
 - Created: 2026-09-16
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-09-18
 - Branch: feature/refactor-readonly-ref-types
 - Polished: {YYYY-MM-DD}
 
@@ -196,4 +196,15 @@ owned 型に `as_mut(&mut self) -> XxxRefMut<'_>` を追加し、`as_ref(&self) 
 
 ## 解決方法
 
-{実装時に記入する}
+- `XxxRef` から可変アクセサを外して `#[derive(Clone, Copy)]` を付け、可変アクセサは新設した `XxxRefMut` に移した
+- `XxxRefMut` は `Copy` にせず、`std::ops::Deref<Target = XxxRef>` で `XxxRef` の読み取りアクセサを共有する（`Deref` は実在する `XxxRef` への参照を返す必要があるため、`cref` フィールドとして保持する）
+- 借用ハンドルが保持するポインタを非 null 型に変え、`XxxRef` は `ConstNonNull`、`XxxRefMut` は `NonNull` を保持するようにした（`NonNull` は `*mut T` 用の API しか持たないため `ConstNonNull` を追加し、クレートルートから参照できるようにした）
+- `XxxRef::from_raw` / `XxxRefMut::from_raw` / `CxxStringRef::from_ptr` を `pub(crate)` に限定し、`unsafe fn` と `fn` が混在していたのを安全関数に統一した（借用先の寿命を型で保証できず、外部に公開すると safe Rust から不正なハンドルを作れてしまうため）
+- 所有権を受け取る `RtcError::from_unique_ptr` / `SdpParseError::from_unique_ptr` / `SessionDescription::from_unique_ptr` も同様に `pub(crate)` に限定した
+- `webrtc_c` に読み取り専用の借用を返す `_const` 版 getter・`_refcounted_get_const`・`WEBRTC_DECLARE_CAST_CONST` を追加し、`AddRef` / `Release` の引数を `const struct CType*` にした（`src/` から const を外すキャストを全廃した）
+- 構築経路が無く未使用だった可変ハンドル（`NaluInfoRefMut` / `VideoDecoderSettingsRefMut` / `VideoEncoderSettingsRefMut` / `VideoEncoderRateControlParametersRefMut` / `SSLCertificateRefMut` / `SSLCertChainRefMut` / `LogLineRefMut` / `VideoDecoderDecodedImageCallbackRef` 系）を削除した
+- 完了条件のうち 2 点は実装時に変わった
+  - 「全 39 の `XxxRef` に対応する `XxxRefMut`」は、未使用の可変ハンドル 8 型を削除したため `XxxRefMut` が 32 型になった
+  - 「`XxxRef` が `*const`、`XxxRefMut` が `*mut` を保持」は、非 null を型で表す `ConstNonNull` / `NonNull` を保持する形になった
+- `CHANGES.md` の `## develop` 節に `[CHANGE]` と misc のエントリを追加した
+- `cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build -- -D warnings` / `cargo test --workspace --features source-build` / `prek run --files` の成功を確認した
