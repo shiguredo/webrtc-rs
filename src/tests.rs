@@ -18,10 +18,32 @@ impl SetLocalDescriptionObserverHandler for NoopHandler {}
 impl SetRemoteDescriptionObserverHandler for NoopHandler {}
 impl VideoEncoderHandler for NoopHandler {}
 impl VideoDecoderHandler for NoopHandler {}
+impl AudioTransportHandler for NoopHandler {}
 
 #[test]
 fn create_and_drop_environment() {
     let _env = Environment::new();
+}
+
+#[test]
+fn audio_transport_ref_borrows_owner() {
+    // 借用ハンドルは所有型の借用に縛られるため、所有者を drop したあとに使うことはできない。
+    let mut transport = AudioTransport::new_with_handler(Box::new(NoopHandler));
+    {
+        let r = transport.as_ref();
+        assert!(!r.as_ptr().is_null());
+    }
+    {
+        let m = transport.as_mut();
+        assert!(!m.as_mut_ptr().is_null());
+        assert!(!m.as_ref().as_ptr().is_null());
+    }
+    // C++ 側の ADM が所有する transport はライフタイムを持たない Ptr で扱う。
+    let m = transport.as_mut();
+    let ptr = AudioTransportPtr::from_raw(
+        NonNull::new(m.as_mut_ptr()).expect("BUG: AudioTransport が null です"),
+    );
+    assert!(!ptr.as_mut_ptr().is_null());
 }
 
 #[test]

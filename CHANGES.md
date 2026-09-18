@@ -42,6 +42,11 @@
   - C 側の呼び出しは `webrtc_Buffer_data` / `webrtc_BufferS16_data` から `_const` 版に置き換える
   - Rust 側は `BufferRef::data` が `_const` 版を使い、`BufferRefMut::data_mut` / `BufferS16RefMut::data_mut` で書き換えられるようにする
   - @melpon
+- [CHANGE] `AudioTransportRef` / `AudioTransportRefMut` にライフタイムを付け、`AudioTransportPtr` を追加する
+  - 2 型は `AudioTransport` の借用に縛られ、同じオブジェクトへの可変ハンドルを 2 本作れなくなる
+  - C++ 側の ADM が所有する transport をハンドラが保持する用途のために、ライフタイムを持たない `AudioTransportPtr` を追加する
+  - `AudioDeviceModuleHandler::register_audio_callback` は `Option<AudioTransportPtr>` を受け取る
+  - @melpon
 - [CHANGE] `RtpEncodingParameters::scalability_mode` の戻り値を `Option<Result<String>>` から `Result<Option<String>>` に変更する
   - 未設定は `Ok(None)`、UTF-8 への変換失敗は `Err` で表す
   - @melpon
