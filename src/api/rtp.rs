@@ -536,7 +536,7 @@ impl Drop for RtpCodecCapabilityVector {
 #[derive(Clone, Copy)]
 pub struct RtpCodecCapabilityVectorRef<'a> {
     raw: ConstNonNull<ffi::webrtc_RtpCodecCapability_vector>,
-    _marker: PhantomData<&'a ffi::webrtc_RtpCapabilities>,
+    _marker: PhantomData<&'a ffi::webrtc_RtpCodecCapability_vector>,
 }
 
 unsafe impl<'a> Send for RtpCodecCapabilityVectorRef<'a> {}

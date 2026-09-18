@@ -108,9 +108,9 @@ WEBRTC_EXPORT int webrtc_VideoFrameBuffer_height(
 }
 
 WEBRTC_EXPORT void* webrtc_VideoFrameBuffer_get_user_data(
-    struct webrtc_VideoFrameBuffer* self) {
-  auto buffer = reinterpret_cast<webrtc::VideoFrameBuffer*>(self);
-  auto impl = dynamic_cast<VideoFrameBufferImpl*>(buffer);
+    const struct webrtc_VideoFrameBuffer* self) {
+  auto buffer = reinterpret_cast<const webrtc::VideoFrameBuffer*>(self);
+  auto impl = dynamic_cast<const VideoFrameBufferImpl*>(buffer);
   if (impl == nullptr) {
     return nullptr;
   }
