@@ -4801,7 +4801,8 @@ impl AudioDecoderHandler for TestAudioDecoderHandler {
         _sample_rate_hz: i32,
         decoded: &mut RawBufferWriter<'_, i16>,
     ) -> (i32, AudioSpeechType) {
-        decoded.write(&[0x1111i16; 160]);
+        // Safety: 呼び出し元が 320 サンプルを確保しており、ここでは 160 サンプルだけを書きます。
+        unsafe { decoded.write(&[0x1111i16; 160]) };
         (160, AudioSpeechType::Speech)
     }
     fn reset(&mut self) {}
@@ -4887,7 +4888,8 @@ impl AudioDecoderHandler for TestComfortNoiseDecoderHandler {
         _sample_rate_hz: i32,
         decoded: &mut RawBufferWriter<'_, i16>,
     ) -> (i32, AudioSpeechType) {
-        decoded.write(&[0x2222i16; 80]);
+        // Safety: 呼び出し元が 160 サンプルを確保しており、ここでは 80 サンプルだけを書きます。
+        unsafe { decoded.write(&[0x2222i16; 80]) };
         (80, AudioSpeechType::ComfortNoise)
     }
     fn reset(&mut self) {}

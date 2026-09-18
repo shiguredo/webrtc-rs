@@ -11,6 +11,10 @@
 
 ## develop
 
+- [CHANGE] `RawBufferWriter::write` を `unsafe fn` にする
+  - 書き込み先の容量を超えないことの保証を、呼び出し側の責任として `unsafe` で明示する
+  - `AudioDecoderHandler` のシグネチャは変わらない
+  - @melpon
 - [CHANGE] 借用型 `XxxRef` を読み取り専用にし、書き換え用の `XxxRefMut` を追加する
   - `XxxRef` から可変アクセサを外して `Copy` にし、`XxxRefMut` に移す
   - `XxxRef` は `ConstNonNull`、`XxxRefMut` は `NonNull` を保持し、`const` を外すキャストを全廃する
