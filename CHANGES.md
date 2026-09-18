@@ -70,6 +70,9 @@
   - C API の `webrtc_PeerConnectionInterface_RTCConfiguration_cpu_adaptation` / `set_cpu_adaptation` を追加し、libwebrtc のアクセサに委譲する
   - CPU アダプテーションの有効 / 無効を Rust SDK から設定できるようにする
   - @voluntas
+- [UPDATE] `Error` の表示メッセージを英語にする
+  - 利用者に見えるエラーメッセージを英語に統一する
+  - @melpon
 - [FIX] C の関数名が間違っていたのを修正する
   - `webrtc_AudioDecoderFactory_MakeAudioDecoder` → `webrtc_AudioDecoderFactory_Create`
   - `webrtc_AudioEncoderFactory_MakeAudioEncoder` → `webrtc_AudioEncoderFactory_Create`

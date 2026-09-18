@@ -125,7 +125,7 @@ impl AudioDeviceModule {
         let ret = unsafe { ffi::webrtc_AudioDeviceModule_Init(self.as_ptr()) };
         if ret != 0 {
             return Err(Error::Message(format!(
-                "AudioDeviceModule::Init が失敗しました: {}",
+                "AudioDeviceModule::Init failed: {}",
                 ret
             )));
         }
@@ -151,7 +151,7 @@ impl AudioDeviceModule {
         };
         if ret != 0 {
             return Err(Error::Message(format!(
-                "AudioDeviceModule::RecordingDeviceName が失敗しました: {}",
+                "AudioDeviceModule::RecordingDeviceName failed: {}",
                 ret
             )));
         }
@@ -171,7 +171,7 @@ impl AudioDeviceModule {
         let ret = unsafe { ffi::webrtc_AudioDeviceModule_SetRecordingDevice(self.as_ptr(), index) };
         if ret != 0 {
             return Err(Error::Message(format!(
-                "AudioDeviceModule::SetRecordingDevice が失敗しました: {}",
+                "AudioDeviceModule::SetRecordingDevice failed: {}",
                 ret
             )));
         }
