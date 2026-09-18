@@ -243,13 +243,24 @@ impl<'a> RtpCodecRefMut<'a> {
         let raw = unsafe { ffi::webrtc_RtpCodec_get_parameters(self.raw.as_ptr()) };
         MapStringStringRefMut::from_raw(expect_non_null(raw, "webrtc_RtpCodec_get_parameters"))
     }
-}
+    pub fn as_ref(&self) -> RtpCodecRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for RtpCodecRefMut<'a> {
-    type Target = RtpCodecRef<'a>;
+    pub fn name(&self) -> Result<String> {
+        self.cref.name()
+    }
 
-    fn deref(&self) -> &RtpCodecRef<'a> {
-        &self.cref
+    pub fn clock_rate(&self) -> Option<i32> {
+        self.cref.clock_rate()
+    }
+
+    pub fn num_channels(&self) -> Option<i32> {
+        self.cref.num_channels()
+    }
+
+    pub fn parameters(&self) -> MapStringStringRef<'_> {
+        self.cref.parameters()
     }
 }
 
@@ -428,13 +439,28 @@ impl<'a> RtpCodecCapabilityRefMut<'a> {
     pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'a> {
         self.cast_to_codec_mut().parameters_mut()
     }
-}
+    pub fn as_ref(&self) -> RtpCodecCapabilityRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for RtpCodecCapabilityRefMut<'a> {
-    type Target = RtpCodecCapabilityRef<'a>;
+    pub fn cast_to_codec(&self) -> RtpCodecRef<'_> {
+        self.cref.cast_to_codec()
+    }
 
-    fn deref(&self) -> &RtpCodecCapabilityRef<'a> {
-        &self.cref
+    pub fn name(&self) -> Result<String> {
+        self.cref.name()
+    }
+
+    pub fn clock_rate(&self) -> Option<i32> {
+        self.cref.clock_rate()
+    }
+
+    pub fn num_channels(&self) -> Option<i32> {
+        self.cref.num_channels()
+    }
+
+    pub fn parameters(&self) -> MapStringStringRef<'_> {
+        self.cref.parameters()
     }
 }
 
@@ -582,13 +608,20 @@ impl<'a> RtpCodecCapabilityVectorRefMut<'a> {
         }
         true
     }
-}
+    pub fn as_ref(&self) -> RtpCodecCapabilityVectorRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for RtpCodecCapabilityVectorRefMut<'a> {
-    type Target = RtpCodecCapabilityVectorRef<'a>;
+    pub fn len(&self) -> usize {
+        self.cref.len()
+    }
 
-    fn deref(&self) -> &RtpCodecCapabilityVectorRef<'a> {
-        &self.cref
+    pub fn is_empty(&self) -> bool {
+        self.cref.is_empty()
+    }
+
+    pub fn get(&self, index: usize) -> Option<RtpCodecCapabilityRef<'_>> {
+        self.cref.get(index)
     }
 }
 
@@ -1092,13 +1125,68 @@ impl<'a> RtpEncodingParametersRefMut<'a> {
             )
         });
     }
-}
+    pub fn as_ref(&self) -> RtpEncodingParametersRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for RtpEncodingParametersRefMut<'a> {
-    type Target = RtpEncodingParametersRef<'a>;
+    pub fn rid(&self) -> Result<String> {
+        self.cref.rid()
+    }
 
-    fn deref(&self) -> &RtpEncodingParametersRef<'a> {
-        &self.cref
+    pub fn ssrc(&self) -> Option<u32> {
+        self.cref.ssrc()
+    }
+
+    pub fn max_bitrate_bps(&self) -> Option<i32> {
+        self.cref.max_bitrate_bps()
+    }
+
+    pub fn min_bitrate_bps(&self) -> Option<i32> {
+        self.cref.min_bitrate_bps()
+    }
+
+    pub fn max_framerate(&self) -> Option<f64> {
+        self.cref.max_framerate()
+    }
+
+    pub fn scale_resolution_down_by(&self) -> Option<f64> {
+        self.cref.scale_resolution_down_by()
+    }
+
+    pub fn scale_resolution_down_to(&self) -> Option<Resolution> {
+        self.cref.scale_resolution_down_to()
+    }
+
+    pub fn active(&self) -> bool {
+        self.cref.active()
+    }
+
+    pub fn adaptive_ptime(&self) -> bool {
+        self.cref.adaptive_ptime()
+    }
+
+    pub fn scalability_mode(&self) -> Result<Option<String>> {
+        self.cref.scalability_mode()
+    }
+
+    pub fn codec(&self) -> Option<RtpCodecRef<'_>> {
+        self.cref.codec()
+    }
+
+    pub fn bitrate_priority(&self) -> f64 {
+        self.cref.bitrate_priority()
+    }
+
+    pub fn network_priority(&self) -> Priority {
+        self.cref.network_priority()
+    }
+
+    pub fn request_key_frame(&self) -> bool {
+        self.cref.request_key_frame()
+    }
+
+    pub fn num_temporal_layers(&self) -> Option<i32> {
+        self.cref.num_temporal_layers()
     }
 }
 

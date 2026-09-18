@@ -749,13 +749,28 @@ impl<'a> SdpAudioFormatRefMut<'a> {
             "webrtc_SdpAudioFormat_get_parameters",
         ))
     }
-}
+    pub fn as_ref(&self) -> SdpAudioFormatRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for SdpAudioFormatRefMut<'a> {
-    type Target = SdpAudioFormatRef<'a>;
+    pub fn name(&self) -> Result<String> {
+        self.cref.name()
+    }
 
-    fn deref(&self) -> &SdpAudioFormatRef<'a> {
-        &self.cref
+    pub fn clockrate_hz(&self) -> i32 {
+        self.cref.clockrate_hz()
+    }
+
+    pub fn num_channels(&self) -> usize {
+        self.cref.num_channels()
+    }
+
+    pub fn parameters(&self) -> MapStringStringRef<'_> {
+        self.cref.parameters()
+    }
+
+    pub fn to_owned(&self) -> SdpAudioFormat {
+        self.cref.to_owned()
     }
 }
 

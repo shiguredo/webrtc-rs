@@ -18,6 +18,8 @@
   - 所有型に `as_mut` を追加し、`RtpCapabilities::codecs` / `PeerConnectionRtcConfiguration::servers` などを `&self` の読み取りと `&mut self` の書き換えに分ける
   - `XxxRef::from_raw` / `CxxStringRef::from_ptr` は `pub(crate)` になり、`NonNull` ではなく `ConstNonNull` を受け取るようになる
     - 借用先の寿命を型で保証できないため、外部に公開しない
+  - `XxxRefMut` は `Deref` を実装せず、読み取りアクセサは転送メソッドと `as_ref()` で提供する
+    - `Deref` だと `'a` を持つ `XxxRef` を借用の外へ持ち出せてしまい、書き換えで safe な use-after-free を作れてしまうため
   - @melpon
 - [CHANGE] 所有権を受け取る `from_unique_ptr` を `pub(crate)` にする
   - `RtcError` / `SdpParseError` / `SessionDescription` の `from_unique_ptr` を外部公開 API から外し、C API の内部機構として限定する

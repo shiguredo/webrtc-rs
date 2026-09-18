@@ -178,13 +178,24 @@ impl<'a> CxxStringRefMut<'a> {
             ffi::std_string_append(self.as_mut_ptr(), s.as_ptr() as *const _, s.len());
         }
     }
-}
+    pub fn as_ref(&self) -> CxxStringRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for CxxStringRefMut<'a> {
-    type Target = CxxStringRef<'a>;
+    pub fn len(&self) -> usize {
+        self.cref.len()
+    }
 
-    fn deref(&self) -> &CxxStringRef<'a> {
-        &self.cref
+    pub fn is_empty(&self) -> bool {
+        self.cref.is_empty()
+    }
+
+    pub fn to_string(&self) -> Result<String> {
+        self.cref.to_string()
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.cref.to_bytes()
     }
 }
 
@@ -310,13 +321,20 @@ impl<'a> StringVectorRefMut<'a> {
     pub fn push(&mut self, value: &CxxString) {
         unsafe { ffi::std_string_vector_push_back(self.raw.as_ptr(), value.as_ptr()) };
     }
-}
+    pub fn as_ref(&self) -> StringVectorRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for StringVectorRefMut<'a> {
-    type Target = StringVectorRef<'a>;
+    pub fn len(&self) -> usize {
+        self.cref.len()
+    }
 
-    fn deref(&self) -> &StringVectorRef<'a> {
-        &self.cref
+    pub fn is_empty(&self) -> bool {
+        self.cref.is_empty()
+    }
+
+    pub fn get(&self, index: usize) -> Result<String> {
+        self.cref.get(index)
     }
 }
 
@@ -403,13 +421,20 @@ impl<'a> MapStringStringRefMut<'a> {
             );
         }
     }
-}
+    pub fn as_ref(&self) -> MapStringStringRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for MapStringStringRefMut<'a> {
-    type Target = MapStringStringRef<'a>;
+    pub fn len(&self) -> usize {
+        self.cref.len()
+    }
 
-    fn deref(&self) -> &MapStringStringRef<'a> {
-        &self.cref
+    pub fn is_empty(&self) -> bool {
+        self.cref.is_empty()
+    }
+
+    pub fn iter(&self) -> MapStringStringIter<'_> {
+        self.cref.iter()
     }
 }
 

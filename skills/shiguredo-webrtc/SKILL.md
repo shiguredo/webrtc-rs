@@ -160,8 +160,14 @@ let (factory, context) =
 C API のオブジェクトは、所有型と 2 種類の借用型で扱う。
 
 - 読み取り専用借用 `XxxRef<'a>`: `Copy` で、非 null の `*const` を保持する。書き換えメソッドは持たない
-- 書き換え用借用 `XxxRefMut<'a>`: `Copy` ではなく、非 null の `*mut` と `Deref` 用の `XxxRef` を保持する
+- 書き換え用借用 `XxxRefMut<'a>`: `Copy` ではなく、非 null の `*mut` と `XxxRef` の実体 (`cref`) を保持する
 - 所有型は `as_ref()` / `as_mut()` で借用型を返す
+
+`XxxRefMut` に `Deref` は実装しない。`Deref` の `Target` は `XxxRef<'a>` に固定され、`deref()` が返す参照の中身が `'a` を持つため、`Copy` でその値を借用の外へ持ち出せてしまう。持ち出したハンドルから得た借用 (例: `BufferRef::data()`) を保持したまま `XxxRefMut` の書き換えメソッドを呼ぶと、C++ 側の再確保で解放された領域を読む safe な use-after-free になる。
+
+- 読み取りアクセサは `XxxRef` に書き、`XxxRefMut` には同じシグネチャの転送メソッド (`self.cref.xxx()` の 1 行) を用意する
+- 借用や借用ハンドルを返す転送メソッドの戻り値は `'_` に短縮する。`XxxRef<'a>` を返すと借用の外へ持ち出せてしまう
+- `XxxRefMut::as_ref(&self) -> XxxRef<'_>` も同じ理由でライフタイムを `&self` に縛る
 
 非 null ポインタは `NonNull` と `ConstNonNull` で表す。`ConstNonNull` は std の `NonNull` が `*mut T` 用の API しか持たないため crate 側で用意している非 null の `*const T` で、クレートルートから参照できる。
 

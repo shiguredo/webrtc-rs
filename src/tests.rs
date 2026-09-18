@@ -3721,10 +3721,8 @@ fn video_decoder_handler_register_decode_complete_callback_accepts_none_and_some
         handler.register_decode_complete_callback(None),
         VideoCodecStatus::Ok
     );
-    let dummy_callback = unsafe {
-        // このテストでは callback を呼び出さず Option::Some 経路だけを確認する。
-        VideoDecoderDecodedImageCallbackPtr::from_raw(NonNull::dangling())
-    };
+    // このテストでは callback を呼び出さず Option::Some 経路だけを確認する。
+    let dummy_callback = VideoDecoderDecodedImageCallbackPtr::from_raw(NonNull::dangling());
     assert_eq!(
         handler.register_decode_complete_callback(Some(dummy_callback)),
         VideoCodecStatus::Ok

@@ -345,13 +345,24 @@ impl<'a> SdpVideoFormatRefMut<'a> {
             "webrtc_SdpVideoFormat_get_parameters",
         ))
     }
-}
+    pub fn as_ref(&self) -> SdpVideoFormatRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for SdpVideoFormatRefMut<'a> {
-    type Target = SdpVideoFormatRef<'a>;
+    pub fn name(&self) -> Result<String> {
+        self.cref.name()
+    }
 
-    fn deref(&self) -> &SdpVideoFormatRef<'a> {
-        &self.cref
+    pub fn parameters(&self) -> MapStringStringRef<'_> {
+        self.cref.parameters()
+    }
+
+    pub fn scalability_modes(&self) -> Vec<ScalabilityMode> {
+        self.cref.scalability_modes()
+    }
+
+    pub fn to_owned(&self) -> SdpVideoFormat {
+        self.cref.to_owned()
     }
 }
 
@@ -1716,13 +1727,68 @@ impl<'a> VideoFrameRefMut<'a> {
     pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_VideoFrame {
         self.raw.as_ptr()
     }
-}
+    pub fn as_ref(&self) -> VideoFrameRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for VideoFrameRefMut<'a> {
-    type Target = VideoFrameRef<'a>;
+    pub fn width(&self) -> i32 {
+        self.cref.width()
+    }
 
-    fn deref(&self) -> &VideoFrameRef<'a> {
-        &self.cref
+    pub fn height(&self) -> i32 {
+        self.cref.height()
+    }
+
+    pub fn timestamp_us(&self) -> i64 {
+        self.cref.timestamp_us()
+    }
+
+    pub fn rtp_timestamp(&self) -> u32 {
+        self.cref.rtp_timestamp()
+    }
+
+    pub fn id(&self) -> u16 {
+        self.cref.id()
+    }
+
+    pub fn ntp_time_ms(&self) -> i64 {
+        self.cref.ntp_time_ms()
+    }
+
+    pub fn rotation(&self) -> VideoRotation {
+        self.cref.rotation()
+    }
+
+    pub fn presentation_timestamp(&self) -> Option<Duration> {
+        self.cref.presentation_timestamp()
+    }
+
+    pub fn reference_time(&self) -> Option<Duration> {
+        self.cref.reference_time()
+    }
+
+    pub fn color_space(&self) -> Option<ColorSpace> {
+        self.cref.color_space()
+    }
+
+    pub fn has_update_rect(&self) -> bool {
+        self.cref.has_update_rect()
+    }
+
+    pub fn update_rect(&self) -> VideoFrameUpdateRect {
+        self.cref.update_rect()
+    }
+
+    pub fn is_repeat_frame(&self) -> bool {
+        self.cref.is_repeat_frame()
+    }
+
+    pub fn buffer(&self) -> VideoFrameBuffer {
+        self.cref.buffer()
+    }
+
+    pub fn to_owned(&self) -> VideoFrame {
+        self.cref.to_owned()
     }
 }
 
@@ -1876,13 +1942,20 @@ impl<'a> VideoFrameTypeVectorRefMut<'a> {
             ffi::webrtc_VideoFrameType_vector_push_back_value(self.raw.as_ptr(), value.to_raw())
         };
     }
-}
+    pub fn as_ref(&self) -> VideoFrameTypeVectorRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for VideoFrameTypeVectorRefMut<'a> {
-    type Target = VideoFrameTypeVectorRef<'a>;
+    pub fn len(&self) -> usize {
+        self.cref.len()
+    }
 
-    fn deref(&self) -> &VideoFrameTypeVectorRef<'a> {
-        &self.cref
+    pub fn is_empty(&self) -> bool {
+        self.cref.is_empty()
+    }
+
+    pub fn get(&self, index: usize) -> Option<VideoFrameType> {
+        self.cref.get(index)
     }
 }
 
@@ -2116,13 +2189,28 @@ impl<'a> SimulcastStreamRefMut<'a> {
     pub fn set_max_bitrate_kbps(&mut self, value: u32) {
         unsafe { ffi::webrtc_SimulcastStream_set_max_bitrate_kbps(self.raw.as_ptr(), value) };
     }
-}
+    pub fn as_ref(&self) -> SimulcastStreamRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for SimulcastStreamRefMut<'a> {
-    type Target = SimulcastStreamRef<'a>;
+    pub fn width(&self) -> i32 {
+        self.cref.width()
+    }
 
-    fn deref(&self) -> &SimulcastStreamRef<'a> {
-        &self.cref
+    pub fn height(&self) -> i32 {
+        self.cref.height()
+    }
+
+    pub fn min_bitrate_kbps(&self) -> u32 {
+        self.cref.min_bitrate_kbps()
+    }
+
+    pub fn target_bitrate_kbps(&self) -> u32 {
+        self.cref.target_bitrate_kbps()
+    }
+
+    pub fn max_bitrate_kbps(&self) -> u32 {
+        self.cref.max_bitrate_kbps()
     }
 }
 
@@ -2420,13 +2508,48 @@ impl<'a> VideoCodecRefMut<'a> {
         // Safety: C 側の `VideoCodec` が生存している間は `simulcastStream[index]` は有効です。
         Some(SimulcastStreamRefMut::from_raw(raw))
     }
-}
+    pub fn as_ref(&self) -> VideoCodecRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for VideoCodecRefMut<'a> {
-    type Target = VideoCodecRef<'a>;
+    pub fn codec_type(&self) -> VideoCodecType {
+        self.cref.codec_type()
+    }
 
-    fn deref(&self) -> &VideoCodecRef<'a> {
-        &self.cref
+    pub fn width(&self) -> i32 {
+        self.cref.width()
+    }
+
+    pub fn height(&self) -> i32 {
+        self.cref.height()
+    }
+
+    pub fn start_bitrate_kbps(&self) -> u32 {
+        self.cref.start_bitrate_kbps()
+    }
+
+    pub fn max_bitrate_kbps(&self) -> u32 {
+        self.cref.max_bitrate_kbps()
+    }
+
+    pub fn min_bitrate_kbps(&self) -> u32 {
+        self.cref.min_bitrate_kbps()
+    }
+
+    pub fn max_framerate(&self) -> u32 {
+        self.cref.max_framerate()
+    }
+
+    pub fn number_of_simulcast_streams(&self) -> usize {
+        self.cref.number_of_simulcast_streams()
+    }
+
+    pub fn simulcast_stream(&self, index: usize) -> Option<SimulcastStreamRef<'_>> {
+        self.cref.simulcast_stream(index)
+    }
+
+    pub fn to_owned(&self) -> VideoCodec {
+        self.cref.to_owned()
     }
 }
 
@@ -2655,12 +2778,31 @@ impl<'a> EncodedImageRefMut<'a> {
     pub fn set_qp(&mut self, qp: i32) {
         unsafe { ffi::webrtc_EncodedImage_set_qp(self.raw.as_ptr(), qp) };
     }
-}
+    pub fn as_ref(&self) -> EncodedImageRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for EncodedImageRefMut<'a> {
-    type Target = EncodedImageRef<'a>;
+    pub fn encoded_data(&self) -> Option<EncodedImageBuffer> {
+        self.cref.encoded_data()
+    }
 
-    fn deref(&self) -> &EncodedImageRef<'a> {
-        &self.cref
+    pub fn rtp_timestamp(&self) -> u32 {
+        self.cref.rtp_timestamp()
+    }
+
+    pub fn encoded_width(&self) -> u32 {
+        self.cref.encoded_width()
+    }
+
+    pub fn encoded_height(&self) -> u32 {
+        self.cref.encoded_height()
+    }
+
+    pub fn frame_type(&self) -> VideoFrameType {
+        self.cref.frame_type()
+    }
+
+    pub fn qp(&self) -> i32 {
+        self.cref.qp()
     }
 }

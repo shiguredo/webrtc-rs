@@ -120,13 +120,20 @@ impl<'a> VideoEncoderFramerateFractionInlinedVectorRefMut<'a> {
             ffi::webrtc_VideoEncoder_FramerateFraction_inlined_vector_clear(self.raw.as_ptr())
         };
     }
-}
+    pub fn as_ref(&self) -> VideoEncoderFramerateFractionInlinedVectorRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for VideoEncoderFramerateFractionInlinedVectorRefMut<'a> {
-    type Target = VideoEncoderFramerateFractionInlinedVectorRef<'a>;
+    pub fn len(&self) -> usize {
+        self.cref.len()
+    }
 
-    fn deref(&self) -> &VideoEncoderFramerateFractionInlinedVectorRef<'a> {
-        &self.cref
+    pub fn is_empty(&self) -> bool {
+        self.cref.is_empty()
+    }
+
+    pub fn get(&self, index: usize) -> Option<u8> {
+        self.cref.get(index)
     }
 }
 
@@ -228,13 +235,20 @@ impl<'a> VideoFrameBufferKindInlinedVectorRefMut<'a> {
     pub fn clear(&mut self) {
         unsafe { ffi::webrtc_VideoFrameBuffer_Type_inlined_vector_clear(self.raw.as_ptr()) };
     }
-}
+    pub fn as_ref(&self) -> VideoFrameBufferKindInlinedVectorRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for VideoFrameBufferKindInlinedVectorRefMut<'a> {
-    type Target = VideoFrameBufferKindInlinedVectorRef<'a>;
+    pub fn len(&self) -> usize {
+        self.cref.len()
+    }
 
-    fn deref(&self) -> &VideoFrameBufferKindInlinedVectorRef<'a> {
-        &self.cref
+    pub fn is_empty(&self) -> bool {
+        self.cref.is_empty()
+    }
+
+    pub fn get(&self, index: usize) -> Option<VideoFrameBufferKind> {
+        self.cref.get(index)
     }
 }
 
@@ -292,13 +306,16 @@ impl<'a> VideoEncoderQpThresholdsRefMut<'a> {
     pub fn set_high(&mut self, value: i32) {
         unsafe { ffi::webrtc_VideoEncoder_QpThresholds_set_high(self.raw.as_ptr(), value) };
     }
-}
+    pub fn as_ref(&self) -> VideoEncoderQpThresholdsRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for VideoEncoderQpThresholdsRefMut<'a> {
-    type Target = VideoEncoderQpThresholdsRef<'a>;
+    pub fn low(&self) -> i32 {
+        self.cref.low()
+    }
 
-    fn deref(&self) -> &VideoEncoderQpThresholdsRef<'a> {
-        &self.cref
+    pub fn high(&self) -> i32 {
+        self.cref.high()
     }
 }
 
@@ -439,13 +456,16 @@ impl<'a> VideoEncoderScalingSettingsRefMut<'a> {
             )
         };
     }
-}
+    pub fn as_ref(&self) -> VideoEncoderScalingSettingsRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for VideoEncoderScalingSettingsRefMut<'a> {
-    type Target = VideoEncoderScalingSettingsRef<'a>;
+    pub fn thresholds(&self) -> Option<VideoEncoderQpThresholds> {
+        self.cref.thresholds()
+    }
 
-    fn deref(&self) -> &VideoEncoderScalingSettingsRef<'a> {
-        &self.cref
+    pub fn min_pixels_per_frame(&self) -> i32 {
+        self.cref.min_pixels_per_frame()
     }
 }
 
@@ -609,13 +629,24 @@ impl<'a> VideoEncoderResolutionBitrateLimitsRefMut<'a> {
             )
         };
     }
-}
+    pub fn as_ref(&self) -> VideoEncoderResolutionBitrateLimitsRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for VideoEncoderResolutionBitrateLimitsRefMut<'a> {
-    type Target = VideoEncoderResolutionBitrateLimitsRef<'a>;
+    pub fn frame_size_pixels(&self) -> i32 {
+        self.cref.frame_size_pixels()
+    }
 
-    fn deref(&self) -> &VideoEncoderResolutionBitrateLimitsRef<'a> {
-        &self.cref
+    pub fn min_start_bitrate_bps(&self) -> i32 {
+        self.cref.min_start_bitrate_bps()
+    }
+
+    pub fn min_bitrate_bps(&self) -> i32 {
+        self.cref.min_bitrate_bps()
+    }
+
+    pub fn max_bitrate_bps(&self) -> i32 {
+        self.cref.max_bitrate_bps()
     }
 }
 
@@ -789,13 +820,20 @@ impl<'a> VideoEncoderResolutionBitrateLimitsVectorRefMut<'a> {
     pub fn clear(&mut self) {
         unsafe { ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_vector_clear(self.raw.as_ptr()) };
     }
-}
+    pub fn as_ref(&self) -> VideoEncoderResolutionBitrateLimitsVectorRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for VideoEncoderResolutionBitrateLimitsVectorRefMut<'a> {
-    type Target = VideoEncoderResolutionBitrateLimitsVectorRef<'a>;
+    pub fn len(&self) -> usize {
+        self.cref.len()
+    }
 
-    fn deref(&self) -> &VideoEncoderResolutionBitrateLimitsVectorRef<'a> {
-        &self.cref
+    pub fn is_empty(&self) -> bool {
+        self.cref.is_empty()
+    }
+
+    pub fn get(&self, index: usize) -> Option<VideoEncoderResolutionBitrateLimitsRef<'_>> {
+        self.cref.get(index)
     }
 }
 
@@ -853,13 +891,16 @@ impl<'a> VideoEncoderResolutionRefMut<'a> {
     pub fn set_height(&mut self, value: i32) {
         unsafe { ffi::webrtc_VideoEncoder_Resolution_set_height(self.raw.as_ptr(), value) };
     }
-}
+    pub fn as_ref(&self) -> VideoEncoderResolutionRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for VideoEncoderResolutionRefMut<'a> {
-    type Target = VideoEncoderResolutionRef<'a>;
+    pub fn width(&self) -> i32 {
+        self.cref.width()
+    }
 
-    fn deref(&self) -> &VideoEncoderResolutionRef<'a> {
-        &self.cref
+    pub fn height(&self) -> i32 {
+        self.cref.height()
     }
 }
 
@@ -1808,13 +1849,84 @@ impl<'a> CodecSpecificInfoRefMut<'a> {
             )
         };
     }
-}
+    pub fn as_ref(&self) -> CodecSpecificInfoRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for CodecSpecificInfoRefMut<'a> {
-    type Target = CodecSpecificInfoRef<'a>;
+    pub fn codec_type(&self) -> VideoCodecType {
+        self.cref.codec_type()
+    }
 
-    fn deref(&self) -> &CodecSpecificInfoRef<'a> {
-        &self.cref
+    pub fn end_of_picture(&self) -> bool {
+        self.cref.end_of_picture()
+    }
+
+    pub fn vp8_non_reference(&self) -> bool {
+        self.cref.vp8_non_reference()
+    }
+
+    pub fn vp8_temporal_idx(&self) -> i32 {
+        self.cref.vp8_temporal_idx()
+    }
+
+    pub fn vp8_layer_sync(&self) -> bool {
+        self.cref.vp8_layer_sync()
+    }
+
+    pub fn vp8_key_idx(&self) -> i32 {
+        self.cref.vp8_key_idx()
+    }
+
+    pub fn vp9_temporal_idx(&self) -> i32 {
+        self.cref.vp9_temporal_idx()
+    }
+
+    pub fn vp9_inter_pic_predicted(&self) -> bool {
+        self.cref.vp9_inter_pic_predicted()
+    }
+
+    pub fn vp9_flexible_mode(&self) -> bool {
+        self.cref.vp9_flexible_mode()
+    }
+
+    pub fn vp9_inter_layer_predicted(&self) -> bool {
+        self.cref.vp9_inter_layer_predicted()
+    }
+
+    pub fn vp9_ss_data_available(&self) -> bool {
+        self.cref.vp9_ss_data_available()
+    }
+
+    pub fn vp9_temporal_up_switch(&self) -> bool {
+        self.cref.vp9_temporal_up_switch()
+    }
+
+    pub fn vp9_num_spatial_layers(&self) -> i32 {
+        self.cref.vp9_num_spatial_layers()
+    }
+
+    pub fn vp9_first_frame_in_picture(&self) -> bool {
+        self.cref.vp9_first_frame_in_picture()
+    }
+
+    pub fn vp9_spatial_layer_resolution_present(&self) -> bool {
+        self.cref.vp9_spatial_layer_resolution_present()
+    }
+
+    pub fn h264_packetization_mode(&self) -> H264PacketizationMode {
+        self.cref.h264_packetization_mode()
+    }
+
+    pub fn h264_temporal_idx(&self) -> i32 {
+        self.cref.h264_temporal_idx()
+    }
+
+    pub fn h264_base_layer_sync(&self) -> bool {
+        self.cref.h264_base_layer_sync()
+    }
+
+    pub fn h264_idr_frame(&self) -> bool {
+        self.cref.h264_idr_frame()
     }
 }
 
@@ -2149,13 +2261,8 @@ impl<'a> VideoEncoderEncodedImageCallbackRefMut<'a> {
         );
         unsafe { VideoEncoderEncodedImageCallbackResult::from_raw_unique(raw_unique) }
     }
-}
-
-impl<'a> std::ops::Deref for VideoEncoderEncodedImageCallbackRefMut<'a> {
-    type Target = VideoEncoderEncodedImageCallbackRef<'a>;
-
-    fn deref(&self) -> &VideoEncoderEncodedImageCallbackRef<'a> {
-        &self.cref
+    pub fn as_ref(&self) -> VideoEncoderEncodedImageCallbackRef<'_> {
+        self.cref
     }
 }
 

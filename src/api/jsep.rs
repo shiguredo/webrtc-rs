@@ -219,13 +219,20 @@ impl<'a> IceCandidateRefMut<'a> {
     pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_IceCandidate {
         self.raw.as_ptr()
     }
-}
+    pub fn as_ref(&self) -> IceCandidateRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for IceCandidateRefMut<'a> {
-    type Target = IceCandidateRef<'a>;
+    pub fn sdp_mid(&self) -> Result<String> {
+        self.cref.sdp_mid()
+    }
 
-    fn deref(&self) -> &IceCandidateRef<'a> {
-        &self.cref
+    pub fn sdp_mline_index(&self) -> i32 {
+        self.cref.sdp_mline_index()
+    }
+
+    pub fn to_string(&self) -> Result<String> {
+        self.cref.to_string()
     }
 }
 

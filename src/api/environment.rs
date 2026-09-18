@@ -91,12 +91,7 @@ impl<'a> EnvironmentRefMut<'a> {
     pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_Environment {
         self.raw.as_ptr()
     }
-}
-
-impl<'a> std::ops::Deref for EnvironmentRefMut<'a> {
-    type Target = EnvironmentRef<'a>;
-
-    fn deref(&self) -> &EnvironmentRef<'a> {
-        &self.cref
+    pub fn as_ref(&self) -> EnvironmentRef<'_> {
+        self.cref
     }
 }

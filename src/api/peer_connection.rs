@@ -472,13 +472,8 @@ impl<'a> NetworkManagerRefMut<'a> {
     pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_NetworkManager {
         self.raw.as_ptr()
     }
-}
-
-impl<'a> std::ops::Deref for NetworkManagerRefMut<'a> {
-    type Target = NetworkManagerRef<'a>;
-
-    fn deref(&self) -> &NetworkManagerRef<'a> {
-        &self.cref
+    pub fn as_ref(&self) -> NetworkManagerRef<'_> {
+        self.cref
     }
 }
 
@@ -525,13 +520,8 @@ impl<'a> PacketSocketFactoryRefMut<'a> {
     pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_PacketSocketFactory {
         self.raw.as_ptr()
     }
-}
-
-impl<'a> std::ops::Deref for PacketSocketFactoryRefMut<'a> {
-    type Target = PacketSocketFactoryRef<'a>;
-
-    fn deref(&self) -> &PacketSocketFactoryRef<'a> {
-        &self.cref
+    pub fn as_ref(&self) -> PacketSocketFactoryRef<'_> {
+        self.cref
     }
 }
 
@@ -847,13 +837,12 @@ impl<'a> IceServerRefMut<'a> {
             );
         }
     }
-}
+    pub fn as_ref(&self) -> IceServerRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for IceServerRefMut<'a> {
-    type Target = IceServerRef<'a>;
-
-    fn deref(&self) -> &IceServerRef<'a> {
-        &self.cref
+    pub fn urls_len(&self) -> usize {
+        self.cref.urls_len()
     }
 }
 
@@ -987,13 +976,20 @@ impl<'a> IceServerVectorRefMut<'a> {
             );
         }
     }
-}
+    pub fn as_ref(&self) -> IceServerVectorRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for IceServerVectorRefMut<'a> {
-    type Target = IceServerVectorRef<'a>;
+    pub fn len(&self) -> usize {
+        self.cref.len()
+    }
 
-    fn deref(&self) -> &IceServerVectorRef<'a> {
-        &self.cref
+    pub fn is_empty(&self) -> bool {
+        self.cref.is_empty()
+    }
+
+    pub fn get(&self, index: usize) -> Option<IceServerRef<'_>> {
+        self.cref.get(index)
     }
 }
 

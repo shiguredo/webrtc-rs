@@ -388,13 +388,8 @@ impl AudioTransportRefMut {
             )
         }
     }
-}
-
-impl std::ops::Deref for AudioTransportRefMut {
-    type Target = AudioTransportRef;
-
-    fn deref(&self) -> &AudioTransportRef {
-        &self.cref
+    pub fn as_ref(&self) -> AudioTransportRef {
+        self.cref
     }
 }
 

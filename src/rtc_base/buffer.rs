@@ -71,13 +71,16 @@ impl<'a> BufferRefMut<'a> {
     pub fn append_data(&mut self, data: &[u8]) {
         unsafe { ffi::webrtc_Buffer_AppendData(self.raw.as_ptr(), data.as_ptr(), data.len()) }
     }
-}
+    pub fn as_ref(&self) -> BufferRef<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for BufferRefMut<'a> {
-    type Target = BufferRef<'a>;
+    pub fn size(&self) -> usize {
+        self.cref.size()
+    }
 
-    fn deref(&self) -> &BufferRef<'a> {
-        &self.cref
+    pub fn data(&self) -> &[u8] {
+        self.cref.data()
     }
 }
 
@@ -214,12 +217,15 @@ impl<'a> BufferS16RefMut<'a> {
     pub fn clear(&mut self) {
         unsafe { ffi::webrtc_BufferS16_Clear(self.raw.as_ptr()) }
     }
-}
+    pub fn as_ref(&self) -> BufferS16Ref<'_> {
+        self.cref
+    }
 
-impl<'a> std::ops::Deref for BufferS16RefMut<'a> {
-    type Target = BufferS16Ref<'a>;
+    pub fn size(&self) -> usize {
+        self.cref.size()
+    }
 
-    fn deref(&self) -> &BufferS16Ref<'a> {
-        &self.cref
+    pub fn data(&self) -> &[i16] {
+        self.cref.data()
     }
 }
