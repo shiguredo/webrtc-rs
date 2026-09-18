@@ -206,5 +206,9 @@ owned 型に `as_mut(&mut self) -> XxxRefMut<'_>` を追加し、`as_ref(&self) 
 - 完了条件のうち 2 点は実装時に変わった
   - 「全 39 の `XxxRef` に対応する `XxxRefMut`」は、未使用の可変ハンドル 8 型を削除したため `XxxRefMut` が 32 型になった
   - 「`XxxRef` が `*const`、`XxxRefMut` が `*mut` を保持」は、非 null を型で表す `ConstNonNull` / `NonNull` を保持する形になった
+- レビューで、`XxxRef` の `Copy` と `XxxRefMut` の `Deref` の組み合わせにより safe なコードで use-after-free を作れることが判明したため、`XxxRefMut` から `Deref` を削除した
+  - `Deref::Target` は `XxxRef<'a>` に固定され、`deref()` が返す参照の中身が `'a` を持つため、`Copy` でその値を借用の外へ持ち出せる。持ち出したハンドルから得た借用を保持したまま `XxxRefMut` の書き換えメソッドを呼ぶと、C++ 側の再確保で解放された領域を読むことになる
+  - 読み取りアクセサは `XxxRefMut` に同じシグネチャの転送メソッド（`self.cref.xxx()` の 1 行）として用意し、借用や借用ハンドルを返すものは戻り値を `'_` に短縮した。`XxxRefMut::as_ref(&self) -> XxxRef<'_>` も同じ規則に従う
+  - `cref` は転送時に一時値を作らないために必要なので保持した。`Copy` / `Clone` は `XxxRef` に残しているため、利用側の書き換えは無い
 - `CHANGES.md` の `## develop` 節に `[CHANGE]` と misc のエントリを追加した
 - `cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build -- -D warnings` / `cargo test --workspace --features source-build` / `prek run --files` の成功を確認した
