@@ -200,7 +200,7 @@ owned 型に `as_mut(&mut self) -> XxxRefMut<'_>` を追加し、`as_ref(&self) 
 - `XxxRefMut` は `Copy` にせず、`std::ops::Deref<Target = XxxRef>` で `XxxRef` の読み取りアクセサを共有する（`Deref` は実在する `XxxRef` への参照を返す必要があるため、`cref` フィールドとして保持する）
 - 借用ハンドルが保持するポインタを非 null 型に変え、`XxxRef` は `ConstNonNull`、`XxxRefMut` は `NonNull` を保持するようにした（`NonNull` は `*mut T` 用の API しか持たないため `ConstNonNull` を追加し、クレートルートから参照できるようにした）
 - `XxxRef::from_raw` / `XxxRefMut::from_raw` / `CxxStringRef::from_ptr` を `pub(crate)` に限定し、`unsafe fn` と `fn` が混在していたのを安全関数に統一した（借用先の寿命を型で保証できず、外部に公開すると safe Rust から不正なハンドルを作れてしまうため）
-- 所有権を受け取る `RtcError::from_unique_ptr` / `SdpParseError::from_unique_ptr` / `SessionDescription::from_unique_ptr` も同様に `pub(crate)` に限定した
+- 所有権を受け取る `CxxString::from_unique` / `RtcError::from_unique_ptr` / `SdpParseError::from_unique_ptr` / `SessionDescription::from_unique_ptr` も同様に `pub(crate)` に限定した（`CxxString::into_raw` は譲渡方向なので public のまま。再監査で public かつ safe に所有権を取る関数はこの 4 つだけであることを確認した）
 - `webrtc_c` に読み取り専用の借用を返す `_const` 版 getter・`_refcounted_get_const`・`WEBRTC_DECLARE_CAST_CONST` を追加し、`AddRef` / `Release` の引数を `const struct CType*` にした（`src/` から const を外すキャストを全廃した）
 - 構築経路が無く未使用だった可変ハンドル（`NaluInfoRefMut` / `VideoDecoderSettingsRefMut` / `VideoEncoderSettingsRefMut` / `VideoEncoderRateControlParametersRefMut` / `SSLCertificateRefMut` / `SSLCertChainRefMut` / `LogLineRefMut` / `VideoDecoderDecodedImageCallbackRef` 系）を削除した
 - 完了条件のうち 2 点は実装時に変わった
