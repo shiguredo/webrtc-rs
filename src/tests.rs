@@ -158,7 +158,9 @@ fn cxx_string_round_trip() {
         "hello world"
     );
 
-    let r = CxxStringRef::from_ptr(ConstNonNull::new(s.as_ptr()).unwrap());
+    let r = CxxStringRef::from_ptr(
+        ConstNonNull::new(s.as_ptr()).expect("ConstNonNull の生成に失敗しました"),
+    );
     assert_eq!(r.len(), 11);
     assert_eq!(
         r.to_string().expect("CxxStringRef の変換に失敗しました"),
@@ -3090,13 +3092,13 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
                 fps0.push(128);
                 fps0.push(255);
             } else {
-                panic!("fps_allocation(0) が取得できません");
+                panic!("fps_allocation_mut(0) が取得できません");
             }
             if let Some(mut fps1) = info.fps_allocation_mut(1) {
                 fps1.clear();
                 fps1.push(64);
             } else {
-                panic!("fps_allocation(1) が取得できません");
+                panic!("fps_allocation_mut(1) が取得できません");
             }
 
             let limits0 =
@@ -3149,7 +3151,7 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
 
     let mut fps0 = info
         .fps_allocation_mut(0)
-        .expect("fps_allocation(0) が None です");
+        .expect("fps_allocation_mut(0) が None です");
     assert_eq!(fps0.len(), 2);
     assert_eq!(fps0.get(0), Some(128));
     assert_eq!(fps0.get(1), Some(255));
