@@ -20,7 +20,7 @@ unsafe extern "C" fn video_sink_on_frame(
     user_data: *mut c_void,
 ) {
     let state = unsafe { &mut *(user_data as *mut VideoSinkHandlerState) };
-    let frame = expect_non_null_const(frame, "VideoFrame");
+    let frame = expect_non_null_const(frame, "video_sink_on_frame (frame)");
     let frame = VideoFrameRef::from_raw(frame);
     state.handler.on_frame(frame);
 }

@@ -389,7 +389,7 @@ pub mod log {
         user_data: *mut c_void,
     ) {
         let state = handler_state(user_data);
-        let line = expect_non_null_const(line, "webrtc_LogLineRef");
+        let line = expect_non_null_const(line, "log_sink_on_log_line_ref (line)");
         state.handler.on_log_message(LogLineRef::from_raw(line));
     }
 }

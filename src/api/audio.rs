@@ -683,8 +683,11 @@ impl<'a> SdpAudioFormatRef<'a> {
     /// SDP コーデック名を返す。
     pub fn name(&self) -> Result<String> {
         let ptr = unsafe { ffi::webrtc_SdpAudioFormat_get_name_const(self.raw.as_ptr()) };
-        CxxStringRef::from_ptr(expect_non_null_const(ptr, "webrtc_SdpAudioFormat_get_name"))
-            .to_string()
+        CxxStringRef::from_ptr(expect_non_null_const(
+            ptr,
+            "webrtc_SdpAudioFormat_get_name_const",
+        ))
+        .to_string()
     }
 
     /// クロックレート (Hz) を返す。

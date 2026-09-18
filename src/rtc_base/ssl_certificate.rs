@@ -108,7 +108,7 @@ unsafe extern "C" fn ssl_certificate_verifier_verify_chain(
         "ssl_certificate_verifier_verify_chain: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut SSLCertificateVerifierHandlerState) };
-    let chain = expect_non_null_const(chain, "SSLCertChain");
+    let chain = expect_non_null_const(chain, "ssl_certificate_verifier_verify_chain (chain)");
     let chain = SSLCertChainRef::from_raw(chain);
     if state.handler.verify_chain(chain) {
         1
