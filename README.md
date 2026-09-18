@@ -139,7 +139,19 @@ impl FactoryHolder {
 
 ## 対応 API
 
-借用ハンドルは読み取り専用の `XxxRef` と書き換え用の `XxxRefMut` に分かれている。所有型の `as_ref()` は `XxxRef` を、`as_mut()` は `XxxRefMut` を返す。借用先を書き換える場合は `XxxRefMut` を取得すること。
+### 借用ハンドル
+
+借用ハンドルは読み取り専用の `XxxRef` と書き換え用の `XxxRefMut` に分かれている。
+
+- 所有型から取得する
+  - `as_ref()` は `XxxRef`、`as_mut()` は `XxxRefMut` を返す (`VideoFrame::as_ref()` / `VideoFrame::as_mut()`)
+  - 所有型が持つコンテナは、読み取り用と書き換え用のアクセサに分かれている (`PeerConnectionRtcConfiguration::servers()` / `servers_mut()`)
+- 読み取りは `as_ref()` か、`XxxRef` と同じ名前のアクセサで行う
+  - `XxxRefMut` は `Deref` を実装していない (`VideoFrameRefMut::as_ref()` / `VideoFrameRefMut::width()`)
+- 生ポインタを取り出す
+  - `XxxRef::as_ptr()` は `*const`、`XxxRefMut::as_mut_ptr()` は `*mut` を返す
+- handler trait とコールバックの引数のうち、書き換えが必要なものは `XxxRefMut` を取る
+  - `AudioEncoderHandler::encode` は `&mut BufferRefMut<'_>` を受け取る
 
 ### PeerConnection
 
@@ -158,7 +170,7 @@ impl FactoryHolder {
   - ICE / 接続設定
 - `ConnectionContext`
   - `default_network_manager()` / `default_socket_factory()` を取得
-- `NetworkManagerRef` / `PacketSocketFactoryRef`
+- `NetworkManagerRef` / `NetworkManagerRefMut` / `PacketSocketFactoryRef` / `PacketSocketFactoryRefMut`
   - `ConnectionContext::default_network_manager()` / `default_socket_factory()` で取得
 - `PeerConnectionOfferAnswerOptions`
   - Offer/Answer オプション (ICE リスタート、Simulcast レイヤー数など)
@@ -203,7 +215,7 @@ impl FactoryHolder {
   - カスタム ADM handler と統計
 - `AudioParameters`
   - 音声パラメータ (サンプルレート、チャネル数など)
-- `AudioTransport` / `AudioTransportRef` / `AudioTransportHandler`
+- `AudioTransport` / `AudioTransportRef` / `AudioTransportRefMut` / `AudioTransportHandler`
   - 音声トランスポート
 - `MediaStreamTrack`
   - メディアストリームトラック
@@ -215,7 +227,7 @@ impl FactoryHolder {
   - 映像フレームバッファ
 - `VideoFrameBufferHandler` / `VideoFrameBufferHandlerAny`
   - カスタム映像バッファ実装
-- `VideoFrame` / `VideoFrameRef`
+- `VideoFrame` / `VideoFrameRef` / `VideoFrameRefMut`
   - 映像フレーム
 - `VideoFrameBuilder`
   - 映像フレーム builder
@@ -254,9 +266,9 @@ impl FactoryHolder {
   - エンコーダー設定とメタ情報
 - `VideoEncoderQpThresholds` / `VideoEncoderScalingSettings` / `VideoEncoderResolution` / `VideoEncoderResolutionBitrateLimits`
   - `VideoEncoderEncoderInfo` の詳細設定型
-- `VideoEncoderQpThresholdsRef` / `VideoEncoderScalingSettingsRef` / `VideoEncoderResolutionRef` / `VideoEncoderResolutionBitrateLimitsRef` / `VideoEncoderResolutionBitrateLimitsVectorRef` / `VideoEncoderFramerateFractionInlinedVectorRef` / `VideoFrameBufferKindInlinedVectorRef`
+- `VideoEncoderQpThresholdsRef` / `VideoEncoderQpThresholdsRefMut` / `VideoEncoderScalingSettingsRef` / `VideoEncoderScalingSettingsRefMut` / `VideoEncoderResolutionRef` / `VideoEncoderResolutionBitrateLimitsRef` / `VideoEncoderResolutionBitrateLimitsVectorRef` / `VideoEncoderFramerateFractionInlinedVectorRef` / `VideoFrameBufferKindInlinedVectorRef`
   - `VideoEncoderEncoderInfo` の詳細設定参照型
-- `VideoEncoderEncodedImageCallback` / `VideoEncoderEncodedImageCallbackRef`
+- `VideoEncoderEncodedImageCallback` / `VideoEncoderEncodedImageCallbackRef` / `VideoEncoderEncodedImageCallbackRefMut`
   - エンコード完了 callback
 - `VideoEncoderEncodedImageCallbackHandler`
   - エンコード完了 callback の handler trait
@@ -272,7 +284,7 @@ impl FactoryHolder {
   - デコーダー / デコーダーファクトリーの handler trait
 - `VideoDecoderDecoderInfo` / `VideoDecoderSettingsRef`
   - デコーダー設定とメタ情報
-- `VideoDecoderDecodedImageCallbackRef` / `VideoDecoderDecodedImageCallbackPtr`
+- `VideoDecoderDecodedImageCallbackPtr`
   - デコード完了 callback
 
 ### RTP
@@ -281,15 +293,15 @@ impl FactoryHolder {
   - コーデック能力
 - `RtpCodecCapability`
   - 個別コーデック設定
-- `RtpCodecRef` / `RtpCodecCapabilityRef`
+- `RtpCodecRef` / `RtpCodecRefMut` / `RtpCodecCapabilityRef` / `RtpCodecCapabilityRefMut`
   - RTP コーデック参照型
 - `RtpCodecCapabilityVector`
   - コーデック能力ベクタ
-- `RtpCodecCapabilityVectorRef`
+- `RtpCodecCapabilityVectorRef` / `RtpCodecCapabilityVectorRefMut`
   - コーデック能力ベクタ参照型
 - `RtpEncodingParameters` / `RtpEncodingParametersVector`
   - エンコーディング設定
-- `RtpEncodingParametersRef`
+- `RtpEncodingParametersRef` / `RtpEncodingParametersRefMut`
   - エンコーディング設定参照型
 - `RtpParameters`
   - RTP 送信パラメータ
@@ -327,11 +339,11 @@ impl FactoryHolder {
   - SDP タイプ (Offer, Answer, PrAnswer, Rollback)
 - `IceCandidate`
   - ICE 候補
-- `IceCandidateRef`
+- `IceCandidateRef` / `IceCandidateRefMut`
   - ICE 候補参照型
 - `IceServer` / `IceServerVector`
   - ICE サーバー設定
-- `IceServerRef` / `IceServerVectorRef`
+- `IceServerRef` / `IceServerRefMut` / `IceServerVectorRef` / `IceServerVectorRefMut`
   - ICE サーバー参照型
 - `IceTransportsType`
   - ICE トランスポートモード
@@ -365,7 +377,7 @@ impl FactoryHolder {
 
 - `Environment`
   - WebRTC 環境の初期化
-- `EnvironmentRef`
+- `EnvironmentRef` / `EnvironmentRefMut`
   - WebRTC 環境参照型
 - `Thread`
   - スレッド管理
@@ -383,10 +395,10 @@ impl FactoryHolder {
   - カラーフォーマット変換 (libyuv)
 - `LibyuvFourcc`
   - `convert_from_i420` 用の出力フォーマット指定
-- `CxxString` / `CxxStringRef` / `StringVector` / `StringVectorRef` / `MapStringString` / `MapStringStringIter`
+- `CxxString` / `CxxStringRef` / `CxxStringRefMut` / `StringVector` / `StringVectorRef` / `StringVectorRefMut` / `MapStringStringRef` / `MapStringStringRefMut` / `MapStringStringIter`
   - C++ 標準文字列 / コンテナの Rust ラッパー
-- `ScopedRef` / `RefCountedHandle`
-  - 参照カウント付きハンドル管理
+- `ConstNonNull`
+  - 非 null が保証された `*const T` を表す型
 - `random_bytes` / `random_string`
   - ランダム生成
 - `time_millis` / `thread_sleep_ms`

@@ -22,10 +22,20 @@
     - `Deref` だと `'a` を持つ `XxxRef` を借用の外へ持ち出せてしまい、書き換えで safe な use-after-free を作れてしまうため
   - `&mut self` を取る可変アクセサ (`parameters_mut` / `cast_to_codec_mut` / `codec_mut` / `simulcast_stream_mut`) の戻り値を `'_` に縛る
     - `'a` を返すと借用が呼び出しで切れて、同一オブジェクトへの可変ハンドルを 2 本作れてしまうため
+  - `XxxRef::as_ptr` の戻り値を `*const` にし、書き換え用の `XxxRefMut::as_mut_ptr` を追加する (`as_ptr` を持つ `RtpCodecRef` / `SSLCertificateRef` / `CxxStringRef` など 11 型)
+  - 未使用だった `VideoDecoderDecodedImageCallbackRef` を削除し、デコード完了 callback は `VideoDecoderDecodedImageCallbackPtr` に集約する
   - @melpon
-- [CHANGE] 所有権を受け取る `from_unique` / `from_unique_ptr` を `pub(crate)` にする
+- [CHANGE] 借用先を書き換える API の引数を `XxxRefMut` に変える
+  - `AudioEncoderHandler::encode` は `&mut BufferRefMut<'_>`、`AudioDecoderHandler::generate_plc` は `&mut BufferS16RefMut<'_>` を受け取る
+  - `VideoDecoderDecodedImageCallbackPtr::decoded` は `VideoFrameRefMut<'_>` を受け取り、`VideoEncoderEncodedImageCallback::on_encoded_image` は `&mut self` になる
+  - `VideoEncoder::register_encode_complete_callback` と `PeerConnectionDependencies::set_proxy` は `XxxRefMut` を受け取る
+  - `AudioTransport` の `recorded_data_is_available` / `need_more_play_data` / `pull_render_data` は `&mut self` になる
+  - `VideoEncoderEncodedImageCallbackPtr::from_ref` を削除し、代わりに書き換え用の `from_mut` を追加する
+  - @melpon
+- [CHANGE] 所有権や生ポインタを受け取るコンストラクタを `pub(crate)` にする
   - `CxxString::from_unique` と `RtcError` / `SdpParseError` / `SessionDescription` の `from_unique_ptr` を外部公開 API から外し、C API の内部機構として限定する
-  - 所有権を移譲する safe な関数を外部に公開すると、二重解放や use-after-free を safe Rust で起こせてしまう
+  - `RtpCapabilities::from_raw` / `RtpParameters::from_raw` / `VideoDecoderDecodedImageCallbackPtr::from_raw` / `VideoEncoderEncodedImageCallbackPtr::from_raw` も同様に `pub(crate)` にする
+  - 所有権や生ポインタをそのまま受け取る関数を外部に公開すると、二重解放や use-after-free を safe Rust で起こせてしまう
   - @melpon
 - [CHANGE] `RtpEncodingParameters::scalability_mode` の戻り値を `Option<Result<String>>` から `Result<Option<String>>` に変更する
   - 未設定は `Ok(None)`、UTF-8 への変換失敗は `Err` で表す
@@ -33,6 +43,10 @@
 - [CHANGE] `AudioDeviceModuleHandler` の要求を `Send + Sync` から `Send` に変更し、各メソッドを `&mut self` にする
   - libwebrtc は ADM の公開メソッドを同時に呼び出さないため、`Sync` と `&self` は要求しない
   - `Mutex` などの内部可変性を用意しなくても、ハンドラが `&mut self` を通して状態を保持できる
+  - @melpon
+- [ADD] `ConnectionContext::default_network_manager_and_socket_factory_mut` を追加する
+  - `NetworkManagerRefMut` と `PacketSocketFactoryRefMut` を 1 回の `&mut self` 借用で取得できるようにする
+  - `PeerConnectionDependencies::set_proxy` のように両方を同時に必要とする API のために用意する
   - @melpon
 - [ADD] `RtpReceiver::stream_ids` を追加する
   - C API の `webrtc_RtpReceiverInterface_stream_ids` を追加し、受信器に関連付けられた Stream ID 群を複製して返す
@@ -56,15 +70,6 @@
 - [ADD] 非 null が保証された `*const T` を表す `ConstNonNull` を追加する
   - `NonNull` は `*mut T` を扱う API しか持たないため、読み取り専用ポインタ用に用意する
   - @melpon
-- [UPDATE] 借用ハンドルが保持するポインタを非 null 型にする
-  - `XxxRef` は `ConstNonNull`、`XxxRefMut` は `NonNull` を保持し、null でないことが型で分かるようにする
-  - `XxxRef::from_raw` / `CxxStringRef::from_ptr` は `ConstNonNull`、`XxxRefMut::from_raw` は `NonNull` を受け取る
-  - 借用ハンドルの `from_raw` / `from_ptr` は `unsafe fn` と `fn` が混在していたのを安全関数に統一する
-  - 使われていない可変借用ハンドル (`NaluInfoRefMut` / `VideoDecoderSettingsRefMut` / `VideoEncoderSettingsRefMut` / `VideoEncoderRateControlParametersRefMut` / `SSLCertificateRefMut` / `SSLCertChainRefMut` / `LogLineRefMut` / `VideoDecoderDecodedImageCallbackRef` 系) を削除する
-  - @melpon
-- [UPDATE] rustdoc の警告を修正する
-  - `std::vector<T>` などをバッククォートで囲み、未解決だったドキュメントリンクを `crate::` 付きのパスにする
-  - @melpon
 - [ADD] webrtc_c に `webrtc_TransformableFrameInterface` から `webrtc_TransformableVideoFrameInterface` への cast を追加する
   - `WEBRTC_DECLARE_CAST` / `WEBRTC_DECLARE_CAST_CONST` マクロで宣言し、C++ 側の `static_cast` でダウンキャストする
   - Rust 側の生のポインタキャストを削除する
@@ -75,6 +80,14 @@
   - Rust 側は const な refcounted ハンドル用に `ScopedRefConst` を追加し、`RTCStatsReport` をこれで保持する
   - `ScopedRefConst::from_raw` / `RTCStatsReport::from_refcounted_ptr` は `NonNull` ではなく `ConstNonNull` を受け取る
   - `RTCStatsReport` を受け取るコールバックから const を外すキャストが消える
+  - @melpon
+- [UPDATE] 借用ハンドルが保持するポインタを非 null 型にする
+  - `XxxRef` は `ConstNonNull`、`XxxRefMut` は `NonNull` を保持し、null でないことが型で分かるようにする
+  - `XxxRef::from_raw` / `CxxStringRef::from_ptr` は `ConstNonNull`、`XxxRefMut::from_raw` は `NonNull` を受け取る
+  - 借用ハンドルの `from_raw` / `from_ptr` は `unsafe fn` と `fn` が混在していたのを安全関数に統一する
+  - @melpon
+- [UPDATE] rustdoc の警告を修正する
+  - `std::vector<T>` などをバッククォートで囲み、未解決だったドキュメントリンクを `crate::` 付きのパスにする
   - @melpon
 - [UPDATE] webrtc_c の `CType_AddRef` / `CType_Release` の引数を `const struct CType*` にする
   - C++ 側の `AddRef()` / `Release()` が const メソッドであるため、C API 側の引数も const にする
@@ -93,6 +106,9 @@
 - [UPDATE] サンプルとテストで PeerConnectionFactory の worker thread に network thread を使う
   - `PeerConnectionFactoryDependencies::set_worker_thread` に network thread を渡す
   - C / C++ の whip / whep サンプルから専用 worker thread の生成を削除する
+  - @melpon
+- [UPDATE] whip / whep サンプルを借用ハンドルの分割に追従させる
+  - `PeerConnectionRtcConfiguration::servers_mut` / `RtpTransceiverInit::stream_ids_mut` / `RtpCodec::parameters_mut` を使って書き換える
   - @melpon
 - [UPDATE] optional 値 (has / value) 方式のヘルパーを C API の値の種類ごとに揃える
   - `has` を読んで `Option` に変換する部分を private な `get_optional` / `set_optional` に集約し、値の種類ごとのヘルパーをその薄いラッパーにする
