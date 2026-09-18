@@ -12,6 +12,7 @@
 //! - bool (c_int の 1 / 0): [get_optional_bool] / [set_optional_bool]
 //! - C オブジェクト: [get_optional_object] / [set_optional_object]
 //! - 生ポインタ: [get_optional_ptr] / [set_optional_ptr]
+//! - 生ポインタ (const): [get_optional_ptr_const]
 //! - ポインタ + 長さ: [get_optional_slice] / [set_optional_slice]
 
 use crate::const_non_null::ConstNonNull;
