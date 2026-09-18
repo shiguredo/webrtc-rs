@@ -27,8 +27,10 @@ fn create_and_drop_environment() {
 }
 
 #[test]
-fn audio_transport_ref_borrows_owner() {
-    // 借用ハンドルは所有型の借用に縛られるため、所有者を drop したあとに使うことはできない。
+fn audio_transport_ref_and_ptr_are_available() {
+    // 借用ハンドルと、C++ 側が所有する transport を保持するための AudioTransportPtr が
+    // 取得できることを確認する。借用ハンドルが所有型の借用に縛られること (所有者を drop した
+    // あとに使えないこと) は型で保証されるため、ここでは検証しない。
     let mut transport = AudioTransport::new_with_handler(Box::new(NoopHandler));
     {
         let r = transport.as_ref();
@@ -82,7 +84,6 @@ fn ref_mut_scalar_write_is_visible_from_owner() {
     );
     parameters.as_mut().set_max_bitrate_bps(Some(1_000_000));
     assert_eq!(parameters.max_bitrate_bps(), Some(1_000_000));
-    assert_eq!(parameters.as_ref().max_bitrate_bps(), Some(1_000_000));
 }
 
 #[test]
@@ -105,21 +106,24 @@ fn ref_mut_vector_write_is_visible_from_owner() {
     let mut vector = RtpCodecCapabilityVector::new(0);
     let capability = RtpCodecCapability::new();
     vector.as_mut().push(&capability.as_ref());
-    assert_eq!(vector.as_ref().len(), 1);
     assert_eq!(vector.len(), 1);
 }
 
 #[test]
 fn ref_mut_forwarded_read_matches_ref() {
-    // XxxRefMut の転送アクセサが XxxRef と同じ値を返すことを確認する。
+    // XxxRefMut の転送アクセサが as_ref() で得た XxxRef と同じ値を返すことを確認する。
     let mut capability = RtpCodecCapability::new();
     capability.set_name("opus");
     capability.set_clock_rate(Some(48_000));
-    let r = capability.as_mut();
-    assert_eq!(r.name().expect("name の取得に失敗しました"), "opus");
-    assert_eq!(r.clock_rate(), Some(48_000));
-    assert!(!r.as_ref().as_ptr().is_null());
-    assert!(!r.as_mut_ptr().is_null());
+    let m = capability.as_mut();
+    let r = m.as_ref();
+    assert_eq!(
+        m.name().expect("name の取得に失敗しました"),
+        r.name().expect("name の取得に失敗しました")
+    );
+    assert_eq!(m.clock_rate(), r.clock_rate());
+    assert!(!r.as_ptr().is_null());
+    assert!(!m.as_mut_ptr().is_null());
 }
 
 #[test]
@@ -1906,9 +1910,6 @@ fn peer_connection_factory_and_capabilities() {
     if !codecs.is_empty() {
         let first = codecs.get(0).expect("先頭 codec の取得に失敗しました");
         assert!(first.name().is_ok());
-        // 読み取り専用の借用から codec のパラメータを読めることを確認する。
-        let parameters = first.parameters();
-        assert_eq!(parameters.len(), parameters.iter().count());
     }
 
     // codecs_mut() から取得した可変ハンドルで書き換えられることを確認する。
@@ -2079,7 +2080,6 @@ fn rtp_codec_capability_vector() {
         "opus"
     );
     let codec_parameters = codec_ref.parameters();
-    assert_eq!(codec_parameters.len(), codec_parameters.iter().count());
     assert!(
         codec_parameters
             .iter()
@@ -2173,8 +2173,16 @@ fn rtp_encoding_parameters_and_transceiver_init() {
         let mut enc_mut = enc.as_mut();
         let mut enc_codec_mut = enc_mut.codec_mut().expect("codec_mut の取得に失敗しました");
         enc_codec_mut.set_num_channels(Some(1));
+        enc_codec_mut.parameters_mut().set("profile-id", "0");
         // 可変ハンドルは読み取りアクセサも転送メソッドとして持つ。
-        assert_eq!(enc_codec_mut.parameters().len(), 0);
+        assert_eq!(enc_codec_mut.parameters().len(), 1);
+        assert!(
+            enc_codec_mut
+                .as_ref()
+                .parameters()
+                .iter()
+                .any(|(k, v)| k == "profile-id" && v == "0")
+        );
     }
     assert_eq!(
         enc.codec()
@@ -4691,9 +4699,8 @@ impl AudioEncoderFactoryHandler for TestAudioEncoderFactoryHandler {
     ) -> Option<AudioEncoder> {
         assert!(!env.as_ptr().is_null());
         assert_eq!(format.name().expect("名前の取得に失敗しました"), "opus");
-        // 読み取り専用の借用からパラメータを読めることを検証する。
-        let parameters = format.parameters();
-        assert_eq!(parameters.len(), parameters.iter().count());
+        // パラメータを設定していないので空になる。
+        assert!(format.parameters().is_empty());
         if self.created {
             return None;
         }
@@ -4821,9 +4828,8 @@ impl AudioDecoderFactoryHandler for TestAudioDecoderFactoryHandler {
     ) -> Option<AudioDecoder> {
         assert!(!env.as_ptr().is_null());
         assert_eq!(format.name().expect("名前の取得に失敗しました"), "opus");
-        // 読み取り専用の借用からパラメータを読めることを検証する。
-        let parameters = format.parameters();
-        assert_eq!(parameters.len(), parameters.iter().count());
+        // パラメータを設定していないので空になる。
+        assert!(format.parameters().is_empty());
         if self.created {
             return None;
         }

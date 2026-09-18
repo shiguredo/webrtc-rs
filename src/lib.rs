@@ -39,11 +39,10 @@ pub use util::*;
 
 /// 借用ハンドルの型システム保証を固定するための `compile_fail` doctest。
 ///
-/// ユーザー向けのドキュメントではなく回帰テストなので、`cfg(doctest)` と `#[doc(hidden)]` で
-/// 通常のビルドとドキュメントからは見えないようにしている。
+/// ユーザー向けのドキュメントではなく回帰テストなので、`cfg(doctest)` で doctest のときだけ
+/// コンパイルし、通常のビルドとドキュメントからは見えないようにしている。
 #[cfg(doctest)]
-#[doc(hidden)]
-pub mod compile_fail_doctests {
+mod compile_fail_doctests {
     //! 借用ハンドルの型システム保証を固定する。
     //!
     //! `XxxRefMut` は `Deref` を実装しないため、借用を外して `XxxRef` を取り出せない (E0614)。
