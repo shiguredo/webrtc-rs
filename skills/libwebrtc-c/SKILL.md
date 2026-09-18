@@ -153,8 +153,9 @@ C++ でスタック配置するクラスは C 側ではヒープに置いて明�
     - 例: `webrtc_RtpCapabilities_get_codecs` / `webrtc_RTPVideoHeaderH264_get_nalus`
     - Rust 側の `XxxRef` から読む場合は `_get_xxx_const` も用意する (`XxxRef` は `*const` しか持たないため可変版を呼べない)
   - 要素への借用を返す `_vector_get` / `_inlined_vector_get` は C++ 側に可変参照と const 参照の両方があるため、読み取り経路では必ず `_get_const` 版を使う
-  - 読み取り専用の借用に対するダウンキャストは `WEBRTC_DECLARE_CAST_CONST` を用意する
+  - 読み取り専用の借用に対する cast は `WEBRTC_DECLARE_CAST_CONST` を用意する
     - 例: `webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec` (可変参照を返す) と `webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec_const` (読み取り専用を返す)
+    - 例: `webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface` (ダウンキャスト) と `webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface_const`
   - 借用ではなくコピーする引数 (`_vector_set` / `_vector_push_back` / `_inlined_vector_set` / `_inlined_vector_push_back` の値) は `const struct webrtc_Xxx*` にする
 - `std::vector` / `absl::InlinedVector` の `_get` は要素への可変参照を返すため非 const、`_get_const` / `_size` / `_index` は const になる (`common.h` / `common.impl.h` のマクロ)
 - `WEBRTC_DECLARE_REFCOUNTED_VECTOR` の `_refcounted_vector_get` は非 const で `_get_const` は持たない (`_refcounted_vector_size` は const)

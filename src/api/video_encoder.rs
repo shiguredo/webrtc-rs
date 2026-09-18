@@ -2210,8 +2210,7 @@ impl<'a> VideoEncoderEncodedImageCallbackRef<'a> {
         }
     }
 
-    // この型は読み取りアクセサを持たず、VideoEncoderEncodedImageCallbackRefMut の
-    // Deref の対象としてのみ使うため、ポインタを読む経路が無い。
+    // この型は読み取りアクセサを持たず、ポインタを読む経路が無い。
     #[expect(dead_code)]
     pub(crate) fn as_ptr(&self) -> *const ffi::webrtc_VideoEncoder_EncodedImageCallback {
         self.raw.as_ptr()

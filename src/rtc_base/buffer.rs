@@ -116,12 +116,10 @@ impl Buffer {
 
     /// [BufferRef] として借用する。
     pub fn as_ref(&self) -> BufferRef<'_> {
-        // Safety: self.raw は Buffer の生存中は常に有効です。
         BufferRef::from_raw(ConstNonNull::from(self.raw))
     }
 
     pub fn as_mut(&mut self) -> BufferRefMut<'_> {
-        // Safety: self.raw は Buffer の生存中は常に有効です。
         BufferRefMut::from_raw(self.raw)
     }
 
