@@ -339,7 +339,7 @@ impl FactoryHolder {
   - SDP タイプ (Offer, Answer, PrAnswer, Rollback)
 - `IceCandidate`
   - ICE 候補
-- `IceCandidateRef` / `IceCandidateRefMut`
+- `IceCandidateRef`
   - ICE 候補参照型
 - `IceServer` / `IceServerVector`
   - ICE サーバー設定
@@ -377,7 +377,7 @@ impl FactoryHolder {
 
 - `Environment`
   - WebRTC 環境の初期化
-- `EnvironmentRef` / `EnvironmentRefMut`
+- `EnvironmentRef`
   - WebRTC 環境参照型
 - `Thread`
   - スレッド管理

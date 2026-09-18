@@ -198,44 +198,6 @@ impl<'a> IceCandidateRef<'a> {
     }
 }
 
-/// webrtc::IceCandidate の可変借用ラッパー。
-pub struct IceCandidateRefMut<'a> {
-    raw: NonNull<ffi::webrtc_IceCandidate>,
-    _marker: PhantomData<&'a mut ffi::webrtc_IceCandidate>,
-    cref: IceCandidateRef<'a>,
-}
-
-unsafe impl<'a> Send for IceCandidateRefMut<'a> {}
-
-impl<'a> IceCandidateRefMut<'a> {
-    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_IceCandidate>) -> Self {
-        Self {
-            raw,
-            _marker: PhantomData,
-            cref: IceCandidateRef::from_raw(ConstNonNull::from(raw)),
-        }
-    }
-
-    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_IceCandidate {
-        self.raw.as_ptr()
-    }
-    pub fn as_ref(&self) -> IceCandidateRef<'_> {
-        self.cref
-    }
-
-    pub fn sdp_mid(&self) -> Result<String> {
-        self.cref.sdp_mid()
-    }
-
-    pub fn sdp_mline_index(&self) -> i32 {
-        self.cref.sdp_mline_index()
-    }
-
-    pub fn to_string(&self) -> Result<String> {
-        self.cref.to_string()
-    }
-}
-
 /// webrtc::IceCandidate の所有ラッパー。
 pub struct IceCandidate {
     raw: NonNull<ffi::webrtc_IceCandidate>,
@@ -265,10 +227,6 @@ impl IceCandidate {
 
     pub fn as_ref(&self) -> IceCandidateRef<'_> {
         IceCandidateRef::from_raw(ConstNonNull::from(self.raw))
-    }
-
-    pub fn as_mut(&mut self) -> IceCandidateRefMut<'_> {
-        IceCandidateRefMut::from_raw(self.raw)
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_IceCandidate {

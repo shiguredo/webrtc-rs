@@ -30,11 +30,6 @@ impl Environment {
         // Safety: self.raw は Environment の生存中は常に有効です。
         EnvironmentRef::from_raw(ConstNonNull::from(self.raw))
     }
-
-    pub fn as_mut(&mut self) -> EnvironmentRefMut<'_> {
-        // Safety: self.raw は Environment の生存中は常に有効です。
-        EnvironmentRefMut::from_raw(self.raw)
-    }
 }
 
 impl Default for Environment {
@@ -67,31 +62,5 @@ impl<'a> EnvironmentRef<'a> {
 
     pub(crate) fn as_ptr(&self) -> *const ffi::webrtc_Environment {
         self.raw.as_ptr()
-    }
-}
-
-/// webrtc_Environment の可変借用ラッパー。
-pub struct EnvironmentRefMut<'a> {
-    raw: NonNull<ffi::webrtc_Environment>,
-    _marker: PhantomData<&'a mut ffi::webrtc_Environment>,
-    cref: EnvironmentRef<'a>,
-}
-
-unsafe impl<'a> Send for EnvironmentRefMut<'a> {}
-
-impl<'a> EnvironmentRefMut<'a> {
-    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_Environment>) -> Self {
-        Self {
-            raw,
-            _marker: PhantomData,
-            cref: EnvironmentRef::from_raw(ConstNonNull::from(raw)),
-        }
-    }
-
-    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_Environment {
-        self.raw.as_ptr()
-    }
-    pub fn as_ref(&self) -> EnvironmentRef<'_> {
-        self.cref
     }
 }
