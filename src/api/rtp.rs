@@ -39,10 +39,6 @@ impl RtpCapabilities {
     }
 
     /// codecs のベクタを借用する。
-    ///
-    /// C API の getter は codecs への可変参照を返すため非 const だが、所有型は
-    /// `*mut` を保持しているので `&self` から呼べる。ここでは読み取り専用の
-    /// 借用として返す。
     pub fn codecs(&self) -> RtpCodecCapabilityVectorRef<'_> {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_RtpCapabilities_get_codecs(self.raw.as_ptr()) },
