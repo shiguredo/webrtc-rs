@@ -34,8 +34,11 @@ impl<'a> BufferRef<'a> {
         if size == 0 {
             return &[];
         }
-        let ptr = unsafe { ffi::webrtc_Buffer_data(self.raw.as_ptr()) };
-        assert!(!ptr.is_null(), "webrtc_Buffer_data が null を返しました");
+        let ptr = unsafe { ffi::webrtc_Buffer_data_const(self.raw.as_ptr()) };
+        assert!(
+            !ptr.is_null(),
+            "webrtc_Buffer_data_const が null を返しました"
+        );
         unsafe { slice::from_raw_parts(ptr, size) }
     }
 }
@@ -81,6 +84,17 @@ impl<'a> BufferRefMut<'a> {
 
     pub fn data(&self) -> &[u8] {
         self.cref.data()
+    }
+
+    /// バッファ内容を書き換え用に返す。
+    pub fn data_mut(&mut self) -> &mut [u8] {
+        let size = self.size();
+        if size == 0 {
+            return &mut [];
+        }
+        let ptr = unsafe { ffi::webrtc_Buffer_data(self.raw.as_ptr()) };
+        assert!(!ptr.is_null(), "webrtc_Buffer_data が null を返しました");
+        unsafe { slice::from_raw_parts_mut(ptr, size) }
     }
 }
 
@@ -132,8 +146,11 @@ impl Buffer {
         if size == 0 {
             return &[];
         }
-        let ptr = unsafe { ffi::webrtc_Buffer_data(self.raw.as_ptr()) };
-        assert!(!ptr.is_null(), "webrtc_Buffer_data が null を返しました");
+        let ptr = unsafe { ffi::webrtc_Buffer_data_const(self.raw.as_ptr()) };
+        assert!(
+            !ptr.is_null(),
+            "webrtc_Buffer_data_const が null を返しました"
+        );
         unsafe { slice::from_raw_parts(ptr, size) }
     }
 
@@ -175,8 +192,11 @@ impl<'a> BufferS16Ref<'a> {
         if size == 0 {
             return &[];
         }
-        let ptr = unsafe { ffi::webrtc_BufferS16_data(self.raw.as_ptr()) };
-        assert!(!ptr.is_null(), "webrtc_BufferS16_data が null を返しました");
+        let ptr = unsafe { ffi::webrtc_BufferS16_data_const(self.raw.as_ptr()) };
+        assert!(
+            !ptr.is_null(),
+            "webrtc_BufferS16_data_const が null を返しました"
+        );
         unsafe { slice::from_raw_parts(ptr, size) }
     }
 }
@@ -227,5 +247,16 @@ impl<'a> BufferS16RefMut<'a> {
 
     pub fn data(&self) -> &[i16] {
         self.cref.data()
+    }
+
+    /// バッファ内容を書き換え用に返す。
+    pub fn data_mut(&mut self) -> &mut [i16] {
+        let size = self.size();
+        if size == 0 {
+            return &mut [];
+        }
+        let ptr = unsafe { ffi::webrtc_BufferS16_data(self.raw.as_ptr()) };
+        assert!(!ptr.is_null(), "webrtc_BufferS16_data が null を返しました");
+        unsafe { slice::from_raw_parts_mut(ptr, size) }
     }
 }

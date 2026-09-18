@@ -25,6 +25,27 @@ fn create_and_drop_environment() {
 }
 
 #[test]
+fn buffer_data_mut_round_trip() {
+    // append_data で用意した内容を data_mut 経由で書き換え、data で読み戻せることを確認する。
+    let mut buffer = Buffer::new();
+    buffer.append_data(&[1, 2, 3, 4]);
+    {
+        let mut r = buffer.as_mut();
+        assert_eq!(r.data(), &[1, 2, 3, 4]);
+        let data = r.data_mut();
+        data[0] = 9;
+        data[3] = 8;
+        assert_eq!(r.data(), &[9, 2, 3, 8]);
+    }
+    assert_eq!(buffer.data(), &[9, 2, 3, 8]);
+
+    // 空のバッファでは空スライスを返す。
+    let mut empty = Buffer::new();
+    assert!(empty.as_mut().data_mut().is_empty());
+    assert!(empty.data().is_empty());
+}
+
+#[test]
 fn cxx_string_round_trip() {
     let mut s = CxxString::from_str("hello");
     assert_eq!(s.len(), 5);

@@ -37,6 +37,11 @@
   - `RtpCapabilities::from_raw` / `RtpParameters::from_raw` / `VideoDecoderDecodedImageCallbackPtr::from_raw` / `VideoEncoderEncodedImageCallbackPtr::from_raw` も同様に `pub(crate)` にする
   - 所有権や生ポインタをそのまま受け取る関数を外部に公開すると、二重解放や use-after-free を safe Rust で起こせてしまう
   - @melpon
+- [CHANGE] webrtc_c の `webrtc_Buffer_data` / `webrtc_BufferS16_data` を `_const` にリネームし、可変版を追加する
+  - `rtc::Buffer::data()` は可変参照を返す版と const 参照を返す版の両方があるため、`webrtc_Buffer_data` を可変版、`webrtc_Buffer_data_const` を読み取り専用版にする
+  - C 側の呼び出しは `webrtc_Buffer_data` / `webrtc_BufferS16_data` から `_const` 版に置き換える
+  - Rust 側は `BufferRef::data` が `_const` 版を使い、`BufferRefMut::data_mut` / `BufferS16RefMut::data_mut` で書き換えられるようにする
+  - @melpon
 - [CHANGE] `RtpEncodingParameters::scalability_mode` の戻り値を `Option<Result<String>>` から `Result<Option<String>>` に変更する
   - 未設定は `Ok(None)`、UTF-8 への変換失敗は `Err` で表す
   - @melpon
