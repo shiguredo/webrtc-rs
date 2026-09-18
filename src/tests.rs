@@ -862,7 +862,7 @@ fn nv12_buffer_planes_kind_and_to_i420() {
     for (i, v) in buf.y_data_mut().iter_mut().enumerate() {
         *v = (i as u8).wrapping_add(0x10);
     }
-    for uv in buf.uv_data_mut().chunks_exact_mut(2) {
+    for uv in buf.uv_data_mut().as_chunks_mut::<2>().0 {
         uv[0] = 0x44;
         uv[1] = 0x88;
     }
@@ -944,7 +944,7 @@ fn nv12_buffer_data_and_data_mut_use_contiguous_memory_with_padding() {
 fn nv12_buffer_crop_and_scale_from() {
     let mut src = NV12Buffer::new(4, 4);
     src.y_data_mut().fill(0x11);
-    for uv in src.uv_data_mut().chunks_exact_mut(2) {
+    for uv in src.uv_data_mut().as_chunks_mut::<2>().0 {
         uv[0] = 0x22;
         uv[1] = 0x66;
     }
@@ -953,7 +953,7 @@ fn nv12_buffer_crop_and_scale_from() {
     dst.crop_and_scale_from(&src, 0, 0, 4, 4);
 
     assert!(dst.y_data().iter().all(|&v| v == 0x11));
-    for uv in dst.uv_data().chunks_exact(2) {
+    for uv in dst.uv_data().as_chunks::<2>().0 {
         assert_eq!(uv[0], 0x22);
         assert_eq!(uv[1], 0x66);
     }
