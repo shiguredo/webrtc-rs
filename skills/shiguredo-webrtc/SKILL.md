@@ -33,6 +33,12 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 
 `cargo test --workspace --features source-build` で C API の薄いラッパーまでを含めた単体テストを実行する。実際に映像・音声フレームが流れる統合テストは webrtc-rs 単体では扱わず、`sora-rust-sdk` 経由で行う。
 
+薄いラッパー (`XxxRef` / `XxxRefMut` のアクセサなど) は型ごとの網羅テストを書かない。FFI の関数名とシグネチャは bindgen 生成のバインディングでコンパイル時に検査され、setter と getter の往復テストの実体は libwebrtc 側の挙動の確認になるためである。代わりに次の 3 つで守る。
+
+- 借用ハンドル経由の書き換えが所有型に反映されることを、機構 (スカラー / map / vector / フレーム) ごとに 1 本ずつ確認する
+- 型システムの保証 (`XxxRefMut` が `Deref` を実装しない / `'_` に縛る / 可変ハンドルを 2 本作れない / 生ポインタや所有権を受け取るコンストラクタが crate 外から呼べない) は、クレートドキュメントの `compile_fail` doctest で固定する
+- この crate 固有のロジック (`Option` の `has` / `value` 変換、UTF-8 変換、境界チェック、既定値、判定関数) は網羅的にテストする
+
 ## ビルド設定 (`Cargo.toml` メタデータ)
 
 - `[package.metadata.external-dependencies.webrtc-build]` で libwebrtc バージョンと URL を管理
