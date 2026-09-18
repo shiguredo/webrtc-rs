@@ -1069,9 +1069,10 @@ impl AudioEncoderEncodedInfo {
         let mut redundant = Vec::with_capacity(size);
         for i in 0..size {
             let raw = unsafe {
-                ffi::webrtc_AudioEncoder_EncodedInfoLeaf_vector_get(vec.as_ptr(), i as i32)
+                ffi::webrtc_AudioEncoder_EncodedInfoLeaf_vector_get_const(vec.as_ptr(), i as i32)
             };
-            let raw = expect_non_null(raw, "webrtc_AudioEncoder_EncodedInfoLeaf_vector_get");
+            let raw =
+                expect_non_null_const(raw, "webrtc_AudioEncoder_EncodedInfoLeaf_vector_get_const");
             // Safety: vector が保持する leaf への借用ポインタを返す。_copy で複製して所有する。
             let copied = unsafe { ffi::webrtc_AudioEncoder_EncodedInfoLeaf_copy(raw.as_ptr()) };
             redundant.push(AudioEncoderEncodedInfoLeaf::from_raw(expect_non_null(
@@ -3042,8 +3043,8 @@ impl AudioEncoderFactory {
         let size = unsafe { ffi::webrtc_AudioCodecSpec_vector_size(raw_vec.as_ptr()) };
         let mut specs = Vec::with_capacity(size.max(0) as usize);
         for i in 0..size {
-            let raw = unsafe { ffi::webrtc_AudioCodecSpec_vector_get(raw_vec.as_ptr(), i) };
-            let raw = expect_non_null(raw, "webrtc_AudioCodecSpec_vector_get");
+            let raw = unsafe { ffi::webrtc_AudioCodecSpec_vector_get_const(raw_vec.as_ptr(), i) };
+            let raw = expect_non_null_const(raw, "webrtc_AudioCodecSpec_vector_get_const");
             let copied = unsafe { ffi::webrtc_AudioCodecSpec_copy(raw.as_ptr()) };
             specs.push(AudioCodecSpec {
                 raw: expect_non_null(copied, "webrtc_AudioCodecSpec_copy"),
@@ -3199,8 +3200,8 @@ impl AudioDecoderFactory {
         let size = unsafe { ffi::webrtc_AudioCodecSpec_vector_size(raw_vec.as_ptr()) };
         let mut specs = Vec::with_capacity(size.max(0) as usize);
         for i in 0..size {
-            let raw = unsafe { ffi::webrtc_AudioCodecSpec_vector_get(raw_vec.as_ptr(), i) };
-            let raw = expect_non_null(raw, "webrtc_AudioCodecSpec_vector_get");
+            let raw = unsafe { ffi::webrtc_AudioCodecSpec_vector_get_const(raw_vec.as_ptr(), i) };
+            let raw = expect_non_null_const(raw, "webrtc_AudioCodecSpec_vector_get_const");
             let copied = unsafe { ffi::webrtc_AudioCodecSpec_copy(raw.as_ptr()) };
             specs.push(AudioCodecSpec {
                 raw: expect_non_null(copied, "webrtc_AudioCodecSpec_copy"),

@@ -92,7 +92,7 @@ impl GofInfoVP9 {
     ///
     /// # Safety
     /// `raw` は有効な `webrtc_GofInfoVP9` を指している必要があります。
-    pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_GofInfoVP9) -> Self {
+    pub(crate) unsafe fn copy_from_raw(raw: *const ffi::webrtc_GofInfoVP9) -> Self {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_GofInfoVP9_copy(raw) },
             "webrtc_GofInfoVP9_copy",
@@ -281,7 +281,7 @@ impl RTPVideoHeaderVP8 {
     ///
     /// # Safety
     /// `raw` は有効な `webrtc_RTPVideoHeaderVP8` を指している必要があります。
-    pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_RTPVideoHeaderVP8) -> Self {
+    pub(crate) unsafe fn copy_from_raw(raw: *const ffi::webrtc_RTPVideoHeaderVP8) -> Self {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_RTPVideoHeaderVP8_copy(raw) },
             "webrtc_RTPVideoHeaderVP8_copy",
@@ -427,7 +427,7 @@ impl RTPVideoHeaderVP9 {
     ///
     /// # Safety
     /// `raw` は有効な `webrtc_RTPVideoHeaderVP9` を指している必要があります。
-    pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_RTPVideoHeaderVP9) -> Self {
+    pub(crate) unsafe fn copy_from_raw(raw: *const ffi::webrtc_RTPVideoHeaderVP9) -> Self {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_RTPVideoHeaderVP9_copy(raw) },
             "webrtc_RTPVideoHeaderVP9_copy",
@@ -827,7 +827,7 @@ impl NaluInfo {
     ///
     /// # Safety
     /// `raw` は有効な `webrtc_NaluInfo` を指している必要があります。
-    pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_NaluInfo) -> Self {
+    pub(crate) unsafe fn copy_from_raw(raw: *const ffi::webrtc_NaluInfo) -> Self {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_NaluInfo_copy(raw) },
             "webrtc_NaluInfo_copy",
@@ -962,9 +962,9 @@ impl NaluInfoVector {
         if index >= self.len() {
             return None;
         }
-        let raw = unsafe { ffi::webrtc_NaluInfo_vector_get(self.raw.as_ptr(), index as i32) };
-        let raw = NonNull::new(raw)?;
-        Some(NaluInfoRef::from_raw(ConstNonNull::from(raw)))
+        let raw = unsafe { ffi::webrtc_NaluInfo_vector_get_const(self.raw.as_ptr(), index as i32) };
+        let raw = ConstNonNull::new(raw)?;
+        Some(NaluInfoRef::from_raw(raw))
     }
 
     pub fn push(&mut self, value: &NaluInfo) {
@@ -1015,7 +1015,7 @@ impl RTPVideoHeaderH264 {
     ///
     /// # Safety
     /// `raw` は有効な `webrtc_RTPVideoHeaderH264` を指している必要があります。
-    pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_RTPVideoHeaderH264) -> Self {
+    pub(crate) unsafe fn copy_from_raw(raw: *const ffi::webrtc_RTPVideoHeaderH264) -> Self {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_RTPVideoHeaderH264_copy(raw) },
             "webrtc_RTPVideoHeaderH264_copy",
@@ -1054,7 +1054,7 @@ impl RTPVideoHeaderH264 {
         let mut vec = NaluInfoVector::new(0);
         let len = unsafe { ffi::webrtc_NaluInfo_vector_size(raw.as_ptr()) };
         for index in 0..len {
-            let elem = unsafe { ffi::webrtc_NaluInfo_vector_get(raw.as_ptr(), index) };
+            let elem = unsafe { ffi::webrtc_NaluInfo_vector_get_const(raw.as_ptr(), index) };
             let elem = unsafe { NaluInfo::copy_from_raw(elem) };
             vec.push(&elem);
         }

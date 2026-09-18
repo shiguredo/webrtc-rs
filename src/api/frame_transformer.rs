@@ -904,8 +904,8 @@ impl VideoFrameMetadata {
         let len = unsafe { ffi::webrtc_uint32_vector_size(raw.as_ptr()) };
         let mut result = Vec::new();
         for index in 0..len {
-            let elem = unsafe { ffi::webrtc_uint32_vector_get(raw.as_ptr(), index) };
-            let elem = expect_non_null(elem, "webrtc_uint32_vector_get");
+            let elem = unsafe { ffi::webrtc_uint32_vector_get_const(raw.as_ptr(), index) };
+            let elem = expect_non_null_const(elem, "webrtc_uint32_vector_get_const");
             result.push(unsafe { ffi::webrtc_uint32_value(elem.as_ptr()) });
         }
         unsafe { ffi::webrtc_uint32_vector_delete(raw.as_ptr()) };

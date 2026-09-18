@@ -1229,13 +1229,13 @@ impl RtpEncodingParametersVector {
             return None;
         }
 
-        let raw = expect_non_null(
+        let raw = expect_non_null_const(
             unsafe {
-                ffi::webrtc_RtpEncodingParameters_vector_get(self.raw.as_ptr(), index as i32)
+                ffi::webrtc_RtpEncodingParameters_vector_get_const(self.raw.as_ptr(), index as i32)
             },
-            "webrtc_RtpEncodingParameters_vector_get",
+            "webrtc_RtpEncodingParameters_vector_get_const",
         );
-        Some(RtpEncodingParametersRef::from_raw(ConstNonNull::from(raw)))
+        Some(RtpEncodingParametersRef::from_raw(raw))
     }
 
     pub fn push(&mut self, enc: &RtpEncodingParameters) {

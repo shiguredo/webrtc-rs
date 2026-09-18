@@ -545,9 +545,11 @@ impl VideoDecoderFactory {
         let size = unsafe { ffi::webrtc_SdpVideoFormat_vector_size(raw_vec.as_ptr()) };
         let mut formats = Vec::with_capacity(size.max(0) as usize);
         for i in 0..size {
-            let raw_format = unsafe { ffi::webrtc_SdpVideoFormat_vector_get(raw_vec.as_ptr(), i) };
-            let raw_format = expect_non_null(raw_format, "webrtc_SdpVideoFormat_vector_get");
-            let format_ref = SdpVideoFormatRef::from_raw(ConstNonNull::from(raw_format));
+            let raw_format =
+                unsafe { ffi::webrtc_SdpVideoFormat_vector_get_const(raw_vec.as_ptr(), i) };
+            let raw_format =
+                expect_non_null_const(raw_format, "webrtc_SdpVideoFormat_vector_get_const");
+            let format_ref = SdpVideoFormatRef::from_raw(raw_format);
             formats.push(format_ref.to_owned());
         }
         unsafe { ffi::webrtc_SdpVideoFormat_vector_delete(raw_vec.as_ptr()) };
