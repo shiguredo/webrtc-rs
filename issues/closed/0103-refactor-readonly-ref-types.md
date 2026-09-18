@@ -202,9 +202,10 @@ owned 型に `as_mut(&mut self) -> XxxRefMut<'_>` を追加し、`as_ref(&self) 
 - `XxxRef::from_raw` / `XxxRefMut::from_raw` / `CxxStringRef::from_ptr` を `pub(crate)` に限定し、`unsafe fn` と `fn` が混在していたのを安全関数に統一した（借用先の寿命を型で保証できず、外部に公開すると safe Rust から不正なハンドルを作れてしまうため）
 - 所有権を受け取る `CxxString::from_unique` / `RtcError::from_unique_ptr` / `SdpParseError::from_unique_ptr` / `SessionDescription::from_unique_ptr` も同様に `pub(crate)` に限定した（`CxxString::into_raw` は譲渡方向なので public のまま。再監査で public かつ safe に所有権を取る関数はこの 4 つだけであることを確認した）
 - `webrtc_c` に読み取り専用の借用を返す `_const` 版 getter・`_refcounted_get_const`・`WEBRTC_DECLARE_CAST_CONST` を追加し、`AddRef` / `Release` の引数を `const struct CType*` にした（`src/` から const を外すキャストを全廃した）
-- 構築経路が無く未使用だった可変ハンドル（`NaluInfoRefMut` / `VideoDecoderSettingsRefMut` / `VideoEncoderSettingsRefMut` / `VideoEncoderRateControlParametersRefMut` / `SSLCertificateRefMut` / `SSLCertChainRefMut` / `LogLineRefMut` / `VideoDecoderDecodedImageCallbackRef` 系）を削除した
+- このブランチで新設したものの、構築経路が無く未使用だった可変ハンドル 7 型（`NaluInfoRefMut` / `VideoDecoderSettingsRefMut` / `VideoEncoderSettingsRefMut` / `VideoEncoderRateControlParametersRefMut` / `SSLCertificateRefMut` / `SSLCertChainRefMut` / `LogLineRefMut`）を削除した
+- 未使用だった `VideoDecoderDecodedImageCallbackRef` を削除し、デコード完了 callback は `VideoDecoderDecodedImageCallbackPtr` に集約した
 - 完了条件のうち 2 点は実装時に変わった
-  - 「全 39 の `XxxRef` に対応する `XxxRefMut`」は、未使用の可変ハンドル 8 型を削除したため `XxxRefMut` が 32 型になった
+  - 「全 39 の `XxxRef` に対応する `XxxRefMut`」は、未使用の可変ハンドル 7 型を削除したため `XxxRefMut` が 32 型になった
   - 「`XxxRef` が `*const`、`XxxRefMut` が `*mut` を保持」は、非 null を型で表す `ConstNonNull` / `NonNull` を保持する形になった
 - レビューで、`XxxRef` の `Copy` と `XxxRefMut` の `Deref` の組み合わせにより safe なコードで use-after-free を作れることが判明したため、`XxxRefMut` から `Deref` を削除した
   - `Deref::Target` は `XxxRef<'a>` に固定され、`deref()` が返す参照の中身が `'a` を持つため、`Copy` でその値を借用の外へ持ち出せる。持ち出したハンドルから得た借用を保持したまま `XxxRefMut` の書き換えメソッドを呼ぶと、C++ 側の再確保で解放された領域を読むことになる
