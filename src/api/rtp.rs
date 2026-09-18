@@ -125,7 +125,8 @@ impl RtpCodec {
 
     /// コーデックパラメータへの可変参照を返す。
     pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'_> {
-        self.as_mut().parameters_mut()
+        let raw = unsafe { ffi::webrtc_RtpCodec_get_parameters(self.raw.as_ptr()) };
+        MapStringStringRefMut::from_raw(expect_non_null(raw, "webrtc_RtpCodec_get_parameters"))
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_RtpCodec {
@@ -239,7 +240,7 @@ impl<'a> RtpCodecRefMut<'a> {
     }
 
     /// コーデックパラメータへの可変参照を返す。
-    pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'a> {
+    pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'_> {
         let raw = unsafe { ffi::webrtc_RtpCodec_get_parameters(self.raw.as_ptr()) };
         MapStringStringRefMut::from_raw(expect_non_null(raw, "webrtc_RtpCodec_get_parameters"))
     }
@@ -320,7 +321,11 @@ impl RtpCodecCapability {
     }
 
     pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'_> {
-        self.as_mut().parameters_mut()
+        let raw =
+            unsafe { ffi::webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec(self.raw.as_ptr()) };
+        let raw = expect_non_null(raw, "webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec");
+        let ptr = unsafe { ffi::webrtc_RtpCodec_get_parameters(raw.as_ptr()) };
+        MapStringStringRefMut::from_raw(expect_non_null(ptr, "webrtc_RtpCodec_get_parameters"))
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_RtpCodecCapability {
@@ -412,7 +417,7 @@ impl<'a> RtpCodecCapabilityRefMut<'a> {
     }
 
     /// 書き換え用に webrtc::RtpCodec へキャストした可変借用を返す。
-    pub fn cast_to_codec_mut(&mut self) -> RtpCodecRefMut<'a> {
+    pub fn cast_to_codec_mut(&mut self) -> RtpCodecRefMut<'_> {
         let raw =
             unsafe { ffi::webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec(self.raw.as_ptr()) };
         let raw = expect_non_null(raw, "webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec");
@@ -436,8 +441,12 @@ impl<'a> RtpCodecCapabilityRefMut<'a> {
     }
 
     /// コーデックパラメータへの可変参照を返す。
-    pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'a> {
-        self.cast_to_codec_mut().parameters_mut()
+    pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'_> {
+        let raw =
+            unsafe { ffi::webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec(self.raw.as_ptr()) };
+        let raw = expect_non_null(raw, "webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec");
+        let ptr = unsafe { ffi::webrtc_RtpCodec_get_parameters(raw.as_ptr()) };
+        MapStringStringRefMut::from_raw(expect_non_null(ptr, "webrtc_RtpCodec_get_parameters"))
     }
     pub fn as_ref(&self) -> RtpCodecCapabilityRef<'_> {
         self.cref
@@ -1072,7 +1081,7 @@ impl<'a> RtpEncodingParametersRefMut<'a> {
     }
 
     /// 書き換え用に codec への可変参照を返す。
-    pub fn codec_mut(&mut self) -> Option<RtpCodecRefMut<'a>> {
+    pub fn codec_mut(&mut self) -> Option<RtpCodecRefMut<'_>> {
         let raw = get_optional_ptr(
             "webrtc_RtpEncodingParameters_get_codec",
             |has, value| unsafe {

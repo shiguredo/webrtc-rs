@@ -2039,12 +2039,10 @@ fn rtp_encoding_parameters_and_transceiver_init() {
 
     // codec_mut() で encoding parameters が保持する codec を直接書き換えられることを検証する。
     {
-        let mut enc_codec_mut = enc
-            .as_mut()
-            .codec_mut()
-            .expect("codec_mut の取得に失敗しました");
+        let mut enc_mut = enc.as_mut();
+        let mut enc_codec_mut = enc_mut.codec_mut().expect("codec_mut の取得に失敗しました");
         enc_codec_mut.set_num_channels(Some(1));
-        // RefMut は Deref 経由で読み取りアクセサも使える。
+        // 可変ハンドルは読み取りアクセサも転送メソッドとして持つ。
         assert_eq!(enc_codec_mut.parameters().len(), 0);
     }
     assert_eq!(

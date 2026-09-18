@@ -742,7 +742,7 @@ impl<'a> SdpAudioFormatRefMut<'a> {
     }
 
     /// コーデックパラメータへの可変参照を返す。
-    pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'a> {
+    pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'_> {
         let ptr = unsafe { ffi::webrtc_SdpAudioFormat_get_parameters(self.raw.as_ptr()) };
         MapStringStringRefMut::from_raw(expect_non_null(
             ptr,

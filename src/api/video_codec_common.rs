@@ -338,7 +338,7 @@ impl<'a> SdpVideoFormatRefMut<'a> {
         self.raw.as_ptr()
     }
 
-    pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'a> {
+    pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'_> {
         let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(self.raw.as_ptr()) };
         MapStringStringRefMut::from_raw(expect_non_null(
             ptr,
@@ -2497,7 +2497,7 @@ impl<'a> VideoCodecRefMut<'a> {
     }
 
     /// simulcast ストリームを書き換え用に借用する。
-    pub fn simulcast_stream_mut(&mut self, index: usize) -> Option<SimulcastStreamRefMut<'a>> {
+    pub fn simulcast_stream_mut(&mut self, index: usize) -> Option<SimulcastStreamRefMut<'_>> {
         let index = i32::try_from(index).ok()?;
         // C 側の `simulcastStream` 配列の範囲外は None を返す。
         if index < 0 || index as usize >= self.number_of_simulcast_streams() {

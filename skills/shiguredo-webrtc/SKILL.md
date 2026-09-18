@@ -169,6 +169,10 @@ C API のオブジェクトは、所有型と 2 種類の借用型で扱う。
 - 借用や借用ハンドルを返す転送メソッドの戻り値は `'_` に短縮する。`XxxRef<'a>` を返すと借用の外へ持ち出せてしまう
 - `XxxRefMut::as_ref(&self) -> XxxRef<'_>` も同じ理由でライフタイムを `&self` に縛る
 
+`&mut self` を取る可変アクセサ (`XxxRefMut::parameters_mut` / `cast_to_codec_mut` / `codec_mut` など) の戻り値も `'_` に縛る。`'a` を返すと借用が呼び出しで切れてしまい、同じオブジェクトへの可変ハンドルを 2 本作れてしまう。可変ハンドルは `unsafe impl Send` なので、別スレッドから同時に書き換えると C++ 側のコンテナ (std::map など) が壊れるか二重解放になる。
+
+- 所有型の `as_mut().xxx_mut()` のような委譲は、戻り値が一時値の借用になってコンパイルできない。所有型側は自身のポインタから直接ハンドルを組み立てる
+
 非 null ポインタは `NonNull` と `ConstNonNull` で表す。`ConstNonNull` は std の `NonNull` が `*mut T` 用の API しか持たないため crate 側で用意している非 null の `*const T` で、クレートルートから参照できる。
 
 - C API が返すポインタは `expect_non_null` / `expect_non_null_const` で null 検査してから保持する
