@@ -32,7 +32,7 @@ impl CxxString {
     }
 
     /// webrtc 側で生成されたユニークポインタを引き取る。
-    pub fn from_unique(raw: NonNull<ffi::std_string_unique>) -> Self {
+    pub(crate) fn from_unique(raw: NonNull<ffi::std_string_unique>) -> Self {
         Self { raw_unique: raw }
     }
 

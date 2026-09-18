@@ -21,8 +21,8 @@
   - `XxxRefMut` は `Deref` を実装せず、読み取りアクセサは転送メソッドと `as_ref()` で提供する
     - `Deref` だと `'a` を持つ `XxxRef` を借用の外へ持ち出せてしまい、書き換えで safe な use-after-free を作れてしまうため
   - @melpon
-- [CHANGE] 所有権を受け取る `from_unique_ptr` を `pub(crate)` にする
-  - `RtcError` / `SdpParseError` / `SessionDescription` の `from_unique_ptr` を外部公開 API から外し、C API の内部機構として限定する
+- [CHANGE] 所有権を受け取る `from_unique` / `from_unique_ptr` を `pub(crate)` にする
+  - `CxxString::from_unique` と `RtcError` / `SdpParseError` / `SessionDescription` の `from_unique_ptr` を外部公開 API から外し、C API の内部機構として限定する
   - 所有権を移譲する safe な関数を外部に公開すると、二重解放や use-after-free を safe Rust で起こせてしまう
   - @melpon
 - [CHANGE] `RtpEncodingParameters::scalability_mode` の戻り値を `Option<Result<String>>` から `Result<Option<String>>` に変更する
