@@ -210,5 +210,8 @@ owned 型に `as_mut(&mut self) -> XxxRefMut<'_>` を追加し、`as_ref(&self) 
   - `Deref::Target` は `XxxRef<'a>` に固定され、`deref()` が返す参照の中身が `'a` を持つため、`Copy` でその値を借用の外へ持ち出せる。持ち出したハンドルから得た借用を保持したまま `XxxRefMut` の書き換えメソッドを呼ぶと、C++ 側の再確保で解放された領域を読むことになる
   - 読み取りアクセサは `XxxRefMut` に同じシグネチャの転送メソッド（`self.cref.xxx()` の 1 行）として用意し、借用や借用ハンドルを返すものは戻り値を `'_` に短縮した。`XxxRefMut::as_ref(&self) -> XxxRef<'_>` も同じ規則に従う
   - `cref` は転送時に一時値を作らないために必要なので保持した。`Copy` / `Clone` は `XxxRef` に残しているため、利用側の書き換えは無い
+- レビューで、`&mut self` を取る可変アクセサが戻り値を `'a` にしていたため、借用が呼び出しで切れて同一オブジェクトへの可変ハンドルを 2 本作れることが判明した（可変ハンドルは `Send` なので、別スレッドから同時に書き換えると C++ 側のコンテナが壊れるか二重解放になる）ため、戻り値を `'_` に縛った
+  - 対象は `RtpCodecRefMut::parameters_mut` / `RtpCodecCapabilityRefMut::cast_to_codec_mut` / `RtpCodecCapabilityRefMut::parameters_mut` / `RtpEncodingParametersRefMut::codec_mut` / `SdpAudioFormatRefMut::parameters_mut` / `SdpVideoFormatRefMut::parameters_mut` / `VideoCodecRefMut::simulcast_stream_mut` の 7 箇所
+  - 所有型の `as_mut().xxx_mut()` という委譲は戻り値が一時値の借用になってしまうため、所有型側で自身のポインタからハンドルを組み立てる形にした
 - `CHANGES.md` の `## develop` 節に `[CHANGE]` と misc のエントリを追加した
 - `cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build -- -D warnings` / `cargo test --workspace --features source-build` / `prek run --files` の成功を確認した
