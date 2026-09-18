@@ -180,6 +180,7 @@ C API のオブジェクトは、所有型と 2 種類の借用型で扱う。
 - 借用型の `from_raw` / `from_ptr` と、所有権を受け取る `from_unique_ptr` は借用先の寿命や所有権を型で保証できないため `pub(crate)` にしてある。クレート外からは `as_ref()` / `as_mut()` と通常の API を使う
 - `pub(crate)` にしたコンストラクタは safe なままでよい。`# Safety` は書かず、crate 内部専用であることと、同じポインタを 2 回渡すと二重解放になるなどの不変条件を書く
 - C API の読み取り専用の借用を返す getter は `XxxRef` が、可変参照を返す getter は `XxxRefMut` が使う (`cast_mut()` は使わない)
+- `_get_const` / `_vector_get_const` / `_inlined_vector_get_const` がある場合、読み取り経路 (所有型の `&self` からコピーや借用を作る場合を含む) は必ず `_const` 版を使う。可変版は書き換える場合だけ使う
 
 ## 参照カウント管理
 
