@@ -1058,7 +1058,7 @@ impl AudioEncoderEncodedInfo {
         // (Unknown) は libwebrtc 内部で配列 OOB になる。ここで拒否する。
         assert!(
             !matches!(value, AudioCodecType::Unknown(_)),
-            "encoder_type は既知のコーデックタイプで指定してください"
+            "encoder_type must be a known codec type"
         );
         unsafe { ffi::webrtc_AudioEncoder_EncodedInfo_set_encoder_type(self.raw(), value.to_raw()) }
     }
@@ -1226,7 +1226,7 @@ impl AudioEncoderEncodedInfoLeaf {
     pub fn set_encoder_type(&mut self, value: AudioCodecType) {
         assert!(
             !matches!(value, AudioCodecType::Unknown(_)),
-            "encoder_type は既知のコーデックタイプで指定してください"
+            "encoder_type must be a known codec type"
         );
         unsafe {
             ffi::webrtc_AudioEncoder_EncodedInfoLeaf_set_encoder_type(

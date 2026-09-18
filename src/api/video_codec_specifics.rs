@@ -111,7 +111,7 @@ impl GofInfoVP9 {
     pub fn set_num_frames_in_gof(&mut self, value: usize) {
         assert!(
             value <= crate::constants::max_vp9_frames_in_gof(),
-            "value が MAX_FRAMES_IN_GOF ({}) を超えています: {value}",
+            "value {value} exceeds MAX_FRAMES_IN_GOF ({})",
             crate::constants::max_vp9_frames_in_gof()
         );
         unsafe { ffi::webrtc_GofInfoVP9_set_num_frames_in_gof(self.raw.as_ptr(), value) };
@@ -126,7 +126,7 @@ impl GofInfoVP9 {
     pub fn set_temporal_idx(&mut self, index: usize, value: u8) {
         assert!(
             index < crate::constants::max_vp9_frames_in_gof(),
-            "index が MAX_FRAMES_IN_GOF ({}) を超えています: {index}",
+            "index {index} exceeds MAX_FRAMES_IN_GOF ({})",
             crate::constants::max_vp9_frames_in_gof()
         );
         unsafe { ffi::webrtc_GofInfoVP9_set_temporal_idx(self.raw.as_ptr(), index, value) };
@@ -144,7 +144,7 @@ impl GofInfoVP9 {
     pub fn set_temporal_up_switch(&mut self, index: usize, value: bool) {
         assert!(
             index < crate::constants::max_vp9_frames_in_gof(),
-            "index が MAX_FRAMES_IN_GOF ({}) を超えています: {index}",
+            "index {index} exceeds MAX_FRAMES_IN_GOF ({})",
             crate::constants::max_vp9_frames_in_gof()
         );
         unsafe {
@@ -166,7 +166,7 @@ impl GofInfoVP9 {
     pub fn set_num_ref_pics(&mut self, index: usize, value: u8) {
         assert!(
             index < crate::constants::max_vp9_frames_in_gof(),
-            "index が MAX_FRAMES_IN_GOF ({}) を超えています: {index}",
+            "index {index} exceeds MAX_FRAMES_IN_GOF ({})",
             crate::constants::max_vp9_frames_in_gof()
         );
         unsafe { ffi::webrtc_GofInfoVP9_set_num_ref_pics(self.raw.as_ptr(), index, value) };
@@ -184,12 +184,12 @@ impl GofInfoVP9 {
     pub fn set_pid_diff(&mut self, index: usize, ref_index: usize, value: u8) {
         assert!(
             index < crate::constants::max_vp9_frames_in_gof(),
-            "index が MAX_FRAMES_IN_GOF ({}) を超えています: {index}",
+            "index {index} exceeds MAX_FRAMES_IN_GOF ({})",
             crate::constants::max_vp9_frames_in_gof()
         );
         assert!(
             ref_index < crate::constants::max_vp9_ref_pics(),
-            "ref_index が MAX_REF_PICS ({}) を超えています: {ref_index}",
+            "ref_index {ref_index} exceeds MAX_REF_PICS ({})",
             crate::constants::max_vp9_ref_pics()
         );
         unsafe { ffi::webrtc_GofInfoVP9_set_pid_diff(self.raw.as_ptr(), index, ref_index, value) };
@@ -600,7 +600,7 @@ impl RTPVideoHeaderVP9 {
     pub fn set_num_ref_pics(&mut self, value: u8) {
         assert!(
             value as usize <= crate::constants::max_vp9_ref_pics(),
-            "value が MAX_REF_PICS ({}) を超えています: {value}",
+            "value {value} exceeds MAX_REF_PICS ({})",
             crate::constants::max_vp9_ref_pics()
         );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_num_ref_pics(self.raw.as_ptr(), value) };
@@ -616,7 +616,7 @@ impl RTPVideoHeaderVP9 {
     pub fn set_pid_diff(&mut self, index: usize, value: u8) {
         assert!(
             index < crate::constants::max_vp9_ref_pics(),
-            "index が MAX_REF_PICS ({}) を超えています: {index}",
+            "index {index} exceeds MAX_REF_PICS ({})",
             crate::constants::max_vp9_ref_pics()
         );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_pid_diff(self.raw.as_ptr(), index, value) };
@@ -632,7 +632,7 @@ impl RTPVideoHeaderVP9 {
     pub fn set_ref_picture_id(&mut self, index: usize, value: i16) {
         assert!(
             index < crate::constants::max_vp9_ref_pics(),
-            "index が MAX_REF_PICS ({}) を超えています: {index}",
+            "index {index} exceeds MAX_REF_PICS ({})",
             crate::constants::max_vp9_ref_pics()
         );
         unsafe {
@@ -647,7 +647,7 @@ impl RTPVideoHeaderVP9 {
     pub fn set_num_spatial_layers(&mut self, value: usize) {
         assert!(
             value <= crate::constants::max_vp9_num_spatial_layers(),
-            "value が MAX_NUM_SPATIAL_LAYERS ({}) を超えています: {value}",
+            "value {value} exceeds MAX_NUM_SPATIAL_LAYERS ({})",
             crate::constants::max_vp9_num_spatial_layers()
         );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_num_spatial_layers(self.raw.as_ptr(), value) };
@@ -687,7 +687,7 @@ impl RTPVideoHeaderVP9 {
     pub fn set_width(&mut self, index: usize, value: u16) {
         assert!(
             index < crate::constants::max_vp9_num_spatial_layers(),
-            "index が MAX_NUM_SPATIAL_LAYERS ({}) を超えています: {index}",
+            "index {index} exceeds MAX_NUM_SPATIAL_LAYERS ({})",
             crate::constants::max_vp9_num_spatial_layers()
         );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_width(self.raw.as_ptr(), index, value) };
@@ -703,7 +703,7 @@ impl RTPVideoHeaderVP9 {
     pub fn set_height(&mut self, index: usize, value: u16) {
         assert!(
             index < crate::constants::max_vp9_num_spatial_layers(),
-            "index が MAX_NUM_SPATIAL_LAYERS ({}) を超えています: {index}",
+            "index {index} exceeds MAX_NUM_SPATIAL_LAYERS ({})",
             crate::constants::max_vp9_num_spatial_layers()
         );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_height(self.raw.as_ptr(), index, value) };

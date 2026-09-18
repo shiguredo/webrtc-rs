@@ -158,7 +158,7 @@ pub mod log {
             unsafe { ffi::webrtc_LoggingConfig_log_prefix(self.raw.as_ptr(), &mut ptr, &mut len) };
             assert!(
                 !ptr.is_null(),
-                "BUG: webrtc_LoggingConfig_log_prefix が null を返しました"
+                "BUG: webrtc_LoggingConfig_log_prefix returned null"
             );
             let bytes = unsafe { std::slice::from_raw_parts(ptr.cast::<u8>(), len) };
             let prefix = std::str::from_utf8(bytes)?;
@@ -364,10 +364,7 @@ pub mod log {
         if len == 0 {
             return "";
         }
-        assert!(
-            !ptr.is_null(),
-            "C 側から null の文字列ビューを受け取りました"
-        );
+        assert!(!ptr.is_null(), "received a null string view from C");
         let bytes = unsafe { std::slice::from_raw_parts(ptr.cast::<u8>(), len) };
         std::str::from_utf8(bytes).unwrap_or("")
     }
@@ -375,7 +372,7 @@ pub mod log {
     fn handler_state<'a>(user_data: *mut c_void) -> &'a mut LogSinkHandlerState {
         assert!(
             !user_data.is_null(),
-            "LogSink コールバックに null の user_data を渡しました"
+            "null user_data passed to the LogSink callback"
         );
         unsafe { &mut *(user_data as *mut LogSinkHandlerState) }
     }

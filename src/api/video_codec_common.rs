@@ -2489,7 +2489,7 @@ impl<'a> VideoCodecRefMut<'a> {
     pub fn set_number_of_simulcast_streams(&mut self, value: usize) {
         assert!(
             value <= crate::constants::max_simulcast_streams(),
-            "value が max_simulcast_streams() ({}) を超えています: {value}",
+            "value {value} exceeds max_simulcast_streams() ({})",
             crate::constants::max_simulcast_streams()
         );
         let value = value.min(i32::MAX as usize) as i32;
@@ -2581,7 +2581,7 @@ impl EncodedImageBuffer {
         let ptr = unsafe { ffi::webrtc_EncodedImageBuffer_data(self.as_ptr()) };
         assert!(
             !(size > 0 && ptr.is_null()),
-            "BUG: EncodedImageBuffer の size > 0 なのに data が null です"
+            "BUG: data is null although the EncodedImageBuffer size is greater than 0"
         );
         if size == 0 || ptr.is_null() {
             return &[];

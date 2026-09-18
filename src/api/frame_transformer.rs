@@ -461,14 +461,15 @@ impl TransformableFrame {
         let value = if index == 0 {
             let alt =
                 unsafe { ffi::webrtc_RtpTimestampInfo_get_RtpTimestampWithOffset(raw.as_ptr()) };
-            let alt = NonNull::new(alt)
-                .expect("BUG: index が RtpTimestampWithOffset なのにアクセサが null を返しました");
+            let alt = NonNull::new(alt).expect(
+                "BUG: the accessor returned null although the index is RtpTimestampWithOffset",
+            );
             unsafe { ffi::webrtc_RtpTimestampWithOffset_get_value(alt.as_ptr()) }
         } else {
             let alt =
                 unsafe { ffi::webrtc_RtpTimestampInfo_get_RtpTimestampWithoutOffset(raw.as_ptr()) };
             let alt = NonNull::new(alt).expect(
-                "BUG: index が RtpTimestampWithoutOffset なのにアクセサが null を返しました",
+                "BUG: the accessor returned null although the index is RtpTimestampWithoutOffset",
             );
             unsafe { ffi::webrtc_RtpTimestampWithoutOffset_get_value(alt.as_ptr()) }
         };
@@ -678,9 +679,7 @@ impl TryFrom<TransformableFrame> for TransformableVideoFrame {
     type Error = TransformableFrame;
 
     fn try_from(frame: TransformableFrame) -> std::result::Result<Self, Self::Error> {
-        let mime = frame
-            .mime_type()
-            .expect("BUG: MIME type の取得に失敗しました");
+        let mime = frame.mime_type().expect("BUG: failed to get the MIME type");
         if mime.starts_with("video/") {
             Ok(TransformableVideoFrame { base: frame })
         } else {
@@ -941,8 +940,9 @@ impl VideoFrameMetadata {
             1 => {
                 let vp8 =
                     unsafe { ffi::webrtc_RTPVideoHeaderCodecSpecifics_get_RTPVideoHeaderVP8(raw) };
-                let vp8 = NonNull::new(vp8)
-                    .expect("BUG: index が RTPVideoHeaderVP8 なのにアクセサが null を返しました");
+                let vp8 = NonNull::new(vp8).expect(
+                    "BUG: the accessor returned null although the index is RTPVideoHeaderVP8",
+                );
                 RTPVideoHeaderCodecSpecifics::VP8(unsafe {
                     RTPVideoHeaderVP8::copy_from_raw(vp8.as_ptr())
                 })
@@ -950,8 +950,9 @@ impl VideoFrameMetadata {
             2 => {
                 let vp9 =
                     unsafe { ffi::webrtc_RTPVideoHeaderCodecSpecifics_get_RTPVideoHeaderVP9(raw) };
-                let vp9 = NonNull::new(vp9)
-                    .expect("BUG: index が RTPVideoHeaderVP9 なのにアクセサが null を返しました");
+                let vp9 = NonNull::new(vp9).expect(
+                    "BUG: the accessor returned null although the index is RTPVideoHeaderVP9",
+                );
                 RTPVideoHeaderCodecSpecifics::VP9(unsafe {
                     RTPVideoHeaderVP9::copy_from_raw(vp9.as_ptr())
                 })
@@ -959,13 +960,14 @@ impl VideoFrameMetadata {
             3 => {
                 let h264 =
                     unsafe { ffi::webrtc_RTPVideoHeaderCodecSpecifics_get_RTPVideoHeaderH264(raw) };
-                let h264 = NonNull::new(h264)
-                    .expect("BUG: index が RTPVideoHeaderH264 なのにアクセサが null を返しました");
+                let h264 = NonNull::new(h264).expect(
+                    "BUG: the accessor returned null although the index is RTPVideoHeaderH264",
+                );
                 RTPVideoHeaderCodecSpecifics::H264(unsafe {
                     RTPVideoHeaderH264::copy_from_raw(h264.as_ptr())
                 })
             }
-            _ => unreachable!("BUG: 未知の RTPVideoHeaderCodecSpecifics index: {}", index),
+            _ => unreachable!("BUG: unknown RTPVideoHeaderCodecSpecifics index: {}", index),
         };
         unsafe { ffi::webrtc_RTPVideoHeaderCodecSpecifics_unique_delete(raw_unique.as_ptr()) };
         value

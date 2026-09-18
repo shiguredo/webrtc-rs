@@ -1384,7 +1384,7 @@ impl VideoEncoderEncodedImageCallbackResultError {
             Self::ErrorSendFailed
         } else {
             panic!(
-                "BUG: 未知の EncodedImageCallback::Result::Error 値: {}",
+                "BUG: unknown EncodedImageCallback::Result::Error value: {}",
                 value
             );
         }

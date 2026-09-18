@@ -130,7 +130,7 @@ impl<'a> CxxStringRef<'a> {
     pub fn to_string(&self) -> Result<String> {
         let len = self.len();
         let ptr = unsafe { ffi::std_string_c_str(self.as_ptr()) }.cast::<u8>();
-        assert!(!ptr.is_null(), "BUG: std_string_c_str が null を返しました");
+        assert!(!ptr.is_null(), "BUG: std_string_c_str returned null");
         let bytes = unsafe { slice::from_raw_parts(ptr, len) };
         let s = std::str::from_utf8(bytes)?;
         Ok(s.to_owned())

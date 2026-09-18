@@ -1628,7 +1628,10 @@ unsafe extern "C" fn peer_connection_on_stats(
         report,
         "peer_connection_on_stats (report)",
     ));
-    let on_stats = state.on_stats.take().expect("BUG: on_stats が消費済みです");
+    let on_stats = state
+        .on_stats
+        .take()
+        .expect("BUG: on_stats is already taken");
     on_stats(report);
 }
 

@@ -37,7 +37,7 @@ impl<'a> BufferRef<'a> {
         let ptr = unsafe { ffi::webrtc_Buffer_data_const(self.raw.as_ptr()) };
         assert!(
             !ptr.is_null(),
-            "webrtc_Buffer_data_const が null を返しました"
+            "BUG: webrtc_Buffer_data_const returned null"
         );
         unsafe { slice::from_raw_parts(ptr, size) }
     }
@@ -93,7 +93,7 @@ impl<'a> BufferRefMut<'a> {
             return &mut [];
         }
         let ptr = unsafe { ffi::webrtc_Buffer_data(self.raw.as_ptr()) };
-        assert!(!ptr.is_null(), "webrtc_Buffer_data が null を返しました");
+        assert!(!ptr.is_null(), "BUG: webrtc_Buffer_data returned null");
         unsafe { slice::from_raw_parts_mut(ptr, size) }
     }
 }
@@ -149,7 +149,7 @@ impl Buffer {
         let ptr = unsafe { ffi::webrtc_Buffer_data_const(self.raw.as_ptr()) };
         assert!(
             !ptr.is_null(),
-            "webrtc_Buffer_data_const が null を返しました"
+            "BUG: webrtc_Buffer_data_const returned null"
         );
         unsafe { slice::from_raw_parts(ptr, size) }
     }
@@ -195,7 +195,7 @@ impl<'a> BufferS16Ref<'a> {
         let ptr = unsafe { ffi::webrtc_BufferS16_data_const(self.raw.as_ptr()) };
         assert!(
             !ptr.is_null(),
-            "webrtc_BufferS16_data_const が null を返しました"
+            "BUG: webrtc_BufferS16_data_const returned null"
         );
         unsafe { slice::from_raw_parts(ptr, size) }
     }
@@ -256,7 +256,7 @@ impl<'a> BufferS16RefMut<'a> {
             return &mut [];
         }
         let ptr = unsafe { ffi::webrtc_BufferS16_data(self.raw.as_ptr()) };
-        assert!(!ptr.is_null(), "webrtc_BufferS16_data が null を返しました");
+        assert!(!ptr.is_null(), "BUG: webrtc_BufferS16_data returned null");
         unsafe { slice::from_raw_parts_mut(ptr, size) }
     }
 }

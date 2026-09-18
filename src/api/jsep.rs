@@ -137,7 +137,7 @@ impl SessionDescription {
         if ok == 0 {
             return Err(Error::InvalidSdp);
         }
-        CxxString::from_unique(NonNull::new(out).expect("BUG: ok != 0 なのに out が null"))
+        CxxString::from_unique(NonNull::new(out).expect("BUG: out is null although ok != 0"))
             .to_string()
     }
 
@@ -193,7 +193,7 @@ impl<'a> IceCandidateRef<'a> {
         if ok == 0 {
             return Err(Error::InvalidIceCandidate);
         }
-        CxxString::from_unique(NonNull::new(out).expect("BUG: ok != 0 なのに out が null"))
+        CxxString::from_unique(NonNull::new(out).expect("BUG: out is null although ok != 0"))
             .to_string()
     }
 }
