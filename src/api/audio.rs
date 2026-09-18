@@ -1135,8 +1135,9 @@ impl AudioEncoderEncodedInfoLeaf {
         }
     }
 
-    /// # Safety
-    /// `raw` は C 側で生成された有効な leaf を指し、所有権をこの型が引き受ける必要があります。
+    /// 生ポインタから生成する crate 内部専用のコンストラクタ。
+    ///
+    /// `raw` の所有権をこの型が引き受けるため、同じポインタを 2 回渡してはいけない。
     pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_AudioEncoder_EncodedInfoLeaf>) -> Self {
         Self { raw }
     }
@@ -1269,9 +1270,9 @@ impl BitrateAllocationUpdate {
         }
     }
 
-    /// # Safety
-    /// `raw` は C 側で生成された有効な `webrtc_BitrateAllocationUpdate` を指し、
-    /// 所有権をこの型が引き受ける必要があります。
+    /// 生ポインタから生成する crate 内部専用のコンストラクタ。
+    ///
+    /// `raw` の所有権をこの型が引き受けるため、同じポインタを 2 回渡してはいけない。
     pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_BitrateAllocationUpdate>) -> Self {
         Self { raw }
     }
@@ -2798,9 +2799,9 @@ impl AudioCodecPairId {
         unsafe { ffi::webrtc_AudioCodecPairId_NumericRepresentation(self.raw.as_ptr()) }
     }
 
-    /// # Safety
-    /// `raw` は C 側で生成された有効な `webrtc_AudioCodecPairId` を指し、
-    /// 所有権をこの型が引き受ける必要があります。
+    /// 生ポインタから生成する crate 内部専用のコンストラクタ。
+    ///
+    /// `raw` の所有権をこの型が引き受けるため、同じポインタを 2 回渡してはいけない。
     pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_AudioCodecPairId>) -> Self {
         Self { raw }
     }

@@ -31,10 +31,10 @@ pub(crate) struct ScopedRef<H: RefCountedHandle> {
 }
 
 impl<H: RefCountedHandle> ScopedRef<H> {
-    /// 生の refcounted ポインタから生成する。
+    /// 生の refcounted ポインタから生成する crate 内部専用のコンストラクタ。
     ///
-    /// # Safety
-    /// - `raw_ref` は有効な refcounted ポインタで、呼び出し元が所有権を持っていること。
+    /// `raw_ref` が持つ参照カウント 1 つ分の所有権をこの型が引き受けるため、
+    /// 同じ参照カウントを 2 回渡してはいけない。
     pub fn from_raw(raw_ref: NonNull<H::Refcounted>) -> Self {
         Self {
             raw_ref,
@@ -85,10 +85,10 @@ pub(crate) struct ScopedRefConst<H: RefCountedHandle> {
 }
 
 impl<H: RefCountedHandle> ScopedRefConst<H> {
-    /// 生の refcounted ポインタから生成する。
+    /// 生の refcounted ポインタから生成する crate 内部専用のコンストラクタ。
     ///
-    /// # Safety
-    /// - `raw_ref` は有効な refcounted ポインタで、呼び出し元が所有権を持っていること。
+    /// `raw_ref` が持つ参照カウント 1 つ分の所有権をこの型が引き受けるため、
+    /// 同じ参照カウントを 2 回渡してはいけない。
     pub fn from_raw(raw_ref: ConstNonNull<H::Refcounted>) -> Self {
         Self {
             raw_ref,

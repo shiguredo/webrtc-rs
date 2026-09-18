@@ -141,9 +141,10 @@ pub struct VideoDecoderDecodedImageCallbackPtr {
 unsafe impl Send for VideoDecoderDecodedImageCallbackPtr {}
 
 impl VideoDecoderDecodedImageCallbackPtr {
-    /// # Safety
-    /// `raw` は有効な `webrtc_VideoDecoder_DecodedImageCallback` を指し、
-    /// 呼び出し時点でも破棄されていない必要があります。
+    /// 生ポインタから生成する crate 内部専用のコンストラクタ。
+    ///
+    /// 所有権は引き受けず、C 側が保持し続けるため、`raw` が指す callback は
+    /// この型を使っている間は破棄されてはいけない。
     pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_VideoDecoder_DecodedImageCallback>) -> Self {
         Self { raw }
     }
