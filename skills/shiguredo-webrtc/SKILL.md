@@ -83,7 +83,6 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 | エラー | `Error`, `Result` |
 | C++ 標準型ラッパー (`cxxstd`) | `CxxString`, `CxxStringRef`, `CxxStringRefMut`, `MapStringStringIter`, `MapStringStringRef`, `MapStringStringRefMut`, `StringVector`, `StringVectorRef`, `StringVectorRefMut` |
 | libyuv | `LibyuvFourcc`, `LibyuvRotationMode`, `abgr_to_i420()`, `convert_from_i420()`, `convert_to_i420()`, `i420_copy()`, `i420_to_nv12()`, `mjpg_size()`, `mjpg_to_i420()`, `mjpg_to_nv12()`, `nv12_copy()`, `nv12_to_i420()`, `yuy2_to_i420()` |
-| 非 null ポインタ | `ConstNonNull` |
 | rtc_base | `Thread`, `TimestampAligner`, `SSLCertChainRef`, `SSLCertificateRef`, `SSLCertificateVerifier`, `SSLCertificateVerifierHandler`, `SSLIdentity`, `log` (モジュール: `Severity`, `LoggingConfig`, `initialize_logging`, `print`), `random_bytes()`, `random_string()`, `rtc_log_format_file()`, `time_millis()` |
 | ログマクロ (`#[macro_export]`) | `rtc_log_verbose!`, `rtc_log_info!`, `rtc_log_warning!`, `rtc_log_error!` |
 | FFI | `ffi` (`bindgen` 生成の raw バインディング。通常は利用者が直接触らない) |
@@ -181,7 +180,7 @@ C API のオブジェクトは、所有型と 2 種類の借用型で扱う。
 
 - 所有型の `as_mut().xxx_mut()` のような委譲は、戻り値が一時値の借用になってコンパイルできない。所有型側は自身のポインタから直接ハンドルを組み立てる
 
-非 null ポインタは `NonNull` と `ConstNonNull` で表す。`ConstNonNull` は std の `NonNull` が `*mut T` 用の API しか持たないため crate 側で用意している非 null の `*const T` で、クレートルートから参照できる。
+非 null ポインタは `NonNull` と `ConstNonNull` で表す。`ConstNonNull` は std の `NonNull` が `*mut T` 用の API しか持たないため crate 側で用意している非 null の `*const T` で、借用ハンドルの内部表現にしか使わないためクレート内部の型 (`pub(crate)`) として扱う。
 
 - C API が返すポインタは `expect_non_null` / `expect_non_null_const` で null 検査してから保持する
 - 借用型の `from_raw` / `from_ptr` と、所有権を受け取る `from_unique_ptr` は借用先の寿命や所有権を型で保証できないため `pub(crate)` にしてある。クレート外からは `as_ref()` / `as_mut()` と通常の API を使う

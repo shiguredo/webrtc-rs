@@ -397,8 +397,6 @@ impl FactoryHolder {
   - `convert_from_i420` 用の出力フォーマット指定
 - `CxxString` / `CxxStringRef` / `CxxStringRefMut` / `StringVector` / `StringVectorRef` / `StringVectorRefMut` / `MapStringStringRef` / `MapStringStringRefMut` / `MapStringStringIter`
   - C++ 標準文字列 / コンテナの Rust ラッパー
-- `ConstNonNull`
-  - 非 null が保証された `*const T` を表す型
 - `random_bytes` / `random_string`
   - ランダム生成
 - `time_millis` / `thread_sleep_ms`
