@@ -9,7 +9,7 @@ use std::ptr::NonNull;
 /// stable では `!null` を型として表現できないため `Option` の niche 最適化は効かないが、
 /// null でないことが型で分かる。
 #[repr(transparent)]
-pub struct ConstNonNull<T: ?Sized> {
+pub(crate) struct ConstNonNull<T: ?Sized> {
     pointer: *const T,
 }
 

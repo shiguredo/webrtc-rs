@@ -19,7 +19,6 @@ mod util;
 mod tests;
 
 pub use api::*;
-pub use const_non_null::ConstNonNull;
 pub use cxxstd::{
     CxxString, CxxStringRef, CxxStringRefMut, MapStringStringIter, MapStringStringRef,
     MapStringStringRefMut, StringVector, StringVectorRef, StringVectorRefMut,

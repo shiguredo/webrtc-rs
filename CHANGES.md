@@ -77,9 +77,6 @@
 
 ### misc
 
-- [ADD] 非 null が保証された `*const T` を表す `ConstNonNull` を追加する
-  - `NonNull` は `*mut T` を扱う API しか持たないため、読み取り専用ポインタ用に用意する
-  - @melpon
 - [ADD] webrtc_c に `webrtc_TransformableFrameInterface` から `webrtc_TransformableVideoFrameInterface` への cast を追加する
   - `WEBRTC_DECLARE_CAST` / `WEBRTC_DECLARE_CAST_CONST` マクロで宣言し、C++ 側の `static_cast` でダウンキャストする
   - Rust 側の生のポインタキャストを削除する
@@ -92,6 +89,7 @@
   - `RTCStatsReport` を受け取るコールバックから const を外すキャストが消える
   - @melpon
 - [UPDATE] 借用ハンドルが保持するポインタを非 null 型にする
+  - `NonNull` は `*mut T` を扱う API しか持たないため、読み取り専用ポインタ用の `ConstNonNull` をクレート内部に追加する
   - `XxxRef` は `ConstNonNull`、`XxxRefMut` は `NonNull` を保持し、null でないことが型で分かるようにする
   - `XxxRef::from_raw` / `CxxStringRef::from_ptr` は `ConstNonNull`、`XxxRefMut::from_raw` は `NonNull` を受け取る
   - 借用ハンドルの `from_raw` / `from_ptr` は `unsafe fn` と `fn` が混在していたのを安全関数に統一する
