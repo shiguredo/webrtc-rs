@@ -47,6 +47,81 @@ fn audio_transport_ref_borrows_owner() {
 }
 
 #[test]
+fn const_non_null_null_is_none() {
+    assert!(ConstNonNull::<u8>::new(std::ptr::null()).is_none());
+}
+
+#[test]
+fn const_non_null_keeps_pointer() {
+    let value = 42u8;
+    let ptr = ConstNonNull::new(&value as *const u8).expect("BUG: 非 null のはずです");
+    assert_eq!(unsafe { *ptr.as_ptr() }, 42);
+
+    // NonNull からの変換でも同じポインタを指す。
+    let mut value2 = 7u8;
+    let non_null = NonNull::new(&mut value2 as *mut u8).expect("BUG: 非 null のはずです");
+    let const_non_null = ConstNonNull::from(non_null);
+    assert_eq!(const_non_null.as_ptr(), non_null.as_ptr() as *const u8);
+    assert_eq!(unsafe { *const_non_null.as_ptr() }, 7);
+
+    // Safety: value3 はこのスコープの間ずっと有効です。
+    let value3 = 1u8;
+    let unchecked = unsafe { ConstNonNull::new_unchecked(&value3 as *const u8) };
+    assert_eq!(unsafe { *unchecked.as_ptr() }, 1);
+}
+
+#[test]
+fn ref_mut_scalar_write_is_visible_from_owner() {
+    // XxxRefMut の書き換えが所有型に反映されることを確認する。
+    let mut parameters = RtpEncodingParameters::new();
+    parameters.as_mut().set_rid("r0");
+    assert_eq!(
+        parameters.as_ref().rid().expect("rid の取得に失敗しました"),
+        "r0"
+    );
+    parameters.as_mut().set_max_bitrate_bps(Some(1_000_000));
+    assert_eq!(parameters.max_bitrate_bps(), Some(1_000_000));
+    assert_eq!(parameters.as_ref().max_bitrate_bps(), Some(1_000_000));
+}
+
+#[test]
+fn ref_mut_map_write_is_visible_from_owner() {
+    // map を返す可変アクセサでも、書き換えが所有型に反映されることを確認する。
+    let mut format = SdpVideoFormat::new("VP8");
+    format.as_mut().parameters_mut().set("profile-id", "0");
+    let parameters = format.as_ref().parameters();
+    assert_eq!(parameters.len(), 1);
+    assert!(
+        parameters
+            .iter()
+            .any(|(k, v)| k == "profile-id" && v == "0")
+    );
+}
+
+#[test]
+fn ref_mut_vector_write_is_visible_from_owner() {
+    // vector を返す可変アクセサでも、書き換えが所有型に反映されることを確認する。
+    let mut vector = RtpCodecCapabilityVector::new(0);
+    let capability = RtpCodecCapability::new();
+    vector.as_mut().push(&capability.as_ref());
+    assert_eq!(vector.as_ref().len(), 1);
+    assert_eq!(vector.len(), 1);
+}
+
+#[test]
+fn ref_mut_forwarded_read_matches_ref() {
+    // XxxRefMut の転送アクセサが XxxRef と同じ値を返すことを確認する。
+    let mut capability = RtpCodecCapability::new();
+    capability.set_name("opus");
+    capability.set_clock_rate(Some(48_000));
+    let r = capability.as_mut();
+    assert_eq!(r.name().expect("name の取得に失敗しました"), "opus");
+    assert_eq!(r.clock_rate(), Some(48_000));
+    assert!(!r.as_ref().as_ptr().is_null());
+    assert!(!r.as_mut_ptr().is_null());
+}
+
+#[test]
 fn buffer_data_mut_round_trip() {
     // append_data で用意した内容を data_mut 経由で書き換え、data で読み戻せることを確認する。
     let mut buffer = Buffer::new();
@@ -1834,13 +1909,14 @@ fn peer_connection_factory_and_capabilities() {
     }
 
     // codecs_mut() から取得した可変ハンドルで書き換えられることを確認する。
+    let codecs_len_before = caps.codecs().len();
     {
         let mut codecs = caps.codecs_mut();
-        let len_before = codecs.len();
-        codecs.resize(len_before + 1);
-        assert_eq!(codecs.len(), len_before + 1);
+        codecs.resize(codecs_len_before + 1);
+        assert_eq!(codecs.len(), codecs_len_before + 1);
     }
-    assert_eq!(caps.codecs().len(), caps.codec_len() as usize);
+    // 書き換えが所有型に反映されていることを確認する。
+    assert_eq!(caps.codecs().len(), codecs_len_before + 1);
 
     drop(caps);
     drop(context);
@@ -1863,12 +1939,14 @@ fn rtc_configuration_and_ice_server() {
     server.add_url("turn:192.0.2.2:3478?transport=udp");
     assert_eq!(server.urls_len(), 2);
 
+    let servers_len_before = config.servers().len();
     {
         let mut servers = config.servers_mut();
-        let len_before = servers.len();
         servers.push(&server);
-        assert_eq!(servers.len(), len_before + 1);
+        assert_eq!(servers.len(), servers_len_before + 1);
     }
+    // 書き換えが所有型に反映されていることを確認する。
+    assert_eq!(config.servers().len(), servers_len_before + 1);
 
     // 所有ベクタでも同じ挙動になることを確認しておく。
     let mut owned = IceServerVector::new(0);
@@ -2006,8 +2084,15 @@ fn rtp_codec_capability_vector() {
     );
 
     // 所有型の codec でも同じパラメータを読めることを検証する。
-    let codec_parameters = codec_ref.to_owned().parameters();
-    assert_eq!(codec_parameters.len(), 1);
+    let mut owned_codec = RtpCodec::new();
+    owned_codec.parameters_mut().set("stereo", "1");
+    let owned_parameters = owned_codec.parameters();
+    assert_eq!(owned_parameters.len(), 1);
+    assert!(
+        owned_parameters
+            .iter()
+            .any(|(k, v)| k == "stereo" && v == "1")
+    );
 }
 
 #[test]
