@@ -34,7 +34,7 @@
   - @melpon
 - [CHANGE] 所有権や生ポインタを受け取るコンストラクタを `pub(crate)` にする
   - `CxxString::from_unique` と `RtcError` / `SdpParseError` / `SessionDescription` の `from_unique_ptr` を外部公開 API から外し、C API の内部機構として限定する
-  - `RtpCapabilities::from_raw` / `RtpParameters::from_raw` / `VideoDecoderDecodedImageCallbackPtr::from_raw` / `VideoEncoderEncodedImageCallbackPtr::from_raw` も同様に `pub(crate)` にする
+  - `RtpCapabilities::from_raw` / `RtpParameters::from_raw` / `RtpEncodingParametersVector::clone_from_raw` / `VideoDecoderDecodedImageCallbackPtr::from_raw` / `VideoEncoderEncodedImageCallbackPtr::from_raw` も同様に `pub(crate)` にする
   - 所有権や生ポインタをそのまま受け取る関数を外部に公開すると、二重解放や use-after-free を safe Rust で起こせてしまう
   - @melpon
 - [CHANGE] webrtc_c の `webrtc_Buffer_data` / `webrtc_BufferS16_data` を `_const` にリネームし、可変版を追加する

@@ -1262,7 +1262,7 @@ impl RtpEncodingParametersVector {
         true
     }
 
-    pub fn clone_from_raw(src: NonNull<ffi::webrtc_RtpEncodingParameters_vector>) -> Self {
+    pub(crate) fn clone_from_raw(src: NonNull<ffi::webrtc_RtpEncodingParameters_vector>) -> Self {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_RtpEncodingParameters_vector_clone(src.as_ptr()) },
             "webrtc_RtpEncodingParameters_vector_clone",
