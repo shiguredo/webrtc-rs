@@ -163,6 +163,7 @@ C API のオブジェクトは、所有型と 2 種類の借用型で扱う。
 - 書き換え用借用 `XxxRefMut<'a>`: `Copy` ではなく、非 null の `*mut` と `XxxRef` の実体 (`cref`) を保持する
 - 所有型は `as_ref()` / `as_mut()` で借用型を返す
 - `XxxRefMut` は書き換えメソッドを持つ型にだけ作る。書き換えメソッドが無く、非 const ポインタを要求する C API に渡すこともない型には作らない (`as_mut()` で取得しても書き換える手段が無いため)
+- C++ 側が所有し、Rust 側のハンドラが状態として保持する必要があるポインタは、ライフタイムを持たない `XxxPtr` 型 (`AudioTransportPtr` / `VideoDecoderDecodedImageCallbackPtr`) で扱う。借用型 (`XxxRef` / `XxxRefMut`) は所有型の借用に縛られるため、ハンドラが保持できない
 
 `XxxRefMut` に `Deref` は実装しない。`Deref` の `Target` は `XxxRef<'a>` に固定され、`deref()` が返す参照の中身が `'a` を持つため、`Copy` でその値を借用の外へ持ち出せてしまう。持ち出したハンドルから得た借用 (例: `BufferRef::data()`) を保持したまま `XxxRefMut` の書き換えメソッドを呼ぶと、C++ 側の再確保で解放された領域を読む safe な use-after-free になる。
 
