@@ -35,18 +35,18 @@ impl<H: RefCountedHandle> ScopedRef<H> {
     ///
     /// `raw_ref` が持つ参照カウント 1 つ分の所有権をこの型が引き受けるため、
     /// 同じ参照カウントを 2 回渡してはいけない。
-    pub fn from_raw(raw_ref: NonNull<H::Refcounted>) -> Self {
+    pub(crate) fn from_raw(raw_ref: NonNull<H::Refcounted>) -> Self {
         Self {
             raw_ref,
             _marker: PhantomData,
         }
     }
 
-    pub fn as_refcounted_ptr(&self) -> *mut H::Refcounted {
+    pub(crate) fn as_refcounted_ptr(&self) -> *mut H::Refcounted {
         self.raw_ref.as_ptr()
     }
 
-    pub fn as_ptr(&self) -> *mut H::Raw {
+    pub(crate) fn as_ptr(&self) -> *mut H::Raw {
         self.raw().as_ptr()
     }
 
@@ -89,7 +89,7 @@ impl<H: RefCountedHandle> ScopedRefConst<H> {
     ///
     /// `raw_ref` が持つ参照カウント 1 つ分の所有権をこの型が引き受けるため、
     /// 同じ参照カウントを 2 回渡してはいけない。
-    pub fn from_raw(raw_ref: ConstNonNull<H::Refcounted>) -> Self {
+    pub(crate) fn from_raw(raw_ref: ConstNonNull<H::Refcounted>) -> Self {
         Self {
             raw_ref,
             _marker: PhantomData,

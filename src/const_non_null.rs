@@ -15,7 +15,7 @@ pub(crate) struct ConstNonNull<T: ?Sized> {
 
 impl<T: ?Sized> ConstNonNull<T> {
     /// null の場合は `None` を返す。
-    pub const fn new(pointer: *const T) -> Option<Self> {
+    pub(crate) const fn new(pointer: *const T) -> Option<Self> {
         if pointer.is_null() {
             None
         } else {
@@ -28,12 +28,12 @@ impl<T: ?Sized> ConstNonNull<T> {
     ///
     /// # Safety
     /// `pointer` は null であってはならない。
-    pub const unsafe fn new_unchecked(pointer: *const T) -> Self {
+    pub(crate) const unsafe fn new_unchecked(pointer: *const T) -> Self {
         Self { pointer }
     }
 
     /// 生ポインタを取り出す。
-    pub const fn as_ptr(self) -> *const T {
+    pub(crate) const fn as_ptr(self) -> *const T {
         self.pointer
     }
 }
