@@ -26,7 +26,7 @@ webrtc_RtpTransceiverInit_get_stream_ids(
     struct webrtc_RtpTransceiverInit* self);
 WEBRTC_EXPORT void webrtc_RtpTransceiverInit_set_send_encodings(
     struct webrtc_RtpTransceiverInit* self,
-    struct webrtc_RtpEncodingParameters_vector* encodings);
+    const struct webrtc_RtpEncodingParameters_vector* encodings);
 
 // -------------------------
 // webrtc::RtpTransceiverInterface

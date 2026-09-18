@@ -105,7 +105,7 @@
   - 呼び出し側は非 const のポインタをそのまま渡せるため変更は不要
   - @melpon
 - [UPDATE] webrtc_c の C API の入力引数に残っていた const 漏れを修正する
-  - `webrtc_PeerConnectionInterface_CreateDataChannelOrError` / `webrtc_AudioCodecSpec_set_format` などの引数を `const struct ...*` にする
+  - `webrtc_PeerConnectionInterface_CreateDataChannelOrError` / `webrtc_AudioCodecSpec_set_format` / `webrtc_RtpTransceiverInit_set_send_encodings` などの引数を `const struct ...*` にする
   - C++ 側が書き換える、または保持して非 const メソッドを呼ぶ引数は非 const のままとする
   - Rust 側の公開 API に変更はない
   - @melpon
