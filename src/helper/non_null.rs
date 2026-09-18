@@ -8,7 +8,7 @@ use std::ptr::NonNull;
 /// null の場合、C API が規約違反を起こした実装バグなので panic する。
 /// `what` には `ptr` を生成した関数名を渡すこと。
 pub(crate) fn expect_non_null<T>(ptr: *mut T, what: &'static str) -> NonNull<T> {
-    NonNull::new(ptr).unwrap_or_else(|| panic!("BUG: {what} が null を返しました"))
+    NonNull::new(ptr).unwrap_or_else(|| panic!("BUG: {what} returned null"))
 }
 
 /// C API が返した const ポインタを null 検査して `ConstNonNull` に包む。
@@ -16,7 +16,7 @@ pub(crate) fn expect_non_null<T>(ptr: *mut T, what: &'static str) -> NonNull<T> 
 /// null の場合、C API が規約違反を起こした実装バグなので panic する。
 /// `what` には `ptr` を生成した関数名を渡すこと。
 pub(crate) fn expect_non_null_const<T>(ptr: *const T, what: &'static str) -> ConstNonNull<T> {
-    ConstNonNull::new(ptr).unwrap_or_else(|| panic!("BUG: {what} が null を返しました"))
+    ConstNonNull::new(ptr).unwrap_or_else(|| panic!("BUG: {what} returned null"))
 }
 
 /// C API が返したポインタを null 検査して `NonNull` に包む。
@@ -33,7 +33,7 @@ pub(crate) fn expect_non_null_with_cleanup<T>(
         Some(raw) => raw,
         None => {
             cleanup();
-            panic!("BUG: {what} が null を返しました")
+            panic!("BUG: {what} returned null")
         }
     }
 }
