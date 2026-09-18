@@ -162,6 +162,7 @@ C API のオブジェクトは、所有型と 2 種類の借用型で扱う。
 - 読み取り専用借用 `XxxRef<'a>`: `Copy` で、非 null の `*const` を保持する。書き換えメソッドは持たない
 - 書き換え用借用 `XxxRefMut<'a>`: `Copy` ではなく、非 null の `*mut` と `XxxRef` の実体 (`cref`) を保持する
 - 所有型は `as_ref()` / `as_mut()` で借用型を返す
+- `XxxRefMut` は書き換えメソッドを持つ型にだけ作る。書き換えメソッドが無く、非 const ポインタを要求する C API に渡すこともない型には作らない (`as_mut()` で取得しても書き換える手段が無いため)
 
 `XxxRefMut` に `Deref` は実装しない。`Deref` の `Target` は `XxxRef<'a>` に固定され、`deref()` が返す参照の中身が `'a` を持つため、`Copy` でその値を借用の外へ持ち出せてしまう。持ち出したハンドルから得た借用 (例: `BufferRef::data()`) を保持したまま `XxxRefMut` の書き換えメソッドを呼ぶと、C++ 側の再確保で解放された領域を読む safe な use-after-free になる。
 
@@ -177,6 +178,7 @@ C API のオブジェクトは、所有型と 2 種類の借用型で扱う。
 
 - C API が返すポインタは `expect_non_null` / `expect_non_null_const` で null 検査してから保持する
 - 借用型の `from_raw` / `from_ptr` と、所有権を受け取る `from_unique_ptr` は借用先の寿命や所有権を型で保証できないため `pub(crate)` にしてある。クレート外からは `as_ref()` / `as_mut()` と通常の API を使う
+- `pub(crate)` にしたコンストラクタは safe なままでよい。`# Safety` は書かず、crate 内部専用であることと、同じポインタを 2 回渡すと二重解放になるなどの不変条件を書く
 - C API の読み取り専用の借用を返す getter は `XxxRef` が、可変参照を返す getter は `XxxRefMut` が使う (`cast_mut()` は使わない)
 
 ## 参照カウント管理
