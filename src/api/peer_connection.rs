@@ -742,7 +742,7 @@ impl Drop for IceServer {
 #[derive(Clone, Copy)]
 pub struct IceServerRef<'a> {
     raw: ConstNonNull<ffi::webrtc_PeerConnectionInterface_IceServer>,
-    _marker: PhantomData<&'a ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
+    _marker: PhantomData<&'a ffi::webrtc_PeerConnectionInterface_IceServer>,
 }
 
 unsafe impl<'a> Send for IceServerRef<'a> {}

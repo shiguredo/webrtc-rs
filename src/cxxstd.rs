@@ -263,7 +263,7 @@ impl Drop for StringVector {
 #[derive(Clone, Copy)]
 pub struct StringVectorRef<'a> {
     raw: ConstNonNull<ffi::std_string_vector>,
-    _marker: PhantomData<&'a ()>,
+    _marker: PhantomData<&'a ffi::std_string_vector>,
 }
 
 unsafe impl<'a> Send for StringVectorRef<'a> {}
@@ -394,7 +394,6 @@ unsafe impl<'a> Send for MapStringStringRefMut<'a> {}
 
 impl<'a> MapStringStringRefMut<'a> {
     /// C 側のポインタから生成する。
-    ///
     pub(crate) fn from_raw(raw: NonNull<ffi::std_map_string_string>) -> Self {
         Self {
             raw,

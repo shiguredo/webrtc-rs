@@ -349,7 +349,7 @@ impl Drop for RtpCodecCapability {
 #[derive(Clone, Copy)]
 pub struct RtpCodecCapabilityRef<'a> {
     raw: ConstNonNull<ffi::webrtc_RtpCodecCapability>,
-    _marker: PhantomData<&'a ffi::webrtc_RtpCodecCapability_vector>,
+    _marker: PhantomData<&'a ffi::webrtc_RtpCodecCapability>,
 }
 
 unsafe impl<'a> Send for RtpCodecCapabilityRef<'a> {}
@@ -847,7 +847,7 @@ impl Drop for RtpEncodingParameters {
 #[derive(Clone, Copy)]
 pub struct RtpEncodingParametersRef<'a> {
     raw: ConstNonNull<ffi::webrtc_RtpEncodingParameters>,
-    _marker: PhantomData<&'a ffi::webrtc_RtpEncodingParameters_vector>,
+    _marker: PhantomData<&'a ffi::webrtc_RtpEncodingParameters>,
 }
 
 unsafe impl<'a> Send for RtpEncodingParametersRef<'a> {}
