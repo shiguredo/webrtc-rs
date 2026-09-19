@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../common.h"
+#include "../../common.h"
 
 #if defined(__cplusplus)
 extern "C" {

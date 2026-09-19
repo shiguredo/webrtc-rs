@@ -7,7 +7,7 @@
 #include <api/environment/environment.h>
 #include <api/environment/environment_factory.h>
 
-#include "../common.h"
+#include "../../common.h"
 
 // -------------------------
 // webrtc::Environment

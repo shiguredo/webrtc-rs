@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../../../api/audio/audio_device.h"
-#include "../../../../api/environment.h"
+#include "../../../../api/environment/environment.h"
 #include "../../../../common.h"
 #include "../../../../jni_export.h"
 

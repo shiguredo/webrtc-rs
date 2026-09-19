@@ -11,7 +11,7 @@
 #include "webrtc_c/api/audio_codecs/audio_decoder.h"
 #include "webrtc_c/api/audio_codecs/audio_encoder.h"
 #include "webrtc_c/api/audio_codecs/audio_format.h"
-#include "webrtc_c/api/environment.h"
+#include "webrtc_c/api/environment/environment.h"
 #include "webrtc_c/api/frame_transformer_interface.h"
 #include "webrtc_c/api/jsep.h"
 #include "webrtc_c/api/media_stream_interface.h"

@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "../../common.h"
-#include "../environment.h"
+#include "../environment/environment.h"
 #include "audio_codec_pair_id.h"
 #include "audio_encoder.h"
 #include "audio_format.h"

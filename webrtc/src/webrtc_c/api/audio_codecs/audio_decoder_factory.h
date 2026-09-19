@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../common.h"
-#include "../environment.h"
+#include "../environment/environment.h"
 #include "audio_decoder.h"
 #include "audio_format.h"
 

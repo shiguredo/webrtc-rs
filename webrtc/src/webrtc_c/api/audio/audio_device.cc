@@ -16,7 +16,7 @@
 
 #include "../../common.h"
 #include "../../common.impl.h"
-#include "../environment.h"
+#include "../environment/environment.h"
 #include "audio_device_defines.h"
 
 // -------------------------
