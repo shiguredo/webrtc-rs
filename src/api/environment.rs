@@ -14,8 +14,6 @@ unsafe impl Send for Environment {}
 
 impl Environment {
     /// フィールドトライアルを指定しない Environment を生成する。
-    ///
-    /// フィールドトライアルを指定する場合は [EnvironmentFactory] を使う。
     pub fn new() -> Self {
         let raw = unsafe { ffi::webrtc_CreateEnvironment() };
         Self {
@@ -78,8 +76,6 @@ impl<'a> EnvironmentRef<'a> {
     }
 
     /// この Environment のコピーを生成し、所有権を持つ [Environment] として返す。
-    ///
-    /// 借用元の [Environment] を drop した後も、返した [Environment] は使用できる。
     pub fn to_owned(&self) -> Environment {
         let raw = unsafe { ffi::webrtc_Environment_copy(self.raw.as_ptr()) };
         Environment {
@@ -146,10 +142,7 @@ impl<'a> FieldTrialsViewRef<'a> {
 
     /// フィールドトライアルに設定された値を返す。
     ///
-    /// 設定されていないフィールドトライアルは空文字列を返す。値が空のフィールドトライアルは
-    /// 不正なため、空文字列は未設定を意味する。[Self::is_enabled] / [Self::is_disabled] と
-    /// 違い、`Enabled,offer:true` のようなパラメータも含めた値をそのまま取得できる。
-    ///
+    /// 設定されていないキーのフィールドトライアルは空文字列を返す。
     /// 値が UTF-8 として解釈できない場合はエラーを返す。
     pub fn lookup(&self, key: &str) -> Result<String> {
         let raw = unsafe {
@@ -170,8 +163,7 @@ unsafe impl Send for FieldTrials {}
 impl FieldTrials {
     /// フィールドトライアル文字列をパースする。
     ///
-    /// 文字列が不正な場合は [Error::InvalidFieldTrials] を返す。空文字は不正ではなく、
-    /// フィールドトライアルを 1 つも含まない `FieldTrials` になる。
+    /// 文字列が不正な場合は [Error::InvalidFieldTrials] を返す。
     pub fn new(field_trials: &str) -> Result<Self> {
         let raw = NonNull::new(unsafe {
             ffi::webrtc_FieldTrials_Create(field_trials.as_ptr().cast(), field_trials.len())
