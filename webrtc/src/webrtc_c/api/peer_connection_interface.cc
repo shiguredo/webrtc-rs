@@ -20,6 +20,7 @@
 #include <api/create_modular_peer_connection_factory.h>
 #include <api/data_channel_interface.h>
 #include <api/enable_media.h>
+#include <api/environment/environment.h>
 #include <api/environment/environment_factory.h>
 #include <api/jsep.h>
 #include <api/make_ref_counted.h>
@@ -60,6 +61,7 @@
 #include "../rtc_base/ssl_identity.h"
 #include "../rtc_base/thread.h"
 #include "../std.h"
+#include "../std.impl.h"
 #include "api/rtp_sender_interface.h"
 #include "audio/audio_device.h"
 #include "audio/audio_processing.h"
@@ -67,6 +69,7 @@
 #include "audio_codecs/audio_encoder_factory.h"
 #include "data_channel_interface.h"
 #include "dtls_transport_interface.h"
+#include "environment/environment.h"
 #include "jsep.h"
 #include "media_stream_interface.h"
 #include "rtc_base/ssl_certificate.h"
@@ -987,6 +990,15 @@ webrtc_PeerConnectionFactoryDependencies_set_signaling_thread(
   auto thread = reinterpret_cast<webrtc::Thread*>(signaling_thread);
   deps->signaling_thread = thread;
 }
+WEBRTC_EXPORT void webrtc_PeerConnectionFactoryDependencies_set_env(
+    struct webrtc_PeerConnectionFactoryDependencies* self,
+    int has,
+    const struct webrtc_Environment* env) {
+  auto deps =
+      reinterpret_cast<webrtc::PeerConnectionFactoryDependencies*>(self);
+  webrtc_c::OptionalSet(deps->env, has,
+                        reinterpret_cast<const webrtc::Environment*>(env));
+}
 WEBRTC_EXPORT void webrtc_PeerConnectionFactoryDependencies_set_adm(
     struct webrtc_PeerConnectionFactoryDependencies* self,
     struct webrtc_AudioDeviceModule_refcounted* adm) {
@@ -1080,25 +1092,27 @@ namespace {
 // webrtc::PeerConnectionFactory に ConnectionContext を返すインターフェースを追加したクラス
 class PeerConnectionFactoryWithContext : public webrtc::PeerConnectionFactory {
  public:
-  explicit PeerConnectionFactoryWithContext(
+  PeerConnectionFactoryWithContext(
+      webrtc::Environment env,
       webrtc::PeerConnectionFactoryDependencies dependencies)
       : PeerConnectionFactoryWithContext(
-            webrtc::ConnectionContext::Create(webrtc::CreateEnvironment(),
-                                              &dependencies),
+            env,
+            webrtc::ConnectionContext::Create(env, &dependencies),
             &dependencies) {}
 
   PeerConnectionFactoryWithContext(
+      webrtc::Environment env,
       webrtc::scoped_refptr<webrtc::ConnectionContext> context,
       webrtc::PeerConnectionFactoryDependencies* dependencies)
       : conn_context_(context),
-        webrtc::PeerConnectionFactory(webrtc::CreateEnvironment(),
-                                      context,
-                                      dependencies) {}
+        webrtc::PeerConnectionFactory(env, context, dependencies) {}
 
   static webrtc::scoped_refptr<PeerConnectionFactoryWithContext> Create(
       webrtc::PeerConnectionFactoryDependencies dependencies) {
+    webrtc::Environment env =
+        dependencies.env.value_or(webrtc::CreateEnvironment());
     return webrtc::make_ref_counted<PeerConnectionFactoryWithContext>(
-        std::move(dependencies));
+        env, std::move(dependencies));
   }
 
   webrtc::scoped_refptr<webrtc::ConnectionContext> GetContext() const {

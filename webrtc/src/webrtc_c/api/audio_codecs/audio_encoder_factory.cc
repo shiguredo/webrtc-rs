@@ -19,7 +19,7 @@
 #include "../../common.h"
 #include "../../common.impl.h"
 #include "../../std.impl.h"
-#include "../environment.h"
+#include "../environment/environment.h"
 #include "audio_encoder.h"
 #include "audio_format.h"
 

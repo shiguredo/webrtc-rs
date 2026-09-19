@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #include "../../common.h"
-#include "../environment.h"
+#include "../environment/environment.h"
 #include "audio_device_defines.h"
 
 #if defined(__cplusplus)

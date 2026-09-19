@@ -1,7 +1,7 @@
 # libwebrtc のフィールドトライアルを指定できるようにする
 
 - Created: 2026-09-19
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-09-19
 - Branch: feature/add-webrtc-field-trials
 - Polished: {YYYY-MM-DD}
 
@@ -176,4 +176,18 @@ prebuilt 利用者（`source-build` feature を有効にしない利用者）が
 
 ## 解決方法
 
-（詳細は polish / 実装時に確定する）
+libwebrtc のフィールドトライアルを指定できるようにした。
+
+- `webrtc_c` の `api/environment.h` / `.cc` を元の C++ のパスに合わせて `api/environment/environment.h` / `.cc` と `api/environment/environment_factory.h` / `.cc` に移動し、`api/field_trials.h` / `.cc` と `api/field_trials_view.h` / `.cc` を追加した。`webrtc_c.h`、`CMakeLists.txt`、旧パスを include していた箇所、`webrtc/RULES.md` の統合例も追随させた
+- `webrtc_c` に `webrtc_FieldTrials_Create` / `webrtc_FieldTrialsView_IsEnabled` / `webrtc_Environment_field_trials` / `webrtc_Environment_copy` / `webrtc_EnvironmentFactory_new` / `webrtc_EnvironmentFactory_Set_field_trials` / `webrtc_EnvironmentFactory_Create` を追加した。`webrtc::EnvironmentFactory` をそのまま公開し、フィールドトライアル付きの `Environment` を作る独自の複合関数は追加していない
+- `webrtc_c` に `webrtc_PeerConnectionFactoryDependencies_set_env` を追加し、`PeerConnectionFactoryWithContext` が `dependencies.env` を尊重して `ConnectionContext` と `PeerConnectionFactory` に同じ `webrtc::Environment` を渡すようにした
+- Rust API に `FieldTrials` / `FieldTrialsViewRef` / `EnvironmentFactory` と `Environment::field_trials` / `EnvironmentRef::field_trials` を追加し、`Environment` を `Clone` に対応させた。`PeerConnectionFactoryDependencies::set_env` と `Error::InvalidFieldTrials` も追加した
+- `Cargo.toml` の webrtc-build を `m154.8037.1.2` に上げた。`api:field_trials` が含まれ、`webrtc::FieldTrials` をリンクできるようになる
+- README とスキルにフィールドトライアルの使い方を追記し、`CHANGES.md` の `## develop` に [ADD] と [UPDATE] を追記した
+
+確認:
+
+- `cargo test --workspace --features source-build` が成功することを確認した (139 件 + 35 件 + doctest 9 件)
+- `cargo clippy --workspace --features source-build --all-targets -- -D warnings` / `cargo fmt --all -- --check` / `python3 webrtc/run.py format --check` / `cargo doc --no-deps --features source-build` が成功することを確認した
+- フィールドトライアルが PeerConnection の offer SDP 生成まで届くことを `WebRTC-RFC8888CongestionControlFeedback/Enabled,offer:true/` を使ったテストで確認した
+- `WebRTC-Video-PerSsrcKeyframes` が `VideoSendStreamImpl` まで届くことの実配信での確認は未実施

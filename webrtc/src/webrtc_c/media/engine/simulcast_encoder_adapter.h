@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../api/environment.h"
+#include "../../api/environment/environment.h"
 #include "../../api/video_codecs/sdp_video_format.h"
 #include "../../api/video_codecs/video_encoder.h"
 #include "../../api/video_codecs/video_encoder_factory.h"

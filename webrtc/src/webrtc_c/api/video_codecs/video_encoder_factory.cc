@@ -15,7 +15,7 @@
 
 #include "../../common.h"
 #include "../../common.impl.h"
-#include "../environment.h"
+#include "../environment/environment.h"
 #include "sdp_video_format.h"
 #include "video_encoder.h"
 

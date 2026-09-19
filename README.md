@@ -107,6 +107,7 @@ impl FactoryHolder {
         deps.set_network_thread(&network);
         deps.set_worker_thread(&network);
         deps.set_signaling_thread(&signaling);
+        deps.set_env(Some(env.clone()));
         let event_log = RtcEventLogFactory::new();
         deps.set_event_log_factory(event_log);
         let adm = AudioDeviceModule::new(
@@ -136,6 +137,29 @@ impl FactoryHolder {
     }
 }
 ```
+
+### フィールドトライアルの指定
+
+libwebrtc のフィールドトライアルを指定する場合は、`FieldTrials` を `EnvironmentFactory` に設定して生成した `Environment` を使う。フィールドトライアルを指定しない場合は `Environment::new()` を使う。
+
+```rust
+use shiguredo_webrtc::{EnvironmentFactory, FieldTrials};
+
+let mut env_factory = EnvironmentFactory::new();
+env_factory.set_field_trials(
+    FieldTrials::new("WebRTC-Video-PerSsrcKeyframes/Enabled/").ok()?,
+);
+let env = env_factory.create();
+deps.set_env(Some(env.clone()));
+
+// 指定したフィールドトライアルが有効かどうかは Environment から確認できる
+assert!(
+    env.field_trials()
+        .is_enabled("WebRTC-Video-PerSsrcKeyframes")
+);
+```
+
+フィールドトライアル文字列が不正な場合、`FieldTrials::new` は `Error::InvalidFieldTrials` を返す。
 
 ## 対応 API
 
@@ -379,6 +403,12 @@ impl FactoryHolder {
   - WebRTC 環境の初期化
 - `EnvironmentRef`
   - WebRTC 環境参照型
+- `EnvironmentFactory`
+  - フィールドトライアルを設定した WebRTC 環境の生成
+- `FieldTrials`
+  - libwebrtc のフィールドトライアル
+- `FieldTrialsViewRef`
+  - フィールドトライアルの参照型
 - `Thread`
   - スレッド管理
 - `AudioEncoderFactory` / `AudioDecoderFactory`

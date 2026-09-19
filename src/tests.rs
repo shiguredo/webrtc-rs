@@ -27,6 +27,59 @@ fn create_and_drop_environment() {
 }
 
 #[test]
+fn field_trials_create_and_environment_field_trials() {
+    // 正しいフィールドトライアル文字列はパースに成功する
+    let field_trials = FieldTrials::new("WebRTC-Video-PerSsrcKeyframes/Enabled/")
+        .expect("FieldTrials の生成に失敗しました");
+
+    // 末尾の / がない文字列は不正なのでエラーになる
+    assert!(
+        matches!(
+            FieldTrials::new("WebRTC-Video-PerSsrcKeyframes/Enabled"),
+            Err(Error::InvalidFieldTrials(_))
+        ),
+        "不正なフィールドトライアル文字列がエラーになりません"
+    );
+
+    // EnvironmentFactory で生成した Environment ではフィールドトライアルが有効になる
+    let mut factory = EnvironmentFactory::new();
+    factory.set_field_trials(field_trials);
+    let env = factory.create();
+    assert!(
+        env.field_trials()
+            .is_enabled("WebRTC-Video-PerSsrcKeyframes"),
+        "EnvironmentFactory で生成した Environment でフィールドトライアルが有効になっていません"
+    );
+
+    // EnvironmentFactory を drop しても、フィールドトライアルは Environment 側で保持される
+    drop(factory);
+    assert!(
+        env.field_trials()
+            .is_enabled("WebRTC-Video-PerSsrcKeyframes"),
+        "EnvironmentFactory の drop 後にフィールドトライアルが無効になっています"
+    );
+
+    // コピーした Environment でもフィールドトライアルは有効で、元を drop しても使える
+    let copied_env = env.clone();
+    drop(env);
+    assert!(
+        copied_env
+            .field_trials()
+            .is_enabled("WebRTC-Video-PerSsrcKeyframes"),
+        "コピーした Environment でフィールドトライアルが無効になっています"
+    );
+
+    // フィールドトライアルを指定していない Environment では無効になる
+    let default_env = Environment::new();
+    assert!(
+        !default_env
+            .field_trials()
+            .is_enabled("WebRTC-Video-PerSsrcKeyframes"),
+        "既定の Environment でフィールドトライアルが有効になっています"
+    );
+}
+
+#[test]
 fn audio_transport_ref_and_ptr_are_available() {
     // 借用ハンドルと、C++ 側が所有する transport を保持するための AudioTransportPtr が
     // 取得できることを確認する。借用ハンドルが所有型の借用に縛られること (所有者を drop した
@@ -2985,6 +3038,93 @@ fn always_negotiate_data_channels_adds_data_section() {
     drop(env);
     network.stop();
     signaling.stop();
+}
+
+// フィールドトライアルを設定した Environment が PeerConnectionFactory を経由して
+// PeerConnection の offer SDP 生成まで届くことを確認する。
+#[test]
+fn field_trials_reach_offer_sdp() {
+    struct OfferHandler {
+        tx: mpsc::Sender<Result<String>>,
+    }
+
+    impl CreateSessionDescriptionObserverHandler for OfferHandler {
+        fn on_success(&mut self, desc: SessionDescription) {
+            let sdp = desc.to_string();
+            let _ = self.tx.send(sdp);
+        }
+
+        fn on_failure(&mut self, err: RtcError) {
+            let _ = self.tx.send(Err(err.into()));
+        }
+    }
+
+    // 音声の m= セクションが含まれる offer SDP を生成する。
+    // コーデックが並ばないと a=rtcp-fb が出力されないため、音声のエンコーダー /
+    // デコーダーファクトリを設定しておく。
+    fn create_offer_sdp(env: &Environment) -> String {
+        let enc = AudioEncoderFactory::builtin();
+        let dec = AudioDecoderFactory::builtin();
+        let apb = AudioProcessingBuilder::new_builtin();
+        let mut deps_factory = PeerConnectionFactoryDependencies::new();
+        let mut network = Thread::new();
+        let mut signaling = Thread::new();
+        network.start();
+        signaling.start();
+        deps_factory.set_network_thread(&network);
+        deps_factory.set_worker_thread(&network);
+        deps_factory.set_signaling_thread(&signaling);
+        deps_factory.set_audio_encoder_factory(&enc);
+        deps_factory.set_audio_decoder_factory(&dec);
+        deps_factory.set_audio_processing_builder(apb);
+        let adm = AudioDeviceModule::new(env, AudioDeviceModuleAudioLayer::Dummy)
+            .expect("AudioDeviceModule の生成に失敗しました");
+        deps_factory.set_audio_device_module(&adm);
+        // フィールドトライアルを持つ Environment をファクトリに設定する
+        deps_factory.set_env(Some(env.clone()));
+        deps_factory.enable_media();
+        let factory = PeerConnectionFactory::create_modular(deps_factory)
+            .expect("PeerConnectionFactory の生成に失敗しました");
+
+        let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
+        let pc_deps = PeerConnectionDependencies::new(&observer);
+        let pc_config = PeerConnectionRtcConfiguration::new();
+        let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
+            .expect("PeerConnection の生成に失敗しました");
+        let init = RtpTransceiverInit::new();
+        pc.add_transceiver(MediaType::Audio, &init)
+            .expect("AddTransceiver に失敗しました");
+
+        let opts = PeerConnectionOfferAnswerOptions::new();
+        let (tx, rx) = mpsc::channel::<Result<String>>();
+        let mut obs =
+            CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferHandler { tx }));
+        pc.create_offer(&mut obs, &opts);
+        rx.recv_timeout(Duration::from_secs(5))
+            .expect("createOffer がタイムアウトしました")
+            .expect("createOffer が失敗しました")
+    }
+
+    // RFC 8888 の輻輳制御フィードバックを offer するフィールドトライアルを有効にする
+    let mut env_factory = EnvironmentFactory::new();
+    env_factory.set_field_trials(
+        FieldTrials::new("WebRTC-RFC8888CongestionControlFeedback/Enabled,offer:true/")
+            .expect("FieldTrials の生成に失敗しました"),
+    );
+    let env = env_factory.create();
+    let sdp_on = create_offer_sdp(&env);
+    assert!(
+        sdp_on.contains("ack ccfb"),
+        "フィールドトライアルが offer SDP に反映されていません: {sdp_on}"
+    );
+
+    // 対照実験: フィールドトライアルを指定していない Environment では ack ccfb は入らない
+    let default_env = Environment::new();
+    let sdp_off = create_offer_sdp(&default_env);
+    assert!(
+        !sdp_off.contains("ack ccfb"),
+        "既定の Environment で ack ccfb が入っています: {sdp_off}"
+    );
 }
 
 // VideoEncoderFactory でカスタムエンコーダーを登録して encode を呼び、
