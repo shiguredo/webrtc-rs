@@ -1521,6 +1521,13 @@ impl PeerConnectionDependencies {
         self.raw.as_ptr()
     }
 
+    /// TURN 用の HTTP Proxy を設定する。
+    ///
+    /// `network_manager` と `socket_factory` が指すオブジェクトは C++ 側の port allocator が
+    /// 保持し続け、この port allocator は、生成した [PeerConnection] の network thread から使われる。
+    /// そのため、これらを所有する [crate::ConnectionContext]
+    /// (およびそれを保持する[crate::PeerConnectionFactory]) を、
+    /// この依存関係で作る [PeerConnection] より長生きさせる必要がある。
     #[expect(clippy::too_many_arguments)]
     pub fn set_proxy(
         &mut self,
