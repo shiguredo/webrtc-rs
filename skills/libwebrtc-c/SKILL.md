@@ -12,7 +12,7 @@ description: webrtc-rs リポジトリ配下の webrtc/ サブプロジェクト
 - C ラッパーは **libwebrtc との薄い対応のみ** を実装する
 - 便利関数や独自機能の追加は禁止
 - 元の C++ API のシグネチャ・名前に忠実に移植する
-- C ラッパーのファイルパスは元の C++ ファイルのパスと一致させる (分割をある程度サボることは許容、例: `api/environment.h` は `api/environment/environment.h` と `api/environment/environment_factory.h` を統合)
+- C ラッパーのファイルパスは元の C++ ファイルのパスと一致させる (分割をある程度サボることは許容、例: `api/rtc_event_log.h` は `api/rtc_event_log/rtc_event_log_factory.h` の型をフラットなファイルにまとめている)
 
 ## ディレクトリ構成
 
@@ -28,7 +28,7 @@ webrtc/
     ├── whip.c, whep.c      WHIP/WHEP サンプル (C)
     ├── whip.cpp, whep.cpp  WHIP/WHEP サンプル (C++)
     └── webrtc_c/
-        ├── api/            PeerConnection, JSEP, RTP, 統計, video/audio codec, environment, observer 等 (audio/, audio_codecs/, video/, video_codecs/, stats/ サブディレクトリを含む)
+        ├── api/            PeerConnection, JSEP, RTP, 統計, video/audio codec, environment, observer 等 (audio/, audio_codecs/, environment/, video/, video_codecs/, stats/ サブディレクトリを含む)
         ├── pc/             connection_context (接続管理)
         ├── rtc_base/       暗号、SSL、ロギング、スレッド、タイムスタンプ
         ├── media/          base/adapted_video_track_source, engine/simulcast_encoder_adapter
@@ -196,7 +196,7 @@ C++ でスタック配置するクラスは C 側ではヒープに置いて明�
 
 | カテゴリ | ヘッダ |
 |----------|--------|
-| 環境・基盤 | `api/environment.h`, `api/ref_count.h`, `api/rtc_error.h`, `api/rtc_event_log.h`, `api/priority.h`, `api/media_types.h` |
+| 環境・基盤 | `api/environment/environment.h`, `api/environment/environment_factory.h`, `api/field_trials.h`, `api/field_trials_view.h`, `api/ref_count.h`, `api/rtc_error.h`, `api/rtc_event_log.h`, `api/priority.h`, `api/media_types.h` |
 | PeerConnection / JSEP | `api/peer_connection_interface.h`, `api/jsep.h`, `api/set_local_description_observer_interface.h`, `api/set_remote_description_observer_interface.h` |
 | Media | `api/media_stream_interface.h`, `api/data_channel_interface.h`, `api/dtls_transport_interface.h` |
 | 音声 | `api/audio/audio_device.h`, `api/audio/audio_processing.h`, `api/audio_codecs/audio_decoder_factory.h`, `api/audio_codecs/audio_encoder_factory.h` |
@@ -226,7 +226,7 @@ C アプリ側で `webrtc::scoped_refptr` に相互変換できるクラスを�
 | 変数 | 用途 |
 |------|------|
 | `WEBRTC_C_TARGET` | ターゲット OS/アーキ (例: `ubuntu-24.04_x86_64`, `macos_arm64`, `windows_x86_64`, `android_arm64`, `ios_arm64`, `raspberry-pi-os_armv8`) |
-| `WEBRTC_BUILD_VERSION` | libwebrtc バージョン (例: `m154.8037.1.1`) |
+| `WEBRTC_BUILD_VERSION` | libwebrtc バージョン (例: `m154.8037.1.2`) |
 | `WEBRTC_BASE_URL` | webrtc-build リリースのベース URL |
 | `WEBRTC_C_SYSROOT` | ARMv8 クロスコンパイル時のみ必須 |
 

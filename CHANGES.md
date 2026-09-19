@@ -70,8 +70,17 @@
   - C API の `webrtc_PeerConnectionInterface_RTCConfiguration_cpu_adaptation` / `set_cpu_adaptation` を追加し、libwebrtc のアクセサに委譲する
   - CPU アダプテーションの有効 / 無効を Rust SDK から設定できるようにする
   - @voluntas
+- [ADD] libwebrtc のフィールドトライアルを指定できるようにする
+  - `FieldTrials` / `EnvironmentFactory` / `FieldTrialsViewRef` を追加し、`Environment::field_trials` でフィールドトライアルを参照できるようにする
+  - `Environment` を `Clone` に対応させる
+  - `PeerConnectionFactoryDependencies::set_env` を追加し、指定した `Environment` が `ConnectionContext` と `PeerConnectionFactory` に渡るようにする
+  - `Error::InvalidFieldTrials` を追加する
+  - @melpon
 - [UPDATE] `Error` の表示メッセージを英語にする
   - 利用者に見えるエラーメッセージを英語に統一する
+  - @melpon
+- [UPDATE] libwebrtc m154 (m154.8037.1.2) に上げる
+  - `api:field_trials` が含まれるようになり、`webrtc::FieldTrials` を利用できるようになった
   - @melpon
 - [FIX] C の関数名が間違っていたのを修正する
   - `webrtc_AudioDecoderFactory_MakeAudioDecoder` → `webrtc_AudioDecoderFactory_Create`
@@ -127,6 +136,9 @@
   - `webrtc_c` の optional を `int has` + `const T*` に統一し、値を直接渡していた `webrtc_TransformableFrameInterface_SetCaptureTime` / `webrtc_VideoFrameBuilder_set_presentation_timestamp_us` / `webrtc_VideoFrameBuilder_set_reference_time_us` を `const int64_t*` にする
   - optional の getter の `has` 引数を `out_has` に揃え、`webrtc_VideoFrame_color_space` が `has == 0` のときに値の出力先を書き換えないようにする (挙動は変更しない)
   - `src/api/*.rs` と `src/rtc_base/logging.rs` に散っていた手動実装を各ヘルパーの呼び出しに置き換える (挙動は変更しない)
+  - @melpon
+- [UPDATE] webrtc_c の `api/environment.h` を `api/environment/environment.h` / `api/environment/environment_factory.h` / `api/field_trials.h` / `api/field_trials_view.h` に分割する
+  - 追加する型が増えたため、元の C++ ファイルのパスに合わせて分割する
   - @melpon
 
 ## 0.154.0

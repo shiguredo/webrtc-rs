@@ -18,7 +18,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 ## バージョン情報
 
 - crate 名: `shiguredo_webrtc`
-- 現行バージョン: 0.154.x (libwebrtc m154 ベース、`webrtc-build = "m154.8037.1.1"`)
+- 現行バージョン: 0.154.x (libwebrtc m154 ベース、`webrtc-build = "m154.8037.1.2"`)
 - Rust Edition: 2024
 - 最小 Rust バージョン: 1.93
 - ライセンス: Apache-2.0
@@ -68,7 +68,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 | `video_encoder` | `VideoEncoder`, `VideoEncoderHandler`, `VideoEncoderFactory`, `VideoEncoderFactoryHandler`, `VideoEncoderEncoderInfo`, `VideoEncoderSettingsRef`, `VideoEncoderRateControlParametersRef`, `VideoEncoderQpThresholds`, `VideoEncoderScalingSettings`, `VideoEncoderResolution`, `VideoEncoderResolutionBitrateLimits`, `VideoEncoderEncodedImageCallback`, `VideoEncoderEncodedImageCallbackRef`, `VideoEncoderEncodedImageCallbackHandler`, `VideoEncoderEncodedImageCallbackResult`, `VideoEncoderEncodedImageCallbackResultError`, `VideoEncoderEncodedImageCallbackPtr` ほか参照型 | 映像エンコーダー (組み込み + カスタム) |
 | `video_decoder` | `VideoDecoder`, `VideoDecoderHandler`, `VideoDecoderFactory`, `VideoDecoderFactoryHandler`, `VideoDecoderDecoderInfo`, `VideoDecoderSettingsRef`, `VideoDecoderDecodedImageCallbackPtr` | 映像デコーダー (組み込み + カスタム) |
 | `dtls_transport` | `DtlsTransport`, `DtlsTransportState`, `DtlsTransportObserver`, `DtlsTransportObserverHandler` | DTLS トランスポートと証明書検証連携 |
-| `environment` | `Environment`, `EnvironmentRef` | WebRTC 環境 |
+| `environment` | `Environment`, `EnvironmentRef`, `EnvironmentFactory`, `FieldTrials`, `FieldTrialsViewRef` | WebRTC 環境とフィールドトライアル |
 | `rtc_error` | `RtcError` | libwebrtc の `RTCError` ラッパー |
 | `rtc_event_log` | `RtcEventLogFactory` | イベントログ |
 | `stats` | `RTCStatsReport` | 統計情報 |
@@ -130,6 +130,7 @@ let mut deps = PeerConnectionFactoryDependencies::new();
 deps.set_network_thread(&network);
 deps.set_worker_thread(&network);
 deps.set_signaling_thread(&signaling);
+deps.set_env(Some(env.clone()));
 deps.set_event_log_factory(RtcEventLogFactory::new());
 
 let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)?;
@@ -144,6 +145,30 @@ deps.enable_media();
 let (factory, context) =
     PeerConnectionFactory::create_modular_with_context(deps)?;
 ```
+
+### フィールドトライアル
+
+libwebrtc のフィールドトライアルは `FieldTrials` を作って `EnvironmentFactory` に設定し、生成した `Environment` を `PeerConnectionFactoryDependencies::set_env` と `AudioDeviceModule::new` に渡す。指定しない場合は `Environment::new()` を使う。
+
+```rust
+use shiguredo_webrtc::{EnvironmentFactory, FieldTrials};
+
+let mut env_factory = EnvironmentFactory::new();
+env_factory.set_field_trials(
+    FieldTrials::new("WebRTC-Video-PerSsrcKeyframes/Enabled/")?,
+);
+let env = env_factory.create();
+deps.set_env(Some(env.clone()));
+
+// 有効かどうかは Environment から確認できる
+assert!(
+    env.field_trials()
+        .is_enabled("WebRTC-Video-PerSsrcKeyframes")
+);
+```
+
+- `FieldTrials::new` は不正な文字列に対して `Error::InvalidFieldTrials` を返す
+- フィールドトライアルを指定しない場合は `Environment::new()` を使う
 
 ### Thread の扱い
 
