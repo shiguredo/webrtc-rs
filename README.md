@@ -157,9 +157,28 @@ assert!(
     env.field_trials()
         .is_enabled("WebRTC-Video-PerSsrcKeyframes")
 );
+
+// 無効かどうかは is_disabled で確認できる。is_enabled の否定ではないため、値が
+// Enabled でも Disabled でもないフィールドトライアルと、指定していない
+// フィールドトライアルは両方 false になる
+assert!(
+    !env.field_trials()
+        .is_disabled("WebRTC-Video-PerSsrcKeyframes")
+);
+
+// 設定された値は lookup でそのまま取得できる。Enabled,offer:true のような
+// パラメータも含めて返り、設定されていないフィールドトライアルは空文字列になる
+assert_eq!(
+    env.field_trials()
+        .lookup("WebRTC-Video-PerSsrcKeyframes")
+        .ok()?,
+    "Enabled"
+);
 ```
 
 フィールドトライアル文字列が不正な場合、`FieldTrials::new` は `Error::InvalidFieldTrials` を返す。
+
+`EnvironmentRef` は借用型なので、借用が切れた後も `Environment` を保持したい場合は `EnvironmentRef::to_owned` で所有権を持つ `Environment` を作る。
 
 ## 対応 API
 

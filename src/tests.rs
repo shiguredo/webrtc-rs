@@ -80,6 +80,136 @@ fn field_trials_create_and_environment_field_trials() {
 }
 
 #[test]
+fn field_trials_is_enabled_and_is_disabled_are_independent() {
+    // 値が Enabled のキーは有効、値が Disabled のキーは無効になる
+    let mut factory = EnvironmentFactory::new();
+    factory.set_field_trials(
+        FieldTrials::new(
+            "Enabled-Trial/Enabled/Disabled-Trial/Disabled/Param-Trial/Enabled,offer:true/Other-Trial/42/",
+        )
+        .expect("FieldTrials の生成に失敗しました"),
+    );
+    let env = factory.create();
+    let trials = env.field_trials();
+
+    assert!(
+        trials.is_enabled("Enabled-Trial"),
+        "値が Enabled のキーが有効になっていません"
+    );
+    assert!(
+        !trials.is_disabled("Enabled-Trial"),
+        "値が Enabled のキーが無効になっています"
+    );
+
+    assert!(
+        !trials.is_enabled("Disabled-Trial"),
+        "値が Disabled のキーが有効になっています"
+    );
+    assert!(
+        trials.is_disabled("Disabled-Trial"),
+        "値が Disabled のキーが無効になっていません"
+    );
+
+    // 値が Enabled で始まる場合はパラメータが付いていても有効になる
+    assert!(
+        trials.is_enabled("Param-Trial"),
+        "パラメータ付きの Enabled のキーが有効になっていません"
+    );
+    assert!(
+        !trials.is_disabled("Param-Trial"),
+        "パラメータ付きの Enabled のキーが無効になっています"
+    );
+
+    // 値が Enabled でも Disabled でもないキーは is_enabled と is_disabled の両方が false になる。
+    // is_enabled の否定で is_disabled を代用できないことを確認する。
+    assert!(
+        !trials.is_enabled("Other-Trial"),
+        "値が Enabled でも Disabled でもないキーが有効になっています"
+    );
+    assert!(
+        !trials.is_disabled("Other-Trial"),
+        "値が Enabled でも Disabled でもないキーが無効になっています"
+    );
+
+    // 設定されていないキーも両方が false になる
+    assert!(
+        !trials.is_enabled("Unknown-Trial"),
+        "設定されていないキーが有効になっています"
+    );
+    assert!(
+        !trials.is_disabled("Unknown-Trial"),
+        "設定されていないキーが無効になっています"
+    );
+}
+
+#[test]
+fn field_trials_lookup_returns_value() {
+    // 設定された値はパラメータも含めてそのまま取得できる
+    let mut factory = EnvironmentFactory::new();
+    factory.set_field_trials(
+        FieldTrials::new("Param-Trial/Enabled,offer:true/Disabled-Trial/Disabled/")
+            .expect("FieldTrials の生成に失敗しました"),
+    );
+    let env = factory.create();
+    let trials = env.field_trials();
+
+    // パラメータ付きの値もそのまま返る
+    assert_eq!(
+        trials.lookup("Param-Trial").expect("lookup に失敗しました"),
+        "Enabled,offer:true",
+        "パラメータ付きの値が取得できていません"
+    );
+    assert_eq!(
+        trials
+            .lookup("Disabled-Trial")
+            .expect("lookup に失敗しました"),
+        "Disabled",
+        "値が取得できていません"
+    );
+
+    // 設定されていないキーは空文字列になる
+    assert_eq!(
+        trials
+            .lookup("Unknown-Trial")
+            .expect("lookup に失敗しました"),
+        "",
+        "設定されていないキーが空文字列になっていません"
+    );
+
+    // フィールドトライアルを指定していない Environment でも空文字列になる
+    let default_env = Environment::new();
+    assert_eq!(
+        default_env
+            .field_trials()
+            .lookup("Param-Trial")
+            .expect("lookup に失敗しました"),
+        "",
+        "既定の Environment のキーが空文字列になっていません"
+    );
+}
+
+#[test]
+fn environment_ref_to_owned_extends_lifetime() {
+    // EnvironmentRef から所有権を持つ Environment を作り、借用元を drop した後も使えることを確認する
+    let mut factory = EnvironmentFactory::new();
+    factory.set_field_trials(
+        FieldTrials::new("WebRTC-Video-PerSsrcKeyframes/Enabled/")
+            .expect("FieldTrials の生成に失敗しました"),
+    );
+    let env = factory.create();
+    let owned = env.as_ref().to_owned();
+    drop(factory);
+    drop(env);
+
+    assert!(
+        owned
+            .field_trials()
+            .is_enabled("WebRTC-Video-PerSsrcKeyframes"),
+        "EnvironmentRef から作った Environment でフィールドトライアルが無効になっています"
+    );
+}
+
+#[test]
 fn audio_transport_ref_and_ptr_are_available() {
     // 借用ハンドルと、C++ 側が所有する transport を保持するための AudioTransportPtr が
     // 取得できることを確認する。借用ハンドルが所有型の借用に縛られること (所有者を drop した

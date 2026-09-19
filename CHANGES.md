@@ -72,7 +72,9 @@
   - @voluntas
 - [ADD] libwebrtc のフィールドトライアルを指定できるようにする
   - `FieldTrials` / `EnvironmentFactory` / `FieldTrialsViewRef` を追加し、`Environment::field_trials` でフィールドトライアルを参照できるようにする
-  - `Environment` を `Clone` に対応させる
+  - `FieldTrialsViewRef::is_disabled` を追加し、`webrtc::FieldTrialsView::IsDisabled` に対応する無効判定をできるようにする
+  - `FieldTrialsViewRef::lookup` を追加し、`webrtc::FieldTrialsView::Lookup` に対応する設定値の取得をできるようにする
+  - `Environment` を `Clone` に対応させ、`EnvironmentRef::to_owned` で借用から所有権を持つ `Environment` を作れるようにする
   - `PeerConnectionFactoryDependencies::set_env` を追加し、指定した `Environment` が `ConnectionContext` と `PeerConnectionFactory` に渡るようにする
   - `Error::InvalidFieldTrials` を追加する
   - @melpon
