@@ -7,7 +7,7 @@
 - **C ラッパーのファイルパスは、元になった C++ ファイルのパスと一致させること**
   - 例えば `webrtc::VideoFrame` は `<api/video/video_frame.h>` で宣言されているので、この C 版を `"webrtc_c/api/video/video_frame.h"` ファイルを作って記述する
   - ただし厳密にやる必要は無く、ある程度分割をサボっても良いものとする
-    - 例えば `webrtc_c/api/environment.h` は本来 `api/environment/environment.h` と `api/environment/environment_factory.h` に分かれているが、分ける意味があまり無いので纏めている。
+    - 例えば `webrtc_c/api/rtc_event_log.h` は `api/rtc_event_log/rtc_event_log_factory.h` の型を、ディレクトリを切らずにフラットなファイルへまとめている。
 - C++ 側の `webrtc::Xxx` というクラスは `struct webrtc_Xxx` に対応させる。
 - C++ 側の `webrtc::Xxx` の `Yyy` 関数は `webrtc_Xxx_Yyy` 関数に対応させる。
 - `webrtc::scoped_refptr<CppType>` は `struct CType_refcounted*` として扱い、手動で `CType_AddRef` 及び `CType_Release` を呼ぶことで寿命を管理する
@@ -119,7 +119,7 @@
 
 - ビルドコマンド: `python3 run.py build ubuntu-24.04_x86_64`
 - 実行コマンド: `./_build/ubuntu-24.04_x86_64/release/webrtc_c/whip_c`
-- デバッグビルドコマンド: `python3 run.py build ubuntu-24.04_x86_64 --local-webrtc-build-dir ../../webrtc-build/_worktree/m154.8037.1.1 --debug`
+- デバッグビルドコマンド: `python3 run.py build ubuntu-24.04_x86_64 --local-webrtc-build-dir ../../webrtc-build/_worktree/m154.8037.1.2 --debug`
 - デバッグ実行コマンド: `./_build/ubuntu-24.04_x86_64/debug/webrtc_c/whip_c`
 - lldb-dap プラグインのインストールと lldb-dap バイナリのインストール、`../.vscode/launch.json` の各種パスの設定さえ適切にやれば、VSCode 上でデバッグ実行も可能です
 - 参照用の libwebrtc のヘッダーファイルの場所: `./_install/ubuntu-24.04_x86_64/release/webrtc/include`

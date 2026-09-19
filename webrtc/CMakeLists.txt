@@ -434,6 +434,9 @@ add_library(webrtc_c
     src/webrtc_c/api/frame_transformer_interface.cc
     src/webrtc_c/api/jsep.cc
     src/webrtc_c/api/environment/environment.cc
+    src/webrtc_c/api/environment/environment_factory.cc
+    src/webrtc_c/api/field_trials.cc
+    src/webrtc_c/api/field_trials_view.cc
     src/webrtc_c/api/media_types.cc
     src/webrtc_c/api/media_stream_interface.cc
     src/webrtc_c/api/priority.cc

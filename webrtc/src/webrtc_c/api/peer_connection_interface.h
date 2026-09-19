@@ -10,6 +10,7 @@
 #include "../std.h"
 #include "data_channel_interface.h"
 #include "dtls_transport_interface.h"
+#include "environment/environment.h"
 #include "jsep.h"
 #include "media_stream_interface.h"
 #include "rtc_error.h"
@@ -356,6 +357,10 @@ WEBRTC_EXPORT void
 webrtc_PeerConnectionFactoryDependencies_set_signaling_thread(
     struct webrtc_PeerConnectionFactoryDependencies* self,
     struct webrtc_Thread* signaling_thread);
+WEBRTC_EXPORT void webrtc_PeerConnectionFactoryDependencies_set_env(
+    struct webrtc_PeerConnectionFactoryDependencies* self,
+    int has,
+    const struct webrtc_Environment* env);
 WEBRTC_EXPORT void webrtc_PeerConnectionFactoryDependencies_set_adm(
     struct webrtc_PeerConnectionFactoryDependencies* self,
     struct webrtc_AudioDeviceModule_refcounted* adm);
