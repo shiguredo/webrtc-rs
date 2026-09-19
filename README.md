@@ -170,7 +170,7 @@ impl FactoryHolder {
   - ICE / 接続設定
 - `ConnectionContext`
   - `default_network_manager()` / `default_socket_factory()` を取得
-- `NetworkManagerRef` / `NetworkManagerRefMut` / `PacketSocketFactoryRef` / `PacketSocketFactoryRefMut`
+- `NetworkManagerRef` / `PacketSocketFactoryRef`
   - `ConnectionContext::default_network_manager()` / `default_socket_factory()` で取得
 - `PeerConnectionOfferAnswerOptions`
   - Offer/Answer オプション (ICE リスタート、Simulcast レイヤー数など)

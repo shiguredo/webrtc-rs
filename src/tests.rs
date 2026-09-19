@@ -2753,22 +2753,20 @@ fn peer_connection_create_with_proxy_allocator() {
         .expect("AudioDeviceModule の生成に失敗しました");
     deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
-    let (factory, mut context) = PeerConnectionFactory::create_modular_with_context(deps_factory)
+    let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps_factory)
         .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
 
     let network_manager = context.default_network_manager();
     let socket_factory = context.default_socket_factory();
     assert!(!network_manager.as_ptr().is_null());
     assert!(!socket_factory.as_ptr().is_null());
-    let (network_manager_mut, socket_factory_mut) =
-        context.default_network_manager_and_socket_factory_mut();
 
     let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
     let mut pc_deps = PeerConnectionDependencies::new(&observer);
     pc_deps.set_proxy(
-        network_manager_mut,
-        socket_factory_mut,
+        network_manager,
+        socket_factory,
         "127.0.0.1",
         8080,
         "user",

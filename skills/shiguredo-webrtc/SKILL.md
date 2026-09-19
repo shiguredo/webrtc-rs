@@ -188,6 +188,16 @@ C API のオブジェクトは、所有型と 2 種類の借用型で扱う。
 - C API の読み取り専用の借用を返す getter は `XxxRef` が、可変参照を返す getter は `XxxRefMut` が使う (`cast_mut()` は使わない)
 - `_get_const` / `_vector_get_const` / `_inlined_vector_get_const` がある場合、読み取り経路 (所有型の `&self` からコピーや借用を作る場合を含む) は必ず `_const` 版を使う。可変版は書き換える場合だけ使う
 
+### 例外: 共有可変ハンドル (`NetworkManagerRef` / `PacketSocketFactoryRef`)
+
+この 2 型だけは `ConstNonNull` ではなく非 null の `*mut` を保持し、`XxxRefMut` を持たず `XxxRef` だけで扱う。他の借用型と制約の向きが逆だからである。
+
+- 保持するポインタ: C++ 側の `ConnectionContext::default_network_manager` / `default_socket_factory` は const メソッドだが非 const ポインタを返す。`BasicPortAllocator` はそれを `NetworkManager* network_manager_` / `PacketSocketFactory* const socket_factory_` として保持し、後から network thread で非 const メソッド (`StartUpdating` / `GetAnyAddressNetworks` など) を呼んで書き換える。借用先は読み取り専用ではないため、`*const` にすると C++ の実態と合わない
+- 排他を主張しない: そのポインタは `set_proxy` を通して複数の `BasicPortAllocator` で共有される。唯一所有には決してならないので `&mut ConnectionContext` を要求できず、`XxxRefMut` は作れない。`XxxRefMut` のライフタイムを `&mut ConnectionContext` に縛るという排他の表現が使えないためである
+- `&self` で取得できる: `XxxRef` が保持するのはポインタ値であり参照ではない。`&NetworkManagerRef` を複数持っても NetworkManager への参照が複数あることにはならず、aliasing 規則に抵触しない。したがって getter を `&self` にできる
+- ライフタイムは残す: `PhantomData<&'a ConnectionContext>` は「借用先が生存している間だけ有効」を表すために維持する。`AudioTransportPtr` がライフタイムを落としているのとは逆に、こちらはライフタイムを型で表せるが排他を表せないことが理由である
+- Rust 側から操作しない: `as_mut_ptr()` は `pub(crate)` にし、C API に渡すときだけ使う。`NetworkManager` の参照を Rust 側で作らないため、C++ が後から書き換えても aliasing 違反にならない
+
 ## 参照カウント管理
 
 libwebrtc の `scoped_refptr` 相当を Rust 側で安全に扱うための型:

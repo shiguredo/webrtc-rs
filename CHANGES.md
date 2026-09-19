@@ -32,7 +32,7 @@
 - [CHANGE] 借用先を書き換える API の引数を `XxxRefMut` に変える
   - `AudioEncoderHandler::encode` は `&mut BufferRefMut<'_>`、`AudioDecoderHandler::generate_plc` は `&mut BufferS16RefMut<'_>` を受け取る
   - `VideoDecoderDecodedImageCallbackPtr::decoded` は `VideoFrameRefMut<'_>` を受け取り、`VideoEncoderEncodedImageCallback::on_encoded_image` は `&mut self` になる
-  - `VideoEncoder::register_encode_complete_callback` と `PeerConnectionDependencies::set_proxy` は `XxxRefMut` を受け取る
+  - `VideoEncoder::register_encode_complete_callback` は `VideoEncoderEncodedImageCallbackRefMut` を受け取る
   - `AudioTransport` の `recorded_data_is_available` / `need_more_play_data` / `pull_render_data` は `&mut self` になる
   - `VideoEncoderEncodedImageCallbackPtr::from_ref` を削除し、代わりに書き換え用の `from_mut` を追加する
   - @melpon
@@ -58,9 +58,11 @@
   - libwebrtc は ADM の公開メソッドを同時に呼び出さないため、`Sync` と `&self` は要求しない
   - `Mutex` などの内部可変性を用意しなくても、ハンドラが `&mut self` を通して状態を保持できる
   - @melpon
-- [ADD] `ConnectionContext::default_network_manager_and_socket_factory_mut` を追加する
-  - `NetworkManagerRefMut` と `PacketSocketFactoryRefMut` を 1 回の `&mut self` 借用で取得できるようにする
-  - `PeerConnectionDependencies::set_proxy` のように両方を同時に必要とする API のために用意する
+- [CHANGE] `NetworkManagerRef` / `PacketSocketFactoryRef` を共有可変ハンドルにする
+  - `NetworkManagerRefMut` / `PacketSocketFactoryRefMut` を削除し、`Ref` 側が非 null の非 const ポインタを保持する
+  - `ConnectionContext::default_network_manager_and_socket_factory_mut` を削除し、getter を `&self` にする
+  - C++ 側の `default_network_manager` は const メソッドだが非 const ポインタを返し、そのポインタは
+    複数の BasicPortAllocator で共有されて後から書き換わるため、唯一所有を主張できない
   - @melpon
 - [ADD] `RtpReceiver::stream_ids` を追加する
   - C API の `webrtc_RtpReceiverInterface_stream_ids` を追加し、受信器に関連付けられた Stream ID 群を複製して返す

@@ -391,55 +391,50 @@ impl ConnectionContext {
         self.raw_ref.as_ptr()
     }
 
+    /// default の NetworkManager を借用する。
     pub fn default_network_manager(&self) -> NetworkManagerRef<'_> {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_ConnectionContext_default_network_manager(self.as_ptr()) },
             "webrtc_ConnectionContext_default_network_manager",
         );
-        NetworkManagerRef::from_raw(ConstNonNull::from(raw))
+        NetworkManagerRef::from_raw(raw)
     }
 
+    /// default の PacketSocketFactory を借用する。
     pub fn default_socket_factory(&self) -> PacketSocketFactoryRef<'_> {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_ConnectionContext_default_socket_factory(self.as_ptr()) },
             "webrtc_ConnectionContext_default_socket_factory",
         );
-        PacketSocketFactoryRef::from_raw(ConstNonNull::from(raw))
-    }
-
-    /// default の NetworkManager と PacketSocketFactory を書き換え用に借用する。
-    ///
-    /// 2 つのハンドルを同時に必要とする API ([crate::PeerConnectionDependencies::set_proxy] 等)
-    /// のために、1 回の `&mut self` 借用で両方を返す。
-    pub fn default_network_manager_and_socket_factory_mut(
-        &mut self,
-    ) -> (NetworkManagerRefMut<'_>, PacketSocketFactoryRefMut<'_>) {
-        let network_manager = expect_non_null(
-            unsafe { ffi::webrtc_ConnectionContext_default_network_manager(self.as_ptr()) },
-            "webrtc_ConnectionContext_default_network_manager",
-        );
-        let socket_factory = expect_non_null(
-            unsafe { ffi::webrtc_ConnectionContext_default_socket_factory(self.as_ptr()) },
-            "webrtc_ConnectionContext_default_socket_factory",
-        );
-        (
-            NetworkManagerRefMut::from_raw(network_manager),
-            PacketSocketFactoryRefMut::from_raw(socket_factory),
-        )
+        PacketSocketFactoryRef::from_raw(raw)
     }
 }
 
 /// rtc::NetworkManager への借用ラッパー。
+///
+/// このライブラリでは、借用ラッパー Ref では `ConstNonNull` で保持して `#[derive(Clone, Copy)]` し、
+/// 可変借用ラッパー RefMut では [NonNull] で保持して derive しないというルールになっている。
+///
+/// しかしこの借用ラッパーは他の Ref と違い、内部ポインタを `ConstNonNull` ではなく [NonNull] で保持する。
+/// つまり書き換え可能な NetworkManager* であるにも関わらず、複数の借用を可能としている。
+/// これで問題ない理由は以下の通りである。
+///
+/// - Rust 側に可変参照を持つメソッドが存在せず、ポインタを取り出す手段しか公開していない
+/// - C++ 側のメソッドには同一スレッドからアクセスしなければならない実行時の仕様がある
+///
+/// これによって、Rust 側は複数の借用を行っても何もできず、C++ 側は常にシーケンシャルにアクセス
+/// されることが保証されている。
+/// そのため内部ポインタは NonNull だが、Rust 側としては Ref として扱うことにする。
 #[derive(Clone, Copy)]
 pub struct NetworkManagerRef<'a> {
-    raw: ConstNonNull<ffi::webrtc_NetworkManager>,
+    raw: NonNull<ffi::webrtc_NetworkManager>,
     _marker: PhantomData<&'a ConnectionContext>,
 }
 
 unsafe impl<'a> Send for NetworkManagerRef<'a> {}
 
 impl<'a> NetworkManagerRef<'a> {
-    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_NetworkManager>) -> Self {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_NetworkManager>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -449,45 +444,26 @@ impl<'a> NetworkManagerRef<'a> {
     pub fn as_ptr(&self) -> *const ffi::webrtc_NetworkManager {
         self.raw.as_ptr()
     }
-}
 
-/// webrtc_NetworkManager の可変借用ラッパー。
-pub struct NetworkManagerRefMut<'a> {
-    raw: NonNull<ffi::webrtc_NetworkManager>,
-    _marker: PhantomData<&'a mut ffi::webrtc_NetworkManager>,
-    cref: NetworkManagerRef<'a>,
-}
-
-unsafe impl<'a> Send for NetworkManagerRefMut<'a> {}
-
-impl<'a> NetworkManagerRefMut<'a> {
-    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_NetworkManager>) -> Self {
-        Self {
-            raw,
-            _marker: PhantomData,
-            cref: NetworkManagerRef::from_raw(ConstNonNull::from(raw)),
-        }
-    }
-
-    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_NetworkManager {
+    /// C API に渡すための可変ポインタ。
+    pub(crate) fn as_mut_ptr(&self) -> *mut ffi::webrtc_NetworkManager {
         self.raw.as_ptr()
-    }
-    pub fn as_ref(&self) -> NetworkManagerRef<'_> {
-        self.cref
     }
 }
 
 /// rtc::PacketSocketFactory への借用ラッパー。
+///
+/// 借用先の扱いは [NetworkManagerRef] と同じ。
 #[derive(Clone, Copy)]
 pub struct PacketSocketFactoryRef<'a> {
-    raw: ConstNonNull<ffi::webrtc_PacketSocketFactory>,
+    raw: NonNull<ffi::webrtc_PacketSocketFactory>,
     _marker: PhantomData<&'a ConnectionContext>,
 }
 
 unsafe impl<'a> Send for PacketSocketFactoryRef<'a> {}
 
 impl<'a> PacketSocketFactoryRef<'a> {
-    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_PacketSocketFactory>) -> Self {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_PacketSocketFactory>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -497,31 +473,10 @@ impl<'a> PacketSocketFactoryRef<'a> {
     pub fn as_ptr(&self) -> *const ffi::webrtc_PacketSocketFactory {
         self.raw.as_ptr()
     }
-}
 
-/// webrtc_PacketSocketFactory の可変借用ラッパー。
-pub struct PacketSocketFactoryRefMut<'a> {
-    raw: NonNull<ffi::webrtc_PacketSocketFactory>,
-    _marker: PhantomData<&'a mut ffi::webrtc_PacketSocketFactory>,
-    cref: PacketSocketFactoryRef<'a>,
-}
-
-unsafe impl<'a> Send for PacketSocketFactoryRefMut<'a> {}
-
-impl<'a> PacketSocketFactoryRefMut<'a> {
-    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_PacketSocketFactory>) -> Self {
-        Self {
-            raw,
-            _marker: PhantomData,
-            cref: PacketSocketFactoryRef::from_raw(ConstNonNull::from(raw)),
-        }
-    }
-
-    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_PacketSocketFactory {
+    /// C API に渡すための可変ポインタ。
+    pub(crate) fn as_mut_ptr(&self) -> *mut ffi::webrtc_PacketSocketFactory {
         self.raw.as_ptr()
-    }
-    pub fn as_ref(&self) -> PacketSocketFactoryRef<'_> {
-        self.cref
     }
 }
 
@@ -1569,8 +1524,8 @@ impl PeerConnectionDependencies {
     #[expect(clippy::too_many_arguments)]
     pub fn set_proxy(
         &mut self,
-        network_manager: NetworkManagerRefMut<'_>,
-        socket_factory: PacketSocketFactoryRefMut<'_>,
+        network_manager: NetworkManagerRef<'_>,
+        socket_factory: PacketSocketFactoryRef<'_>,
         proxy_host: &str,
         proxy_port: u16,
         proxy_username: &str,
