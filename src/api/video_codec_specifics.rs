@@ -1,3 +1,4 @@
+use crate::const_non_null::ConstNonNull;
 use crate::ffi;
 use crate::helper::non_null::expect_non_null;
 use std::marker::PhantomData;
@@ -91,7 +92,7 @@ impl GofInfoVP9 {
     ///
     /// # Safety
     /// `raw` は有効な `webrtc_GofInfoVP9` を指している必要があります。
-    pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_GofInfoVP9) -> Self {
+    pub(crate) unsafe fn copy_from_raw(raw: *const ffi::webrtc_GofInfoVP9) -> Self {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_GofInfoVP9_copy(raw) },
             "webrtc_GofInfoVP9_copy",
@@ -110,7 +111,7 @@ impl GofInfoVP9 {
     pub fn set_num_frames_in_gof(&mut self, value: usize) {
         assert!(
             value <= crate::constants::max_vp9_frames_in_gof(),
-            "value が MAX_FRAMES_IN_GOF ({}) を超えています: {value}",
+            "value {value} exceeds MAX_FRAMES_IN_GOF ({})",
             crate::constants::max_vp9_frames_in_gof()
         );
         unsafe { ffi::webrtc_GofInfoVP9_set_num_frames_in_gof(self.raw.as_ptr(), value) };
@@ -125,7 +126,7 @@ impl GofInfoVP9 {
     pub fn set_temporal_idx(&mut self, index: usize, value: u8) {
         assert!(
             index < crate::constants::max_vp9_frames_in_gof(),
-            "index が MAX_FRAMES_IN_GOF ({}) を超えています: {index}",
+            "index {index} exceeds MAX_FRAMES_IN_GOF ({})",
             crate::constants::max_vp9_frames_in_gof()
         );
         unsafe { ffi::webrtc_GofInfoVP9_set_temporal_idx(self.raw.as_ptr(), index, value) };
@@ -143,7 +144,7 @@ impl GofInfoVP9 {
     pub fn set_temporal_up_switch(&mut self, index: usize, value: bool) {
         assert!(
             index < crate::constants::max_vp9_frames_in_gof(),
-            "index が MAX_FRAMES_IN_GOF ({}) を超えています: {index}",
+            "index {index} exceeds MAX_FRAMES_IN_GOF ({})",
             crate::constants::max_vp9_frames_in_gof()
         );
         unsafe {
@@ -165,7 +166,7 @@ impl GofInfoVP9 {
     pub fn set_num_ref_pics(&mut self, index: usize, value: u8) {
         assert!(
             index < crate::constants::max_vp9_frames_in_gof(),
-            "index が MAX_FRAMES_IN_GOF ({}) を超えています: {index}",
+            "index {index} exceeds MAX_FRAMES_IN_GOF ({})",
             crate::constants::max_vp9_frames_in_gof()
         );
         unsafe { ffi::webrtc_GofInfoVP9_set_num_ref_pics(self.raw.as_ptr(), index, value) };
@@ -183,12 +184,12 @@ impl GofInfoVP9 {
     pub fn set_pid_diff(&mut self, index: usize, ref_index: usize, value: u8) {
         assert!(
             index < crate::constants::max_vp9_frames_in_gof(),
-            "index が MAX_FRAMES_IN_GOF ({}) を超えています: {index}",
+            "index {index} exceeds MAX_FRAMES_IN_GOF ({})",
             crate::constants::max_vp9_frames_in_gof()
         );
         assert!(
             ref_index < crate::constants::max_vp9_ref_pics(),
-            "ref_index が MAX_REF_PICS ({}) を超えています: {ref_index}",
+            "ref_index {ref_index} exceeds MAX_REF_PICS ({})",
             crate::constants::max_vp9_ref_pics()
         );
         unsafe { ffi::webrtc_GofInfoVP9_set_pid_diff(self.raw.as_ptr(), index, ref_index, value) };
@@ -280,7 +281,7 @@ impl RTPVideoHeaderVP8 {
     ///
     /// # Safety
     /// `raw` は有効な `webrtc_RTPVideoHeaderVP8` を指している必要があります。
-    pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_RTPVideoHeaderVP8) -> Self {
+    pub(crate) unsafe fn copy_from_raw(raw: *const ffi::webrtc_RTPVideoHeaderVP8) -> Self {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_RTPVideoHeaderVP8_copy(raw) },
             "webrtc_RTPVideoHeaderVP8_copy",
@@ -426,7 +427,7 @@ impl RTPVideoHeaderVP9 {
     ///
     /// # Safety
     /// `raw` は有効な `webrtc_RTPVideoHeaderVP9` を指している必要があります。
-    pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_RTPVideoHeaderVP9) -> Self {
+    pub(crate) unsafe fn copy_from_raw(raw: *const ffi::webrtc_RTPVideoHeaderVP9) -> Self {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_RTPVideoHeaderVP9_copy(raw) },
             "webrtc_RTPVideoHeaderVP9_copy",
@@ -599,7 +600,7 @@ impl RTPVideoHeaderVP9 {
     pub fn set_num_ref_pics(&mut self, value: u8) {
         assert!(
             value as usize <= crate::constants::max_vp9_ref_pics(),
-            "value が MAX_REF_PICS ({}) を超えています: {value}",
+            "value {value} exceeds MAX_REF_PICS ({})",
             crate::constants::max_vp9_ref_pics()
         );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_num_ref_pics(self.raw.as_ptr(), value) };
@@ -615,7 +616,7 @@ impl RTPVideoHeaderVP9 {
     pub fn set_pid_diff(&mut self, index: usize, value: u8) {
         assert!(
             index < crate::constants::max_vp9_ref_pics(),
-            "index が MAX_REF_PICS ({}) を超えています: {index}",
+            "index {index} exceeds MAX_REF_PICS ({})",
             crate::constants::max_vp9_ref_pics()
         );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_pid_diff(self.raw.as_ptr(), index, value) };
@@ -631,7 +632,7 @@ impl RTPVideoHeaderVP9 {
     pub fn set_ref_picture_id(&mut self, index: usize, value: i16) {
         assert!(
             index < crate::constants::max_vp9_ref_pics(),
-            "index が MAX_REF_PICS ({}) を超えています: {index}",
+            "index {index} exceeds MAX_REF_PICS ({})",
             crate::constants::max_vp9_ref_pics()
         );
         unsafe {
@@ -646,7 +647,7 @@ impl RTPVideoHeaderVP9 {
     pub fn set_num_spatial_layers(&mut self, value: usize) {
         assert!(
             value <= crate::constants::max_vp9_num_spatial_layers(),
-            "value が MAX_NUM_SPATIAL_LAYERS ({}) を超えています: {value}",
+            "value {value} exceeds MAX_NUM_SPATIAL_LAYERS ({})",
             crate::constants::max_vp9_num_spatial_layers()
         );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_num_spatial_layers(self.raw.as_ptr(), value) };
@@ -686,7 +687,7 @@ impl RTPVideoHeaderVP9 {
     pub fn set_width(&mut self, index: usize, value: u16) {
         assert!(
             index < crate::constants::max_vp9_num_spatial_layers(),
-            "index が MAX_NUM_SPATIAL_LAYERS ({}) を超えています: {index}",
+            "index {index} exceeds MAX_NUM_SPATIAL_LAYERS ({})",
             crate::constants::max_vp9_num_spatial_layers()
         );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_width(self.raw.as_ptr(), index, value) };
@@ -702,7 +703,7 @@ impl RTPVideoHeaderVP9 {
     pub fn set_height(&mut self, index: usize, value: u16) {
         assert!(
             index < crate::constants::max_vp9_num_spatial_layers(),
-            "index が MAX_NUM_SPATIAL_LAYERS ({}) を超えています: {index}",
+            "index {index} exceeds MAX_NUM_SPATIAL_LAYERS ({})",
             crate::constants::max_vp9_num_spatial_layers()
         );
         unsafe { ffi::webrtc_RTPVideoHeaderVP9_set_height(self.raw.as_ptr(), index, value) };
@@ -826,7 +827,7 @@ impl NaluInfo {
     ///
     /// # Safety
     /// `raw` は有効な `webrtc_NaluInfo` を指している必要があります。
-    pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_NaluInfo) -> Self {
+    pub(crate) unsafe fn copy_from_raw(raw: *const ffi::webrtc_NaluInfo) -> Self {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_NaluInfo_copy(raw) },
             "webrtc_NaluInfo_copy",
@@ -892,17 +893,16 @@ impl Drop for NaluInfo {
 }
 
 /// webrtc::NaluInfo の借用ラッパー。
+#[derive(Clone, Copy)]
 pub struct NaluInfoRef<'a> {
-    raw: NonNull<ffi::webrtc_NaluInfo>,
+    raw: ConstNonNull<ffi::webrtc_NaluInfo>,
     _marker: PhantomData<&'a ffi::webrtc_NaluInfo>,
 }
 
 unsafe impl<'a> Send for NaluInfoRef<'a> {}
 
 impl<'a> NaluInfoRef<'a> {
-    /// # Safety
-    /// `raw` は有効な `webrtc_NaluInfo` を指し、この参照の利用中は破棄されない必要があります。
-    pub(crate) unsafe fn from_raw(raw: NonNull<ffi::webrtc_NaluInfo>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_NaluInfo>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -932,7 +932,7 @@ impl std::fmt::Debug for NaluInfoRef<'_> {
     }
 }
 
-/// std::vector<webrtc::NaluInfo> の所有ラッパー。
+/// `std::vector<webrtc::NaluInfo>` の所有ラッパー。
 pub struct NaluInfoVector {
     raw: NonNull<ffi::webrtc_NaluInfo_vector>,
 }
@@ -962,9 +962,9 @@ impl NaluInfoVector {
         if index >= self.len() {
             return None;
         }
-        let raw = unsafe { ffi::webrtc_NaluInfo_vector_get(self.raw.as_ptr(), index as i32) };
-        let raw = NonNull::new(raw)?;
-        Some(unsafe { NaluInfoRef::from_raw(raw) })
+        let raw = unsafe { ffi::webrtc_NaluInfo_vector_get_const(self.raw.as_ptr(), index as i32) };
+        let raw = ConstNonNull::new(raw)?;
+        Some(NaluInfoRef::from_raw(raw))
     }
 
     pub fn push(&mut self, value: &NaluInfo) {
@@ -1015,7 +1015,7 @@ impl RTPVideoHeaderH264 {
     ///
     /// # Safety
     /// `raw` は有効な `webrtc_RTPVideoHeaderH264` を指している必要があります。
-    pub(crate) unsafe fn copy_from_raw(raw: *mut ffi::webrtc_RTPVideoHeaderH264) -> Self {
+    pub(crate) unsafe fn copy_from_raw(raw: *const ffi::webrtc_RTPVideoHeaderH264) -> Self {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_RTPVideoHeaderH264_copy(raw) },
             "webrtc_RTPVideoHeaderH264_copy",
@@ -1054,7 +1054,7 @@ impl RTPVideoHeaderH264 {
         let mut vec = NaluInfoVector::new(0);
         let len = unsafe { ffi::webrtc_NaluInfo_vector_size(raw.as_ptr()) };
         for index in 0..len {
-            let elem = unsafe { ffi::webrtc_NaluInfo_vector_get(raw.as_ptr(), index) };
+            let elem = unsafe { ffi::webrtc_NaluInfo_vector_get_const(raw.as_ptr(), index) };
             let elem = unsafe { NaluInfo::copy_from_raw(elem) };
             vec.push(&elem);
         }

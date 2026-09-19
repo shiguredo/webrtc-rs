@@ -20,7 +20,8 @@ WEBRTC_EXPORT void webrtc_Buffer_AppendData(struct webrtc_Buffer* self,
                                             const uint8_t* data,
                                             size_t len);
 WEBRTC_EXPORT size_t webrtc_Buffer_size(const struct webrtc_Buffer* self);
-WEBRTC_EXPORT const uint8_t* webrtc_Buffer_data(
+WEBRTC_EXPORT uint8_t* webrtc_Buffer_data(struct webrtc_Buffer* self);
+WEBRTC_EXPORT const uint8_t* webrtc_Buffer_data_const(
     const struct webrtc_Buffer* self);
 
 // -------------------------
@@ -33,7 +34,8 @@ WEBRTC_EXPORT void webrtc_BufferS16_AppendData(struct webrtc_BufferS16* self,
                                                const int16_t* data,
                                                size_t len);
 WEBRTC_EXPORT size_t webrtc_BufferS16_size(const struct webrtc_BufferS16* self);
-WEBRTC_EXPORT const int16_t* webrtc_BufferS16_data(
+WEBRTC_EXPORT int16_t* webrtc_BufferS16_data(struct webrtc_BufferS16* self);
+WEBRTC_EXPORT const int16_t* webrtc_BufferS16_data_const(
     const struct webrtc_BufferS16* self);
 
 #if defined(__cplusplus)

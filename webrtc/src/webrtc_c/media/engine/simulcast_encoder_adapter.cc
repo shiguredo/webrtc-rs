@@ -24,16 +24,16 @@ WEBRTC_DEFINE_CAST(webrtc_SimulcastEncoderAdapter,
 
 WEBRTC_EXPORT struct webrtc_SimulcastEncoderAdapter_unique*
 webrtc_SimulcastEncoderAdapter_new(
-    struct webrtc_Environment* env,
+    const struct webrtc_Environment* env,
     struct webrtc_VideoEncoderFactory* primary_factory,
     struct webrtc_VideoEncoderFactory* fallback_factory,
-    struct webrtc_SdpVideoFormat* format) {
-  auto cpp_env = reinterpret_cast<webrtc::Environment*>(env);
+    const struct webrtc_SdpVideoFormat* format) {
+  auto cpp_env = reinterpret_cast<const webrtc::Environment*>(env);
   auto cpp_primary_factory =
       reinterpret_cast<webrtc::VideoEncoderFactory*>(primary_factory);
   auto cpp_fallback_factory =
       reinterpret_cast<webrtc::VideoEncoderFactory*>(fallback_factory);
-  auto cpp_format = reinterpret_cast<webrtc::SdpVideoFormat*>(format);
+  auto cpp_format = reinterpret_cast<const webrtc::SdpVideoFormat*>(format);
 
   auto adapter = new webrtc::SimulcastEncoderAdapter(
       *cpp_env, cpp_primary_factory, cpp_fallback_factory, *cpp_format);

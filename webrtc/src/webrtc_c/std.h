@@ -56,8 +56,9 @@ WEBRTC_EXPORT int std_map_string_string_size(
     const struct std_map_string_string* self);
 
 struct std_map_string_string_iter;
+// イテレータは map を書き換えないため、const の map からも生成できる。
 WEBRTC_EXPORT struct std_map_string_string_iter* std_map_string_string_iter_new(
-    struct std_map_string_string* map);
+    const struct std_map_string_string* map);
 WEBRTC_EXPORT void std_map_string_string_iter_delete(
     struct std_map_string_string_iter* iter);
 WEBRTC_EXPORT int std_map_string_string_iter_next(

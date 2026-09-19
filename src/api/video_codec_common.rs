@@ -1,12 +1,16 @@
+use crate::const_non_null::ConstNonNull;
 use crate::helper::handler::{create_with_handler, destroy_handler};
-use crate::helper::non_null::expect_non_null;
+use crate::helper::non_null::{expect_non_null, expect_non_null_const};
 use crate::helper::optional::{
     get_optional_ptr, get_optional_scalar, set_optional_object, set_optional_scalar,
 };
 use crate::helper::ref_count::{
     EncodedImageBufferHandle, I420BufferHandle, NV12BufferHandle, VideoFrameBufferHandle,
 };
-use crate::{CxxString, CxxStringRef, Error, MapStringString, Result, ScopedRef, ffi};
+use crate::{
+    CxxString, CxxStringRef, Error, MapStringStringRef, MapStringStringRefMut, Result, ScopedRef,
+    ffi,
+};
 use std::any::Any;
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -194,19 +198,20 @@ impl SdpVideoFormat {
         self.as_ref().name()
     }
 
-    pub fn parameters_mut(&mut self) -> MapStringString<'_> {
+    pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'_> {
         let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(self.raw().as_ptr()) };
-        MapStringString::from_raw(expect_non_null(ptr, "webrtc_SdpVideoFormat_get_parameters"))
+        MapStringStringRefMut::from_raw(expect_non_null(
+            ptr,
+            "webrtc_SdpVideoFormat_get_parameters",
+        ))
     }
 
     pub fn is_equal(&self, other: SdpVideoFormatRef<'_>) -> bool {
-        unsafe { ffi::webrtc_SdpVideoFormat_is_equal(self.raw().as_ptr(), other.raw.as_ptr()) != 0 }
+        unsafe { ffi::webrtc_SdpVideoFormat_is_equal(self.raw().as_ptr(), other.as_ptr()) != 0 }
     }
 
     pub fn is_same_codec(&self, other: SdpVideoFormatRef<'_>) -> bool {
-        unsafe {
-            ffi::webrtc_SdpVideoFormat_IsSameCodec(self.raw().as_ptr(), other.raw.as_ptr()) != 0
-        }
+        unsafe { ffi::webrtc_SdpVideoFormat_IsSameCodec(self.raw().as_ptr(), other.as_ptr()) != 0 }
     }
 
     pub fn scalability_modes(&self) -> Vec<ScalabilityMode> {
@@ -215,7 +220,12 @@ impl SdpVideoFormat {
 
     pub fn as_ref(&self) -> SdpVideoFormatRef<'_> {
         // Safety: self.raw() は SdpVideoFormat の生存中は常に有効です。
-        unsafe { SdpVideoFormatRef::from_raw(self.raw()) }
+        SdpVideoFormatRef::from_raw(ConstNonNull::from(self.raw()))
+    }
+
+    pub fn as_mut(&mut self) -> SdpVideoFormatRefMut<'_> {
+        // Safety: self.raw() は SdpVideoFormat の生存中は常に有効です。
+        SdpVideoFormatRefMut::from_raw(self.raw())
     }
 
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_SdpVideoFormat> {
@@ -239,17 +249,16 @@ impl Drop for SdpVideoFormat {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct SdpVideoFormatRef<'a> {
-    raw: NonNull<ffi::webrtc_SdpVideoFormat>,
+    raw: ConstNonNull<ffi::webrtc_SdpVideoFormat>,
     _marker: PhantomData<&'a ffi::webrtc_SdpVideoFormat>,
 }
 
 unsafe impl<'a> Send for SdpVideoFormatRef<'a> {}
 
 impl<'a> SdpVideoFormatRef<'a> {
-    /// # Safety
-    /// `raw` は有効な `webrtc_SdpVideoFormat` を指している必要があります。
-    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_SdpVideoFormat>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_SdpVideoFormat>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -257,13 +266,21 @@ impl<'a> SdpVideoFormatRef<'a> {
     }
 
     pub fn name(&self) -> Result<String> {
-        let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_name(self.raw.as_ptr()) };
-        CxxStringRef::from_ptr(expect_non_null(ptr, "webrtc_SdpVideoFormat_get_name")).to_string()
+        let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_name_const(self.raw.as_ptr()) };
+        CxxStringRef::from_ptr(expect_non_null_const(
+            ptr,
+            "webrtc_SdpVideoFormat_get_name_const",
+        ))
+        .to_string()
     }
 
-    pub fn parameters_mut(&mut self) -> MapStringString<'_> {
-        let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(self.raw.as_ptr()) };
-        MapStringString::from_raw(expect_non_null(ptr, "webrtc_SdpVideoFormat_get_parameters"))
+    /// コーデックパラメータへの参照を返す。
+    pub fn parameters(&self) -> MapStringStringRef<'a> {
+        let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters_const(self.raw.as_ptr()) };
+        MapStringStringRef::from_raw(expect_non_null_const(
+            ptr,
+            "webrtc_SdpVideoFormat_get_parameters_const",
+        ))
     }
 
     pub fn scalability_modes(&self) -> Vec<ScalabilityMode> {
@@ -287,7 +304,7 @@ impl<'a> SdpVideoFormatRef<'a> {
             .collect()
     }
 
-    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_SdpVideoFormat {
+    pub(crate) fn as_ptr(&self) -> *const ffi::webrtc_SdpVideoFormat {
         self.raw.as_ptr()
     }
 
@@ -296,6 +313,56 @@ impl<'a> SdpVideoFormatRef<'a> {
         SdpVideoFormat {
             raw_unique: expect_non_null(raw, "webrtc_SdpVideoFormat_copy"),
         }
+    }
+}
+
+/// webrtc_SdpVideoFormat の可変借用ラッパー。
+pub struct SdpVideoFormatRefMut<'a> {
+    raw: NonNull<ffi::webrtc_SdpVideoFormat>,
+    _marker: PhantomData<&'a mut ffi::webrtc_SdpVideoFormat>,
+    cref: SdpVideoFormatRef<'a>,
+}
+
+unsafe impl<'a> Send for SdpVideoFormatRefMut<'a> {}
+
+impl<'a> SdpVideoFormatRefMut<'a> {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_SdpVideoFormat>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+            cref: SdpVideoFormatRef::from_raw(ConstNonNull::from(raw)),
+        }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_SdpVideoFormat {
+        self.raw.as_ptr()
+    }
+
+    pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'_> {
+        let ptr = unsafe { ffi::webrtc_SdpVideoFormat_get_parameters(self.raw.as_ptr()) };
+        MapStringStringRefMut::from_raw(expect_non_null(
+            ptr,
+            "webrtc_SdpVideoFormat_get_parameters",
+        ))
+    }
+    pub fn as_ref(&self) -> SdpVideoFormatRef<'_> {
+        self.cref
+    }
+
+    pub fn name(&self) -> Result<String> {
+        self.cref.name()
+    }
+
+    pub fn parameters(&self) -> MapStringStringRef<'_> {
+        self.cref.parameters()
+    }
+
+    pub fn scalability_modes(&self) -> Vec<ScalabilityMode> {
+        self.cref.scalability_modes()
+    }
+
+    pub fn to_owned(&self) -> SdpVideoFormat {
+        self.cref.to_owned()
     }
 }
 
@@ -1504,7 +1571,12 @@ impl VideoFrame {
 
     pub fn as_ref(&self) -> VideoFrameRef<'_> {
         // Safety: self.raw() は VideoFrame の生存中は常に有効です。
-        unsafe { VideoFrameRef::from_raw(self.raw()) }
+        VideoFrameRef::from_raw(ConstNonNull::from(self.raw()))
+    }
+
+    pub fn as_mut(&mut self) -> VideoFrameRefMut<'_> {
+        // Safety: self.raw() は VideoFrame の生存中は常に有効です。
+        VideoFrameRefMut::from_raw(self.raw())
     }
 
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_VideoFrame> {
@@ -1529,8 +1601,9 @@ impl Drop for VideoFrame {
 }
 
 /// webrtc::VideoFrame の借用ラッパー。
+#[derive(Clone, Copy)]
 pub struct VideoFrameRef<'a> {
-    raw: NonNull<ffi::webrtc_VideoFrame>,
+    raw: ConstNonNull<ffi::webrtc_VideoFrame>,
     _marker: PhantomData<&'a ffi::webrtc_VideoFrame>,
 }
 
@@ -1539,9 +1612,7 @@ unsafe impl<'a> Send for VideoFrameRef<'a> {}
 impl<'a> VideoFrameRef<'a> {
     /// C 側から渡された生ポインタを借用する。
     ///
-    /// # Safety
-    /// `raw` は有効な webrtc_VideoFrame ポインタであること。
-    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoFrame>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_VideoFrame>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -1630,8 +1701,94 @@ impl<'a> VideoFrameRef<'a> {
         }
     }
 
-    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoFrame {
+    pub(crate) fn as_ptr(&self) -> *const ffi::webrtc_VideoFrame {
         self.raw.as_ptr()
+    }
+}
+
+/// webrtc::VideoFrame の可変借用ラッパー。
+pub struct VideoFrameRefMut<'a> {
+    raw: NonNull<ffi::webrtc_VideoFrame>,
+    _marker: PhantomData<&'a mut ffi::webrtc_VideoFrame>,
+    cref: VideoFrameRef<'a>,
+}
+
+unsafe impl<'a> Send for VideoFrameRefMut<'a> {}
+
+impl<'a> VideoFrameRefMut<'a> {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_VideoFrame>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+            cref: VideoFrameRef::from_raw(ConstNonNull::from(raw)),
+        }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_VideoFrame {
+        self.raw.as_ptr()
+    }
+    pub fn as_ref(&self) -> VideoFrameRef<'_> {
+        self.cref
+    }
+
+    pub fn width(&self) -> i32 {
+        self.cref.width()
+    }
+
+    pub fn height(&self) -> i32 {
+        self.cref.height()
+    }
+
+    pub fn timestamp_us(&self) -> i64 {
+        self.cref.timestamp_us()
+    }
+
+    pub fn rtp_timestamp(&self) -> u32 {
+        self.cref.rtp_timestamp()
+    }
+
+    pub fn id(&self) -> u16 {
+        self.cref.id()
+    }
+
+    pub fn ntp_time_ms(&self) -> i64 {
+        self.cref.ntp_time_ms()
+    }
+
+    pub fn rotation(&self) -> VideoRotation {
+        self.cref.rotation()
+    }
+
+    pub fn presentation_timestamp(&self) -> Option<Duration> {
+        self.cref.presentation_timestamp()
+    }
+
+    pub fn reference_time(&self) -> Option<Duration> {
+        self.cref.reference_time()
+    }
+
+    pub fn color_space(&self) -> Option<ColorSpace> {
+        self.cref.color_space()
+    }
+
+    pub fn has_update_rect(&self) -> bool {
+        self.cref.has_update_rect()
+    }
+
+    pub fn update_rect(&self) -> VideoFrameUpdateRect {
+        self.cref.update_rect()
+    }
+
+    pub fn is_repeat_frame(&self) -> bool {
+        self.cref.is_repeat_frame()
+    }
+
+    pub fn buffer(&self) -> VideoFrameBuffer {
+        self.cref.buffer()
+    }
+
+    pub fn to_owned(&self) -> VideoFrame {
+        self.cref.to_owned()
     }
 }
 
@@ -1693,11 +1850,15 @@ impl VideoFrameTypeVector {
     }
 
     pub fn push(&mut self, value: VideoFrameType) {
-        self.as_ref().push(value);
+        self.as_mut().push(value);
     }
 
     pub fn as_ref(&self) -> VideoFrameTypeVectorRef<'_> {
-        unsafe { VideoFrameTypeVectorRef::from_raw(self.raw) }
+        VideoFrameTypeVectorRef::from_raw(ConstNonNull::from(self.raw))
+    }
+
+    pub fn as_mut(&mut self) -> VideoFrameTypeVectorRefMut<'_> {
+        VideoFrameTypeVectorRefMut::from_raw(self.raw)
     }
 }
 
@@ -1713,17 +1874,16 @@ impl Drop for VideoFrameTypeVector {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct VideoFrameTypeVectorRef<'a> {
-    raw: NonNull<ffi::webrtc_VideoFrameType_vector>,
+    raw: ConstNonNull<ffi::webrtc_VideoFrameType_vector>,
     _marker: PhantomData<&'a ffi::webrtc_VideoFrameType_vector>,
 }
 
 unsafe impl<'a> Send for VideoFrameTypeVectorRef<'a> {}
 
 impl<'a> VideoFrameTypeVectorRef<'a> {
-    /// # Safety
-    /// `raw` は有効な `webrtc_VideoFrameType_vector` を指している必要があります。
-    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoFrameType_vector>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_VideoFrameType_vector>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -1743,10 +1903,38 @@ impl<'a> VideoFrameTypeVectorRef<'a> {
         if index >= self.len() {
             return None;
         }
-        let raw = unsafe { ffi::webrtc_VideoFrameType_vector_get(self.raw.as_ptr(), index as i32) };
-        let raw = NonNull::new(raw)?;
+        let raw =
+            unsafe { ffi::webrtc_VideoFrameType_vector_get_const(self.raw.as_ptr(), index as i32) };
+        let raw = ConstNonNull::new(raw)?;
         let value = unsafe { ffi::webrtc_VideoFrameType_value(raw.as_ptr()) };
         Some(VideoFrameType::from_raw(value))
+    }
+
+    pub(crate) fn as_ptr(&self) -> *const ffi::webrtc_VideoFrameType_vector {
+        self.raw.as_ptr()
+    }
+}
+
+/// webrtc_VideoFrameType_vector の可変借用ラッパー。
+pub struct VideoFrameTypeVectorRefMut<'a> {
+    raw: NonNull<ffi::webrtc_VideoFrameType_vector>,
+    _marker: PhantomData<&'a mut ffi::webrtc_VideoFrameType_vector>,
+    cref: VideoFrameTypeVectorRef<'a>,
+}
+
+unsafe impl<'a> Send for VideoFrameTypeVectorRefMut<'a> {}
+
+impl<'a> VideoFrameTypeVectorRefMut<'a> {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_VideoFrameType_vector>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+            cref: VideoFrameTypeVectorRef::from_raw(ConstNonNull::from(raw)),
+        }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_VideoFrameType_vector {
+        self.raw.as_ptr()
     }
 
     pub fn push(&mut self, value: VideoFrameType) {
@@ -1754,9 +1942,20 @@ impl<'a> VideoFrameTypeVectorRef<'a> {
             ffi::webrtc_VideoFrameType_vector_push_back_value(self.raw.as_ptr(), value.to_raw())
         };
     }
+    pub fn as_ref(&self) -> VideoFrameTypeVectorRef<'_> {
+        self.cref
+    }
 
-    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoFrameType_vector {
-        self.raw.as_ptr()
+    pub fn len(&self) -> usize {
+        self.cref.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.cref.is_empty()
+    }
+
+    pub fn get(&self, index: usize) -> Option<VideoFrameType> {
+        self.cref.get(index)
     }
 }
 
@@ -1912,17 +2111,16 @@ impl std::str::FromStr for VideoCodecType {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct SimulcastStreamRef<'a> {
-    raw: NonNull<ffi::webrtc_SimulcastStream>,
+    raw: ConstNonNull<ffi::webrtc_SimulcastStream>,
     _marker: PhantomData<&'a ffi::webrtc_SimulcastStream>,
 }
 
 unsafe impl<'a> Send for SimulcastStreamRef<'a> {}
 
 impl<'a> SimulcastStreamRef<'a> {
-    /// # Safety
-    /// `raw` は有効な `webrtc_SimulcastStream` を指している必要があります。
-    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_SimulcastStream>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_SimulcastStream>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -1933,40 +2131,86 @@ impl<'a> SimulcastStreamRef<'a> {
         unsafe { ffi::webrtc_SimulcastStream_width(self.raw.as_ptr()) }
     }
 
-    pub fn set_width(&mut self, value: i32) {
-        unsafe { ffi::webrtc_SimulcastStream_set_width(self.raw.as_ptr(), value) };
-    }
-
     pub fn height(&self) -> i32 {
         unsafe { ffi::webrtc_SimulcastStream_height(self.raw.as_ptr()) }
-    }
-
-    pub fn set_height(&mut self, value: i32) {
-        unsafe { ffi::webrtc_SimulcastStream_set_height(self.raw.as_ptr(), value) };
     }
 
     pub fn min_bitrate_kbps(&self) -> u32 {
         unsafe { ffi::webrtc_SimulcastStream_min_bitrate_kbps(self.raw.as_ptr()) }
     }
 
-    pub fn set_min_bitrate_kbps(&mut self, value: u32) {
-        unsafe { ffi::webrtc_SimulcastStream_set_min_bitrate_kbps(self.raw.as_ptr(), value) };
-    }
-
     pub fn target_bitrate_kbps(&self) -> u32 {
         unsafe { ffi::webrtc_SimulcastStream_target_bitrate_kbps(self.raw.as_ptr()) }
+    }
+
+    pub fn max_bitrate_kbps(&self) -> u32 {
+        unsafe { ffi::webrtc_SimulcastStream_max_bitrate_kbps(self.raw.as_ptr()) }
+    }
+}
+
+/// webrtc_SimulcastStream の可変借用ラッパー。
+pub struct SimulcastStreamRefMut<'a> {
+    raw: NonNull<ffi::webrtc_SimulcastStream>,
+    _marker: PhantomData<&'a mut ffi::webrtc_SimulcastStream>,
+    cref: SimulcastStreamRef<'a>,
+}
+
+unsafe impl<'a> Send for SimulcastStreamRefMut<'a> {}
+
+impl<'a> SimulcastStreamRefMut<'a> {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_SimulcastStream>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+            cref: SimulcastStreamRef::from_raw(ConstNonNull::from(raw)),
+        }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_SimulcastStream {
+        self.raw.as_ptr()
+    }
+
+    pub fn set_width(&mut self, value: i32) {
+        unsafe { ffi::webrtc_SimulcastStream_set_width(self.raw.as_ptr(), value) };
+    }
+
+    pub fn set_height(&mut self, value: i32) {
+        unsafe { ffi::webrtc_SimulcastStream_set_height(self.raw.as_ptr(), value) };
+    }
+
+    pub fn set_min_bitrate_kbps(&mut self, value: u32) {
+        unsafe { ffi::webrtc_SimulcastStream_set_min_bitrate_kbps(self.raw.as_ptr(), value) };
     }
 
     pub fn set_target_bitrate_kbps(&mut self, value: u32) {
         unsafe { ffi::webrtc_SimulcastStream_set_target_bitrate_kbps(self.raw.as_ptr(), value) };
     }
 
-    pub fn max_bitrate_kbps(&self) -> u32 {
-        unsafe { ffi::webrtc_SimulcastStream_max_bitrate_kbps(self.raw.as_ptr()) }
-    }
-
     pub fn set_max_bitrate_kbps(&mut self, value: u32) {
         unsafe { ffi::webrtc_SimulcastStream_set_max_bitrate_kbps(self.raw.as_ptr(), value) };
+    }
+    pub fn as_ref(&self) -> SimulcastStreamRef<'_> {
+        self.cref
+    }
+
+    pub fn width(&self) -> i32 {
+        self.cref.width()
+    }
+
+    pub fn height(&self) -> i32 {
+        self.cref.height()
+    }
+
+    pub fn min_bitrate_kbps(&self) -> u32 {
+        self.cref.min_bitrate_kbps()
+    }
+
+    pub fn target_bitrate_kbps(&self) -> u32 {
+        self.cref.target_bitrate_kbps()
+    }
+
+    pub fn max_bitrate_kbps(&self) -> u32 {
+        self.cref.max_bitrate_kbps()
     }
 }
 
@@ -1990,8 +2234,7 @@ impl VideoCodec {
     }
 
     pub fn set_codec_type(&mut self, value: VideoCodecType) {
-        let mut codec = self.as_ref();
-        codec.set_codec_type(value);
+        self.as_mut().set_codec_type(value);
     }
 
     pub fn width(&self) -> i32 {
@@ -1999,8 +2242,7 @@ impl VideoCodec {
     }
 
     pub fn set_width(&mut self, value: i32) {
-        let mut codec = self.as_ref();
-        codec.set_width(value);
+        self.as_mut().set_width(value);
     }
 
     pub fn height(&self) -> i32 {
@@ -2008,8 +2250,7 @@ impl VideoCodec {
     }
 
     pub fn set_height(&mut self, value: i32) {
-        let mut codec = self.as_ref();
-        codec.set_height(value);
+        self.as_mut().set_height(value);
     }
 
     pub fn start_bitrate_kbps(&self) -> u32 {
@@ -2017,8 +2258,7 @@ impl VideoCodec {
     }
 
     pub fn set_start_bitrate_kbps(&mut self, value: u32) {
-        let mut codec = self.as_ref();
-        codec.set_start_bitrate_kbps(value);
+        self.as_mut().set_start_bitrate_kbps(value);
     }
 
     pub fn max_bitrate_kbps(&self) -> u32 {
@@ -2026,8 +2266,7 @@ impl VideoCodec {
     }
 
     pub fn set_max_bitrate_kbps(&mut self, value: u32) {
-        let mut codec = self.as_ref();
-        codec.set_max_bitrate_kbps(value);
+        self.as_mut().set_max_bitrate_kbps(value);
     }
 
     pub fn min_bitrate_kbps(&self) -> u32 {
@@ -2035,8 +2274,7 @@ impl VideoCodec {
     }
 
     pub fn set_min_bitrate_kbps(&mut self, value: u32) {
-        let mut codec = self.as_ref();
-        codec.set_min_bitrate_kbps(value);
+        self.as_mut().set_min_bitrate_kbps(value);
     }
 
     pub fn max_framerate(&self) -> u32 {
@@ -2044,8 +2282,7 @@ impl VideoCodec {
     }
 
     pub fn set_max_framerate(&mut self, value: u32) {
-        let mut codec = self.as_ref();
-        codec.set_max_framerate(value);
+        self.as_mut().set_max_framerate(value);
     }
 
     pub fn number_of_simulcast_streams(&self) -> usize {
@@ -2053,31 +2290,44 @@ impl VideoCodec {
     }
 
     pub fn set_number_of_simulcast_streams(&mut self, value: usize) {
-        assert!(
-            value <= crate::constants::max_simulcast_streams(),
-            "value が max_simulcast_streams() ({}) を超えています: {value}",
-            crate::constants::max_simulcast_streams()
-        );
-        let mut codec = self.as_ref();
-        codec.set_number_of_simulcast_streams(value);
+        self.as_mut().set_number_of_simulcast_streams(value);
     }
 
-    pub fn simulcast_stream(&mut self, index: usize) -> Option<SimulcastStreamRef<'_>> {
+    /// simulcast ストリームを借用する。
+    pub fn simulcast_stream(&self, index: usize) -> Option<SimulcastStreamRef<'_>> {
         let index = i32::try_from(index).ok()?;
         // C 側の `simulcastStream` 配列の範囲外は None を返す。
         if index < 0 || index as usize >= self.number_of_simulcast_streams() {
             return None;
         }
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_VideoCodec_simulcast_stream_at(self.raw().as_ptr(), index)
-        })?;
+        let raw =
+            unsafe { ffi::webrtc_VideoCodec_simulcast_stream_at_const(self.raw().as_ptr(), index) };
+        let raw = ConstNonNull::new(raw)?;
         // Safety: C 側の `VideoCodec` が生存している間は `simulcastStream[index]` は有効です。
-        Some(unsafe { SimulcastStreamRef::from_raw(raw) })
+        Some(SimulcastStreamRef::from_raw(raw))
+    }
+
+    /// simulcast ストリームを書き換え用に借用する。
+    pub fn simulcast_stream_mut(&mut self, index: usize) -> Option<SimulcastStreamRefMut<'_>> {
+        let index = i32::try_from(index).ok()?;
+        // C 側の `simulcastStream` 配列の範囲外は None を返す。
+        if index < 0 || index as usize >= self.number_of_simulcast_streams() {
+            return None;
+        }
+        let raw = unsafe { ffi::webrtc_VideoCodec_simulcast_stream_at(self.raw().as_ptr(), index) };
+        let raw = NonNull::new(raw)?;
+        // Safety: C 側の `VideoCodec` が生存している間は `simulcastStream[index]` は有効です。
+        Some(SimulcastStreamRefMut::from_raw(raw))
     }
 
     pub fn as_ref(&self) -> VideoCodecRef<'_> {
         // Safety: self.raw() は VideoCodec の生存中は常に有効です。
-        unsafe { VideoCodecRef::from_raw(self.raw()) }
+        VideoCodecRef::from_raw(ConstNonNull::from(self.raw()))
+    }
+
+    pub fn as_mut(&mut self) -> VideoCodecRefMut<'_> {
+        // Safety: self.raw() は VideoCodec の生存中は常に有効です。
+        VideoCodecRefMut::from_raw(self.raw())
     }
 
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_VideoCodec> {
@@ -2108,17 +2358,16 @@ impl Drop for VideoCodec {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct VideoCodecRef<'a> {
-    raw: NonNull<ffi::webrtc_VideoCodec>,
+    raw: ConstNonNull<ffi::webrtc_VideoCodec>,
     _marker: PhantomData<&'a ffi::webrtc_VideoCodec>,
 }
 
 unsafe impl<'a> Send for VideoCodecRef<'a> {}
 
 impl<'a> VideoCodecRef<'a> {
-    /// # Safety
-    /// `raw` は有効な `webrtc_VideoCodec` を指している必要があります。
-    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_VideoCodec>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_VideoCodec>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -2130,56 +2379,28 @@ impl<'a> VideoCodecRef<'a> {
         VideoCodecType::from_raw(value)
     }
 
-    pub fn set_codec_type(&mut self, value: VideoCodecType) {
-        unsafe { ffi::webrtc_VideoCodec_set_codec_type(self.raw.as_ptr(), value.to_raw()) };
-    }
-
     pub fn width(&self) -> i32 {
         unsafe { ffi::webrtc_VideoCodec_width(self.raw.as_ptr()) }
-    }
-
-    pub fn set_width(&mut self, value: i32) {
-        unsafe { ffi::webrtc_VideoCodec_set_width(self.raw.as_ptr(), value) };
     }
 
     pub fn height(&self) -> i32 {
         unsafe { ffi::webrtc_VideoCodec_height(self.raw.as_ptr()) }
     }
 
-    pub fn set_height(&mut self, value: i32) {
-        unsafe { ffi::webrtc_VideoCodec_set_height(self.raw.as_ptr(), value) };
-    }
-
     pub fn start_bitrate_kbps(&self) -> u32 {
         unsafe { ffi::webrtc_VideoCodec_start_bitrate_kbps(self.raw.as_ptr()) }
-    }
-
-    pub fn set_start_bitrate_kbps(&mut self, value: u32) {
-        unsafe { ffi::webrtc_VideoCodec_set_start_bitrate_kbps(self.raw.as_ptr(), value) };
     }
 
     pub fn max_bitrate_kbps(&self) -> u32 {
         unsafe { ffi::webrtc_VideoCodec_max_bitrate_kbps(self.raw.as_ptr()) }
     }
 
-    pub fn set_max_bitrate_kbps(&mut self, value: u32) {
-        unsafe { ffi::webrtc_VideoCodec_set_max_bitrate_kbps(self.raw.as_ptr(), value) };
-    }
-
     pub fn min_bitrate_kbps(&self) -> u32 {
         unsafe { ffi::webrtc_VideoCodec_min_bitrate_kbps(self.raw.as_ptr()) }
     }
 
-    pub fn set_min_bitrate_kbps(&mut self, value: u32) {
-        unsafe { ffi::webrtc_VideoCodec_set_min_bitrate_kbps(self.raw.as_ptr(), value) };
-    }
-
     pub fn max_framerate(&self) -> u32 {
         unsafe { ffi::webrtc_VideoCodec_max_framerate(self.raw.as_ptr()) }
-    }
-
-    pub fn set_max_framerate(&mut self, value: u32) {
-        unsafe { ffi::webrtc_VideoCodec_set_max_framerate(self.raw.as_ptr(), value) };
     }
 
     pub fn number_of_simulcast_streams(&self) -> usize {
@@ -2188,27 +2409,18 @@ impl<'a> VideoCodecRef<'a> {
         value.max(0) as usize
     }
 
-    pub fn set_number_of_simulcast_streams(&mut self, value: usize) {
-        assert!(
-            value <= crate::constants::max_simulcast_streams(),
-            "value が max_simulcast_streams() ({}) を超えています: {value}",
-            crate::constants::max_simulcast_streams()
-        );
-        let value = value.min(i32::MAX as usize) as i32;
-        unsafe { ffi::webrtc_VideoCodec_set_number_of_simulcast_streams(self.raw.as_ptr(), value) };
-    }
-
-    pub fn simulcast_stream(&mut self, index: usize) -> Option<SimulcastStreamRef<'_>> {
+    /// simulcast ストリームを借用する。
+    pub fn simulcast_stream(&self, index: usize) -> Option<SimulcastStreamRef<'_>> {
         let index = i32::try_from(index).ok()?;
         // C 側の `simulcastStream` 配列の範囲外は None を返す。
         if index < 0 || index as usize >= self.number_of_simulcast_streams() {
             return None;
         }
-        let raw = NonNull::new(unsafe {
-            ffi::webrtc_VideoCodec_simulcast_stream_at(self.raw.as_ptr(), index)
-        })?;
+        let raw =
+            unsafe { ffi::webrtc_VideoCodec_simulcast_stream_at_const(self.raw.as_ptr(), index) };
+        let raw = ConstNonNull::new(raw)?;
         // Safety: C 側の `VideoCodec` が生存している間は `simulcastStream[index]` は有効です。
-        Some(unsafe { SimulcastStreamRef::from_raw(raw) })
+        Some(SimulcastStreamRef::from_raw(raw))
     }
 
     pub fn to_owned(&self) -> VideoCodec {
@@ -2219,8 +2431,125 @@ impl<'a> VideoCodecRef<'a> {
         VideoCodec { raw_unique }
     }
 
-    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_VideoCodec {
+    pub(crate) fn as_ptr(&self) -> *const ffi::webrtc_VideoCodec {
         self.raw.as_ptr()
+    }
+}
+
+/// webrtc_VideoCodec の可変借用ラッパー。
+pub struct VideoCodecRefMut<'a> {
+    raw: NonNull<ffi::webrtc_VideoCodec>,
+    _marker: PhantomData<&'a mut ffi::webrtc_VideoCodec>,
+    cref: VideoCodecRef<'a>,
+}
+
+unsafe impl<'a> Send for VideoCodecRefMut<'a> {}
+
+impl<'a> VideoCodecRefMut<'a> {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_VideoCodec>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+            cref: VideoCodecRef::from_raw(ConstNonNull::from(raw)),
+        }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_VideoCodec {
+        self.raw.as_ptr()
+    }
+
+    pub fn set_codec_type(&mut self, value: VideoCodecType) {
+        unsafe { ffi::webrtc_VideoCodec_set_codec_type(self.raw.as_ptr(), value.to_raw()) };
+    }
+
+    pub fn set_width(&mut self, value: i32) {
+        unsafe { ffi::webrtc_VideoCodec_set_width(self.raw.as_ptr(), value) };
+    }
+
+    pub fn set_height(&mut self, value: i32) {
+        unsafe { ffi::webrtc_VideoCodec_set_height(self.raw.as_ptr(), value) };
+    }
+
+    pub fn set_start_bitrate_kbps(&mut self, value: u32) {
+        unsafe { ffi::webrtc_VideoCodec_set_start_bitrate_kbps(self.raw.as_ptr(), value) };
+    }
+
+    pub fn set_max_bitrate_kbps(&mut self, value: u32) {
+        unsafe { ffi::webrtc_VideoCodec_set_max_bitrate_kbps(self.raw.as_ptr(), value) };
+    }
+
+    pub fn set_min_bitrate_kbps(&mut self, value: u32) {
+        unsafe { ffi::webrtc_VideoCodec_set_min_bitrate_kbps(self.raw.as_ptr(), value) };
+    }
+
+    pub fn set_max_framerate(&mut self, value: u32) {
+        unsafe { ffi::webrtc_VideoCodec_set_max_framerate(self.raw.as_ptr(), value) };
+    }
+
+    pub fn set_number_of_simulcast_streams(&mut self, value: usize) {
+        assert!(
+            value <= crate::constants::max_simulcast_streams(),
+            "value {value} exceeds max_simulcast_streams() ({})",
+            crate::constants::max_simulcast_streams()
+        );
+        let value = value.min(i32::MAX as usize) as i32;
+        unsafe { ffi::webrtc_VideoCodec_set_number_of_simulcast_streams(self.raw.as_ptr(), value) };
+    }
+
+    /// simulcast ストリームを書き換え用に借用する。
+    pub fn simulcast_stream_mut(&mut self, index: usize) -> Option<SimulcastStreamRefMut<'_>> {
+        let index = i32::try_from(index).ok()?;
+        // C 側の `simulcastStream` 配列の範囲外は None を返す。
+        if index < 0 || index as usize >= self.number_of_simulcast_streams() {
+            return None;
+        }
+        let raw = unsafe { ffi::webrtc_VideoCodec_simulcast_stream_at(self.raw.as_ptr(), index) };
+        let raw = NonNull::new(raw)?;
+        // Safety: C 側の `VideoCodec` が生存している間は `simulcastStream[index]` は有効です。
+        Some(SimulcastStreamRefMut::from_raw(raw))
+    }
+    pub fn as_ref(&self) -> VideoCodecRef<'_> {
+        self.cref
+    }
+
+    pub fn codec_type(&self) -> VideoCodecType {
+        self.cref.codec_type()
+    }
+
+    pub fn width(&self) -> i32 {
+        self.cref.width()
+    }
+
+    pub fn height(&self) -> i32 {
+        self.cref.height()
+    }
+
+    pub fn start_bitrate_kbps(&self) -> u32 {
+        self.cref.start_bitrate_kbps()
+    }
+
+    pub fn max_bitrate_kbps(&self) -> u32 {
+        self.cref.max_bitrate_kbps()
+    }
+
+    pub fn min_bitrate_kbps(&self) -> u32 {
+        self.cref.min_bitrate_kbps()
+    }
+
+    pub fn max_framerate(&self) -> u32 {
+        self.cref.max_framerate()
+    }
+
+    pub fn number_of_simulcast_streams(&self) -> usize {
+        self.cref.number_of_simulcast_streams()
+    }
+
+    pub fn simulcast_stream(&self, index: usize) -> Option<SimulcastStreamRef<'_>> {
+        self.cref.simulcast_stream(index)
+    }
+
+    pub fn to_owned(&self) -> VideoCodec {
+        self.cref.to_owned()
     }
 }
 
@@ -2252,7 +2581,7 @@ impl EncodedImageBuffer {
         let ptr = unsafe { ffi::webrtc_EncodedImageBuffer_data(self.as_ptr()) };
         assert!(
             !(size > 0 && ptr.is_null()),
-            "BUG: EncodedImageBuffer の size > 0 なのに data が null です"
+            "BUG: data is null although the EncodedImageBuffer size is greater than 0"
         );
         if size == 0 || ptr.is_null() {
             return &[];
@@ -2281,31 +2610,35 @@ impl EncodedImage {
     }
 
     pub fn set_encoded_data(&mut self, encoded_data: &EncodedImageBuffer) {
-        self.as_ref().set_encoded_data(encoded_data);
+        self.as_mut().set_encoded_data(encoded_data);
     }
 
     pub fn set_rtp_timestamp(&mut self, rtp_timestamp: u32) {
-        self.as_ref().set_rtp_timestamp(rtp_timestamp);
+        self.as_mut().set_rtp_timestamp(rtp_timestamp);
     }
 
     pub fn set_encoded_width(&mut self, encoded_width: u32) {
-        self.as_ref().set_encoded_width(encoded_width);
+        self.as_mut().set_encoded_width(encoded_width);
     }
 
     pub fn set_encoded_height(&mut self, encoded_height: u32) {
-        self.as_ref().set_encoded_height(encoded_height);
+        self.as_mut().set_encoded_height(encoded_height);
     }
 
     pub fn set_frame_type(&mut self, frame_type: VideoFrameType) {
-        self.as_ref().set_frame_type(frame_type);
+        self.as_mut().set_frame_type(frame_type);
     }
 
     pub fn set_qp(&mut self, qp: i32) {
-        self.as_ref().set_qp(qp);
+        self.as_mut().set_qp(qp);
     }
 
     pub fn as_ref(&self) -> EncodedImageRef<'_> {
-        unsafe { EncodedImageRef::from_raw(self.raw()) }
+        EncodedImageRef::from_raw(ConstNonNull::from(self.raw()))
+    }
+
+    pub fn as_mut(&mut self) -> EncodedImageRefMut<'_> {
+        EncodedImageRefMut::from_raw(self.raw())
     }
 
     pub fn encoded_data(&self) -> Option<EncodedImageBuffer> {
@@ -2350,17 +2683,16 @@ impl Drop for EncodedImage {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct EncodedImageRef<'a> {
-    raw: NonNull<ffi::webrtc_EncodedImage>,
+    raw: ConstNonNull<ffi::webrtc_EncodedImage>,
     _marker: PhantomData<&'a ffi::webrtc_EncodedImage>,
 }
 
 unsafe impl<'a> Send for EncodedImageRef<'a> {}
 
 impl<'a> EncodedImageRef<'a> {
-    /// # Safety
-    /// `raw` は有効な `webrtc_EncodedImage` を指している必要があります。
-    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_EncodedImage>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_EncodedImage>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -2371,6 +2703,54 @@ impl<'a> EncodedImageRef<'a> {
         let raw_ref = unsafe { ffi::webrtc_EncodedImage_encoded_data(self.raw.as_ptr()) };
         let raw_ref = NonNull::new(raw_ref)?;
         Some(EncodedImageBuffer::from_raw_ref(raw_ref))
+    }
+
+    pub fn rtp_timestamp(&self) -> u32 {
+        unsafe { ffi::webrtc_EncodedImage_rtp_timestamp(self.raw.as_ptr()) }
+    }
+
+    pub fn encoded_width(&self) -> u32 {
+        unsafe { ffi::webrtc_EncodedImage_encoded_width(self.raw.as_ptr()) }
+    }
+
+    pub fn encoded_height(&self) -> u32 {
+        unsafe { ffi::webrtc_EncodedImage_encoded_height(self.raw.as_ptr()) }
+    }
+
+    pub fn frame_type(&self) -> VideoFrameType {
+        let value = unsafe { ffi::webrtc_EncodedImage_frame_type(self.raw.as_ptr()) };
+        VideoFrameType::from_raw(value)
+    }
+
+    pub fn qp(&self) -> i32 {
+        unsafe { ffi::webrtc_EncodedImage_qp(self.raw.as_ptr()) }
+    }
+
+    pub(crate) fn as_ptr(&self) -> *const ffi::webrtc_EncodedImage {
+        self.raw.as_ptr()
+    }
+}
+
+/// webrtc_EncodedImage の可変借用ラッパー。
+pub struct EncodedImageRefMut<'a> {
+    raw: NonNull<ffi::webrtc_EncodedImage>,
+    _marker: PhantomData<&'a mut ffi::webrtc_EncodedImage>,
+    cref: EncodedImageRef<'a>,
+}
+
+unsafe impl<'a> Send for EncodedImageRefMut<'a> {}
+
+impl<'a> EncodedImageRefMut<'a> {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_EncodedImage>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+            cref: EncodedImageRef::from_raw(ConstNonNull::from(raw)),
+        }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_EncodedImage {
+        self.raw.as_ptr()
     }
 
     pub fn set_encoded_data(&mut self, encoded_data: &EncodedImageBuffer) {
@@ -2398,29 +2778,31 @@ impl<'a> EncodedImageRef<'a> {
     pub fn set_qp(&mut self, qp: i32) {
         unsafe { ffi::webrtc_EncodedImage_set_qp(self.raw.as_ptr(), qp) };
     }
+    pub fn as_ref(&self) -> EncodedImageRef<'_> {
+        self.cref
+    }
+
+    pub fn encoded_data(&self) -> Option<EncodedImageBuffer> {
+        self.cref.encoded_data()
+    }
 
     pub fn rtp_timestamp(&self) -> u32 {
-        unsafe { ffi::webrtc_EncodedImage_rtp_timestamp(self.raw.as_ptr()) }
+        self.cref.rtp_timestamp()
     }
 
     pub fn encoded_width(&self) -> u32 {
-        unsafe { ffi::webrtc_EncodedImage_encoded_width(self.raw.as_ptr()) }
+        self.cref.encoded_width()
     }
 
     pub fn encoded_height(&self) -> u32 {
-        unsafe { ffi::webrtc_EncodedImage_encoded_height(self.raw.as_ptr()) }
+        self.cref.encoded_height()
     }
 
     pub fn frame_type(&self) -> VideoFrameType {
-        let value = unsafe { ffi::webrtc_EncodedImage_frame_type(self.raw.as_ptr()) };
-        VideoFrameType::from_raw(value)
+        self.cref.frame_type()
     }
 
     pub fn qp(&self) -> i32 {
-        unsafe { ffi::webrtc_EncodedImage_qp(self.raw.as_ptr()) }
-    }
-
-    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_EncodedImage {
-        self.raw.as_ptr()
+        self.cref.qp()
     }
 }

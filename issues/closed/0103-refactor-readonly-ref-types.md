@@ -1,7 +1,7 @@
 # 借用型 `XxxRef` を読み取り専用にし `XxxRefMut` を新設する
 
 - Created: 2026-09-16
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-09-18
 - Branch: feature/refactor-readonly-ref-types
 - Polished: {YYYY-MM-DD}
 
@@ -196,4 +196,23 @@ owned 型に `as_mut(&mut self) -> XxxRefMut<'_>` を追加し、`as_ref(&self) 
 
 ## 解決方法
 
-{実装時に記入する}
+- `XxxRef` から可変アクセサを外して `#[derive(Clone, Copy)]` を付け、可変アクセサは新設した `XxxRefMut` に移した
+- `XxxRefMut` は `Copy` にせず、`std::ops::Deref<Target = XxxRef>` で `XxxRef` の読み取りアクセサを共有する（`Deref` は実在する `XxxRef` への参照を返す必要があるため、`cref` フィールドとして保持する）
+- 借用ハンドルが保持するポインタを非 null 型に変え、`XxxRef` は `ConstNonNull`、`XxxRefMut` は `NonNull` を保持するようにした（`NonNull` は `*mut T` 用の API しか持たないため `ConstNonNull` を追加し、クレートルートから参照できるようにした）
+- `XxxRef::from_raw` / `XxxRefMut::from_raw` / `CxxStringRef::from_ptr` を `pub(crate)` に限定し、`unsafe fn` と `fn` が混在していたのを安全関数に統一した（借用先の寿命を型で保証できず、外部に公開すると safe Rust から不正なハンドルを作れてしまうため）
+- 所有権を受け取る `CxxString::from_unique` / `RtcError::from_unique_ptr` / `SdpParseError::from_unique_ptr` / `SessionDescription::from_unique_ptr` も同様に `pub(crate)` に限定した（`CxxString::into_raw` は譲渡方向なので public のまま。再監査で public かつ safe に所有権を取る関数はこの 4 つだけであることを確認した）
+- `webrtc_c` に読み取り専用の借用を返す `_const` 版 getter・`_refcounted_get_const`・`WEBRTC_DECLARE_CAST_CONST` を追加し、`AddRef` / `Release` の引数を `const struct CType*` にした（`src/` から const を外すキャストを全廃した）
+- このブランチで新設した可変ハンドルのうち、構築経路が無く未使用だった 7 型（`NaluInfoRefMut` / `VideoDecoderSettingsRefMut` / `VideoEncoderSettingsRefMut` / `VideoEncoderRateControlParametersRefMut` / `SSLCertificateRefMut` / `SSLCertChainRefMut` / `LogLineRefMut`）と、書き換えメソッドも非 const ポインタを要求する C API も持たない `EnvironmentRefMut` / `IceCandidateRefMut` を削除した
+- 未使用だった `VideoDecoderDecodedImageCallbackRef` を削除し、デコード完了 callback は `VideoDecoderDecodedImageCallbackPtr` に集約した
+- 完了条件のうち 2 点は実装時に変わった
+  - 「全 39 の `XxxRef` に対応する `XxxRefMut`」は、未使用の可変ハンドル 9 型を削除したため `XxxRefMut` が 30 型になった
+  - 「`XxxRef` が `*const`、`XxxRefMut` が `*mut` を保持」は、非 null を型で表す `ConstNonNull` / `NonNull` を保持する形になった
+- レビューで、`XxxRef` の `Copy` と `XxxRefMut` の `Deref` の組み合わせにより safe なコードで use-after-free を作れることが判明したため、`XxxRefMut` から `Deref` を削除した
+  - `Deref::Target` は `XxxRef<'a>` に固定され、`deref()` が返す参照の中身が `'a` を持つため、`Copy` でその値を借用の外へ持ち出せる。持ち出したハンドルから得た借用を保持したまま `XxxRefMut` の書き換えメソッドを呼ぶと、C++ 側の再確保で解放された領域を読むことになる
+  - 読み取りアクセサは `XxxRefMut` に同じシグネチャの転送メソッド（`self.cref.xxx()` の 1 行）として用意し、借用や借用ハンドルを返すものは戻り値を `'_` に短縮した。`XxxRefMut::as_ref(&self) -> XxxRef<'_>` も同じ規則に従う
+  - `cref` は転送時に一時値を作らないために必要なので保持した。`Copy` / `Clone` は `XxxRef` に残しているため、利用側の書き換えは無い
+- レビューで、`&mut self` を取る可変アクセサが戻り値を `'a` にしていたため、借用が呼び出しで切れて同一オブジェクトへの可変ハンドルを 2 本作れることが判明した（可変ハンドルは `Send` なので、別スレッドから同時に書き換えると C++ 側のコンテナが壊れるか二重解放になる）ため、戻り値を `'_` に縛った
+  - 対象は `RtpCodecRefMut::parameters_mut` / `RtpCodecCapabilityRefMut::cast_to_codec_mut` / `RtpCodecCapabilityRefMut::parameters_mut` / `RtpEncodingParametersRefMut::codec_mut` / `SdpAudioFormatRefMut::parameters_mut` / `SdpVideoFormatRefMut::parameters_mut` / `VideoCodecRefMut::simulcast_stream_mut` の 7 箇所
+  - 所有型の `as_mut().xxx_mut()` という委譲は戻り値が一時値の借用になってしまうため、所有型側で自身のポインタからハンドルを組み立てる形にした
+- `CHANGES.md` の `## develop` 節に `[CHANGE]` と misc のエントリを追加した
+- `cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build -- -D warnings` / `cargo test --workspace --features source-build` / `prek run --files` の成功を確認した

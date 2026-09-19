@@ -35,7 +35,7 @@ impl<'a, T> RawBufferWriter<'a, T> {
     ///
     /// # Safety
     /// `samples` を書き込んでも領域の容量を超えないことを呼び出し側が保証しなければならない。
-    pub fn write(&mut self, samples: &[T]) {
+    pub unsafe fn write(&mut self, samples: &[T]) {
         if samples.is_empty() {
             return;
         }

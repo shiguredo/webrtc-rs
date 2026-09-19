@@ -1,5 +1,6 @@
+use crate::const_non_null::ConstNonNull;
 use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
-use crate::helper::non_null::expect_non_null;
+use crate::helper::non_null::{expect_non_null, expect_non_null_const};
 use crate::helper::optional::{
     get_optional_bool, get_optional_scalar, get_optional_scalar2, set_optional_bool,
     set_optional_object, set_optional_scalar, set_optional_scalar2,
@@ -8,10 +9,10 @@ use crate::helper::ref_count::{
     AudioDecoderFactoryHandle, AudioEncoderFactoryHandle, AudioTrackHandle, AudioTrackSourceHandle,
     MediaStreamTrackHandle,
 };
-use crate::rtc_base::{Buffer, BufferRef, BufferS16Ref};
+use crate::rtc_base::{Buffer, BufferRefMut, BufferS16RefMut};
 use crate::{
-    CxxString, CxxStringRef, EnvironmentRef, Error, MapStringString, MediaStreamTrack,
-    RawBufferWriter, Result, ScopedRef, ffi,
+    CxxString, CxxStringRef, EnvironmentRef, Error, MapStringStringRef, MapStringStringRefMut,
+    MediaStreamTrack, RawBufferWriter, Result, ScopedRef, ffi,
 };
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -556,7 +557,7 @@ impl SdpAudioFormat {
         name: &str,
         clockrate_hz: i32,
         num_channels: usize,
-        parameters: &MapStringString<'_>,
+        parameters: &MapStringStringRef<'_>,
     ) -> Self {
         let raw = unsafe {
             ffi::webrtc_SdpAudioFormat_new_with_parameters(
@@ -564,7 +565,7 @@ impl SdpAudioFormat {
                 name.len(),
                 clockrate_hz,
                 num_channels,
-                parameters.raw(),
+                parameters.as_ptr(),
             )
         };
         Self {
@@ -606,29 +607,39 @@ impl SdpAudioFormat {
     }
 
     /// コーデックパラメータへの可変参照を返す。
-    pub fn parameters_mut(&mut self) -> MapStringString<'_> {
+    pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'_> {
         let ptr = unsafe { ffi::webrtc_SdpAudioFormat_get_parameters(self.raw().as_ptr()) };
-        MapStringString::from_raw(expect_non_null(ptr, "webrtc_SdpAudioFormat_get_parameters"))
+        MapStringStringRefMut::from_raw(expect_non_null(
+            ptr,
+            "webrtc_SdpAudioFormat_get_parameters",
+        ))
     }
 
     /// コーデックパラメータを設定する。
-    pub fn set_parameters(&mut self, parameters: &MapStringString<'_>) {
-        unsafe { ffi::webrtc_SdpAudioFormat_set_parameters(self.raw().as_ptr(), parameters.raw()) }
+    pub fn set_parameters(&mut self, parameters: &MapStringStringRef<'_>) {
+        unsafe {
+            ffi::webrtc_SdpAudioFormat_set_parameters(self.raw().as_ptr(), parameters.as_ptr())
+        }
     }
 
     /// 等価かどうかを返す。
     pub fn is_equal(&self, other: SdpAudioFormatRef<'_>) -> bool {
-        unsafe { ffi::webrtc_SdpAudioFormat_is_equal(self.raw().as_ptr(), other.raw.as_ptr()) != 0 }
+        unsafe { ffi::webrtc_SdpAudioFormat_is_equal(self.raw().as_ptr(), other.as_ptr()) != 0 }
     }
 
     /// コーデックがマッチするかどうかを返す。
     pub fn matches(&self, other: SdpAudioFormatRef<'_>) -> bool {
-        unsafe { ffi::webrtc_SdpAudioFormat_Matches(self.raw().as_ptr(), other.raw.as_ptr()) != 0 }
+        unsafe { ffi::webrtc_SdpAudioFormat_Matches(self.raw().as_ptr(), other.as_ptr()) != 0 }
     }
 
     pub fn as_ref(&self) -> SdpAudioFormatRef<'_> {
         // Safety: self.raw() は SdpAudioFormat の生存中は常に有効です。
-        unsafe { SdpAudioFormatRef::from_raw(self.raw()) }
+        SdpAudioFormatRef::from_raw(ConstNonNull::from(self.raw()))
+    }
+
+    pub fn as_mut(&mut self) -> SdpAudioFormatRefMut<'_> {
+        // Safety: self.raw() は SdpAudioFormat の生存中は常に有効です。
+        SdpAudioFormatRefMut::from_raw(self.raw())
     }
 
     pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_SdpAudioFormat> {
@@ -653,17 +664,16 @@ impl Drop for SdpAudioFormat {
 }
 
 /// webrtc::SdpAudioFormat への借用ラッパー。
+#[derive(Clone, Copy)]
 pub struct SdpAudioFormatRef<'a> {
-    raw: NonNull<ffi::webrtc_SdpAudioFormat>,
+    raw: ConstNonNull<ffi::webrtc_SdpAudioFormat>,
     _marker: PhantomData<&'a ffi::webrtc_SdpAudioFormat>,
 }
 
 unsafe impl<'a> Send for SdpAudioFormatRef<'a> {}
 
 impl<'a> SdpAudioFormatRef<'a> {
-    /// # Safety
-    /// `raw` は有効な `webrtc_SdpAudioFormat` を指している必要があります。
-    pub unsafe fn from_raw(raw: NonNull<ffi::webrtc_SdpAudioFormat>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_SdpAudioFormat>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -672,8 +682,12 @@ impl<'a> SdpAudioFormatRef<'a> {
 
     /// SDP コーデック名を返す。
     pub fn name(&self) -> Result<String> {
-        let ptr = unsafe { ffi::webrtc_SdpAudioFormat_get_name(self.raw.as_ptr()) };
-        CxxStringRef::from_ptr(expect_non_null(ptr, "webrtc_SdpAudioFormat_get_name")).to_string()
+        let ptr = unsafe { ffi::webrtc_SdpAudioFormat_get_name_const(self.raw.as_ptr()) };
+        CxxStringRef::from_ptr(expect_non_null_const(
+            ptr,
+            "webrtc_SdpAudioFormat_get_name_const",
+        ))
+        .to_string()
     }
 
     /// クロックレート (Hz) を返す。
@@ -686,13 +700,16 @@ impl<'a> SdpAudioFormatRef<'a> {
         unsafe { ffi::webrtc_SdpAudioFormat_get_num_channels(self.raw.as_ptr()) }
     }
 
-    /// コーデックパラメータへの可変参照を返す。
-    pub fn parameters_mut(&mut self) -> MapStringString<'_> {
-        let ptr = unsafe { ffi::webrtc_SdpAudioFormat_get_parameters(self.raw.as_ptr()) };
-        MapStringString::from_raw(expect_non_null(ptr, "webrtc_SdpAudioFormat_get_parameters"))
+    /// コーデックパラメータへの参照を返す。
+    pub fn parameters(&self) -> MapStringStringRef<'a> {
+        let ptr = unsafe { ffi::webrtc_SdpAudioFormat_get_parameters_const(self.raw.as_ptr()) };
+        MapStringStringRef::from_raw(expect_non_null_const(
+            ptr,
+            "webrtc_SdpAudioFormat_get_parameters_const",
+        ))
     }
 
-    pub(crate) fn as_ptr(&self) -> *mut ffi::webrtc_SdpAudioFormat {
+    pub(crate) fn as_ptr(&self) -> *const ffi::webrtc_SdpAudioFormat {
         self.raw.as_ptr()
     }
 
@@ -702,6 +719,61 @@ impl<'a> SdpAudioFormatRef<'a> {
         SdpAudioFormat {
             raw_unique: expect_non_null(raw, "webrtc_SdpAudioFormat_copy"),
         }
+    }
+}
+
+/// webrtc::SdpAudioFormat への可変借用ラッパー。
+pub struct SdpAudioFormatRefMut<'a> {
+    raw: NonNull<ffi::webrtc_SdpAudioFormat>,
+    _marker: PhantomData<&'a mut ffi::webrtc_SdpAudioFormat>,
+    cref: SdpAudioFormatRef<'a>,
+}
+
+unsafe impl<'a> Send for SdpAudioFormatRefMut<'a> {}
+
+impl<'a> SdpAudioFormatRefMut<'a> {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_SdpAudioFormat>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+            cref: SdpAudioFormatRef::from_raw(ConstNonNull::from(raw)),
+        }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_SdpAudioFormat {
+        self.raw.as_ptr()
+    }
+
+    /// コーデックパラメータへの可変参照を返す。
+    pub fn parameters_mut(&mut self) -> MapStringStringRefMut<'_> {
+        let ptr = unsafe { ffi::webrtc_SdpAudioFormat_get_parameters(self.raw.as_ptr()) };
+        MapStringStringRefMut::from_raw(expect_non_null(
+            ptr,
+            "webrtc_SdpAudioFormat_get_parameters",
+        ))
+    }
+    pub fn as_ref(&self) -> SdpAudioFormatRef<'_> {
+        self.cref
+    }
+
+    pub fn name(&self) -> Result<String> {
+        self.cref.name()
+    }
+
+    pub fn clockrate_hz(&self) -> i32 {
+        self.cref.clockrate_hz()
+    }
+
+    pub fn num_channels(&self) -> usize {
+        self.cref.num_channels()
+    }
+
+    pub fn parameters(&self) -> MapStringStringRef<'_> {
+        self.cref.parameters()
+    }
+
+    pub fn to_owned(&self) -> SdpAudioFormat {
+        self.cref.to_owned()
     }
 }
 
@@ -971,11 +1043,9 @@ impl AudioEncoderEncodedInfo {
 
     /// エンコーダータイプを返す。
     pub fn encoder_type(&self) -> AudioCodecType {
-        unsafe {
-            AudioCodecType::from_raw(ffi::webrtc_AudioEncoder_EncodedInfo_get_encoder_type(
-                self.raw(),
-            ))
-        }
+        AudioCodecType::from_raw(unsafe {
+            ffi::webrtc_AudioEncoder_EncodedInfo_get_encoder_type(self.raw())
+        })
     }
 
     /// エンコーダータイプを設定する。
@@ -988,7 +1058,7 @@ impl AudioEncoderEncodedInfo {
         // (Unknown) は libwebrtc 内部で配列 OOB になる。ここで拒否する。
         assert!(
             !matches!(value, AudioCodecType::Unknown(_)),
-            "encoder_type は既知のコーデックタイプで指定してください"
+            "encoder_type must be a known codec type"
         );
         unsafe { ffi::webrtc_AudioEncoder_EncodedInfo_set_encoder_type(self.raw(), value.to_raw()) }
     }
@@ -1002,17 +1072,16 @@ impl AudioEncoderEncodedInfo {
         let mut redundant = Vec::with_capacity(size);
         for i in 0..size {
             let raw = unsafe {
-                ffi::webrtc_AudioEncoder_EncodedInfoLeaf_vector_get(vec.as_ptr(), i as i32)
+                ffi::webrtc_AudioEncoder_EncodedInfoLeaf_vector_get_const(vec.as_ptr(), i as i32)
             };
-            let raw = expect_non_null(raw, "webrtc_AudioEncoder_EncodedInfoLeaf_vector_get");
+            let raw =
+                expect_non_null_const(raw, "webrtc_AudioEncoder_EncodedInfoLeaf_vector_get_const");
             // Safety: vector が保持する leaf への借用ポインタを返す。_copy で複製して所有する。
             let copied = unsafe { ffi::webrtc_AudioEncoder_EncodedInfoLeaf_copy(raw.as_ptr()) };
-            redundant.push(unsafe {
-                AudioEncoderEncodedInfoLeaf::from_raw(expect_non_null(
-                    copied,
-                    "webrtc_AudioEncoder_EncodedInfoLeaf_copy",
-                ))
-            });
+            redundant.push(AudioEncoderEncodedInfoLeaf::from_raw(expect_non_null(
+                copied,
+                "webrtc_AudioEncoder_EncodedInfoLeaf_copy",
+            )));
         }
         redundant
     }
@@ -1070,9 +1139,10 @@ impl AudioEncoderEncodedInfoLeaf {
         }
     }
 
-    /// # Safety
-    /// `raw` は C 側で生成された有効な leaf を指し、所有権をこの型が引き受ける必要があります。
-    pub(crate) unsafe fn from_raw(raw: NonNull<ffi::webrtc_AudioEncoder_EncodedInfoLeaf>) -> Self {
+    /// 生ポインタから生成する crate 内部専用のコンストラクタ。
+    ///
+    /// `raw` の所有権をこの型が引き受けるため、同じポインタを 2 回渡してはいけない。
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_AudioEncoder_EncodedInfoLeaf>) -> Self {
         Self { raw }
     }
 
@@ -1143,11 +1213,9 @@ impl AudioEncoderEncodedInfoLeaf {
 
     /// エンコーダータイプを返す。
     pub fn encoder_type(&self) -> AudioCodecType {
-        unsafe {
-            AudioCodecType::from_raw(ffi::webrtc_AudioEncoder_EncodedInfoLeaf_get_encoder_type(
-                self.raw.as_ptr(),
-            ))
-        }
+        AudioCodecType::from_raw(unsafe {
+            ffi::webrtc_AudioEncoder_EncodedInfoLeaf_get_encoder_type(self.raw.as_ptr())
+        })
     }
 
     /// エンコーダータイプを設定する。
@@ -1158,7 +1226,7 @@ impl AudioEncoderEncodedInfoLeaf {
     pub fn set_encoder_type(&mut self, value: AudioCodecType) {
         assert!(
             !matches!(value, AudioCodecType::Unknown(_)),
-            "encoder_type は既知のコーデックタイプで指定してください"
+            "encoder_type must be a known codec type"
         );
         unsafe {
             ffi::webrtc_AudioEncoder_EncodedInfoLeaf_set_encoder_type(
@@ -1206,10 +1274,10 @@ impl BitrateAllocationUpdate {
         }
     }
 
-    /// # Safety
-    /// `raw` は C 側で生成された有効な `webrtc_BitrateAllocationUpdate` を指し、
-    /// 所有権をこの型が引き受ける必要があります。
-    pub(crate) unsafe fn from_raw(raw: NonNull<ffi::webrtc_BitrateAllocationUpdate>) -> Self {
+    /// 生ポインタから生成する crate 内部専用のコンストラクタ。
+    ///
+    /// `raw` の所有権をこの型が引き受けるため、同じポインタを 2 回渡してはいけない。
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_BitrateAllocationUpdate>) -> Self {
         Self { raw }
     }
 
@@ -1345,7 +1413,7 @@ pub trait AudioEncoderHandler: Send {
         &mut self,
         rtp_timestamp: u32,
         audio: &[i16],
-        encoded: &mut BufferRef<'_>,
+        encoded: &mut BufferRefMut<'_>,
     ) -> AudioEncoderEncodedInfo;
 
     /// エンコーダーを初期状態へ戻す。
@@ -1672,8 +1740,8 @@ unsafe extern "C" fn audio_encoder_encode(
     } else {
         unsafe { slice::from_raw_parts(audio, audio_size) }
     };
-    let mut encoded =
-        unsafe { BufferRef::from_raw(expect_non_null(encoded, "audio_encoder_encode (encoded)")) };
+    let encoded = expect_non_null(encoded, "audio_encoder_encode (encoded)");
+    let mut encoded = BufferRefMut::from_raw(encoded);
     state
         .handler
         .encode(rtp_timestamp, audio, &mut encoded)
@@ -1838,21 +1906,17 @@ unsafe extern "C" fn audio_encoder_on_received_uplink_allocation(
         !user_data.is_null(),
         "audio_encoder_on_received_uplink_allocation: user_data is null"
     );
-    // C 側では const ポインタで渡されるが、expect_non_null は *mut を取るため const を外している。
-    // 取得した値はコピーして使うだけで、借用先は書き換えない。
-    let update = expect_non_null(
-        update.cast_mut(),
+    let update = expect_non_null_const(
+        update,
         "audio_encoder_on_received_uplink_allocation (update)",
     );
     let state = unsafe { &mut *(user_data as *mut AudioEncoderHandlerState) };
     // C++ 側の update はコールバック期間だけ生きるため、コピーして所有する。
     let copied = unsafe { ffi::webrtc_BitrateAllocationUpdate_copy(update.as_ptr()) };
-    let update = unsafe {
-        BitrateAllocationUpdate::from_raw(expect_non_null(
-            copied,
-            "webrtc_BitrateAllocationUpdate_copy",
-        ))
-    };
+    let update = BitrateAllocationUpdate::from_raw(expect_non_null(
+        copied,
+        "webrtc_BitrateAllocationUpdate_copy",
+    ));
     state.handler.on_received_uplink_allocation(update);
 }
 
@@ -2307,7 +2371,7 @@ pub trait AudioDecoderHandler: Send {
     fn generate_plc(
         &mut self,
         requested_samples_per_channel: usize,
-        concealment_audio: &mut BufferS16Ref<'_>,
+        concealment_audio: &mut BufferS16RefMut<'_>,
     ) {
     }
 
@@ -2442,7 +2506,7 @@ unsafe extern "C" fn audio_decoder_generate_plc(
         concealment_audio,
         "audio_decoder_generate_plc (concealment_audio)",
     );
-    let mut concealment_audio = unsafe { BufferS16Ref::from_raw(concealment_audio) };
+    let mut concealment_audio = BufferS16RefMut::from_raw(concealment_audio);
     state
         .handler
         .generate_plc(requested_samples_per_channel, &mut concealment_audio);
@@ -2664,13 +2728,13 @@ impl AudioDecoder {
     pub fn generate_plc(
         &mut self,
         requested_samples_per_channel: usize,
-        concealment_audio: &mut BufferS16Ref<'_>,
+        concealment_audio: &mut BufferS16RefMut<'_>,
     ) {
         unsafe {
             ffi::webrtc_AudioDecoder_GeneratePlc(
                 self.as_ptr(),
                 requested_samples_per_channel,
-                concealment_audio.raw(),
+                concealment_audio.as_mut_ptr(),
             )
         }
     }
@@ -2739,10 +2803,10 @@ impl AudioCodecPairId {
         unsafe { ffi::webrtc_AudioCodecPairId_NumericRepresentation(self.raw.as_ptr()) }
     }
 
-    /// # Safety
-    /// `raw` は C 側で生成された有効な `webrtc_AudioCodecPairId` を指し、
-    /// 所有権をこの型が引き受ける必要があります。
-    pub(crate) unsafe fn from_raw(raw: NonNull<ffi::webrtc_AudioCodecPairId>) -> Self {
+    /// 生ポインタから生成する crate 内部専用のコンストラクタ。
+    ///
+    /// `raw` の所有権をこの型が引き受けるため、同じポインタを 2 回渡してはいけない。
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_AudioCodecPairId>) -> Self {
         Self { raw }
     }
 
@@ -2828,7 +2892,7 @@ impl AudioEncoderFactoryOptions {
     pub fn codec_pair_id(&self) -> Option<AudioCodecPairId> {
         let raw =
             unsafe { ffi::webrtc_AudioEncoderFactory_Options_get_codec_pair_id(self.raw.as_ptr()) };
-        NonNull::new(raw).map(|raw| unsafe { AudioCodecPairId::from_raw(raw) })
+        NonNull::new(raw).map(AudioCodecPairId::from_raw)
     }
 
     /// コーデックペア ID を設定 / 解除する。
@@ -2911,14 +2975,9 @@ unsafe extern "C" fn audio_encoder_factory_query_audio_encoder(
         "audio_encoder_factory_query_audio_encoder: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut AudioEncoderFactoryHandlerState) };
-    // C 側では const ポインタで渡されるが、借用型 (SdpAudioFormatRef) は
-    // 現状 *mut を保持するため const を外している。
-    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
-    let format = expect_non_null(
-        format.cast_mut(),
-        "audio_encoder_factory_query_audio_encoder (format)",
-    );
-    let format = unsafe { SdpAudioFormatRef::from_raw(format) };
+    let format =
+        expect_non_null_const(format, "audio_encoder_factory_query_audio_encoder (format)");
+    let format = SdpAudioFormatRef::from_raw(format);
     match state.handler.query_audio_encoder(format) {
         Some(info) => info.into_raw(),
         None => std::ptr::null_mut(),
@@ -2936,14 +2995,11 @@ unsafe extern "C" fn audio_encoder_factory_create(
         "audio_encoder_factory_create: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut AudioEncoderFactoryHandlerState) };
-    // C 側では const ポインタで渡されるが、借用型 (EnvironmentRef / SdpAudioFormatRef) は
-    // 現状 *mut を保持するため const を外している。
-    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
-    let env = expect_non_null(env.cast_mut(), "audio_encoder_factory_create (env)");
-    let format = expect_non_null(format.cast_mut(), "audio_encoder_factory_create (format)");
+    let env = expect_non_null_const(env, "audio_encoder_factory_create (env)");
+    let format = expect_non_null_const(format, "audio_encoder_factory_create (format)");
     let options = expect_non_null(options, "audio_encoder_factory_create (options)");
-    let env = unsafe { EnvironmentRef::from_raw(env) };
-    let format = unsafe { SdpAudioFormatRef::from_raw(format) };
+    let env = EnvironmentRef::from_raw(env);
+    let format = SdpAudioFormatRef::from_raw(format);
     // options は C++ 側が保有する借用ポインタのため、Drop しないよう ManuallyDrop で包む。
     let options = std::mem::ManuallyDrop::new(AudioEncoderFactoryOptions { raw: options });
     match state.handler.create(env, format, &options) {
@@ -2990,8 +3046,8 @@ impl AudioEncoderFactory {
         let size = unsafe { ffi::webrtc_AudioCodecSpec_vector_size(raw_vec.as_ptr()) };
         let mut specs = Vec::with_capacity(size.max(0) as usize);
         for i in 0..size {
-            let raw = unsafe { ffi::webrtc_AudioCodecSpec_vector_get(raw_vec.as_ptr(), i) };
-            let raw = expect_non_null(raw, "webrtc_AudioCodecSpec_vector_get");
+            let raw = unsafe { ffi::webrtc_AudioCodecSpec_vector_get_const(raw_vec.as_ptr(), i) };
+            let raw = expect_non_null_const(raw, "webrtc_AudioCodecSpec_vector_get_const");
             let copied = unsafe { ffi::webrtc_AudioCodecSpec_copy(raw.as_ptr()) };
             specs.push(AudioCodecSpec {
                 raw: expect_non_null(copied, "webrtc_AudioCodecSpec_copy"),
@@ -3077,14 +3133,11 @@ unsafe extern "C" fn audio_decoder_factory_is_supported_decoder(
         "audio_decoder_factory_is_supported_decoder: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut AudioDecoderFactoryHandlerState) };
-    // C 側では const ポインタで渡されるが、借用型 (SdpAudioFormatRef) は
-    // 現状 *mut を保持するため const を外している。
-    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
-    let format = expect_non_null(
-        format.cast_mut(),
+    let format = expect_non_null_const(
+        format,
         "audio_decoder_factory_is_supported_decoder (format)",
     );
-    let format = unsafe { SdpAudioFormatRef::from_raw(format) };
+    let format = SdpAudioFormatRef::from_raw(format);
     if state.handler.is_supported_decoder(format) {
         1
     } else {
@@ -3102,13 +3155,10 @@ unsafe extern "C" fn audio_decoder_factory_create(
         "audio_decoder_factory_create: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut AudioDecoderFactoryHandlerState) };
-    // C 側では const ポインタで渡されるが、借用型 (EnvironmentRef / SdpAudioFormatRef) は
-    // 現状 *mut を保持するため const を外している。
-    // 借用先を書き換えないことは、この参照を受け取るハンドラの責務である。
-    let env = expect_non_null(env.cast_mut(), "audio_decoder_factory_create (env)");
-    let format = expect_non_null(format.cast_mut(), "audio_decoder_factory_create (format)");
-    let env = unsafe { EnvironmentRef::from_raw(env) };
-    let format = unsafe { SdpAudioFormatRef::from_raw(format) };
+    let env = expect_non_null_const(env, "audio_decoder_factory_create (env)");
+    let format = expect_non_null_const(format, "audio_decoder_factory_create (format)");
+    let env = EnvironmentRef::from_raw(env);
+    let format = SdpAudioFormatRef::from_raw(format);
     match state.handler.create(env, format) {
         Some(decoder) => decoder.into_raw(),
         None => std::ptr::null_mut(),
@@ -3153,8 +3203,8 @@ impl AudioDecoderFactory {
         let size = unsafe { ffi::webrtc_AudioCodecSpec_vector_size(raw_vec.as_ptr()) };
         let mut specs = Vec::with_capacity(size.max(0) as usize);
         for i in 0..size {
-            let raw = unsafe { ffi::webrtc_AudioCodecSpec_vector_get(raw_vec.as_ptr(), i) };
-            let raw = expect_non_null(raw, "webrtc_AudioCodecSpec_vector_get");
+            let raw = unsafe { ffi::webrtc_AudioCodecSpec_vector_get_const(raw_vec.as_ptr(), i) };
+            let raw = expect_non_null_const(raw, "webrtc_AudioCodecSpec_vector_get_const");
             let copied = unsafe { ffi::webrtc_AudioCodecSpec_copy(raw.as_ptr()) };
             specs.push(AudioCodecSpec {
                 raw: expect_non_null(copied, "webrtc_AudioCodecSpec_copy"),

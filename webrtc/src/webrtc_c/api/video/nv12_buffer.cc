@@ -78,13 +78,13 @@ WEBRTC_EXPORT int webrtc_NV12Buffer_StrideUV(
 }
 WEBRTC_EXPORT void webrtc_NV12Buffer_CropAndScaleFrom(
     struct webrtc_NV12Buffer* self,
-    struct webrtc_NV12Buffer* src,
+    const struct webrtc_NV12Buffer* src,
     int offset_x,
     int offset_y,
     int crop_width,
     int crop_height) {
   auto dst_buf = reinterpret_cast<webrtc::NV12Buffer*>(self);
-  auto src_buf = reinterpret_cast<webrtc::NV12Buffer*>(src);
+  auto src_buf = reinterpret_cast<const webrtc::NV12Buffer*>(src);
   dst_buf->CropAndScaleFrom(*src_buf, offset_x, offset_y, crop_width,
                             crop_height);
 }

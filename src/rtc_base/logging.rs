@@ -1,8 +1,9 @@
 pub mod log {
     use crate::Result;
+    use crate::const_non_null::ConstNonNull;
     use crate::ffi;
     use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
-    use crate::helper::non_null::expect_non_null;
+    use crate::helper::non_null::{expect_non_null, expect_non_null_const};
     use crate::helper::optional::get_optional_scalar;
     use std::ffi::CString;
     use std::marker::PhantomData;
@@ -157,7 +158,7 @@ pub mod log {
             unsafe { ffi::webrtc_LoggingConfig_log_prefix(self.raw.as_ptr(), &mut ptr, &mut len) };
             assert!(
                 !ptr.is_null(),
-                "BUG: webrtc_LoggingConfig_log_prefix が null を返しました"
+                "BUG: webrtc_LoggingConfig_log_prefix returned null"
             );
             let bytes = unsafe { std::slice::from_raw_parts(ptr.cast::<u8>(), len) };
             let prefix = std::str::from_utf8(bytes)?;
@@ -225,21 +226,21 @@ pub mod log {
     /// 一時的な文字列ビューを返す。
     #[derive(Clone, Copy)]
     pub struct LogLineRef<'a> {
-        raw: NonNull<ffi::webrtc_LogLineRef>,
+        raw: ConstNonNull<ffi::webrtc_LogLineRef>,
         _marker: PhantomData<&'a ffi::webrtc_LogLineRef>,
     }
 
     unsafe impl<'a> Send for LogLineRef<'a> {}
 
     impl<'a> LogLineRef<'a> {
-        pub fn from_raw(raw: NonNull<ffi::webrtc_LogLineRef>) -> Self {
+        pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_LogLineRef>) -> Self {
             Self {
                 raw,
                 _marker: PhantomData,
             }
         }
 
-        pub fn as_ptr(&self) -> *mut ffi::webrtc_LogLineRef {
+        pub fn as_ptr(&self) -> *const ffi::webrtc_LogLineRef {
             self.raw.as_ptr()
         }
 
@@ -363,10 +364,7 @@ pub mod log {
         if len == 0 {
             return "";
         }
-        assert!(
-            !ptr.is_null(),
-            "C 側から null の文字列ビューを受け取りました"
-        );
+        assert!(!ptr.is_null(), "received a null string view from C");
         let bytes = unsafe { std::slice::from_raw_parts(ptr.cast::<u8>(), len) };
         std::str::from_utf8(bytes).unwrap_or("")
     }
@@ -374,7 +372,7 @@ pub mod log {
     fn handler_state<'a>(user_data: *mut c_void) -> &'a mut LogSinkHandlerState {
         assert!(
             !user_data.is_null(),
-            "LogSink コールバックに null の user_data を渡しました"
+            "null user_data passed to the LogSink callback"
         );
         unsafe { &mut *(user_data as *mut LogSinkHandlerState) }
     }
@@ -388,7 +386,7 @@ pub mod log {
         user_data: *mut c_void,
     ) {
         let state = handler_state(user_data);
-        let line = expect_non_null(line as *mut ffi::webrtc_LogLineRef, "webrtc_LogLineRef");
+        let line = expect_non_null_const(line, "log_sink_on_log_line_ref (line)");
         state.handler.on_log_message(LogLineRef::from_raw(line));
     }
 }

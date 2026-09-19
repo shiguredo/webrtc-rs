@@ -1,3 +1,4 @@
+use crate::const_non_null::ConstNonNull;
 use crate::helper::non_null::expect_non_null;
 use crate::helper::out_param::{call_with_out, call_with_return_and_error};
 use crate::{CxxString, Error, Result, ffi};
@@ -15,7 +16,7 @@ pub struct SdpParseError {
 unsafe impl Send for SdpParseError {}
 
 impl SdpParseError {
-    pub fn from_unique_ptr(raw: NonNull<ffi::webrtc_SdpParseError_unique>) -> Self {
+    pub(crate) fn from_unique_ptr(raw: NonNull<ffi::webrtc_SdpParseError_unique>) -> Self {
         Self { raw_unique: raw }
     }
 
@@ -112,7 +113,9 @@ impl SessionDescription {
         Ok(Self { raw_unique })
     }
 
-    pub fn from_unique_ptr(raw: NonNull<ffi::webrtc_SessionDescriptionInterface_unique>) -> Self {
+    pub(crate) fn from_unique_ptr(
+        raw: NonNull<ffi::webrtc_SessionDescriptionInterface_unique>,
+    ) -> Self {
         Self { raw_unique: raw }
     }
 
@@ -134,7 +137,7 @@ impl SessionDescription {
         if ok == 0 {
             return Err(Error::InvalidSdp);
         }
-        CxxString::from_unique(NonNull::new(out).expect("BUG: ok != 0 なのに out が null"))
+        CxxString::from_unique(NonNull::new(out).expect("BUG: out is null although ok != 0"))
             .to_string()
     }
 
@@ -152,8 +155,9 @@ impl Drop for SessionDescription {
 }
 
 /// webrtc::IceCandidate の借用ラッパー。
+#[derive(Clone, Copy)]
 pub struct IceCandidateRef<'a> {
-    raw: NonNull<ffi::webrtc_IceCandidate>,
+    raw: ConstNonNull<ffi::webrtc_IceCandidate>,
     _marker: PhantomData<&'a ffi::webrtc_IceCandidate>,
 }
 
@@ -161,14 +165,14 @@ unsafe impl<'a> Send for IceCandidateRef<'a> {}
 
 impl<'a> IceCandidateRef<'a> {
     /// 生ポインタから借用ラップする。
-    pub fn from_raw(raw: NonNull<ffi::webrtc_IceCandidate>) -> Self {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_IceCandidate>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
         }
     }
 
-    pub fn as_ptr(&self) -> *mut ffi::webrtc_IceCandidate {
+    pub fn as_ptr(&self) -> *const ffi::webrtc_IceCandidate {
         self.raw.as_ptr()
     }
 
@@ -189,7 +193,7 @@ impl<'a> IceCandidateRef<'a> {
         if ok == 0 {
             return Err(Error::InvalidIceCandidate);
         }
-        CxxString::from_unique(NonNull::new(out).expect("BUG: ok != 0 なのに out が null"))
+        CxxString::from_unique(NonNull::new(out).expect("BUG: out is null although ok != 0"))
             .to_string()
     }
 }
@@ -222,7 +226,7 @@ impl IceCandidate {
     }
 
     pub fn as_ref(&self) -> IceCandidateRef<'_> {
-        IceCandidateRef::from_raw(self.raw)
+        IceCandidateRef::from_raw(ConstNonNull::from(self.raw))
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_IceCandidate {

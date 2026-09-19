@@ -29,6 +29,16 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 - マイナーバージョンは libwebrtc の m バージョンと一致 (例: 0.154.x は m154)
 - パッチバージョンは同一 m バージョン内での変更時にインクリメント
 
+## テスト
+
+`cargo test --workspace --features source-build` で C API の薄いラッパーまでを含めた単体テストを実行する。実際に映像・音声フレームが流れる統合テストは webrtc-rs 単体では扱わず、`sora-rust-sdk` 経由で行う。
+
+薄いラッパー (`XxxRef` / `XxxRefMut` のアクセサなど) は型ごとの網羅テストを書かない。FFI の関数名とシグネチャは bindgen 生成のバインディングでコンパイル時に検査され、setter と getter の往復テストの実体は libwebrtc 側の挙動の確認になるためである。代わりに次の 3 つで守る。
+
+- 借用ハンドル経由の書き換えが所有型に反映されることを、機構 (スカラー / map / vector / フレーム) ごとに 1 本ずつ確認する
+- 型システムの保証 (`XxxRefMut` が `Deref` を実装しない / `'_` に縛る / 可変ハンドルを 2 本作れない / 生ポインタや所有権を受け取るコンストラクタが crate 外から呼べない) は、クレートドキュメントの `compile_fail` doctest で固定する
+- この crate 固有のロジック (`Option` の `has` / `value` 変換、UTF-8 変換、境界チェック、既定値、判定関数) は網羅的にテストする
+
 ## ビルド設定 (`Cargo.toml` メタデータ)
 
 - `[package.metadata.external-dependencies.webrtc-build]` で libwebrtc バージョンと URL を管理
@@ -56,7 +66,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 | `rtp` | `RtpTransceiver`, `RtpSender`, `RtpReceiver`, `RtpTransceiverInit`, `RtpTransceiverDirection`, `RtpCapabilities`, `RtpCodec`, `RtpCodecRef`, `RtpCodecCapability`, `RtpCodecCapabilityRef`, `RtpCodecCapabilityVector`, `RtpCodecCapabilityVectorRef`, `RtpEncodingParameters`, `RtpEncodingParametersRef`, `RtpEncodingParametersVector`, `RtpParameters`, `Resolution`, `Priority`, `DegradationPreference`, `default_bitrate_priority` | RTP 層の送受信 |
 | `video_codec_common` | `VideoFrame`, `VideoFrameRef`, `VideoFrameBuilder`, `VideoFrameBuffer`, `VideoFrameBufferKind`, `VideoFrameBufferHandler`, `VideoFrameBufferHandlerAny`, `VideoFrameUpdateRect`, `VideoRotation`, `ColorSpace`, `I420Buffer`, `NV12Buffer`, `SdpVideoFormat`, `SdpVideoFormatRef`, `ScalabilityMode`, `VideoCodecRef`, `VideoCodecType`, `VideoCodecStatus`, `VideoFrameType`, `VideoFrameTypeVector`, `VideoFrameTypeVectorRef`, `EncodedImage`, `EncodedImageRef`, `EncodedImageBuffer`, `CodecSpecificInfo`, `CodecSpecificInfoRef`, `H264PacketizationMode` | フレーム・バッファ・コーデック共通 |
 | `video_encoder` | `VideoEncoder`, `VideoEncoderHandler`, `VideoEncoderFactory`, `VideoEncoderFactoryHandler`, `VideoEncoderEncoderInfo`, `VideoEncoderSettingsRef`, `VideoEncoderRateControlParametersRef`, `VideoEncoderQpThresholds`, `VideoEncoderScalingSettings`, `VideoEncoderResolution`, `VideoEncoderResolutionBitrateLimits`, `VideoEncoderEncodedImageCallback`, `VideoEncoderEncodedImageCallbackRef`, `VideoEncoderEncodedImageCallbackHandler`, `VideoEncoderEncodedImageCallbackResult`, `VideoEncoderEncodedImageCallbackResultError`, `VideoEncoderEncodedImageCallbackPtr` ほか参照型 | 映像エンコーダー (組み込み + カスタム) |
-| `video_decoder` | `VideoDecoder`, `VideoDecoderHandler`, `VideoDecoderFactory`, `VideoDecoderFactoryHandler`, `VideoDecoderDecoderInfo`, `VideoDecoderSettingsRef`, `VideoDecoderDecodedImageCallbackRef`, `VideoDecoderDecodedImageCallbackPtr` | 映像デコーダー (組み込み + カスタム) |
+| `video_decoder` | `VideoDecoder`, `VideoDecoderHandler`, `VideoDecoderFactory`, `VideoDecoderFactoryHandler`, `VideoDecoderDecoderInfo`, `VideoDecoderSettingsRef`, `VideoDecoderDecodedImageCallbackPtr` | 映像デコーダー (組み込み + カスタム) |
 | `dtls_transport` | `DtlsTransport`, `DtlsTransportState`, `DtlsTransportObserver`, `DtlsTransportObserverHandler` | DTLS トランスポートと証明書検証連携 |
 | `environment` | `Environment`, `EnvironmentRef` | WebRTC 環境 |
 | `rtc_error` | `RtcError` | libwebrtc の `RTCError` ラッパー |
@@ -71,9 +81,8 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 |------|---------|
 | バージョン | `version()` |
 | エラー | `Error`, `Result` |
-| C++ 標準型ラッパー (`cxxstd`) | `CxxString`, `CxxStringRef`, `MapStringString`, `MapStringStringIter`, `StringVector`, `StringVectorRef` |
+| C++ 標準型ラッパー (`cxxstd`) | `CxxString`, `CxxStringRef`, `CxxStringRefMut`, `MapStringStringIter`, `MapStringStringRef`, `MapStringStringRefMut`, `StringVector`, `StringVectorRef`, `StringVectorRefMut` |
 | libyuv | `LibyuvFourcc`, `LibyuvRotationMode`, `abgr_to_i420()`, `convert_from_i420()`, `convert_to_i420()`, `i420_copy()`, `i420_to_nv12()`, `mjpg_size()`, `mjpg_to_i420()`, `mjpg_to_nv12()`, `nv12_copy()`, `nv12_to_i420()`, `yuy2_to_i420()` |
-| 参照カウント | `RefCountedHandle`, `ScopedRef` |
 | rtc_base | `Thread`, `TimestampAligner`, `SSLCertChainRef`, `SSLCertificateRef`, `SSLCertificateVerifier`, `SSLCertificateVerifierHandler`, `SSLIdentity`, `log` (モジュール: `Severity`, `LoggingConfig`, `initialize_logging`, `print`), `random_bytes()`, `random_string()`, `rtc_log_format_file()`, `time_millis()` |
 | ログマクロ (`#[macro_export]`) | `rtc_log_verbose!`, `rtc_log_info!`, `rtc_log_warning!`, `rtc_log_error!` |
 | FFI | `ffi` (`bindgen` 生成の raw バインディング。通常は利用者が直接触らない) |
@@ -151,12 +160,49 @@ let (factory, context) =
 - `RtcError`: libwebrtc の `RTCError` ラッパー (コードと詳細メッセージを保持)
 - `Result<T>`: `std::result::Result<T, Error>` のエイリアス
 
+## 借用型と非 null ポインタ
+
+C API のオブジェクトは、所有型と 2 種類の借用型で扱う。
+
+- 読み取り専用借用 `XxxRef<'a>`: `Copy` で、非 null の `*const` を保持する。書き換えメソッドは持たない
+- 書き換え用借用 `XxxRefMut<'a>`: `Copy` ではなく、非 null の `*mut` と `XxxRef` の実体 (`cref`) を保持する
+- 所有型は `as_ref()` / `as_mut()` で借用型を返す
+- `XxxRefMut` は書き換えメソッドを持つ型にだけ作る。書き換えメソッドが無く、非 const ポインタを要求する C API に渡すこともない型には作らない (`as_mut()` で取得しても書き換える手段が無いため)
+- C++ 側が所有し、Rust 側のハンドラが状態として保持する必要があるポインタは、ライフタイムを持たない `XxxPtr` 型 (`AudioTransportPtr` / `VideoDecoderDecodedImageCallbackPtr`) で扱う。借用型 (`XxxRef` / `XxxRefMut`) は所有型の借用に縛られるため、ハンドラが保持できない
+
+`XxxRefMut` に `Deref` は実装しない。`Deref` の `Target` は `XxxRef<'a>` に固定され、`deref()` が返す参照の中身が `'a` を持つため、`Copy` でその値を借用の外へ持ち出せてしまう。持ち出したハンドルから得た借用 (例: `BufferRef::data()`) を保持したまま `XxxRefMut` の書き換えメソッドを呼ぶと、C++ 側の再確保で解放された領域を読む safe な use-after-free になる。
+
+- 読み取りアクセサは `XxxRef` に書き、`XxxRefMut` には同じシグネチャの転送メソッド (`self.cref.xxx()` の 1 行) を用意する
+- 借用や借用ハンドルを返す転送メソッドの戻り値は `'_` に短縮する。`XxxRef<'a>` を返すと借用の外へ持ち出せてしまう
+- `XxxRefMut::as_ref(&self) -> XxxRef<'_>` も同じ理由でライフタイムを `&self` に縛る
+
+`&mut self` を取る可変アクセサ (`XxxRefMut::parameters_mut` / `cast_to_codec_mut` / `codec_mut` など) の戻り値も `'_` に縛る。`'a` を返すと借用が呼び出しで切れてしまい、同じオブジェクトへの可変ハンドルを 2 本作れてしまう。可変ハンドルは `unsafe impl Send` なので、別スレッドから同時に書き換えると C++ 側のコンテナ (std::map など) が壊れるか二重解放になる。
+
+- 所有型の `as_mut().xxx_mut()` のような委譲は、戻り値が一時値の借用になってコンパイルできない。所有型側は自身のポインタから直接ハンドルを組み立てる
+
+非 null ポインタは `NonNull` と `ConstNonNull` で表す。`ConstNonNull` は std の `NonNull` が `*mut T` 用の API しか持たないため crate 側で用意している非 null の `*const T` で、借用ハンドルの内部表現にしか使わないためクレート内部の型 (`pub(crate)`) として扱う。
+
+- C API が返すポインタは `expect_non_null` / `expect_non_null_const` で null 検査してから保持する
+- 借用型の `from_raw` / `from_ptr` と、所有権を受け取る `from_unique_ptr` は借用先の寿命や所有権を型で保証できないため `pub(crate)` にしてある。クレート外からは `as_ref()` / `as_mut()` と通常の API を使う
+- `pub(crate)` にしたコンストラクタは safe なままでよい。`# Safety` は書かず、crate 内部専用であることと、同じポインタを 2 回渡すと二重解放になるなどの不変条件を書く
+- C API の読み取り専用の借用を返す getter は `XxxRef` が、可変参照を返す getter は `XxxRefMut` が使う (`cast_mut()` は使わない)
+- `_get_const` / `_vector_get_const` / `_inlined_vector_get_const` がある場合、読み取り経路 (所有型の `&self` からコピーや借用を作る場合を含む) は必ず `_const` 版を使う。可変版は書き換える場合だけ使う
+
+### 例外: 共有可変ハンドル (`NetworkManagerRef` / `PacketSocketFactoryRef`)
+
+この 2 型だけは `ConstNonNull` ではなく非 null の `*mut` を保持し、`XxxRefMut` を持たず `XxxRef` だけで扱う。他の借用型と制約の向きが逆だからである。
+
+- 保持するポインタ: C++ 側の `ConnectionContext::default_network_manager` / `default_socket_factory` は const メソッドだが非 const ポインタを返す。`BasicPortAllocator` はそれを `NetworkManager* network_manager_` / `PacketSocketFactory* const socket_factory_` として保持し、後から network thread で非 const メソッド (`StartUpdating` / `GetAnyAddressNetworks` など) を呼んで書き換える。借用先は読み取り専用ではないため、`*const` にすると C++ の実態と合わない
+- 排他を主張しない: そのポインタは `set_proxy` を通して複数の `BasicPortAllocator` で共有される。唯一所有には決してならないので `&mut ConnectionContext` を要求できず、`XxxRefMut` は作れない。`XxxRefMut` のライフタイムを `&mut ConnectionContext` に縛るという排他の表現が使えないためである
+- `&self` で取得できる: `XxxRef` が保持するのはポインタ値であり参照ではない。`&NetworkManagerRef` を複数持っても NetworkManager への参照が複数あることにはならず、aliasing 規則に抵触しない。したがって getter を `&self` にできる
+- ライフタイムは残す: `PhantomData<&'a ConnectionContext>` は「借用先が生存している間だけ有効」を表すために維持する。`AudioTransportPtr` がライフタイムを落としているのとは逆に、こちらはライフタイムを型で表せるが排他を表せないことが理由である
+- Rust 側から操作しない: `as_mut_ptr()` は `pub(crate)` にし、C API に渡すときだけ使う。`NetworkManager` の参照を Rust 側で作らないため、C++ が後から書き換えても aliasing 違反にならない
+
 ## 参照カウント管理
 
 libwebrtc の `scoped_refptr` 相当を Rust 側で安全に扱うための型:
 
-- `RefCountedHandle`: refcounted オブジェクトへのハンドル trait
-- `ScopedRef<H>`: `H: RefCountedHandle` に対するスコープ付き参照
+- refcounted ハンドル (`RefCountedHandle` / `ScopedRef` / `ScopedRefConst`) はクレート内部の機構で、`pub(crate)` として扱う
 - 生ポインタを保持する型 (`PeerConnection`, `DataChannel`, `RtpTransceiver` 等) は `Send` / 適切な場合 `Sync` が実装されている
 
 ## libyuv

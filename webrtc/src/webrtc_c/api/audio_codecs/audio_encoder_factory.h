@@ -73,7 +73,7 @@ webrtc_AudioEncoderFactory_Create(
     struct webrtc_AudioEncoderFactory* self,
     const struct webrtc_Environment* env,
     const struct webrtc_SdpAudioFormat* format,
-    struct webrtc_AudioEncoderFactory_Options* options);
+    const struct webrtc_AudioEncoderFactory_Options* options);
 
 WEBRTC_EXPORT struct webrtc_AudioEncoderFactory_refcounted*
 webrtc_CreateBuiltinAudioEncoderFactory();

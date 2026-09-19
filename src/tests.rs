@@ -1,4 +1,5 @@
 use super::*;
+use crate::const_non_null::ConstNonNull;
 use std::cell::Cell;
 use std::ptr::NonNull;
 use std::sync::{
@@ -18,10 +19,132 @@ impl SetLocalDescriptionObserverHandler for NoopHandler {}
 impl SetRemoteDescriptionObserverHandler for NoopHandler {}
 impl VideoEncoderHandler for NoopHandler {}
 impl VideoDecoderHandler for NoopHandler {}
+impl AudioTransportHandler for NoopHandler {}
 
 #[test]
 fn create_and_drop_environment() {
     let _env = Environment::new();
+}
+
+#[test]
+fn audio_transport_ref_and_ptr_are_available() {
+    // 借用ハンドルと、C++ 側が所有する transport を保持するための AudioTransportPtr が
+    // 取得できることを確認する。借用ハンドルが所有型の借用に縛られること (所有者を drop した
+    // あとに使えないこと) は型で保証されるため、ここでは検証しない。
+    let mut transport = AudioTransport::new_with_handler(Box::new(NoopHandler));
+    {
+        let r = transport.as_ref();
+        assert!(!r.as_ptr().is_null());
+    }
+    {
+        let m = transport.as_mut();
+        assert!(!m.as_mut_ptr().is_null());
+        assert!(!m.as_ref().as_ptr().is_null());
+    }
+    // C++ 側の ADM が所有する transport はライフタイムを持たない Ptr で扱う。
+    let m = transport.as_mut();
+    let ptr = AudioTransportPtr::from_raw(
+        NonNull::new(m.as_mut_ptr()).expect("BUG: AudioTransport が null です"),
+    );
+    assert!(!ptr.as_mut_ptr().is_null());
+}
+
+#[test]
+fn const_non_null_null_is_none() {
+    assert!(ConstNonNull::<u8>::new(std::ptr::null()).is_none());
+}
+
+#[test]
+fn const_non_null_keeps_pointer() {
+    let value = 42u8;
+    let ptr = ConstNonNull::new(&value as *const u8).expect("BUG: 非 null のはずです");
+    assert_eq!(unsafe { *ptr.as_ptr() }, 42);
+
+    // NonNull からの変換でも同じポインタを指す。
+    let mut value2 = 7u8;
+    let non_null = NonNull::new(&mut value2 as *mut u8).expect("BUG: 非 null のはずです");
+    let const_non_null = ConstNonNull::from(non_null);
+    assert_eq!(const_non_null.as_ptr(), non_null.as_ptr() as *const u8);
+    assert_eq!(unsafe { *const_non_null.as_ptr() }, 7);
+
+    // Safety: value3 はこのスコープの間ずっと有効です。
+    let value3 = 1u8;
+    let unchecked = unsafe { ConstNonNull::new_unchecked(&value3 as *const u8) };
+    assert_eq!(unsafe { *unchecked.as_ptr() }, 1);
+}
+
+#[test]
+fn ref_mut_scalar_write_is_visible_from_owner() {
+    // XxxRefMut の書き換えが所有型に反映されることを確認する。
+    let mut parameters = RtpEncodingParameters::new();
+    parameters.as_mut().set_rid("r0");
+    assert_eq!(
+        parameters.as_ref().rid().expect("rid の取得に失敗しました"),
+        "r0"
+    );
+    parameters.as_mut().set_max_bitrate_bps(Some(1_000_000));
+    assert_eq!(parameters.max_bitrate_bps(), Some(1_000_000));
+}
+
+#[test]
+fn ref_mut_map_write_is_visible_from_owner() {
+    // map を返す可変アクセサでも、書き換えが所有型に反映されることを確認する。
+    let mut format = SdpVideoFormat::new("VP8");
+    format.as_mut().parameters_mut().set("profile-id", "0");
+    let parameters = format.as_ref().parameters();
+    assert_eq!(parameters.len(), 1);
+    assert!(
+        parameters
+            .iter()
+            .any(|(k, v)| k == "profile-id" && v == "0")
+    );
+}
+
+#[test]
+fn ref_mut_vector_write_is_visible_from_owner() {
+    // vector を返す可変アクセサでも、書き換えが所有型に反映されることを確認する。
+    let mut vector = RtpCodecCapabilityVector::new(0);
+    let capability = RtpCodecCapability::new();
+    vector.as_mut().push(&capability.as_ref());
+    assert_eq!(vector.len(), 1);
+}
+
+#[test]
+fn ref_mut_forwarded_read_matches_ref() {
+    // XxxRefMut の転送アクセサが as_ref() で得た XxxRef と同じ値を返すことを確認する。
+    let mut capability = RtpCodecCapability::new();
+    capability.set_name("opus");
+    capability.set_clock_rate(Some(48_000));
+    let m = capability.as_mut();
+    let r = m.as_ref();
+    assert_eq!(
+        m.name().expect("name の取得に失敗しました"),
+        r.name().expect("name の取得に失敗しました")
+    );
+    assert_eq!(m.clock_rate(), r.clock_rate());
+    assert!(!r.as_ptr().is_null());
+    assert!(!m.as_mut_ptr().is_null());
+}
+
+#[test]
+fn buffer_data_mut_round_trip() {
+    // append_data で用意した内容を data_mut 経由で書き換え、data で読み戻せることを確認する。
+    let mut buffer = Buffer::new();
+    buffer.append_data(&[1, 2, 3, 4]);
+    {
+        let mut r = buffer.as_mut();
+        assert_eq!(r.data(), &[1, 2, 3, 4]);
+        let data = r.data_mut();
+        data[0] = 9;
+        data[3] = 8;
+        assert_eq!(r.data(), &[9, 2, 3, 8]);
+    }
+    assert_eq!(buffer.data(), &[9, 2, 3, 8]);
+
+    // 空のバッファでは空スライスを返す。
+    let mut empty = Buffer::new();
+    assert!(empty.as_mut().data_mut().is_empty());
+    assert!(empty.data().is_empty());
 }
 
 #[test]
@@ -39,7 +162,9 @@ fn cxx_string_round_trip() {
         "hello world"
     );
 
-    let r = CxxStringRef::from_ptr(NonNull::new(s.as_ptr()).unwrap());
+    let r = CxxStringRef::from_ptr(
+        ConstNonNull::new(s.as_ptr()).expect("ConstNonNull の生成に失敗しました"),
+    );
     assert_eq!(r.len(), 11);
     assert_eq!(
         r.to_string().expect("CxxStringRef の変換に失敗しました"),
@@ -165,7 +290,7 @@ fn session_description_to_string() {
 
 #[test]
 fn sdp_video_format_with_parameters() {
-    let mut fmt = SdpVideoFormat::new_with_parameters(
+    let fmt = SdpVideoFormat::new_with_parameters(
         "VP8",
         &std::collections::HashMap::from([
             (String::from("profile-id"), String::from("0")),
@@ -173,7 +298,7 @@ fn sdp_video_format_with_parameters() {
         ]),
         &[ScalabilityMode::L1T1, ScalabilityMode::L1T2],
     );
-    let params = fmt.parameters_mut();
+    let params = fmt.as_ref().parameters();
     assert_eq!(params.len(), 2);
 
     let mut found = std::collections::HashMap::new();
@@ -205,7 +330,7 @@ fn sdp_video_format_with_parameters() {
         params.set("packetization-mode", "1");
     }
     let mut has_packetization_mode = false;
-    for (k, _) in fmt.parameters_mut().iter() {
+    for (k, _) in fmt.as_ref().parameters().iter() {
         if k == "packetization-mode" {
             has_packetization_mode = true;
             break;
@@ -253,10 +378,11 @@ fn fuzzy_match_sdp_video_format_prefers_more_parameter_matches() {
         &[],
     );
 
-    let mut matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
+    let matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
         .expect("fuzzy_match_sdp_video_format が一致するフォーマットを見つけられませんでした");
     let params = matched
-        .parameters_mut()
+        .as_ref()
+        .parameters()
         .iter()
         .collect::<std::collections::HashMap<String, String>>();
 
@@ -288,10 +414,11 @@ fn fuzzy_match_sdp_video_format_keeps_first_candidate_on_tie() {
     ];
     let requested = SdpVideoFormat::new("H264");
 
-    let mut matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
+    let matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
         .expect("fuzzy_match_sdp_video_format が一致するフォーマットを見つけられませんでした");
     let params = matched
-        .parameters_mut()
+        .as_ref()
+        .parameters()
         .iter()
         .collect::<std::collections::HashMap<String, String>>();
 
@@ -431,7 +558,7 @@ fn video_codec_ref_getter_setter_and_simulcast_stream_ref_roundtrip() {
 
     {
         let mut stream0 = codec
-            .simulcast_stream(0)
+            .simulcast_stream_mut(0)
             .expect("simulcast stream 0 の取得に失敗");
         stream0.set_width(640);
         stream0.set_height(360);
@@ -446,7 +573,7 @@ fn video_codec_ref_getter_setter_and_simulcast_stream_ref_roundtrip() {
     }
     {
         let mut stream1 = codec
-            .simulcast_stream(1)
+            .simulcast_stream_mut(1)
             .expect("simulcast stream 1 の取得に失敗");
         stream1.set_width(320);
         stream1.set_height(180);
@@ -742,7 +869,7 @@ fn nv12_buffer_planes_kind_and_to_i420() {
     for (i, v) in buf.y_data_mut().iter_mut().enumerate() {
         *v = (i as u8).wrapping_add(0x10);
     }
-    for uv in buf.uv_data_mut().chunks_exact_mut(2) {
+    for uv in buf.uv_data_mut().as_chunks_mut::<2>().0 {
         uv[0] = 0x44;
         uv[1] = 0x88;
     }
@@ -824,7 +951,7 @@ fn nv12_buffer_data_and_data_mut_use_contiguous_memory_with_padding() {
 fn nv12_buffer_crop_and_scale_from() {
     let mut src = NV12Buffer::new(4, 4);
     src.y_data_mut().fill(0x11);
-    for uv in src.uv_data_mut().chunks_exact_mut(2) {
+    for uv in src.uv_data_mut().as_chunks_mut::<2>().0 {
         uv[0] = 0x22;
         uv[1] = 0x66;
     }
@@ -833,7 +960,7 @@ fn nv12_buffer_crop_and_scale_from() {
     dst.crop_and_scale_from(&src, 0, 0, 4, 4);
 
     assert!(dst.y_data().iter().all(|&v| v == 0x11));
-    for uv in dst.uv_data().chunks_exact(2) {
+    for uv in dst.uv_data().as_chunks::<2>().0 {
         assert_eq!(uv[0], 0x22);
         assert_eq!(uv[1], 0x66);
     }
@@ -1776,7 +1903,7 @@ fn peer_connection_factory_and_capabilities() {
     assert!(!network_manager.as_ptr().is_null());
     assert!(!socket_factory.as_ptr().is_null());
 
-    let caps = factory.get_rtp_sender_capabilities(MediaType::Audio);
+    let mut caps = factory.get_rtp_sender_capabilities(MediaType::Audio);
     assert!(caps.codec_len() >= 0);
     let codecs = caps.codecs();
     assert_eq!(codecs.len() as i32, caps.codec_len());
@@ -1784,6 +1911,16 @@ fn peer_connection_factory_and_capabilities() {
         let first = codecs.get(0).expect("先頭 codec の取得に失敗しました");
         assert!(first.name().is_ok());
     }
+
+    // codecs_mut() から取得した可変ハンドルで書き換えられることを確認する。
+    let codecs_len_before = caps.codecs().len();
+    {
+        let mut codecs = caps.codecs_mut();
+        codecs.resize(codecs_len_before + 1);
+        assert_eq!(codecs.len(), codecs_len_before + 1);
+    }
+    // 書き換えが所有型に反映されていることを確認する。
+    assert_eq!(caps.codecs().len(), codecs_len_before + 1);
 
     drop(caps);
     drop(context);
@@ -1806,12 +1943,14 @@ fn rtc_configuration_and_ice_server() {
     server.add_url("turn:192.0.2.2:3478?transport=udp");
     assert_eq!(server.urls_len(), 2);
 
+    let servers_len_before = config.servers().len();
     {
-        let mut servers = config.servers();
-        let len_before = servers.len();
+        let mut servers = config.servers_mut();
         servers.push(&server);
-        assert_eq!(servers.len(), len_before + 1);
+        assert_eq!(servers.len(), servers_len_before + 1);
     }
+    // 書き換えが所有型に反映されていることを確認する。
+    assert_eq!(config.servers().len(), servers_len_before + 1);
 
     // 所有ベクタでも同じ挙動になることを確認しておく。
     let mut owned = IceServerVector::new(0);
@@ -1905,7 +2044,7 @@ fn rtp_codec_capability_vector() {
     cap.set_name("opus");
     cap.set_clock_rate(Some(48_000));
     {
-        let mut params = cap.parameters();
+        let mut params = cap.parameters_mut();
         params.set("stereo", "1");
         assert!(params.iter().any(|(k, v)| k == "stereo" && v == "1"));
     }
@@ -1930,6 +2069,32 @@ fn rtp_codec_capability_vector() {
     assert_eq!(
         second.name().expect("2 番目 codec 名の取得に失敗しました"),
         "PCMU"
+    );
+
+    // 借用ハンドル経由の読み取りアクセサを検証する。
+    let codec_ref = cap.cast_to_codec();
+    assert_eq!(
+        codec_ref
+            .name()
+            .expect("cast_to_codec 経由の codec 名の取得に失敗しました"),
+        "opus"
+    );
+    let codec_parameters = codec_ref.parameters();
+    assert!(
+        codec_parameters
+            .iter()
+            .any(|(k, v)| k == "stereo" && v == "1")
+    );
+
+    // 所有型の codec でも同じパラメータを読めることを検証する。
+    let mut owned_codec = RtpCodec::new();
+    owned_codec.parameters_mut().set("stereo", "1");
+    let owned_parameters = owned_codec.parameters();
+    assert_eq!(owned_parameters.len(), 1);
+    assert!(
+        owned_parameters
+            .iter()
+            .any(|(k, v)| k == "stereo" && v == "1")
     );
 }
 
@@ -2002,6 +2167,31 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     );
     assert_eq!(enc_codec.clock_rate(), Some(48_000));
     assert_eq!(enc_codec.num_channels(), Some(2));
+
+    // codec_mut() で encoding parameters が保持する codec を直接書き換えられることを検証する。
+    {
+        let mut enc_mut = enc.as_mut();
+        let mut enc_codec_mut = enc_mut.codec_mut().expect("codec_mut の取得に失敗しました");
+        enc_codec_mut.set_num_channels(Some(1));
+        enc_codec_mut.parameters_mut().set("profile-id", "0");
+        // 可変ハンドルは読み取りアクセサも転送メソッドとして持つ。
+        assert_eq!(enc_codec_mut.parameters().len(), 1);
+        assert!(
+            enc_codec_mut
+                .as_ref()
+                .parameters()
+                .iter()
+                .any(|(k, v)| k == "profile-id" && v == "0")
+        );
+    }
+    assert_eq!(
+        enc.codec()
+            .expect("codec の取得に失敗しました")
+            .num_channels(),
+        Some(1)
+    );
+    // 書き換えたのは enc が保持するコピーだけなので、元の codec は変わらない。
+    assert_eq!(codec.num_channels(), Some(2));
     // clock_rate / num_channels を None に戻せば getter が None に戻ることを検証する
     codec.set_clock_rate(None);
     codec.set_num_channels(None);
@@ -2030,9 +2220,8 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     let mut init = RtpTransceiverInit::new();
     init.set_direction(RtpTransceiverDirection::SendOnly);
     init.set_send_encodings(&vec);
-    let mut stream_ids = init.stream_ids();
-    stream_ids.push(&CxxString::from_str("stream-1"));
-    assert_eq!(stream_ids.len(), 1);
+    init.stream_ids_mut().push(&CxxString::from_str("stream-1"));
+    assert_eq!(init.stream_ids().len(), 1);
 
     let mut offer = PeerConnectionOfferAnswerOptions::new();
     offer.set_offer_to_receive_audio(1);
@@ -2904,18 +3093,18 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
             info.set_has_trusted_rate_controller(true);
             info.set_is_hardware_accelerated(true);
 
-            if let Some(mut fps0) = info.fps_allocation(0) {
+            if let Some(mut fps0) = info.fps_allocation_mut(0) {
                 fps0.clear();
                 fps0.push(128);
                 fps0.push(255);
             } else {
-                panic!("fps_allocation(0) が取得できません");
+                panic!("fps_allocation_mut(0) が取得できません");
             }
-            if let Some(mut fps1) = info.fps_allocation(1) {
+            if let Some(mut fps1) = info.fps_allocation_mut(1) {
                 fps1.clear();
                 fps1.push(64);
             } else {
-                panic!("fps_allocation(1) が取得できません");
+                panic!("fps_allocation_mut(1) が取得できません");
             }
 
             let limits0 =
@@ -2923,7 +3112,7 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
             let limits1 =
                 VideoEncoderResolutionBitrateLimits::new(1280 * 720, 300000, 200000, 1500000);
             {
-                let mut limits = info.resolution_bitrate_limits();
+                let mut limits = info.resolution_bitrate_limits_mut();
                 limits.clear();
                 limits.push(&limits0);
                 limits.push(&limits1);
@@ -2931,7 +3120,7 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
 
             info.set_supports_simulcast(true);
             {
-                let mut preferred = info.preferred_pixel_formats();
+                let mut preferred = info.preferred_pixel_formats_mut();
                 preferred.clear();
                 preferred.push(VideoFrameBufferKind::I420);
                 preferred.push(VideoFrameBufferKind::Nv12);
@@ -2967,8 +3156,8 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
     assert_eq!(scaling.min_pixels_per_frame(), 12345);
 
     let mut fps0 = info
-        .fps_allocation(0)
-        .expect("fps_allocation(0) が None です");
+        .fps_allocation_mut(0)
+        .expect("fps_allocation_mut(0) が None です");
     assert_eq!(fps0.len(), 2);
     assert_eq!(fps0.get(0), Some(128));
     assert_eq!(fps0.get(1), Some(255));
@@ -2982,7 +3171,7 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
     assert_eq!(fps1.get(0), Some(64));
 
     {
-        let mut limits = info.resolution_bitrate_limits();
+        let mut limits = info.resolution_bitrate_limits_mut();
         assert_eq!(limits.len(), 2);
         let limits0 = limits
             .get(0)
@@ -3007,7 +3196,7 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
         assert_eq!(limits1.max_bitrate_bps(), 2500000);
     }
 
-    let mut preferred = info.preferred_pixel_formats();
+    let mut preferred = info.preferred_pixel_formats_mut();
     assert_eq!(preferred.len(), 2);
     assert_eq!(preferred.get(0), Some(VideoFrameBufferKind::I420));
     assert_eq!(preferred.get(1), Some(VideoFrameBufferKind::Nv12));
@@ -3073,7 +3262,7 @@ fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
     }
 
     let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler));
-    let mut formats = factory.get_supported_formats();
+    let formats = factory.get_supported_formats();
     assert_eq!(formats.len(), 2);
     assert_eq!(
         formats[0].name().expect("name の取得に失敗しました"),
@@ -3082,9 +3271,10 @@ fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
     assert_eq!(formats[1].name().expect("name の取得に失敗しました"), "VP8");
 
     let params: std::collections::HashMap<String, String> = formats
-        .get_mut(0)
+        .first()
         .expect("先頭フォーマットが存在しません")
-        .parameters_mut()
+        .as_ref()
+        .parameters()
         .iter()
         .collect();
     assert_eq!(
@@ -3285,16 +3475,17 @@ fn video_decoder_factory_get_supported_formats_returns_owned_formats() {
     }
 
     let factory = VideoDecoderFactory::new_with_handler(Box::new(TestVideoDecoderFactoryHandler));
-    let mut formats = factory.get_supported_formats();
+    let formats = factory.get_supported_formats();
     assert_eq!(formats.len(), 1);
     assert_eq!(
         formats[0].name().expect("name の取得に失敗しました"),
         "H264"
     );
     let params: std::collections::HashMap<String, String> = formats
-        .get_mut(0)
+        .first()
         .expect("先頭フォーマットが存在しません")
-        .parameters_mut()
+        .as_ref()
+        .parameters()
         .iter()
         .collect();
     assert_eq!(
@@ -3410,14 +3601,14 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     impl VideoEncoderHandler for TestVideoEncoderHandler {
         fn register_encode_complete_callback(
             &mut self,
-            callback: Option<VideoEncoderEncodedImageCallbackRef<'_>>,
+            callback: Option<VideoEncoderEncodedImageCallbackRefMut<'_>>,
         ) -> VideoCodecStatus {
             let callback = callback.expect("register 側 callback が None です");
             let state = unsafe { self.state_ptr.get_mut() };
             state.register_called = true;
             state.order.push("register");
             state.callback_ptr =
-                Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_ref(callback) });
+                Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_mut(&callback) });
             VideoCodecStatus::Ok
         }
 
@@ -3513,12 +3704,12 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     let state_ptr = StatePtr((&mut *state) as *mut State);
     let mut encoder =
         VideoEncoder::new_with_handler(Box::new(TestVideoEncoderHandler { state_ptr }));
-    let encoded_image_callback = VideoEncoderEncodedImageCallback::new_with_handler(Box::new(
+    let mut encoded_image_callback = VideoEncoderEncodedImageCallback::new_with_handler(Box::new(
         TestEncodedImageCallbackHandler { state_ptr },
     ));
 
     assert_eq!(
-        encoder.register_encode_complete_callback(Some(encoded_image_callback.as_ref())),
+        encoder.register_encode_complete_callback(Some(encoded_image_callback.as_mut())),
         VideoCodecStatus::Ok
     );
 
@@ -3665,10 +3856,8 @@ fn video_decoder_handler_register_decode_complete_callback_accepts_none_and_some
         handler.register_decode_complete_callback(None),
         VideoCodecStatus::Ok
     );
-    let dummy_callback = unsafe {
-        // このテストでは callback を呼び出さず Option::Some 経路だけを確認する。
-        VideoDecoderDecodedImageCallbackPtr::from_raw(NonNull::dangling())
-    };
+    // このテストでは callback を呼び出さず Option::Some 経路だけを確認する。
+    let dummy_callback = VideoDecoderDecodedImageCallbackPtr::from_raw(NonNull::dangling());
     assert_eq!(
         handler.register_decode_complete_callback(Some(dummy_callback)),
         VideoCodecStatus::Ok
@@ -4471,7 +4660,7 @@ impl AudioEncoderHandler for TestAudioEncoderHandler {
         &mut self,
         _rtp_timestamp: u32,
         _audio: &[i16],
-        encoded: &mut BufferRef<'_>,
+        encoded: &mut BufferRefMut<'_>,
     ) -> AudioEncoderEncodedInfo {
         self.encoded = true;
         encoded.append_data(&[0x01, 0x02, 0x03]);
@@ -4508,6 +4697,8 @@ impl AudioEncoderFactoryHandler for TestAudioEncoderFactoryHandler {
     ) -> Option<AudioEncoder> {
         assert!(!env.as_ptr().is_null());
         assert_eq!(format.name().expect("名前の取得に失敗しました"), "opus");
+        // パラメータを設定していないので空になる。
+        assert!(format.parameters().is_empty());
         if self.created {
             return None;
         }
@@ -4583,7 +4774,7 @@ impl AudioEncoderHandler for TestAudioEncoderNoOutputHandler {
         &mut self,
         _rtp_timestamp: u32,
         _audio: &[i16],
-        _encoded: &mut BufferRef<'_>,
+        _encoded: &mut BufferRefMut<'_>,
     ) -> AudioEncoderEncodedInfo {
         AudioEncoderEncodedInfo::new()
     }
@@ -4608,7 +4799,8 @@ impl AudioDecoderHandler for TestAudioDecoderHandler {
         _sample_rate_hz: i32,
         decoded: &mut RawBufferWriter<'_, i16>,
     ) -> (i32, AudioSpeechType) {
-        decoded.write(&[0x1111i16; 160]);
+        // Safety: 呼び出し元が 320 サンプルを確保しており、ここでは 160 サンプルだけを書きます。
+        unsafe { decoded.write(&[0x1111i16; 160]) };
         (160, AudioSpeechType::Speech)
     }
     fn reset(&mut self) {}
@@ -4635,6 +4827,8 @@ impl AudioDecoderFactoryHandler for TestAudioDecoderFactoryHandler {
     ) -> Option<AudioDecoder> {
         assert!(!env.as_ptr().is_null());
         assert_eq!(format.name().expect("名前の取得に失敗しました"), "opus");
+        // パラメータを設定していないので空になる。
+        assert!(format.parameters().is_empty());
         if self.created {
             return None;
         }
@@ -4692,7 +4886,8 @@ impl AudioDecoderHandler for TestComfortNoiseDecoderHandler {
         _sample_rate_hz: i32,
         decoded: &mut RawBufferWriter<'_, i16>,
     ) -> (i32, AudioSpeechType) {
-        decoded.write(&[0x2222i16; 80]);
+        // Safety: 呼び出し元が 160 サンプルを確保しており、ここでは 80 サンプルだけを書きます。
+        unsafe { decoded.write(&[0x2222i16; 80]) };
         (80, AudioSpeechType::ComfortNoise)
     }
     fn reset(&mut self) {}

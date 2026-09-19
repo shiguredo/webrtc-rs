@@ -88,10 +88,11 @@ WEBRTC_EXPORT int webrtc_I420Buffer_StrideV(
   auto buf = reinterpret_cast<const webrtc::I420Buffer*>(self);
   return buf->StrideV();
 }
-WEBRTC_EXPORT void webrtc_I420Buffer_ScaleFrom(struct webrtc_I420Buffer* self,
-                                               struct webrtc_I420Buffer* src) {
+WEBRTC_EXPORT void webrtc_I420Buffer_ScaleFrom(
+    struct webrtc_I420Buffer* self,
+    const struct webrtc_I420Buffer* src) {
   auto dst_buf = reinterpret_cast<webrtc::I420Buffer*>(self);
-  auto src_buf = reinterpret_cast<webrtc::I420Buffer*>(src);
+  auto src_buf = reinterpret_cast<const webrtc::I420Buffer*>(src);
   dst_buf->ScaleFrom(*src_buf);
 }
 }

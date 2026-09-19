@@ -43,7 +43,7 @@ WEBRTC_EXPORT int webrtc_VideoFrameBuffer_width(
 WEBRTC_EXPORT int webrtc_VideoFrameBuffer_height(
     const struct webrtc_VideoFrameBuffer* self);
 WEBRTC_EXPORT void* webrtc_VideoFrameBuffer_get_user_data(
-    struct webrtc_VideoFrameBuffer* self);
+    const struct webrtc_VideoFrameBuffer* self);
 WEBRTC_EXPORT struct webrtc_I420Buffer_refcounted*
 webrtc_VideoFrameBuffer_cast_to_webrtc_I420Buffer(
     struct webrtc_VideoFrameBuffer* self);

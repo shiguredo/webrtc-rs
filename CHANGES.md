@@ -11,6 +11,46 @@
 
 ## develop
 
+- [CHANGE] `RawBufferWriter::write` を `unsafe fn` にする
+  - 書き込み先の容量を超えないことの保証を、呼び出し側の責任として `unsafe` で明示する
+  - `AudioDecoderHandler` のシグネチャは変わらない
+  - @melpon
+- [CHANGE] 借用型 `XxxRef` を読み取り専用にし、書き換え用の `XxxRefMut` を追加する
+  - `XxxRef` から可変アクセサを外して `Copy` にし、`XxxRefMut` に移す
+  - `XxxRef` は `ConstNonNull`、`XxxRefMut` は `NonNull` を保持し、`const` を外すキャストを全廃する
+  - 読み取り専用の借用を返す C API の getter に `_const` 版を追加し、`MapStringString` を `MapStringStringRef` / `MapStringStringRefMut` に分ける
+  - 所有型に `as_mut` を追加し、`RtpCapabilities::codecs` / `PeerConnectionRtcConfiguration::servers` などを `&self` の読み取りと `&mut self` の書き換えに分ける
+  - `XxxRef::from_raw` / `CxxStringRef::from_ptr` は `pub(crate)` になり、`NonNull` ではなく `ConstNonNull` を受け取るようになる
+    - 借用先の寿命を型で保証できないため、外部に公開しない
+  - `XxxRefMut` は `Deref` を実装せず、読み取りアクセサは転送メソッドと `as_ref()` で提供する
+    - `Deref` だと `'a` を持つ `XxxRef` を借用の外へ持ち出せてしまい、書き換えで safe な use-after-free を作れてしまうため
+  - `&mut self` を取る可変アクセサ (`parameters_mut` / `cast_to_codec_mut` / `codec_mut` / `simulcast_stream_mut`) の戻り値を `'_` に縛る
+    - `'a` を返すと借用が呼び出しで切れて、同一オブジェクトへの可変ハンドルを 2 本作れてしまうため
+  - `XxxRef::as_ptr` の戻り値を `*const` にし、書き換え用の `XxxRefMut::as_mut_ptr` を追加する (`as_ptr` を持つ `RtpCodecRef` / `SSLCertificateRef` / `CxxStringRef` など 11 型)
+  - 未使用だった `VideoDecoderDecodedImageCallbackRef` を削除し、デコード完了 callback は `VideoDecoderDecodedImageCallbackPtr` に集約する
+  - @melpon
+- [CHANGE] 借用先を書き換える API の引数を `XxxRefMut` に変える
+  - `AudioEncoderHandler::encode` は `&mut BufferRefMut<'_>`、`AudioDecoderHandler::generate_plc` は `&mut BufferS16RefMut<'_>` を受け取る
+  - `VideoDecoderDecodedImageCallbackPtr::decoded` は `VideoFrameRefMut<'_>` を受け取り、`VideoEncoderEncodedImageCallback::on_encoded_image` は `&mut self` になる
+  - `VideoEncoder::register_encode_complete_callback` は `VideoEncoderEncodedImageCallbackRefMut` を受け取る
+  - `AudioTransport` の `recorded_data_is_available` / `need_more_play_data` / `pull_render_data` は `&mut self` になる
+  - `VideoEncoderEncodedImageCallbackPtr::from_ref` を削除し、代わりに書き換え用の `from_mut` を追加する
+  - @melpon
+- [CHANGE] 所有権や生ポインタを受け取るコンストラクタを `pub(crate)` にする
+  - `CxxString::from_unique` と `RtcError` / `SdpParseError` / `SessionDescription` の `from_unique_ptr` を外部公開 API から外し、C API の内部機構として限定する
+  - `RtpCapabilities::from_raw` / `RtpParameters::from_raw` / `RtpEncodingParametersVector::clone_from_raw` / `VideoDecoderDecodedImageCallbackPtr::from_raw` / `VideoEncoderEncodedImageCallbackPtr::from_raw` も同様に `pub(crate)` にする
+  - 所有権や生ポインタをそのまま受け取る関数を外部に公開すると、二重解放や use-after-free を safe Rust で起こせてしまう
+  - @melpon
+- [CHANGE] webrtc_c の `webrtc_Buffer_data` / `webrtc_BufferS16_data` を `_const` にリネームし、可変版を追加する
+  - `rtc::Buffer::data()` は可変参照を返す版と const 参照を返す版の両方があるため、`webrtc_Buffer_data` を可変版、`webrtc_Buffer_data_const` を読み取り専用版にする
+  - C 側の呼び出しは `webrtc_Buffer_data` / `webrtc_BufferS16_data` から `_const` 版に置き換える
+  - Rust 側は `BufferRef::data` が `_const` 版を使い、`BufferRefMut::data_mut` / `BufferS16RefMut::data_mut` で書き換えられるようにする
+  - @melpon
+- [CHANGE] `AudioTransportRef` / `AudioTransportRefMut` にライフタイムを付け、`AudioTransportPtr` を追加する
+  - 2 型は `AudioTransport` の借用に縛られ、同じオブジェクトへの可変ハンドルを 2 本作れなくなる
+  - C++ 側の ADM が所有する transport をハンドラが保持する用途のために、ライフタイムを持たない `AudioTransportPtr` を追加する
+  - `AudioDeviceModuleHandler::register_audio_callback` は `Option<AudioTransportPtr>` を受け取る
+  - @melpon
 - [CHANGE] `RtpEncodingParameters::scalability_mode` の戻り値を `Option<Result<String>>` から `Result<Option<String>>` に変更する
   - 未設定は `Ok(None)`、UTF-8 への変換失敗は `Err` で表す
   - @melpon
@@ -30,6 +70,9 @@
   - C API の `webrtc_PeerConnectionInterface_RTCConfiguration_cpu_adaptation` / `set_cpu_adaptation` を追加し、libwebrtc のアクセサに委譲する
   - CPU アダプテーションの有効 / 無効を Rust SDK から設定できるようにする
   - @voluntas
+- [UPDATE] `Error` の表示メッセージを英語にする
+  - 利用者に見えるエラーメッセージを英語に統一する
+  - @melpon
 - [FIX] C の関数名が間違っていたのを修正する
   - `webrtc_AudioDecoderFactory_MakeAudioDecoder` → `webrtc_AudioDecoderFactory_Create`
   - `webrtc_AudioEncoderFactory_MakeAudioEncoder` → `webrtc_AudioEncoderFactory_Create`
@@ -37,6 +80,35 @@
 
 ### misc
 
+- [ADD] webrtc_c に `webrtc_TransformableFrameInterface` から `webrtc_TransformableVideoFrameInterface` への cast を追加する
+  - `WEBRTC_DECLARE_CAST` / `WEBRTC_DECLARE_CAST_CONST` マクロで宣言し、C++ 側の `static_cast` でダウンキャストする
+  - Rust 側の生のポインタキャストを削除する
+  - `TransformableFrame` は `as_ptr` を `*const`、書き換え用の `as_mut_ptr` を `*mut` に分ける
+  - @melpon
+- [ADD] webrtc_c の refcounted ハンドルを const で扱えるようにする
+  - `WEBRTC_DECLARE_REFCOUNTED` / `WEBRTC_DEFINE_REFCOUNTED` に `CType_refcounted_get_const` を追加し、const な `CType_refcounted*` から `const struct CType*` を取得できるようにする
+  - Rust 側は const な refcounted ハンドル用に `ScopedRefConst` を追加し、`RTCStatsReport` をこれで保持する
+  - `ScopedRefConst::from_raw` / `RTCStatsReport::from_refcounted_ptr` は `NonNull` ではなく `ConstNonNull` を受け取る
+  - `RTCStatsReport` を受け取るコールバックから const を外すキャストが消える
+  - @melpon
+- [UPDATE] 借用ハンドルが保持するポインタを非 null 型にする
+  - `NonNull` は `*mut T` を扱う API しか持たないため、読み取り専用ポインタ用の `ConstNonNull` をクレート内部に追加する
+  - `XxxRef` は `ConstNonNull`、`XxxRefMut` は `NonNull` を保持し、null でないことが型で分かるようにする
+  - `XxxRef::from_raw` / `CxxStringRef::from_ptr` は `ConstNonNull`、`XxxRefMut::from_raw` は `NonNull` を受け取る
+  - 借用ハンドルの `from_raw` / `from_ptr` は `unsafe fn` と `fn` が混在していたのを安全関数に統一する
+  - @melpon
+- [UPDATE] rustdoc の警告を修正する
+  - `std::vector<T>` などをバッククォートで囲み、未解決だったドキュメントリンクを `crate::` 付きのパスにする
+  - @melpon
+- [UPDATE] webrtc_c の `CType_AddRef` / `CType_Release` の引数を `const struct CType*` にする
+  - C++ 側の `AddRef()` / `Release()` が const メソッドであるため、C API 側の引数も const にする
+  - 呼び出し側は非 const のポインタをそのまま渡せるため変更は不要
+  - @melpon
+- [UPDATE] webrtc_c の C API の入力引数に残っていた const 漏れを修正する
+  - `webrtc_PeerConnectionInterface_CreateDataChannelOrError` / `webrtc_AudioCodecSpec_set_format` / `webrtc_RtpTransceiverInit_set_send_encodings` などの引数を `const struct ...*` にする
+  - C++ 側が書き換える、または保持して非 const メソッドを呼ぶ引数は非 const のままとする
+  - Rust 側の公開 API に変更はない
+  - @melpon
 - [UPDATE] webrtc_c の C API の const 性を libwebrtc の C++ シグネチャに合わせる
   - 読み取り専用の getter を `const struct ...* self` にし、引数の `const_cast` を全廃する
   - C++ 側が `const` 参照/ポインタで受ける引数を C API でも `const struct ...*` にする
@@ -45,6 +117,9 @@
 - [UPDATE] サンプルとテストで PeerConnectionFactory の worker thread に network thread を使う
   - `PeerConnectionFactoryDependencies::set_worker_thread` に network thread を渡す
   - C / C++ の whip / whep サンプルから専用 worker thread の生成を削除する
+  - @melpon
+- [UPDATE] whip / whep サンプルを借用ハンドルの分割に追従させる
+  - `PeerConnectionRtcConfiguration::servers_mut` / `RtpTransceiverInit::stream_ids_mut` / `RtpCodec::parameters_mut` を使って書き換える
   - @melpon
 - [UPDATE] optional 値 (has / value) 方式のヘルパーを C API の値の種類ごとに揃える
   - `has` を読んで `Option` に変換する部分を private な `get_optional` / `set_optional` に集約し、値の種類ごとのヘルパーをその薄いラッパーにする

@@ -21,14 +21,14 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Message(message) => f.write_str(message),
-            Error::NullPointer(name) => write!(f, "{name} が null を返しました"),
+            Error::NullPointer(name) => write!(f, "{name} returned null"),
             Error::NulError(err) => write!(f, "{err}"),
             Error::Utf8Error(err) => write!(f, "{err}"),
             Error::RtcError(err) => {
                 if let Ok(message) = err.message() {
                     return f.write_str(&message);
                 }
-                f.write_str("RTCError が発生しました")
+                f.write_str("an RTCError occurred")
             }
             Error::SdpParseError(err) => {
                 let line = err.line().ok();
@@ -39,18 +39,18 @@ impl fmt::Display for Error {
                     }
                     (Some(line), None) => write!(f, "SDP parse error: {}", line),
                     (None, Some(description)) => write!(f, "SDP parse error: {}", description),
-                    (None, None) => f.write_str("SDP parse error が発生しました"),
+                    (None, None) => f.write_str("an SDP parse error occurred"),
                 }
             }
-            Error::InvalidSdp => f.write_str("不正な SDP です"),
-            Error::InvalidIceCandidate => f.write_str("不正な ICE candidate です"),
+            Error::InvalidSdp => f.write_str("invalid SDP"),
+            Error::InvalidIceCandidate => f.write_str("invalid ICE candidate"),
             Error::InvalidVideoCodecType(codec_type) => {
-                write!(f, "不正な VideoCodecType です: {}", codec_type)
+                write!(f, "invalid VideoCodecType: {}", codec_type)
             }
             Error::InvalidAudioCodecType(codec_type) => {
-                write!(f, "不正な AudioCodecType です: {}", codec_type)
+                write!(f, "invalid AudioCodecType: {}", codec_type)
             }
-            Error::OutOfIndex(index) => write!(f, "インデックス {} が範囲外です", index),
+            Error::OutOfIndex(index) => write!(f, "index {} is out of range", index),
         }
     }
 }

@@ -22,6 +22,8 @@
 - C++ の構造体 `CppType` の `field` 変数へ読み書きする場合には `CppType_get_field` や `CppType_set_field` 関数を定義する
 - `*_refcounted` の型を直接 C++ の型にキャストしてはならない
   - 必ず `*_refcounted_get()` 関数を経由すること
+  - const な `*_refcounted` からは `*_refcounted_get_const()` を経由して `const struct CType*` を取得する
+  - `*_AddRef()` / `*_Release()` は C++ 側の `AddRef()` / `Release()` が const メソッドであるため、`const struct CType*` を受け取る
 - C++ オブジェクトを `*_refcounted` に渡すときは、必ず `webrtc::scoped_refptr<CppType>` で構築し、 `p.release()` したもののみをキャストする。
 - `*_unique` の型を直接 C++ の型にキャストしてはならない
   - 必ず `*_unique_get()` 関数を経由すること
@@ -52,6 +54,21 @@
   - `const_cast` は使わない
   - フィールドへの可変参照を返す getter（`webrtc_SdpVideoFormat_get_parameters` / `webrtc_SdpVideoFormat_get_name` 等）は非 const のままとする
     - 呼び出し側が借用先を書き換えられるため、const 化すると const 契約が壊れる
+  - 借用を返す getter は、C++ 側の形に合わせて必要な分だけ用意する
+    - C++ 側に const 参照（`const T&` / `const T*`）を返す getter しか無い場合は `_get_xxx` を 1 つだけ用意する（`_const` は付けない）
+      - 例: `webrtc_SSLCertChain_Get`（`const SSLCertificate& Get(size_t pos) const`）
+    - C++ 側に可変参照（`T&` / `T*`）を返す getter と const 参照を返す getter の両方がある場合は、`_get_xxx`（可変参照を返す）と `_get_xxx_const`（読み取り専用を返す）の 2 つを用意する
+      - 例: `webrtc_SdpVideoFormat_get_name`（可変参照を返す）と `webrtc_SdpVideoFormat_get_name_const`（`const struct std_string*` を返す）
+      - 例: `webrtc_Buffer_data`（`U* data()`）と `webrtc_Buffer_data_const`（`const U* data() const`）
+    - C++ 側のフィールドへの借用を返す getter は、フィールドにオーバーロードが無いため可変参照を返す `_get_xxx` を用意する
+      - 例: `webrtc_RtpCapabilities_get_codecs` / `webrtc_RTPVideoHeaderH264_get_nalus`
+      - Rust 側の `XxxRef` から読む場合は `_get_xxx_const` も用意する（`XxxRef` は `*const` しか持たないため可変版を呼べない）
+        - 例: `webrtc_SdpVideoFormat_get_name_const`（`std::string name` フィールドへの読み取り専用の借用）
+    - 要素への借用を返す `_vector_get` / `_inlined_vector_get` は C++ 側に可変参照と const 参照の両方があるため、読み取り経路では必ず `_get_const` 版を使う
+    - 読み取り専用の借用に対する cast は `WEBRTC_DECLARE_CAST_CONST` を用意する
+      - 例: `webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec`（可変参照を返す）と `webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec_const`（読み取り専用を返す）
+      - 例: `webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface`（ダウンキャスト）と `webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface_const`
+    - 借用ではなくコピーする引数（`_vector_set` / `_vector_push_back` / `_inlined_vector_set` / `_inlined_vector_push_back` の値）は `const struct webrtc_Xxx*` にする
   - ObjC のオブジェクトハンドル（`objc_*` / `webrtc_objc_*`）を扱う C API は非 const のままとする
     - ObjC の `id` は const を表現できず、対応する ObjC メソッドにも const が無いため、非 const が元の API と一致する
     - const 化すると `__bridge` で const を外すことになり、`release` や setter のような書き換える関数まで const になってしまう
@@ -63,6 +80,8 @@
 - 対応する C++ パスと型名を必ず開いて照合し、C 側のファイル・シンボル名が元の C++ に一致しているか確認する
 - `*_unique` / `*_refcounted` へのキャストが必ず `*_unique_get` / `*_refcounted_get` / `release` 経由になっているか `rg` でチェックする
 - `const_cast` が残っていないか、`self` と引数の const 性が元の C++ シグネチャと一致しているかを `rg` でチェックする
+- 読み取り専用の借用を返す getter が `_get_const` / `_vector_get_const` / `_inlined_vector_get_const` を使っているか（`_const` 版があるのに可変版を呼んでいないか）を `rg` でチェックする
+- C++ 側に可変参照と const 参照の両方がある getter に `_get_xxx` と `_get_xxx_const` の 2 つが揃っているか確認する
 - 便利関数やパラメータ展開を追加していないか、各変更ブロックごとに「薄いラッパーか」を自問する
 - 変更後に再度 RULES.md を読み直し、全ルール順守をチェックリスト形式で確認してから回答する
 

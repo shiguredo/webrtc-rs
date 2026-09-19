@@ -66,8 +66,13 @@ WEBRTC_EXPORT struct webrtc_SdpVideoFormat_unique* webrtc_SdpVideoFormat_copy(
     const struct webrtc_SdpVideoFormat* self);
 WEBRTC_EXPORT struct std_string* webrtc_SdpVideoFormat_get_name(
     struct webrtc_SdpVideoFormat* self);
+WEBRTC_EXPORT const struct std_string* webrtc_SdpVideoFormat_get_name_const(
+    const struct webrtc_SdpVideoFormat* self);
 WEBRTC_EXPORT struct std_map_string_string*
 webrtc_SdpVideoFormat_get_parameters(struct webrtc_SdpVideoFormat* self);
+WEBRTC_EXPORT const struct std_map_string_string*
+webrtc_SdpVideoFormat_get_parameters_const(
+    const struct webrtc_SdpVideoFormat* self);
 WEBRTC_EXPORT size_t webrtc_SdpVideoFormat_get_scalability_modes_size(
     const struct webrtc_SdpVideoFormat* self);
 WEBRTC_EXPORT size_t webrtc_SdpVideoFormat_copy_scalability_modes(

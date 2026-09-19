@@ -3,7 +3,7 @@ use super::video_codec_specifics::{
     RTPVideoHeaderCodecSpecifics, RTPVideoHeaderH264, RTPVideoHeaderVP8, RTPVideoHeaderVP9,
 };
 use crate::helper::handler::{create_with_handler, destroy_handler};
-use crate::helper::non_null::expect_non_null;
+use crate::helper::non_null::{expect_non_null, expect_non_null_const};
 use crate::helper::optional::{
     get_optional_ptr, get_optional_scalar, get_optional_slice, set_optional_scalar,
     set_optional_slice,
@@ -309,7 +309,7 @@ unsafe extern "C" fn frame_transformer_on_destroy(user_data: *mut c_void) {
 ///
 /// エンコード済みフレームを [FrameTransformerHandler] で変換して
 /// libwebrtc へ返す。生成したフレーム変換は
-/// [RtpSender::set_frame_transformer] または [RtpReceiver::set_frame_transformer]
+/// [crate::RtpSender::set_frame_transformer] または [crate::RtpReceiver::set_frame_transformer]
 /// で適用する。
 ///
 /// 1 つの [FrameTransformer] は 1 エンドポイントにだけ設定すること。
@@ -381,7 +381,11 @@ impl TransformableFrame {
         Self { raw_unique }
     }
 
-    fn as_ptr(&self) -> *mut ffi::webrtc_TransformableFrameInterface {
+    fn as_ptr(&self) -> *const ffi::webrtc_TransformableFrameInterface {
+        unsafe { ffi::webrtc_TransformableFrameInterface_unique_get(self.raw_unique.as_ptr()) }
+    }
+
+    fn as_mut_ptr(&mut self) -> *mut ffi::webrtc_TransformableFrameInterface {
         unsafe { ffi::webrtc_TransformableFrameInterface_unique_get(self.raw_unique.as_ptr()) }
     }
 
@@ -413,7 +417,7 @@ impl TransformableFrame {
     pub fn set_data(&mut self, data: &[u8]) {
         unsafe {
             ffi::webrtc_TransformableFrameInterface_SetData(
-                self.as_ptr(),
+                self.as_mut_ptr(),
                 data.as_ptr(),
                 data.len(),
             )
@@ -433,7 +437,7 @@ impl TransformableFrame {
     /// ペイロードタイプを設定する。
     pub fn set_payload_type(&mut self, payload_type: u8) {
         unsafe {
-            ffi::webrtc_TransformableFrameInterface_SetPayloadType(self.as_ptr(), payload_type)
+            ffi::webrtc_TransformableFrameInterface_SetPayloadType(self.as_mut_ptr(), payload_type)
         };
     }
 
@@ -457,14 +461,15 @@ impl TransformableFrame {
         let value = if index == 0 {
             let alt =
                 unsafe { ffi::webrtc_RtpTimestampInfo_get_RtpTimestampWithOffset(raw.as_ptr()) };
-            let alt = NonNull::new(alt)
-                .expect("BUG: index が RtpTimestampWithOffset なのにアクセサが null を返しました");
+            let alt = NonNull::new(alt).expect(
+                "BUG: the accessor returned null although the index is RtpTimestampWithOffset",
+            );
             unsafe { ffi::webrtc_RtpTimestampWithOffset_get_value(alt.as_ptr()) }
         } else {
             let alt =
                 unsafe { ffi::webrtc_RtpTimestampInfo_get_RtpTimestampWithoutOffset(raw.as_ptr()) };
             let alt = NonNull::new(alt).expect(
-                "BUG: index が RtpTimestampWithoutOffset なのにアクセサが null を返しました",
+                "BUG: the accessor returned null although the index is RtpTimestampWithoutOffset",
             );
             unsafe { ffi::webrtc_RtpTimestampWithoutOffset_get_value(alt.as_ptr()) }
         };
@@ -480,7 +485,7 @@ impl TransformableFrame {
     pub fn set_rtp_timestamp(&mut self, rtp_timestamp_with_offset: u32) {
         unsafe {
             ffi::webrtc_TransformableFrameInterface_SetRTPTimestamp(
-                self.as_ptr(),
+                self.as_mut_ptr(),
                 rtp_timestamp_with_offset,
             )
         };
@@ -540,7 +545,11 @@ impl TransformableFrame {
     /// `None` を指定するとキャプチャ時間を未設定にする。
     pub fn set_capture_time(&mut self, capture_time: Option<i64>) {
         set_optional_scalar(capture_time, |has, timestamp_us| unsafe {
-            ffi::webrtc_TransformableFrameInterface_SetCaptureTime(self.as_ptr(), has, timestamp_us)
+            ffi::webrtc_TransformableFrameInterface_SetCaptureTime(
+                self.as_mut_ptr(),
+                has,
+                timestamp_us,
+            )
         });
     }
 
@@ -575,8 +584,30 @@ pub struct TransformableVideoFrame {
 unsafe impl Send for TransformableVideoFrame {}
 
 impl TransformableVideoFrame {
-    fn as_video_ptr(&self) -> *mut ffi::webrtc_TransformableVideoFrameInterface {
-        self.base.as_ptr() as *mut ffi::webrtc_TransformableVideoFrameInterface
+    fn as_video_ptr(&self) -> *const ffi::webrtc_TransformableVideoFrameInterface {
+        let raw = unsafe {
+            ffi::webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface_const(
+                self.base.as_ptr(),
+            )
+        };
+        expect_non_null_const(
+            raw,
+            "webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface_const",
+        )
+        .as_ptr()
+    }
+
+    fn as_video_mut_ptr(&mut self) -> *mut ffi::webrtc_TransformableVideoFrameInterface {
+        let raw = unsafe {
+            ffi::webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface(
+                self.base.as_mut_ptr(),
+            )
+        };
+        expect_non_null(
+            raw,
+            "webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface",
+        )
+        .as_ptr()
     }
 
     /// 基底フレームへ戻す。
@@ -623,7 +654,7 @@ impl TransformableVideoFrame {
     pub fn set_metadata(&mut self, metadata: &VideoFrameMetadata) {
         unsafe {
             ffi::webrtc_TransformableVideoFrameInterface_SetMetadata(
-                self.as_video_ptr(),
+                self.as_video_mut_ptr(),
                 metadata.raw.as_ptr(),
             )
         };
@@ -648,9 +679,7 @@ impl TryFrom<TransformableFrame> for TransformableVideoFrame {
     type Error = TransformableFrame;
 
     fn try_from(frame: TransformableFrame) -> std::result::Result<Self, Self::Error> {
-        let mime = frame
-            .mime_type()
-            .expect("BUG: MIME type の取得に失敗しました");
+        let mime = frame.mime_type().expect("BUG: failed to get the MIME type");
         if mime.starts_with("video/") {
             Ok(TransformableVideoFrame { base: frame })
         } else {
@@ -874,8 +903,8 @@ impl VideoFrameMetadata {
         let len = unsafe { ffi::webrtc_uint32_vector_size(raw.as_ptr()) };
         let mut result = Vec::new();
         for index in 0..len {
-            let elem = unsafe { ffi::webrtc_uint32_vector_get(raw.as_ptr(), index) };
-            let elem = expect_non_null(elem, "webrtc_uint32_vector_get");
+            let elem = unsafe { ffi::webrtc_uint32_vector_get_const(raw.as_ptr(), index) };
+            let elem = expect_non_null_const(elem, "webrtc_uint32_vector_get_const");
             result.push(unsafe { ffi::webrtc_uint32_value(elem.as_ptr()) });
         }
         unsafe { ffi::webrtc_uint32_vector_delete(raw.as_ptr()) };
@@ -911,8 +940,9 @@ impl VideoFrameMetadata {
             1 => {
                 let vp8 =
                     unsafe { ffi::webrtc_RTPVideoHeaderCodecSpecifics_get_RTPVideoHeaderVP8(raw) };
-                let vp8 = NonNull::new(vp8)
-                    .expect("BUG: index が RTPVideoHeaderVP8 なのにアクセサが null を返しました");
+                let vp8 = NonNull::new(vp8).expect(
+                    "BUG: the accessor returned null although the index is RTPVideoHeaderVP8",
+                );
                 RTPVideoHeaderCodecSpecifics::VP8(unsafe {
                     RTPVideoHeaderVP8::copy_from_raw(vp8.as_ptr())
                 })
@@ -920,8 +950,9 @@ impl VideoFrameMetadata {
             2 => {
                 let vp9 =
                     unsafe { ffi::webrtc_RTPVideoHeaderCodecSpecifics_get_RTPVideoHeaderVP9(raw) };
-                let vp9 = NonNull::new(vp9)
-                    .expect("BUG: index が RTPVideoHeaderVP9 なのにアクセサが null を返しました");
+                let vp9 = NonNull::new(vp9).expect(
+                    "BUG: the accessor returned null although the index is RTPVideoHeaderVP9",
+                );
                 RTPVideoHeaderCodecSpecifics::VP9(unsafe {
                     RTPVideoHeaderVP9::copy_from_raw(vp9.as_ptr())
                 })
@@ -929,13 +960,14 @@ impl VideoFrameMetadata {
             3 => {
                 let h264 =
                     unsafe { ffi::webrtc_RTPVideoHeaderCodecSpecifics_get_RTPVideoHeaderH264(raw) };
-                let h264 = NonNull::new(h264)
-                    .expect("BUG: index が RTPVideoHeaderH264 なのにアクセサが null を返しました");
+                let h264 = NonNull::new(h264).expect(
+                    "BUG: the accessor returned null although the index is RTPVideoHeaderH264",
+                );
                 RTPVideoHeaderCodecSpecifics::H264(unsafe {
                     RTPVideoHeaderH264::copy_from_raw(h264.as_ptr())
                 })
             }
-            _ => unreachable!("BUG: 未知の RTPVideoHeaderCodecSpecifics index: {}", index),
+            _ => unreachable!("BUG: unknown RTPVideoHeaderCodecSpecifics index: {}", index),
         };
         unsafe { ffi::webrtc_RTPVideoHeaderCodecSpecifics_unique_delete(raw_unique.as_ptr()) };
         value

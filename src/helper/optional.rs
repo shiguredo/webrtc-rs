@@ -12,9 +12,11 @@
 //! - bool (c_int の 1 / 0): [get_optional_bool] / [set_optional_bool]
 //! - C オブジェクト: [get_optional_object] / [set_optional_object]
 //! - 生ポインタ: [get_optional_ptr] / [set_optional_ptr]
+//! - 生ポインタ (const): [get_optional_ptr_const]
 //! - ポインタ + 長さ: [get_optional_slice] / [set_optional_slice]
 
-use crate::helper::non_null::expect_non_null;
+use crate::const_non_null::ConstNonNull;
+use crate::helper::non_null::{expect_non_null, expect_non_null_const};
 use std::os::raw::c_int;
 use std::ptr::NonNull;
 
@@ -153,6 +155,21 @@ pub(crate) fn get_optional_ptr<U>(
 #[expect(dead_code)]
 pub(crate) fn set_optional_ptr<U>(value: Option<NonNull<U>>, set_fn: impl FnOnce(c_int, *const U)) {
     set_optional(value, |p| p.as_ptr(), std::ptr::null(), set_fn)
+}
+
+/// 生ポインタ (const) が出力の getter。
+///
+/// C API のシグネチャが `void get(int* out_has, const U** out_value)` のときに使う。
+/// `out_has` が 1 なのに `out_value` が null の場合は panic する (`what` には関数名を渡す)。
+/// 返すポインタの所有 / 借用は C API の契約に従う。
+pub(crate) fn get_optional_ptr_const<U>(
+    what: &'static str,
+    get_fn: impl FnOnce(*mut c_int, *mut *const U),
+) -> Option<ConstNonNull<U>> {
+    get_optional(std::ptr::null::<U>(), |has, out_value| {
+        get_fn(has, out_value)
+    })
+    .map(|raw| expect_non_null_const(raw, what))
 }
 
 /// ポインタ + 長さが出力の getter。
