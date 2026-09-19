@@ -1,7 +1,7 @@
 use crate::const_non_null::ConstNonNull;
 use crate::ffi;
 use crate::helper::non_null::{expect_non_null, expect_non_null_const};
-use crate::{Error, Result};
+use crate::{CxxString, Error, Result};
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -47,10 +47,7 @@ impl Default for Environment {
 
 impl Clone for Environment {
     fn clone(&self) -> Self {
-        let raw = unsafe { ffi::webrtc_Environment_copy(self.raw.as_ptr()) };
-        Self {
-            raw: expect_non_null(raw, "webrtc_Environment_copy"),
-        }
+        self.as_ref().to_owned()
     }
 }
 
@@ -78,6 +75,16 @@ impl<'a> EnvironmentRef<'a> {
 
     pub(crate) fn as_ptr(&self) -> *const ffi::webrtc_Environment {
         self.raw.as_ptr()
+    }
+
+    /// この Environment のコピーを生成し、所有権を持つ [Environment] として返す。
+    ///
+    /// 借用元の [Environment] を drop した後も、返した [Environment] は使用できる。
+    pub fn to_owned(&self) -> Environment {
+        let raw = unsafe { ffi::webrtc_Environment_copy(self.raw.as_ptr()) };
+        Environment {
+            raw: expect_non_null(raw, "webrtc_Environment_copy"),
+        }
     }
 
     /// フィールドトライアルを参照する。
@@ -110,11 +117,46 @@ impl<'a> FieldTrialsViewRef<'a> {
     }
 
     /// フィールドトライアルが有効かどうかを返す。
+    ///
+    /// 設定された値が `Enabled` で始まるフィールドトライアルだけが true になる。値が
+    /// `Enabled,offer:true` のようにパラメータ付きの場合も true になる。
+    /// [Self::is_disabled] の否定ではないため、値が `Enabled` でも `Disabled` でもない
+    /// フィールドトライアルと、設定されていないフィールドトライアルは両方 false になる。
     pub fn is_enabled(&self, key: &str) -> bool {
         unsafe {
             ffi::webrtc_FieldTrialsView_IsEnabled(self.raw.as_ptr(), key.as_ptr().cast(), key.len())
                 != 0
         }
+    }
+
+    /// フィールドトライアルが無効かどうかを返す。
+    ///
+    /// 設定された値が `Disabled` で始まるフィールドトライアルだけが true になる。
+    /// [Self::is_enabled] の否定ではないため、値が `Enabled` でも `Disabled` でもない
+    /// フィールドトライアルと、設定されていないフィールドトライアルは両方 false になる。
+    pub fn is_disabled(&self, key: &str) -> bool {
+        unsafe {
+            ffi::webrtc_FieldTrialsView_IsDisabled(
+                self.raw.as_ptr(),
+                key.as_ptr().cast(),
+                key.len(),
+            ) != 0
+        }
+    }
+
+    /// フィールドトライアルに設定された値を返す。
+    ///
+    /// 設定されていないフィールドトライアルは空文字列を返す。値が空のフィールドトライアルは
+    /// 不正なため、空文字列は未設定を意味する。[Self::is_enabled] / [Self::is_disabled] と
+    /// 違い、`Enabled,offer:true` のようなパラメータも含めた値をそのまま取得できる。
+    ///
+    /// 値が UTF-8 として解釈できない場合はエラーを返す。
+    pub fn lookup(&self, key: &str) -> Result<String> {
+        let raw = unsafe {
+            ffi::webrtc_FieldTrialsView_Lookup(self.raw.as_ptr(), key.as_ptr().cast(), key.len())
+        };
+        let raw = expect_non_null(raw, "webrtc_FieldTrialsView_Lookup");
+        CxxString::from_unique(raw).to_string()
     }
 }
 
