@@ -1,6 +1,7 @@
 use crate::const_non_null::ConstNonNull;
 use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
 use crate::helper::non_null::{expect_non_null, expect_non_null_const};
+use crate::helper::optional::set_optional_object;
 use crate::helper::out_param::{call_with_out, call_with_out_and_error, call_with_void_and_error};
 use crate::helper::ref_count::{
     AudioTrackHandle, AudioTrackSourceHandle, ConnectionContextHandle, DataChannelHandle,
@@ -11,11 +12,11 @@ use crate::helper::ref_count::{
 use crate::{
     AudioDecoderFactory, AudioDeviceModule, AudioEncoderFactory, AudioOptions,
     AudioProcessingBuilder, AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit,
-    DtlsTransport, Error, IceCandidate, IceCandidateRef, MediaStream, MediaStreamTrack, MediaType,
-    RTCStatsReport, Result, RtcError, RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender,
-    RtpTransceiver, RtpTransceiverInit, SSLCertificateVerifier, SSLIdentity, ScopedRef,
-    SessionDescription, StringVector, Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack,
-    VideoTrackSource, ffi,
+    DtlsTransport, Environment, Error, IceCandidate, IceCandidateRef, MediaStream,
+    MediaStreamTrack, MediaType, RTCStatsReport, Result, RtcError, RtcEventLogFactory,
+    RtpCapabilities, RtpReceiver, RtpSender, RtpTransceiver, RtpTransceiverInit,
+    SSLCertificateVerifier, SSLIdentity, ScopedRef, SessionDescription, StringVector, Thread,
+    VideoDecoderFactory, VideoEncoderFactory, VideoTrack, VideoTrackSource, ffi,
 };
 use std::marker::PhantomData;
 use std::os::raw::{c_char, c_void};
@@ -69,6 +70,19 @@ impl PeerConnectionFactoryDependencies {
                 raw.as_ptr(),
             );
         }
+    }
+
+    /// PeerConnectionFactory が使う Environment を設定する。
+    ///
+    /// 設定しない場合は既定の Environment が使われる。
+    pub fn set_env(&mut self, env: Option<Environment>) {
+        set_optional_object(
+            env,
+            |env| env.as_ptr(),
+            |has, env| unsafe {
+                ffi::webrtc_PeerConnectionFactoryDependencies_set_env(self.raw.as_ptr(), has, env)
+            },
+        );
     }
 
     pub fn set_audio_encoder_factory(&mut self, factory: &AudioEncoderFactory) {

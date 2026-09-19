@@ -14,6 +14,7 @@ pub enum Error {
     InvalidIceCandidate,
     InvalidVideoCodecType(String),
     InvalidAudioCodecType(String),
+    InvalidFieldTrials(String),
     OutOfIndex(usize),
 }
 
@@ -49,6 +50,9 @@ impl fmt::Display for Error {
             }
             Error::InvalidAudioCodecType(codec_type) => {
                 write!(f, "invalid AudioCodecType: {}", codec_type)
+            }
+            Error::InvalidFieldTrials(field_trials) => {
+                write!(f, "invalid field trials: {}", field_trials)
             }
             Error::OutOfIndex(index) => write!(f, "index {} is out of range", index),
         }
