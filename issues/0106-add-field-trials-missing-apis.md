@@ -1,7 +1,7 @@
 # FieldTrialsViewRef と EnvironmentRef の不足 API を追加する
 
 - Created: 2026-09-19
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-09-19
 - Branch: feature/add-field-trials-is-disabled-and-environment-to-owned
 - Polished: {YYYY-MM-DD}
 
@@ -92,4 +92,18 @@ libwebrtc の `api/field_trials_view.h` の `FieldTrialsView` は `Lookup` の�
 
 ## 解決方法
 
-（詳細は polish / 実装時に確定する）
+フィールドトライアル API の不足分を追加した。
+
+- `webrtc_c` の `api/field_trials_view.h` / `.cc` に `webrtc_FieldTrialsView_IsDisabled` と `webrtc_FieldTrialsView_Lookup` を追加した。`Lookup` は `std::string` を値で返すため、`webrtc_TransformableFrameInterface_GetMimeType` と同じくヒープ確保したコピーを `std_string_unique` として返す
+- `FieldTrialsViewRef::is_disabled` を追加し、`is_enabled` の否定ではないこと (値が `Enabled` でも `Disabled` でもないキーと、設定されていないキーは両方 false になること) を doc コメントに明記した
+- `FieldTrialsViewRef::lookup` を追加し、`Enabled,offer:true` のようなパラメータも含めた設定値をそのまま取得できるようにした。設定されていないキーは空文字列になる
+- `EnvironmentRef::to_owned` を追加し、`webrtc_Environment_copy` で所有権を持つ `Environment` を作れるようにした。`Environment::clone` の実装もこの経路に寄せた
+- `src/tests.rs` に `field_trials_is_enabled_and_is_disabled_are_independent` / `field_trials_lookup_returns_value` / `environment_ref_to_owned_extends_lifetime` を追加した
+- README / `skills/shiguredo-webrtc/SKILL.md` / `CHANGES.md` を更新した
+
+確認:
+
+- `cargo test --workspace --features source-build` が成功することを確認した (142 件 + 35 件 + doctest 9 件)
+- `cargo clippy --workspace --features source-build --all-targets -- -D warnings` / `cargo fmt --all -- --check` / `python3 webrtc/run.py format --check` が成功することを確認した
+
+prebuilt 利用者 (source-build feature を有効にしない利用者) が新しい API を使えるようにするには、この変更を含むバージョンをリリースして libwebrtc_c-*.tar.gz を作り直す必要がある。リリース作業自体はリリース手順で行う。
