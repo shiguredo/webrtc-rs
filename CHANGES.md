@@ -78,6 +78,12 @@
   - `PeerConnectionFactoryDependencies::set_env` を追加し、指定した `Environment` が `ConnectionContext` と `PeerConnectionFactory` に渡るようにする
   - `Error::InvalidFieldTrials` を追加する
   - @melpon
+- [ADD] コンテナの要素を直接書き換える可変アクセサを追加する
+  - `RtpEncodingParametersVector` / `RtpCodecCapabilityVector` / `RtpCodecCapabilityVectorRefMut` / `IceServerVector` / `IceServerVectorRefMut` / `VideoEncoderResolutionBitrateLimitsVectorRefMut` / `NaluInfoVector` / `StringVector` / `StringVectorRefMut` に `get_mut` を追加し、要素を組み立て直さずに書き換えられるようにする
+  - `IceServerVector` / `IceServerVectorRefMut` / `NaluInfoVector` に `set` を追加し、要素を丸ごと差し替えられるようにする
+  - `VideoFrameTypeVector` / `VideoFrameTypeVectorRefMut` に `set` を追加し、値型の要素を書き込めるようにする
+  - `NaluInfoRefMut` と C API の `webrtc_VideoFrameType_vector_set_value` を追加する
+  - @melpon
 - [UPDATE] `Error` の表示メッセージを英語にする
   - 利用者に見えるエラーメッセージを英語に統一する
   - @melpon
