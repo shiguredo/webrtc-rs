@@ -1,7 +1,7 @@
 # コンテナの要素を直接書き換える可変アクセサを追加する
 
 - Created: 2026-09-28
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-09-28
 - Branch: feature/add-container-element-mut-accessors
 - Polished: {YYYY-MM-DD}
 
@@ -54,3 +54,21 @@ C API 側は `WEBRTC_DECLARE_VECTOR` / `WEBRTC_DEFINE_VECTOR` が非 const の `
   - 範囲外の index で `None` / `Err` / `false` が返ることを確認する
 - `cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build -- -D warnings` / `cargo test --workspace --features source-build` が成功する
 - `CHANGES.md` の `## develop` 節に `[ADD]` として記載されている
+
+## 解決方法
+
+- 表の 7 箇所すべてに `get_mut(&mut self, index: usize)` を追加した
+  - `RtpEncodingParametersVector` / `RtpCodecCapabilityVector` / `RtpCodecCapabilityVectorRefMut` は `RtpEncodingParametersRefMut` / `RtpCodecCapabilityRefMut` を返す
+  - `IceServerVector` / `IceServerVectorRefMut` は `IceServerRefMut`、`NaluInfoVector` は新設した `NaluInfoRefMut`、`VideoEncoderResolutionBitrateLimitsVectorRefMut` は `VideoEncoderResolutionBitrateLimitsRefMut` を返す
+  - `StringVector` / `StringVectorRefMut` は既存の `get` に揃えて範囲外で `Error::OutOfIndex` を返すため `Result<CxxStringRefMut<'_>>` を返す
+- 戻り値のライフタイムは `'_` にした。所有型の `get_mut` は `as_mut()` の戻り値が一時値になるため委譲できず、自身のポインタからハンドルを組み立てている
+- 要素を丸ごと差し替える `set(&mut self, index, value) -> bool` を `IceServerVector` / `IceServerVectorRefMut` に追加し、`NaluInfoVector` にも同じ形で追加した
+- 要素が値型の `VideoFrameTypeVector` / `VideoFrameTypeVectorRefMut` には `set(&mut self, index, value: VideoFrameType) -> bool` を追加した
+  - 値を書き込む C API として `webrtc_VideoFrameType_vector_set_value` を `webrtc_VideoFrameType_vector_push_back_value` と同じ形で追加した
+- `NaluInfoRefMut` を `RtpEncodingParametersRefMut` と同じ形 (`NonNull` と `cref` を保持し、セッターと読み取りの転送メソッドを持つ `Copy` でない型) で新設した
+- マクロと新規トレイトは作らず、追加のみで既存 API は変えていない
+- `src/lib.rs` の `compile_fail` doctest に、コンテナの `get_mut` が `'_` に縛られて同一要素への可変ハンドルを 2 本作れないこと (E0499) を固定するケースを追加した
+- `src/tests.rs` に 7 本のテストを追加し、所有型と `XxxVectorRefMut` の両経路で書き換えた結果が `get` から読めることと、範囲外の index で `None` / `Err` / `false` が返ることを確認した
+- `CHANGES.md` の `## develop` 節に `[ADD]` を記載し、README の「借用ハンドル」節と `skills/shiguredo-webrtc/SKILL.md` に要素アクセサの規約を追記した
+- `cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build --all-targets -- -D warnings` / `cargo test --workspace --features source-build` / `python3 webrtc/run.py format --check` / `prek run` の成功を確認した
+- prebuilt 利用者が `webrtc_VideoFrameType_vector_set_value` を使えるようにするには、この変更を含むバージョンをリリースして `libwebrtc_c-*.tar.gz` を作り直す必要がある

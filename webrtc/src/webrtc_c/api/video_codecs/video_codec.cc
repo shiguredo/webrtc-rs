@@ -284,4 +284,12 @@ WEBRTC_EXPORT void webrtc_VideoFrameType_vector_push_back_value(
   auto vec = reinterpret_cast<std::vector<webrtc::VideoFrameType>*>(self);
   vec->push_back(static_cast<webrtc::VideoFrameType>(value));
 }
+
+WEBRTC_EXPORT void webrtc_VideoFrameType_vector_set_value(
+    struct webrtc_VideoFrameType_vector* self,
+    int index,
+    int value) {
+  auto vec = reinterpret_cast<std::vector<webrtc::VideoFrameType>*>(self);
+  (*vec)[index] = static_cast<webrtc::VideoFrameType>(value);
+}
 }

@@ -1849,6 +1849,12 @@ impl VideoFrameTypeVector {
         self.as_ref().get(index)
     }
 
+    /// index の要素を value で置き換える。
+    /// 範囲外の index では `false` を返す。
+    pub fn set(&mut self, index: usize, value: VideoFrameType) -> bool {
+        self.as_mut().set(index, value)
+    }
+
     pub fn push(&mut self, value: VideoFrameType) {
         self.as_mut().push(value);
     }
@@ -1941,6 +1947,22 @@ impl<'a> VideoFrameTypeVectorRefMut<'a> {
         unsafe {
             ffi::webrtc_VideoFrameType_vector_push_back_value(self.raw.as_ptr(), value.to_raw())
         };
+    }
+
+    /// index の要素を value で置き換える。
+    /// 範囲外の index では `false` を返す。
+    pub fn set(&mut self, index: usize, value: VideoFrameType) -> bool {
+        if index >= self.len() {
+            return false;
+        }
+        unsafe {
+            ffi::webrtc_VideoFrameType_vector_set_value(
+                self.raw.as_ptr(),
+                index as i32,
+                value.to_raw(),
+            )
+        };
+        true
     }
     pub fn as_ref(&self) -> VideoFrameTypeVectorRef<'_> {
         self.cref

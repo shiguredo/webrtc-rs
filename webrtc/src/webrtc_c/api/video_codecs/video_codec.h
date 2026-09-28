@@ -128,6 +128,10 @@ WEBRTC_EXPORT int webrtc_VideoFrameType_value(
 WEBRTC_EXPORT void webrtc_VideoFrameType_vector_push_back_value(
     struct webrtc_VideoFrameType_vector* self,
     int value);
+WEBRTC_EXPORT void webrtc_VideoFrameType_vector_set_value(
+    struct webrtc_VideoFrameType_vector* self,
+    int index,
+    int value);
 
 #if defined(__cplusplus)
 }

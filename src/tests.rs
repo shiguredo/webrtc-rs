@@ -421,6 +421,42 @@ fn string_vector_push_and_get() {
 }
 
 #[test]
+fn string_vector_get_mut() {
+    let mut vec = StringVector::new(0);
+    vec.push(&CxxString::from_str("hello"));
+
+    // 所有型の get_mut で取得したハンドル越しに要素を書き換えられることを確認する。
+    {
+        let mut element = vec.get_mut(0).expect("要素が存在する想定");
+        element.append("-world");
+        assert_eq!(
+            element.to_string().expect("文字列の取得に失敗しました"),
+            "hello-world"
+        );
+    }
+    // 書き換えがベクタ本体に反映されていることを確認する。
+    assert_eq!(
+        vec.get(0).expect("0 番目の取得に失敗しました"),
+        "hello-world"
+    );
+
+    // StringVectorRefMut 経由でも同じ要素を書き換えられることを確認する。
+    {
+        let mut borrowed = vec.as_mut();
+        let mut element = borrowed.get_mut(0).expect("要素が存在する想定");
+        element.append("!");
+    }
+    assert_eq!(
+        vec.get(0).expect("0 番目の取得に失敗しました"),
+        "hello-world!"
+    );
+
+    // 範囲外の index では Error::OutOfIndex を返すことを確認する。
+    assert!(matches!(vec.get_mut(1), Err(Error::OutOfIndex(1))));
+    assert!(matches!(vec.as_mut().get_mut(1), Err(Error::OutOfIndex(1))));
+}
+
+#[test]
 fn sdp_type_round_trip() {
     let offer = SdpType::Offer;
     let val = offer.to_int();
@@ -2143,6 +2179,48 @@ fn rtc_configuration_and_ice_server() {
 }
 
 #[test]
+fn ice_server_vector_get_mut_and_set() {
+    let mut vec = IceServerVector::new(0);
+    let mut server = IceServer::new();
+    server.add_url("stun:192.0.2.1:3478");
+    vec.push(&server);
+
+    // 所有型の get_mut で取得したハンドル越しに要素を書き換えられることを確認する。
+    {
+        let mut element = vec.get_mut(0).expect("要素が存在する想定");
+        element.add_url("turn:192.0.2.2:3478?transport=udp");
+        assert_eq!(element.urls_len(), 2);
+    }
+    // 書き換えがベクタ本体に反映されていることを確認する。
+    assert_eq!(vec.get(0).expect("要素が存在する想定").urls_len(), 2);
+
+    // 所有型の set で要素を丸ごと差し替えられることを確認する。
+    let mut replacement = IceServer::new();
+    replacement.add_url("stun:192.0.2.3:3478");
+    assert!(vec.set(0, &replacement));
+    assert_eq!(vec.get(0).expect("要素が存在する想定").urls_len(), 1);
+
+    // IceServerVectorRefMut 経由でも同じ要素を書き換えられることを確認する。
+    {
+        let mut borrowed = vec.as_mut();
+        let mut element = borrowed.get_mut(0).expect("要素が存在する想定");
+        element.add_url("stun:192.0.2.4:3478");
+        assert_eq!(element.urls_len(), 2);
+    }
+    assert_eq!(vec.get(0).expect("要素が存在する想定").urls_len(), 2);
+
+    // IceServerVectorRefMut 経由でも要素を丸ごと差し替えられることを確認する。
+    assert!(vec.as_mut().set(0, &replacement));
+    assert_eq!(vec.get(0).expect("要素が存在する想定").urls_len(), 1);
+
+    // 範囲外の index では None / false を返すことを確認する。
+    assert!(vec.get_mut(1).is_none());
+    assert!(!vec.set(1, &replacement));
+    assert!(vec.as_mut().get_mut(1).is_none());
+    assert!(!vec.as_mut().set(1, &replacement));
+}
+
+#[test]
 fn rtc_configuration_cpu_adaptation_round_trip() {
     let mut config = PeerConnectionRtcConfiguration::new();
 
@@ -2279,6 +2357,51 @@ fn rtp_codec_capability_vector() {
             .iter()
             .any(|(k, v)| k == "stereo" && v == "1")
     );
+}
+
+#[test]
+fn rtp_codec_capability_vector_get_mut() {
+    let mut vec = RtpCodecCapabilityVector::new(0);
+    let mut cap = RtpCodecCapability::new();
+    cap.set_kind(MediaType::Audio);
+    cap.set_name("opus");
+    vec.push(&cap.as_ref());
+
+    // 所有型の get_mut で取得したハンドル越しに要素を書き換えられることを確認する。
+    {
+        let mut element = vec.get_mut(0).expect("要素が存在する想定");
+        element.set_name("PCMU");
+        element.set_clock_rate(Some(8_000));
+        assert_eq!(
+            element.name().expect("codec 名の取得に失敗しました"),
+            "PCMU"
+        );
+    }
+    // 書き換えがベクタ本体に反映されていることを確認する。
+    {
+        let element = vec.get(0).expect("要素が存在する想定");
+        assert_eq!(
+            element.name().expect("codec 名の取得に失敗しました"),
+            "PCMU"
+        );
+        assert_eq!(element.clock_rate(), Some(8_000));
+    }
+
+    // RtpCodecCapabilityVectorRefMut 経由でも同じ要素を書き換えられることを確認する。
+    {
+        let mut borrowed = vec.as_mut();
+        let mut element = borrowed.get_mut(0).expect("要素が存在する想定");
+        element.set_num_channels(Some(2));
+        assert_eq!(element.num_channels(), Some(2));
+    }
+    assert_eq!(
+        vec.get(0).expect("要素が存在する想定").num_channels(),
+        Some(2)
+    );
+
+    // 範囲外の index では None を返すことを確認する。
+    assert!(vec.get_mut(1).is_none());
+    assert!(vec.as_mut().get_mut(1).is_none());
 }
 
 #[test]
@@ -2419,6 +2542,32 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     assert_eq!(offer.offer_to_receive_video(), 1);
     assert!(offer.voice_activity_detection());
     assert!(offer.use_rtp_mux());
+}
+
+#[test]
+fn rtp_encoding_parameters_vector_get_mut() {
+    let mut vec = RtpEncodingParametersVector::new(0);
+    let mut enc = RtpEncodingParameters::new();
+    enc.set_rid("r0");
+    vec.push(&enc);
+
+    // 所有型の get_mut で取得したハンドル越しに要素を書き換えられることを確認する。
+    // RtpEncodingParameters はフィールドが多いため、set の往復を挟まずに直接書き換える。
+    {
+        let mut element = vec.get_mut(0).expect("要素が存在する想定");
+        element.set_rid("r1");
+        element.set_max_bitrate_bps(Some(500_000));
+        assert_eq!(element.rid().expect("rid の取得に失敗しました"), "r1");
+    }
+    // 書き換えがベクタ本体に反映されていることを確認する。
+    {
+        let element = vec.get(0).expect("要素が存在する想定");
+        assert_eq!(element.rid().expect("rid の取得に失敗しました"), "r1");
+        assert_eq!(element.max_bitrate_bps(), Some(500_000));
+    }
+
+    // 範囲外の index では None を返すことを確認する。
+    assert!(vec.get_mut(1).is_none());
 }
 
 #[test]
@@ -3508,6 +3657,42 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
     scaling_none.set_thresholds(None);
     info.set_scaling_settings(&scaling_none);
     assert!(info.scaling_settings().thresholds().is_none());
+}
+
+#[test]
+fn video_encoder_resolution_bitrate_limits_vector_get_mut() {
+    let mut info = VideoEncoderEncoderInfo::new();
+    {
+        let mut limits = info.resolution_bitrate_limits_mut();
+        limits.clear();
+        limits.push(&VideoEncoderResolutionBitrateLimits::new(
+            640 * 360,
+            100_000,
+            80_000,
+            500_000,
+        ));
+    }
+
+    // VideoEncoderResolutionBitrateLimitsVectorRefMut の get_mut で取得したハンドル越しに
+    // 要素を書き換えられることを確認する。
+    {
+        let mut limits = info.resolution_bitrate_limits_mut();
+        let mut element = limits.get_mut(0).expect("要素が存在する想定");
+        element.set_max_bitrate_bps(600_000);
+        element.set_min_bitrate_bps(90_000);
+        assert_eq!(element.max_bitrate_bps(), 600_000);
+        assert_eq!(element.min_bitrate_bps(), 90_000);
+
+        // 範囲外の index では None を返すことを確認する。
+        assert!(limits.get_mut(1).is_none());
+    }
+    // 書き換えが所有型に反映されていることを確認する。
+    {
+        let limits = info.resolution_bitrate_limits();
+        let element = limits.get(0).expect("要素が存在する想定");
+        assert_eq!(element.max_bitrate_bps(), 600_000);
+        assert_eq!(element.min_bitrate_bps(), 90_000);
+    }
 }
 
 #[test]
@@ -4780,6 +4965,75 @@ fn nalu_info_vector_roundtrip() {
     assert_eq!(elem.sps_id(), 3);
     assert_eq!(elem.pps_id(), 4);
     assert!(vec.get(1).is_none());
+}
+
+#[test]
+fn nalu_info_vector_get_mut_and_set() {
+    let mut nalu = NaluInfo::new();
+    nalu.set_type(7);
+    nalu.set_sps_id(3);
+    nalu.set_pps_id(4);
+    let mut vec = NaluInfoVector::new(0);
+    vec.push(&nalu);
+
+    // get_mut で取得したハンドル越しに要素を書き換えられることを確認する。
+    {
+        let mut element = vec.get_mut(0).expect("要素が存在する想定");
+        element.set_type(5);
+        element.set_sps_id(1);
+        element.set_pps_id(2);
+        assert_eq!(element.type_(), 5);
+        assert_eq!(element.sps_id(), 1);
+        assert_eq!(element.pps_id(), 2);
+    }
+    // 書き換えがベクタ本体に反映されていることを確認する。
+    {
+        let element = vec.get(0).expect("要素が存在する想定");
+        assert_eq!(element.type_(), 5);
+        assert_eq!(element.sps_id(), 1);
+        assert_eq!(element.pps_id(), 2);
+    }
+
+    // set で要素を丸ごと差し替えられることを確認する。
+    let mut other = NaluInfo::new();
+    other.set_type(1);
+    other.set_sps_id(-1);
+    other.set_pps_id(-1);
+    assert!(vec.set(0, &other));
+    {
+        let element = vec.get(0).expect("要素が存在する想定");
+        assert_eq!(element.type_(), 1);
+        assert_eq!(element.sps_id(), -1);
+        assert_eq!(element.pps_id(), -1);
+    }
+
+    // 範囲外の index では None / false を返すことを確認する。
+    assert!(vec.get_mut(1).is_none());
+    assert!(!vec.set(1, &other));
+}
+
+#[test]
+fn video_frame_type_vector_set() {
+    let mut vec = VideoFrameTypeVector::new(0);
+    vec.push(VideoFrameType::Key);
+    vec.push(VideoFrameType::Delta);
+
+    // 所有型の set で要素を置き換えられることを確認する。
+    assert!(vec.set(0, VideoFrameType::Empty));
+    assert_eq!(vec.get(0), Some(VideoFrameType::Empty));
+    assert_eq!(vec.get(1), Some(VideoFrameType::Delta));
+
+    // VideoFrameTypeVectorRefMut 経由でも同じ要素を置き換えられることを確認する。
+    {
+        let mut borrowed = vec.as_mut();
+        assert!(borrowed.set(1, VideoFrameType::Key));
+    }
+    assert_eq!(vec.get(0), Some(VideoFrameType::Empty));
+    assert_eq!(vec.get(1), Some(VideoFrameType::Key));
+
+    // 範囲外の index では false を返すことを確認する。
+    assert!(!vec.set(2, VideoFrameType::Key));
+    assert!(!vec.as_mut().set(2, VideoFrameType::Key));
 }
 
 #[test]

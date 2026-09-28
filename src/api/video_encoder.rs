@@ -835,6 +835,26 @@ impl<'a> VideoEncoderResolutionBitrateLimitsVectorRefMut<'a> {
     pub fn get(&self, index: usize) -> Option<VideoEncoderResolutionBitrateLimitsRef<'_>> {
         self.cref.get(index)
     }
+
+    /// index の要素を書き換えるための可変ハンドルを返す。
+    /// 範囲外の index では `None` を返す。
+    pub fn get_mut(
+        &mut self,
+        index: usize,
+    ) -> Option<VideoEncoderResolutionBitrateLimitsRefMut<'_>> {
+        if index >= self.len() {
+            return None;
+        }
+        // 書き換え用のハンドルを返すため、可変参照を返す非 const 版の get を使う。
+        let raw = unsafe {
+            ffi::webrtc_VideoEncoder_ResolutionBitrateLimits_vector_get(
+                self.raw.as_ptr(),
+                index as i32,
+            )
+        };
+        let raw = NonNull::new(raw)?;
+        Some(VideoEncoderResolutionBitrateLimitsRefMut::from_raw(raw))
+    }
 }
 
 #[derive(Clone, Copy)]

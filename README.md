@@ -193,6 +193,10 @@ assert_eq!(
   - `XxxRefMut` は `Deref` を実装していない (`VideoFrameRefMut::as_ref()` / `VideoFrameRefMut::width()`)
 - 生ポインタを取り出す
   - `XxxRef::as_ptr()` は `*const`、`XxxRefMut::as_mut_ptr()` は `*mut` を返す
+- コンテナの要素を書き換える
+  - `get_mut(index)` は要素の `XxxRefMut` を返す (`RtpCodecCapabilityVector::get_mut()`)
+  - 要素が値型のコンテナは `set(index, value)` で書き込む (`VideoFrameTypeVector::set()`)
+  - 範囲外の index は `get` と揃えて `None` / `Err` / `false` を返す
 - handler trait とコールバックの引数のうち、書き換えが必要なものは `XxxRefMut` を取る
   - `AudioEncoderHandler::encode` は `&mut BufferRefMut<'_>` を受け取る
 
