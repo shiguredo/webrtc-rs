@@ -932,6 +932,56 @@ impl std::fmt::Debug for NaluInfoRef<'_> {
     }
 }
 
+/// webrtc::NaluInfo の可変借用ラッパー。
+pub struct NaluInfoRefMut<'a> {
+    raw: NonNull<ffi::webrtc_NaluInfo>,
+    _marker: PhantomData<&'a mut ffi::webrtc_NaluInfo>,
+    cref: NaluInfoRef<'a>,
+}
+
+unsafe impl<'a> Send for NaluInfoRefMut<'a> {}
+
+impl<'a> NaluInfoRefMut<'a> {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_NaluInfo>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+            cref: NaluInfoRef::from_raw(ConstNonNull::from(raw)),
+        }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_NaluInfo {
+        self.raw.as_ptr()
+    }
+
+    pub fn set_type(&mut self, value: u8) {
+        unsafe { ffi::webrtc_NaluInfo_set_type(self.raw.as_ptr(), value) };
+    }
+
+    pub fn set_sps_id(&mut self, value: i32) {
+        unsafe { ffi::webrtc_NaluInfo_set_sps_id(self.raw.as_ptr(), value) };
+    }
+
+    pub fn set_pps_id(&mut self, value: i32) {
+        unsafe { ffi::webrtc_NaluInfo_set_pps_id(self.raw.as_ptr(), value) };
+    }
+    pub fn as_ref(&self) -> NaluInfoRef<'_> {
+        self.cref
+    }
+
+    pub fn type_(&self) -> u8 {
+        self.cref.type_()
+    }
+
+    pub fn sps_id(&self) -> i32 {
+        self.cref.sps_id()
+    }
+
+    pub fn pps_id(&self) -> i32 {
+        self.cref.pps_id()
+    }
+}
+
 /// `std::vector<webrtc::NaluInfo>` の所有ラッパー。
 pub struct NaluInfoVector {
     raw: NonNull<ffi::webrtc_NaluInfo_vector>,
@@ -965,6 +1015,30 @@ impl NaluInfoVector {
         let raw = unsafe { ffi::webrtc_NaluInfo_vector_get_const(self.raw.as_ptr(), index as i32) };
         let raw = ConstNonNull::new(raw)?;
         Some(NaluInfoRef::from_raw(raw))
+    }
+
+    /// index の要素を書き換えるための可変ハンドルを返す。
+    /// 範囲外の index では `None` を返す。
+    pub fn get_mut(&mut self, index: usize) -> Option<NaluInfoRefMut<'_>> {
+        if index >= self.len() {
+            return None;
+        }
+        // 書き換え用のハンドルを返すため、可変参照を返す非 const 版の get を使う。
+        let raw = unsafe { ffi::webrtc_NaluInfo_vector_get(self.raw.as_ptr(), index as i32) };
+        let raw = NonNull::new(raw)?;
+        Some(NaluInfoRefMut::from_raw(raw))
+    }
+
+    /// index の要素を value で置き換える。
+    /// 範囲外の index では `false` を返す。
+    pub fn set(&mut self, index: usize, value: &NaluInfo) -> bool {
+        if index >= self.len() {
+            return false;
+        }
+        unsafe {
+            ffi::webrtc_NaluInfo_vector_set(self.raw.as_ptr(), index as i32, value.as_ptr());
+        }
+        true
     }
 
     pub fn push(&mut self, value: &NaluInfo) {

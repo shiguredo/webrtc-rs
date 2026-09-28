@@ -239,6 +239,21 @@ impl StringVector {
         self.as_ref().get(index)
     }
 
+    /// index の要素を書き換えるための可変ハンドルを返す。
+    /// 範囲外の index では `Error::OutOfIndex` を返す。
+    pub fn get_mut(&mut self, index: usize) -> Result<CxxStringRefMut<'_>> {
+        if index >= self.len() {
+            return Err(Error::OutOfIndex(index));
+        }
+        // 返すハンドルのライフタイムを self の可変借用に縛るため、
+        // as_mut() の戻り値 (一時値) には委譲せず、ここでハンドルを組み立てる。
+        let ptr = unsafe { ffi::std_string_vector_get(self.raw.as_ptr(), index as i32) };
+        Ok(CxxStringRefMut::from_raw(expect_non_null(
+            ptr,
+            "std_string_vector_get",
+        )))
+    }
+
     /// FFI が返した所有権付きベクタを引き取る。
     pub(crate) fn from_raw(raw: NonNull<ffi::std_string_vector>) -> Self {
         Self { raw }
@@ -335,6 +350,20 @@ impl<'a> StringVectorRefMut<'a> {
 
     pub fn get(&self, index: usize) -> Result<String> {
         self.cref.get(index)
+    }
+
+    /// index の要素を書き換えるための可変ハンドルを返す。
+    /// 範囲外の index では `Error::OutOfIndex` を返す。
+    pub fn get_mut(&mut self, index: usize) -> Result<CxxStringRefMut<'_>> {
+        if index >= self.len() {
+            return Err(Error::OutOfIndex(index));
+        }
+        // 書き換え用のハンドルを返すため、可変参照を返す非 const 版の get を使う。
+        let ptr = unsafe { ffi::std_string_vector_get(self.raw.as_ptr(), index as i32) };
+        Ok(CxxStringRefMut::from_raw(expect_non_null(
+            ptr,
+            "std_string_vector_get",
+        )))
     }
 }
 

@@ -497,6 +497,21 @@ impl RtpCodecCapabilityVector {
         self.as_ref().get(index)
     }
 
+    /// index の要素を書き換えるための可変ハンドルを返す。
+    /// 範囲外の index では `None` を返す。
+    pub fn get_mut(&mut self, index: usize) -> Option<RtpCodecCapabilityRefMut<'_>> {
+        if index >= self.len() {
+            return None;
+        }
+        // 返すハンドルのライフタイムを self の可変借用に縛るため、
+        // as_mut() の戻り値 (一時値) には委譲せず、ここでハンドルを組み立てる。
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RtpCodecCapability_vector_get(self.raw.as_ptr(), index as i32) },
+            "webrtc_RtpCodecCapability_vector_get",
+        );
+        Some(RtpCodecCapabilityRefMut::from_raw(raw))
+    }
+
     pub fn push(&mut self, cap: &RtpCodecCapabilityRef<'_>) {
         self.as_mut().push(cap);
     }
@@ -627,6 +642,20 @@ impl<'a> RtpCodecCapabilityVectorRefMut<'a> {
 
     pub fn get(&self, index: usize) -> Option<RtpCodecCapabilityRef<'_>> {
         self.cref.get(index)
+    }
+
+    /// index の要素を書き換えるための可変ハンドルを返す。
+    /// 範囲外の index では `None` を返す。
+    pub fn get_mut(&mut self, index: usize) -> Option<RtpCodecCapabilityRefMut<'_>> {
+        if index >= self.len() {
+            return None;
+        }
+        // 書き換え用のハンドルを返すため、可変参照を返す非 const 版の get を使う。
+        let raw = expect_non_null(
+            unsafe { ffi::webrtc_RtpCodecCapability_vector_get(self.raw.as_ptr(), index as i32) },
+            "webrtc_RtpCodecCapability_vector_get",
+        );
+        Some(RtpCodecCapabilityRefMut::from_raw(raw))
     }
 }
 
@@ -1232,6 +1261,22 @@ impl RtpEncodingParametersVector {
             "webrtc_RtpEncodingParameters_vector_get_const",
         );
         Some(RtpEncodingParametersRef::from_raw(raw))
+    }
+
+    /// index の要素を書き換えるための可変ハンドルを返す。
+    /// 範囲外の index では `None` を返す。
+    pub fn get_mut(&mut self, index: usize) -> Option<RtpEncodingParametersRefMut<'_>> {
+        if index >= self.len() {
+            return None;
+        }
+        // 書き換え用のハンドルを返すため、可変参照を返す非 const 版の get を使う。
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_RtpEncodingParameters_vector_get(self.raw.as_ptr(), index as i32)
+            },
+            "webrtc_RtpEncodingParameters_vector_get",
+        );
+        Some(RtpEncodingParametersRefMut::from_raw(raw))
     }
 
     pub fn push(&mut self, enc: &RtpEncodingParameters) {

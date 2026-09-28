@@ -843,6 +843,32 @@ impl IceServerVector {
         self.as_ref().get(index)
     }
 
+    /// index の要素を書き換えるための可変ハンドルを返す。
+    /// 範囲外の index では `None` を返す。
+    pub fn get_mut(&mut self, index: usize) -> Option<IceServerRefMut<'_>> {
+        if index >= self.len() {
+            return None;
+        }
+        // 返すハンドルのライフタイムを self の可変借用に縛るため、
+        // as_mut() の戻り値 (一時値) には委譲せず、ここでハンドルを組み立てる。
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceServer_vector_get(
+                    self.raw.as_ptr(),
+                    index as i32,
+                )
+            },
+            "webrtc_PeerConnectionInterface_IceServer_vector_get",
+        );
+        Some(IceServerRefMut::from_raw(raw))
+    }
+
+    /// index の要素を server で置き換える。
+    /// 範囲外の index では `false` を返す。
+    pub fn set(&mut self, index: usize, server: &IceServer) -> bool {
+        self.as_mut().set(index, server)
+    }
+
     pub fn push(&mut self, server: &IceServer) {
         self.as_mut().push(server);
     }
@@ -945,6 +971,23 @@ impl<'a> IceServerVectorRefMut<'a> {
             );
         }
     }
+
+    /// index の要素を server で置き換える。
+    /// 範囲外の index では `false` を返す。
+    pub fn set(&mut self, index: usize, server: &IceServer) -> bool {
+        if index >= self.len() {
+            return false;
+        }
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_IceServer_vector_set(
+                self.raw.as_ptr(),
+                index as i32,
+                server.as_ptr(),
+            );
+        }
+        true
+    }
+
     pub fn as_ref(&self) -> IceServerVectorRef<'_> {
         self.cref
     }
@@ -959,6 +1002,25 @@ impl<'a> IceServerVectorRefMut<'a> {
 
     pub fn get(&self, index: usize) -> Option<IceServerRef<'_>> {
         self.cref.get(index)
+    }
+
+    /// index の要素を書き換えるための可変ハンドルを返す。
+    /// 範囲外の index では `None` を返す。
+    pub fn get_mut(&mut self, index: usize) -> Option<IceServerRefMut<'_>> {
+        if index >= self.len() {
+            return None;
+        }
+        // 書き換え用のハンドルを返すため、可変参照を返す非 const 版の get を使う。
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceServer_vector_get(
+                    self.raw.as_ptr(),
+                    index as i32,
+                )
+            },
+            "webrtc_PeerConnectionInterface_IceServer_vector_get",
+        );
+        Some(IceServerRefMut::from_raw(raw))
     }
 }
 

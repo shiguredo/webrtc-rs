@@ -80,6 +80,18 @@ mod compile_fail_doctests {
     //! # let _ = (parameters, parameters2);
     //! ```
     //!
+    //! コンテナの要素への可変アクセサも戻り値が `'_` に縛られるため、同じ要素への可変ハンドルを
+    //! 2 本作ることはできない (E0499)。
+    //!
+    //! ```compile_fail,E0499
+    //! use shiguredo_webrtc::RtpCodecCapabilityVector;
+    //!
+    //! let mut vec = RtpCodecCapabilityVector::new(0);
+    //! let a = vec.get_mut(0);
+    //! let b = vec.get_mut(0);
+    //! # let _ = (a, b);
+    //! ```
+    //!
     //! 所有権や生ポインタを受け取るコンストラクタは crate 内部専用のため、crate 外からは呼べない
     //! (E0624)。
     //!
