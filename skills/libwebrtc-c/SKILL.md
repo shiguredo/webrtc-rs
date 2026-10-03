@@ -226,7 +226,7 @@ C アプリ側で `webrtc::scoped_refptr` に相互変換できるクラスを�
 | 変数 | 用途 |
 |------|------|
 | `WEBRTC_C_TARGET` | ターゲット OS/アーキ (例: `ubuntu-24.04_x86_64`, `macos_arm64`, `windows_x86_64`, `android_arm64`, `ios_arm64`, `raspberry-pi-os_armv8`) |
-| `WEBRTC_BUILD_VERSION` | libwebrtc バージョン (例: `m154.8037.1.2`) |
+| `WEBRTC_BUILD_VERSION` | libwebrtc バージョン (例: `m154.8037.3.0`) |
 | `WEBRTC_BASE_URL` | webrtc-build リリースのベース URL |
 | `WEBRTC_C_SYSROOT` | ARMv8 クロスコンパイル時のみ必須 |
 

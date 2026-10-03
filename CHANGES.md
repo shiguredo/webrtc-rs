@@ -87,9 +87,10 @@
 - [UPDATE] `Error` の表示メッセージを英語にする
   - 利用者に見えるエラーメッセージを英語に統一する
   - @melpon
-- [UPDATE] libwebrtc m154 (m154.8037.1.2) に上げる
+- [UPDATE] libwebrtc m154 (m154.8037.3.0) に上げる
   - `api:field_trials` が含まれるようになり、`webrtc::FieldTrials` を利用できるようになった
-  - @melpon
+  - Android の `ConnectionContext` 破棄順が原因で PeerConnectionFactory 破棄時にクラッシュする不具合が修正された
+  - @melpon, @voluntas
 - [FIX] C の関数名が間違っていたのを修正する
   - `webrtc_AudioDecoderFactory_MakeAudioDecoder` → `webrtc_AudioDecoderFactory_Create`
   - `webrtc_AudioEncoderFactory_MakeAudioEncoder` → `webrtc_AudioEncoderFactory_Create`
