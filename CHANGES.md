@@ -108,6 +108,12 @@
   - `ScopedRefConst::from_raw` / `RTCStatsReport::from_refcounted_ptr` は `NonNull` ではなく `ConstNonNull` を受け取る
   - `RTCStatsReport` を受け取るコールバックから const を外すキャストが消える
   - @melpon
+- [UPDATE] `rust-toolchain.toml` を追加し、ツールチェーンを MSRV と同じ 1.93 に揃える
+  - ローカルと CI で常に MSRV (1.93) の `cargo` / `rustc` / `clippy` が使われるようになり、
+    MSRV より新しい API や言語機能の使用を検出できる
+  - MSRV の `cargo` は TOML 1.1 の複数行インラインテーブルを解釈できないため、
+    examples の `Cargo.toml` の `rustls` 依存を 1 行のインラインテーブルに直す
+  - @voluntas
 - [UPDATE] 借用ハンドルが保持するポインタを非 null 型にする
   - `NonNull` は `*mut T` を扱う API しか持たないため、読み取り専用ポインタ用の `ConstNonNull` をクレート内部に追加する
   - `XxxRef` は `ConstNonNull`、`XxxRefMut` は `NonNull` を保持し、null でないことが型で分かるようにする

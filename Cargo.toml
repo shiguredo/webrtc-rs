@@ -35,9 +35,13 @@ members = ["examples/*"]
 [dependencies]
 
 [build-dependencies]
+# WebRTC C API のヘッダーから Rust バインディングを生成するために使用
 bindgen = "0.72"
+# `cargo metadata` の出力 (JSON) から target_directory を取得するために使用
 nojson = "0.3"
+# WebRTC の C++ ライブラリ (webrtc_c) を CMake でビルドするために使用
 shiguredo_cmake = "4.4"
+# Cargo.toml の package.metadata を読み取るために使用
 shiguredo_toml = "2026.2"
 
 [features]
