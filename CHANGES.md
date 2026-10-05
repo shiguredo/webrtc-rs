@@ -84,6 +84,10 @@
   - `VideoFrameTypeVector` / `VideoFrameTypeVectorRefMut` に `set` を追加し、値型の要素を書き込めるようにする
   - `NaluInfoRefMut` と C API の `webrtc_VideoFrameType_vector_set_value` を追加する
   - @melpon
+- [ADD] 参照カウントで実体を共有する公開型に `Clone` を実装する
+  - `AudioTrack` / `AudioTrackSource` / `AudioDecoderFactory` / `AudioEncoderFactory` / `MediaStreamTrack` / `RtpSender` / `RtpReceiver` / `RtpTransceiver` / `DataChannel` / `DtlsTransport` / `PeerConnection` / `PeerConnectionFactory` / `ConnectionContext` / `EncodedImageBuffer` を `Clone` に対応させる
+  - `Clone` は `scoped_refptr` と同じく参照カウントを増やし、同じ実体を指すハンドルを作る
+  - @melpon
 - [UPDATE] `Error` の表示メッセージを英語にする
   - 利用者に見えるエラーメッセージを英語に統一する
   - @melpon

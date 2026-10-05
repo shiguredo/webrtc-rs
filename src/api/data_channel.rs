@@ -117,6 +117,14 @@ impl DataChannel {
     }
 }
 
+impl Clone for DataChannel {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
+    }
+}
+
 // -------------------------
 // DataChannelObserver
 // -------------------------

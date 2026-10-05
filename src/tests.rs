@@ -2676,6 +2676,288 @@ fn rtp_sender_get_set_parameters() {
 }
 
 #[test]
+fn rtp_and_peer_connection_refcounted_wrappers_clone() {
+    // Offer の生成完了を待つための処理。
+    struct OfferHandler {
+        tx: mpsc::Sender<Result<String>>,
+    }
+
+    impl CreateSessionDescriptionObserverHandler for OfferHandler {
+        fn on_success(&mut self, desc: SessionDescription) {
+            let _ = self.tx.send(desc.to_string());
+        }
+
+        fn on_failure(&mut self, err: RtcError) {
+            let _ = self.tx.send(Err(err.into()));
+        }
+    }
+
+    // local description の設定完了を待つための処理。
+    struct SetLocalDescriptionHandler {
+        tx: mpsc::Sender<bool>,
+    }
+
+    impl SetLocalDescriptionObserverHandler for SetLocalDescriptionHandler {
+        fn on_set_local_description_complete(&mut self, error: RtcError) {
+            let _ = self.tx.send(error.ok());
+        }
+    }
+
+    // Factory と ConnectionContext を組み立てる。
+    let dec_audio = AudioDecoderFactory::builtin();
+    let enc_audio = AudioEncoderFactory::builtin();
+    let enc_video = VideoEncoderFactory::builtin();
+    let dec_video = VideoDecoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&network);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc_audio);
+    deps_factory.set_audio_decoder_factory(&dec_audio);
+    deps_factory.set_video_encoder_factory(enc_video);
+    deps_factory.set_video_decoder_factory(dec_video);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    // PeerConnectionFactory の clone。
+    let factory_clone = factory.clone();
+    assert_eq!(
+        factory.as_ptr(),
+        factory_clone.as_ptr(),
+        "PeerConnectionFactory の clone が別の実体を指しています"
+    );
+
+    // ConnectionContext の clone。
+    let context_clone = context.clone();
+    assert_eq!(
+        context.as_ptr(),
+        context_clone.as_ptr(),
+        "ConnectionContext の clone が別の実体を指しています"
+    );
+    drop(context);
+    assert!(
+        !context_clone.default_network_manager().as_ptr().is_null(),
+        "元の ConnectionContext の drop 後に clone が使えません"
+    );
+    assert!(
+        !context_clone.default_socket_factory().as_ptr().is_null(),
+        "元の ConnectionContext の drop 後に clone が使えません"
+    );
+
+    // PeerConnection の clone。
+    let pc_config = PeerConnectionRtcConfiguration::new();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
+    let pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
+        .expect("PeerConnection の生成に失敗しました");
+    let pc_clone = pc.clone();
+    assert_eq!(
+        pc.as_ptr(),
+        pc_clone.as_ptr(),
+        "PeerConnection の clone が別の実体を指しています"
+    );
+    drop(pc);
+
+    // MediaStreamTrack の clone。
+    let source = AdaptedVideoTrackSource::new();
+    let vts = source.cast_to_video_track_source();
+    let send_track = factory
+        .create_video_track(&vts, "video-track-clone-send")
+        .expect("VideoTrack の生成に失敗しました");
+    let recv_track = factory
+        .create_video_track(&vts, "video-track-clone-recv")
+        .expect("VideoTrack の生成に失敗しました");
+    let stream_track = send_track.cast_to_media_stream_track();
+    let stream_track_clone = stream_track.clone();
+    assert_eq!(
+        stream_track.as_refcounted_ptr(),
+        stream_track_clone.as_refcounted_ptr(),
+        "MediaStreamTrack の clone が別の実体を指しています"
+    );
+    // clone 経由の操作が元のハンドルから見えることを確認する。
+    assert!(
+        stream_track_clone.set_enabled(false),
+        "clone した MediaStreamTrack の set_enabled が失敗しました"
+    );
+    assert!(
+        !stream_track.enabled(),
+        "clone 経由の set_enabled が元の MediaStreamTrack に反映されていません"
+    );
+    drop(stream_track);
+    assert!(
+        !stream_track_clone.enabled(),
+        "元の MediaStreamTrack の drop 後に clone が使えません"
+    );
+
+    // 元の PeerConnectionFactory を drop しても、clone で media stream を生成できることを確認する。
+    drop(factory);
+    let stream = factory_clone
+        .create_local_media_stream("stream-clone")
+        .expect("CreateLocalMediaStream が失敗しました");
+    assert_eq!(
+        stream.id().expect("MediaStream の id 取得に失敗しました"),
+        "stream-clone",
+        "元の PeerConnectionFactory の drop 後に clone が使えません"
+    );
+
+    // RtpSender の clone。
+    let mut stream_ids = StringVector::new(0);
+    stream_ids.push(&CxxString::from_str("stream-clone"));
+    let sender = pc_clone
+        .add_track(&stream_track_clone, &stream_ids)
+        .expect("AddTrack が失敗しました");
+    let sender_clone = sender.clone();
+    assert_eq!(
+        sender.as_refcounted_ptr(),
+        sender_clone.as_refcounted_ptr(),
+        "RtpSender の clone が別の実体を指しています"
+    );
+    drop(sender);
+    let _ = sender_clone.get_parameters();
+
+    // RtpTransceiver と RtpReceiver の clone。
+    let mut transceiver_init = RtpTransceiverInit::new();
+    transceiver_init.set_direction(RtpTransceiverDirection::SendRecv);
+    let transceiver = pc_clone
+        .add_transceiver_with_track(&recv_track, &transceiver_init)
+        .expect("AddTransceiverWithTrack が失敗しました");
+    let transceiver_clone = transceiver.clone();
+    assert_eq!(
+        transceiver.as_ptr(),
+        transceiver_clone.as_ptr(),
+        "RtpTransceiver の clone が別の実体を指しています"
+    );
+    let receiver = transceiver.receiver();
+    let receiver_clone = receiver.clone();
+    // RtpReceiver は実体のポインタを取り出す公開 API を持たないため、
+    // 同じ実体を指していることを受信トラックの id の一致で確認する。
+    let track_id = receiver
+        .track()
+        .id()
+        .expect("受信トラックの id 取得に失敗しました");
+    assert_eq!(
+        receiver_clone
+            .track()
+            .id()
+            .expect("受信トラックの id 取得に失敗しました"),
+        track_id,
+        "RtpReceiver の clone が別の実体を指しています"
+    );
+    drop(receiver);
+    assert_eq!(
+        receiver_clone
+            .track()
+            .id()
+            .expect("受信トラックの id 取得に失敗しました"),
+        track_id,
+        "元の RtpReceiver の drop 後に clone が使えません"
+    );
+    drop(transceiver);
+    let _ = transceiver_clone.receiver();
+
+    // DataChannel の clone。
+    let data_channel_init = DataChannelInit::new();
+    let data_channel = pc_clone
+        .create_data_channel("dc-clone", &data_channel_init)
+        .expect("DataChannel の生成に失敗しました");
+    let data_channel_clone = data_channel.clone();
+    assert_eq!(
+        data_channel.as_ptr(),
+        data_channel_clone.as_ptr(),
+        "DataChannel の clone が別の実体を指しています"
+    );
+    drop(data_channel);
+    assert_eq!(
+        data_channel_clone
+            .label()
+            .expect("DataChannel のラベル取得に失敗しました"),
+        "dc-clone",
+        "元の DataChannel の drop 後に clone が使えません"
+    );
+
+    // DtlsTransport の clone。offer を設定して transport を生成してから mid で取得する。
+    let opts = PeerConnectionOfferAnswerOptions::new();
+    let (offer_tx, offer_rx) = mpsc::channel::<Result<String>>();
+    let mut offer_observer =
+        CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferHandler { tx: offer_tx }));
+    pc_clone.create_offer(&mut offer_observer, &opts);
+    let sdp = offer_rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("createOffer がタイムアウトしました")
+        .expect("createOffer が失敗しました");
+    let (local_tx, local_rx) = mpsc::channel::<bool>();
+    let local_observer =
+        SetLocalDescriptionObserver::new_with_handler(Box::new(SetLocalDescriptionHandler {
+            tx: local_tx,
+        }));
+    let local_description =
+        SessionDescription::new(SdpType::Offer, &sdp).expect("Offer の組み立てに失敗しました");
+    pc_clone.set_local_description(local_description, &local_observer);
+    assert!(
+        local_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("setLocalDescription がタイムアウトしました"),
+        "setLocalDescription が失敗しました"
+    );
+    let dtls_transport = pc_clone
+        .lookup_dtls_transport_by_mid("0")
+        .expect("DtlsTransport の取得に失敗しました");
+    let dtls_state = dtls_transport.state();
+    let dtls_transport_clone = dtls_transport.clone();
+    assert_eq!(
+        dtls_transport_clone.state(),
+        dtls_state,
+        "DtlsTransport の clone が別の実体を指しています"
+    );
+    drop(dtls_transport);
+    assert_eq!(
+        dtls_transport_clone.state(),
+        dtls_state,
+        "元の DtlsTransport の drop 後に clone が使えません"
+    );
+    let dtls_observer = DtlsTransportObserver::new_with_handler(Box::new(NoopHandler));
+    dtls_transport_clone.register_observer(&dtls_observer);
+    dtls_transport_clone.unregister_observer();
+
+    // webrtc オブジェクトを先に解放してからスレッドを停止する。
+    drop(dtls_observer);
+    drop(dtls_transport_clone);
+    drop(data_channel_clone);
+    drop(data_channel_init);
+    drop(receiver_clone);
+    drop(transceiver_clone);
+    drop(sender_clone);
+    drop(stream_ids);
+    drop(stream);
+    drop(stream_track_clone);
+    drop(recv_track);
+    drop(send_track);
+    drop(vts);
+    drop(source);
+    drop(local_observer);
+    drop(offer_observer);
+    drop(context_clone);
+    drop(pc_clone);
+    drop(observer);
+    drop(factory_clone);
+    drop(adm);
+    drop(env);
+    network.stop();
+    signaling.stop();
+}
+
+#[test]
 fn peer_connection_create_and_transceiver() {
     // Factory を組み立てる。
     let dec = AudioDecoderFactory::builtin();
@@ -4617,6 +4899,103 @@ fn create_audio_source_with_default_audio_options() {
 }
 
 #[test]
+fn audio_refcounted_wrappers_clone() {
+    // 参照カウントで実体を共有する音声関連の型を複製しても、元のハンドルを drop した後に使えることを確認する。
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let dec_clone = dec.clone();
+    let enc_clone = enc.clone();
+    // 同じ実体を指していることを、実体を取り出すポインタの一致で確認する。
+    assert_eq!(
+        dec.as_ptr(),
+        dec_clone.as_ptr(),
+        "AudioDecoderFactory の clone が別の実体を指しています"
+    );
+    assert_eq!(
+        enc.as_ptr(),
+        enc_clone.as_ptr(),
+        "AudioEncoderFactory の clone が別の実体を指しています"
+    );
+
+    // 元のファクトリを drop しても、clone を使って PeerConnectionFactory を組み立てられることを確認する。
+    drop(dec);
+    drop(enc);
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&network);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc_clone);
+    deps_factory.set_audio_decoder_factory(&dec_clone);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    // AudioTrackSource の clone。
+    let options = AudioOptions::new();
+    let source = factory
+        .create_audio_source(&options)
+        .expect("AudioSource の生成に失敗しました");
+    let source_clone = source.clone();
+    assert_eq!(
+        source.as_ptr(),
+        source_clone.as_ptr(),
+        "AudioTrackSource の clone が別の実体を指しています"
+    );
+
+    // AudioTrack の clone。
+    let track = factory
+        .create_audio_track(&source, "audio-track-clone")
+        .expect("AudioTrack の生成に失敗しました");
+    let track_clone = track.clone();
+    assert_eq!(
+        track.as_refcounted_ptr(),
+        track_clone.as_refcounted_ptr(),
+        "AudioTrack の clone が別の実体を指しています"
+    );
+
+    // clone 経由の操作が元のハンドルから見えることを確認する。
+    assert!(
+        track_clone.cast_to_media_stream_track().set_enabled(false),
+        "clone した AudioTrack の set_enabled が失敗しました"
+    );
+    assert!(
+        !track.cast_to_media_stream_track().enabled(),
+        "clone 経由の set_enabled が元の AudioTrack に反映されていません"
+    );
+
+    // 元のハンドルを drop しても clone が使えることを確認する。
+    drop(track);
+    drop(source);
+    assert!(
+        !track_clone.cast_to_media_stream_track().enabled(),
+        "元の AudioTrack の drop 後に clone が使えません"
+    );
+    let source_after_drop = factory
+        .create_audio_track(&source_clone, "audio-track-clone-after-drop")
+        .expect("元の AudioTrackSource の drop 後に clone が使えません");
+
+    drop(source_after_drop);
+    drop(source_clone);
+    drop(track_clone);
+    drop(options);
+    drop(factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    signaling.stop();
+}
+
+#[test]
 fn frame_transformer_create_and_drop() {
     struct TransformHandler;
 
@@ -5463,4 +5842,25 @@ fn audio_encoder_owned_wrapper_methods() {
     encoder.on_received_rtt(10);
     encoder.on_received_target_audio_bitrate(64000);
     encoder.on_received_overhead(12);
+}
+
+#[test]
+fn encoded_image_buffer_clone() {
+    // 参照カウントで実体を共有する EncodedImageBuffer を複製しても、元のハンドルを drop した後に使えることを確認する。
+    let buffer = EncodedImageBuffer::from_bytes(&[1, 2, 3, 4]);
+    let buffer_clone = buffer.clone();
+    // 同じ実体を指していることを、中身の一致で確認する。
+    assert_eq!(
+        buffer_clone.data(),
+        buffer.data(),
+        "EncodedImageBuffer の clone が別の実体を指しています"
+    );
+
+    // 元のハンドルを drop しても clone が使えることを確認する。
+    drop(buffer);
+    assert_eq!(
+        buffer_clone.data(),
+        &[1, 2, 3, 4],
+        "元の EncodedImageBuffer の drop 後に clone が使えません"
+    );
 }

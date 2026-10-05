@@ -1649,6 +1649,14 @@ impl RtpTransceiver {
     }
 }
 
+impl Clone for RtpTransceiver {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
+    }
+}
+
 // 安全性: libwebrtc 側で参照カウント管理されたポインタのみを保持する。
 /// webrtc::RtpReceiverInterface のラッパー。
 pub struct RtpReceiver {
@@ -1693,6 +1701,14 @@ impl RtpReceiver {
                 frame_transformer.as_refcounted_ptr(),
             )
         };
+    }
+}
+
+impl Clone for RtpReceiver {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
     }
 }
 
@@ -1757,6 +1773,14 @@ impl RtpSender {
                 frame_transformer.as_refcounted_ptr(),
             )
         };
+    }
+}
+
+impl Clone for RtpSender {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
     }
 }
 
@@ -1865,5 +1889,13 @@ impl MediaStreamTrack {
         );
         let raw_ref = ScopedRef::<AudioTrackHandle>::from_raw(raw_ref);
         AudioTrack::from_scoped_ref(raw_ref)
+    }
+}
+
+impl Clone for MediaStreamTrack {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
     }
 }

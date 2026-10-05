@@ -385,6 +385,14 @@ impl PeerConnectionFactory {
     }
 }
 
+impl Clone for PeerConnectionFactory {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
+    }
+}
+
 /// webrtc::ConnectionContext のラッパー。
 pub struct ConnectionContext {
     raw_ref: ScopedRef<ConnectionContextHandle>,
@@ -421,6 +429,14 @@ impl ConnectionContext {
             "webrtc_ConnectionContext_default_socket_factory",
         );
         PacketSocketFactoryRef::from_raw(raw)
+    }
+}
+
+impl Clone for ConnectionContext {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
     }
 }
 
@@ -2138,5 +2154,13 @@ impl PeerConnection {
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface {
         self.raw_ref.as_ptr()
+    }
+}
+
+impl Clone for PeerConnection {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
     }
 }
