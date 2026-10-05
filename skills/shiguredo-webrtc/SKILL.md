@@ -55,7 +55,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 
 | モジュール | 主な型 | 用途 |
 |----------|--------|------|
-| `peer_connection` | `PeerConnection`, `PeerConnectionFactory`, `PeerConnectionFactoryDependencies`, `PeerConnectionFactoryOptions`, `PeerConnectionDependencies`, `PeerConnectionRtcConfiguration`, `PeerConnectionOfferAnswerOptions`, `PeerConnectionObserver`, `PeerConnectionObserverHandler`, `PeerConnectionState`, `IceConnectionState`, `IceGatheringState`, `IceCandidateError`, `IceTransportsType`, `TlsCertPolicy`, `ConnectionContext`, `NetworkManagerRef`, `PacketSocketFactoryRef`, `IceServer`, `IceServerRef`, `IceServerVector`, `IceServerVectorRef`, `CreateSessionDescriptionObserver`, `CreateSessionDescriptionObserverHandler`, `SetLocalDescriptionObserver`, `SetLocalDescriptionObserverHandler`, `SetRemoteDescriptionObserver`, `SetRemoteDescriptionObserverHandler` | 接続の生成と管理、ICE 設定、Observer |
+| `peer_connection` | `PeerConnection`, `PeerConnectionFactory`, `PeerConnectionFactoryDependencies`, `PeerConnectionFactoryOptions`, `PeerConnectionDependencies`, `PeerConnectionRtcConfiguration`, `PeerConnectionOfferAnswerOptions`, `PeerConnectionObserver`, `PeerConnectionObserverHandler`, `SignalingState`, `PeerConnectionState`, `IceConnectionState`, `IceGatheringState`, `IceCandidateError`, `IceTransportsType`, `TlsCertPolicy`, `ConnectionContext`, `NetworkManagerRef`, `PacketSocketFactoryRef`, `IceServer`, `IceServerRef`, `IceServerVector`, `IceServerVectorRef`, `CreateSessionDescriptionObserver`, `CreateSessionDescriptionObserverHandler`, `SetLocalDescriptionObserver`, `SetLocalDescriptionObserverHandler`, `SetRemoteDescriptionObserver`, `SetRemoteDescriptionObserverHandler` | 接続の生成と管理、ICE 設定、Observer |
 | `audio` | `AudioTrack`, `AudioTrackSource`, `AudioTrackSink`, `AudioTrackSinkHandler`, `AudioEncoderFactory`, `AudioDecoderFactory`, `AudioProcessingBuilder` | 音声トラックとコーデック |
 | `audio_device_module` | `AudioDeviceModule`, `AudioDeviceModuleAudioLayer`, `AudioDeviceModuleHandler`, `AudioDeviceModuleStats`, `AudioParameters`, `AudioTransport`, `AudioTransportRef`, `AudioTransportHandler` | プラットフォーム音声 I/O、カスタム ADM |
 | `video` | `VideoTrack`, `VideoTrackSource`, `AdaptedVideoTrackSource`, `AdaptedSize`, `AdaptFrameResult`, `VideoSink`, `VideoSinkHandler`, `VideoSinkWants` | 映像トラックとフレーム配信 |
@@ -93,7 +93,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 
 | trait | 主なメソッド | 用途 |
 |-------|-------------|------|
-| `PeerConnectionObserverHandler` | `on_signaling_change`, `on_ice_candidate`, `on_ice_candidate_error`, `on_ice_connection_change`, `on_connection_change`, `on_track`, `on_add_stream`, `on_remove_stream`, `on_data_channel`, `on_renegotiation_needed`, `on_ice_gathering_change` ほか | PeerConnection のイベント購読 |
+| `PeerConnectionObserverHandler` | `on_signaling_change`, `on_connection_change`, `on_standardized_ice_connection_change`, `on_ice_gathering_change`, `on_track`, `on_remove_track`, `on_ice_candidate`, `on_ice_candidate_error`, `on_data_channel` | PeerConnection のイベント購読 |
 | `DataChannelObserverHandler` | `on_state_change`, `on_message`, `on_buffered_amount_change` | DataChannel のイベント購読 |
 | `DtlsTransportObserverHandler` | DTLS 状態遷移コールバック | DTLS トランスポートイベント |
 | `CreateSessionDescriptionObserverHandler` | SDP 生成完了コールバック | createOffer/createAnswer 結果 |

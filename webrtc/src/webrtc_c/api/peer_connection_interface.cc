@@ -97,6 +97,7 @@ class PeerConnectionObserverImpl : public webrtc::PeerConnectionObserver {
       void* user_data)
       : user_data_(user_data) {
     assert(observer != nullptr);
+    assert(observer->OnSignalingChange != nullptr);
     assert(observer->OnStandardizedIceConnectionChange != nullptr);
     assert(observer->OnConnectionChange != nullptr);
     assert(observer->OnIceCandidate != nullptr);
@@ -112,7 +113,11 @@ class PeerConnectionObserverImpl : public webrtc::PeerConnectionObserver {
   ~PeerConnectionObserverImpl() override { observer_.OnDestroy(user_data_); }
 
   void OnSignalingChange(
-      webrtc::PeerConnectionInterface::SignalingState new_state) override {}
+      webrtc::PeerConnectionInterface::SignalingState new_state) override {
+    observer_.OnSignalingChange(
+        static_cast<webrtc_PeerConnectionInterface_SignalingState>(new_state),
+        user_data_);
+  }
   void OnDataChannel(webrtc::scoped_refptr<webrtc::DataChannelInterface>
                          data_channel) override {
     webrtc::scoped_refptr<webrtc::DataChannelInterface> data_channel_ref(
@@ -887,6 +892,24 @@ webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_use_obsolete_sctp_sdp(
   opts->use_obsolete_sctp_sdp = use_obsolete_sctp_sdp != 0;
 }
 
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kStable =
+        (int)webrtc::PeerConnectionInterface::SignalingState::kStable;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kHaveLocalOffer =
+        (int)webrtc::PeerConnectionInterface::SignalingState::kHaveLocalOffer;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kHaveRemoteOffer =
+        (int)webrtc::PeerConnectionInterface::SignalingState::kHaveRemoteOffer;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kHaveLocalPranswer = (int)
+        webrtc::PeerConnectionInterface::SignalingState::kHaveLocalPrAnswer;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kHaveRemotePranswer = (int)
+        webrtc::PeerConnectionInterface::SignalingState::kHaveRemotePrAnswer;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kClosed =
+        (int)webrtc::PeerConnectionInterface::SignalingState::kClosed;
 WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_PeerConnectionState_kNew =
         (int)webrtc::PeerConnectionInterface::PeerConnectionState::kNew;

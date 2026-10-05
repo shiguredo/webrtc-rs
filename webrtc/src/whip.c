@@ -716,6 +716,12 @@ void SignalingWhip_OnConnectionChange(
   pthread_mutex_unlock(&self->mutex);
 }
 
+void SignalingWhip_OnSignalingChange(
+    webrtc_PeerConnectionInterface_SignalingState new_state,
+    void* user_data) {
+  RTC_LOG_INFO("SignalingWhip_OnSignalingChange: new_state=%d", new_state);
+}
+
 static void SignalingWhip_SetState(struct SignalingWhip* self, int state) {
   pthread_mutex_lock(&self->mutex);
   self->state = state;
@@ -1236,6 +1242,7 @@ struct SignalingWhip* SignalingWhip_Create(struct SignalingWhipConfig* config) {
   struct SignalingWhip* p =
       (struct SignalingWhip*)calloc(1, sizeof(struct SignalingWhip));
   p->ref = webrtc_RefCountInterface_Create(SignalingWhip_delete, p);
+  p->observer_cbs.OnSignalingChange = SignalingWhip_OnSignalingChange;
   p->observer_cbs.OnConnectionChange = SignalingWhip_OnConnectionChange;
   p->loc_cbs.OnSetLocalDescriptionComplete = whip_OnSetLocalDescriptionComplete;
   p->rem_cbs.OnSetRemoteDescriptionComplete =

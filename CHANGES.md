@@ -88,6 +88,9 @@
   - `AudioTrack` / `AudioTrackSource` / `AudioDecoderFactory` / `AudioEncoderFactory` / `MediaStreamTrack` / `RtpSender` / `RtpReceiver` / `RtpTransceiver` / `DataChannel` / `DtlsTransport` / `PeerConnection` / `PeerConnectionFactory` / `ConnectionContext` / `EncodedImageBuffer` を `Clone` に対応させる
   - `Clone` は `scoped_refptr` と同じく参照カウントを増やし、同じ実体を指すハンドルを作る
   - @melpon
+- [ADD] `PeerConnectionObserverHandler::on_signaling_change` を追加する
+  - `SignalingState` で offer / answer の交換状態を購読できるようにする
+  - @melpon
 - [UPDATE] `Error` の表示メッセージを英語にする
   - 利用者に見えるエラーメッセージを英語に統一する
   - @melpon
