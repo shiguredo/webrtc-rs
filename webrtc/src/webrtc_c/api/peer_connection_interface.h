@@ -196,6 +196,19 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_GetStats(
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_Close(
     struct webrtc_PeerConnectionInterface* self);
 
+typedef int webrtc_PeerConnectionInterface_SignalingState;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kStable;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kHaveLocalOffer;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kHaveRemoteOffer;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kHaveLocalPranswer;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kHaveRemotePranswer;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kClosed;
 typedef int webrtc_PeerConnectionInterface_PeerConnectionState;
 WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_PeerConnectionState_kNew;
@@ -302,6 +315,9 @@ webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_use_obsolete_sctp_sdp(
 // 全コールバックは必須（null 非許容）。
 // 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_PeerConnectionObserver_cbs {
+  void (*OnSignalingChange)(
+      webrtc_PeerConnectionInterface_SignalingState new_state,
+      void* user_data);
   void (*OnStandardizedIceConnectionChange)(
       webrtc_PeerConnectionInterface_IceConnectionState new_state,
       void* user_data);

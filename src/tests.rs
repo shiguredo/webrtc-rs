@@ -3186,6 +3186,246 @@ fn rtp_receiver_stream_ids() {
 }
 
 #[test]
+fn signaling_state_from_int_and_to_int() {
+    // C 側の定数と Rust 側の値が双方向に対応していることを確認する。
+    let cases = [
+        (
+            unsafe { ffi::webrtc_PeerConnectionInterface_SignalingState_kStable },
+            SignalingState::Stable,
+        ),
+        (
+            unsafe { ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveLocalOffer },
+            SignalingState::HaveLocalOffer,
+        ),
+        (
+            unsafe { ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveRemoteOffer },
+            SignalingState::HaveRemoteOffer,
+        ),
+        (
+            unsafe { ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveLocalPranswer },
+            SignalingState::HaveLocalPranswer,
+        ),
+        (
+            unsafe { ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveRemotePranswer },
+            SignalingState::HaveRemotePranswer,
+        ),
+        (
+            unsafe { ffi::webrtc_PeerConnectionInterface_SignalingState_kClosed },
+            SignalingState::Closed,
+        ),
+    ];
+    for (value, expected) in cases {
+        assert_eq!(
+            SignalingState::from_int(value),
+            expected,
+            "SignalingState の from_int が定数に対応していません"
+        );
+        assert_eq!(
+            expected.to_int(),
+            value,
+            "SignalingState の to_int が定数に対応していません"
+        );
+    }
+
+    // 未知の値は Unknown として保持され、そのまま戻る。
+    assert_eq!(SignalingState::from_int(999), SignalingState::Unknown(999));
+    assert_eq!(SignalingState::Unknown(999).to_int(), 999);
+}
+
+#[test]
+fn signaling_state_change_is_observed() {
+    // SignalingState の変化が observer へ届くことを確認する。
+    struct SignalingHandler {
+        tx: mpsc::Sender<SignalingState>,
+    }
+
+    impl PeerConnectionObserverHandler for SignalingHandler {
+        fn on_signaling_change(&mut self, new_state: SignalingState) {
+            let _ = self.tx.send(new_state);
+        }
+    }
+
+    // Offer / Answer 生成の完了を待つための処理。
+    struct OfferAnswerHandler {
+        tx: mpsc::Sender<Result<String>>,
+    }
+
+    impl CreateSessionDescriptionObserverHandler for OfferAnswerHandler {
+        fn on_success(&mut self, desc: SessionDescription) {
+            let _ = self.tx.send(desc.to_string());
+        }
+
+        fn on_failure(&mut self, err: RtcError) {
+            let _ = self.tx.send(Err(err.into()));
+        }
+    }
+
+    // Offer / Answer の設定完了を待つための処理。
+    struct SetDescriptionHandler {
+        tx: mpsc::Sender<bool>,
+    }
+
+    impl SetLocalDescriptionObserverHandler for SetDescriptionHandler {
+        fn on_set_local_description_complete(&mut self, error: RtcError) {
+            let _ = self.tx.send(error.ok());
+        }
+    }
+
+    impl SetRemoteDescriptionObserverHandler for SetDescriptionHandler {
+        fn on_set_remote_description_complete(&mut self, error: RtcError) {
+            let _ = self.tx.send(error.ok());
+        }
+    }
+
+    // Factory を組み立てる。
+    let dec_audio = AudioDecoderFactory::builtin();
+    let enc_audio = AudioEncoderFactory::builtin();
+    let enc_video = VideoEncoderFactory::builtin();
+    let dec_video = VideoDecoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&network);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc_audio);
+    deps_factory.set_audio_decoder_factory(&dec_audio);
+    deps_factory.set_video_encoder_factory(enc_video);
+    deps_factory.set_video_decoder_factory(dec_video);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    // 送信側と受信側の PeerConnection を生成する。
+    let pc_config = PeerConnectionRtcConfiguration::new();
+    let (offer_tx, offer_rx) = mpsc::channel::<SignalingState>();
+    let offer_observer =
+        PeerConnectionObserver::new_with_handler(Box::new(SignalingHandler { tx: offer_tx }));
+    let offer_deps = PeerConnectionDependencies::new(&offer_observer);
+    let offer_pc = PeerConnection::create(&factory, &pc_config, offer_deps)
+        .expect("PeerConnection の生成に失敗しました");
+    let (answer_tx, answer_rx) = mpsc::channel::<SignalingState>();
+    let answer_observer =
+        PeerConnectionObserver::new_with_handler(Box::new(SignalingHandler { tx: answer_tx }));
+    let answer_deps = PeerConnectionDependencies::new(&answer_observer);
+    let answer_pc = PeerConnection::create(&factory, &pc_config, answer_deps)
+        .expect("PeerConnection の生成に失敗しました");
+
+    // 送信側で Offer を生成して設定し、HaveLocalOffer になることを確認する。
+    let opts = PeerConnectionOfferAnswerOptions::new();
+    let (offer_desc_tx, offer_desc_rx) = mpsc::channel::<Result<String>>();
+    let mut offer_desc_obs =
+        CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferAnswerHandler {
+            tx: offer_desc_tx,
+        }));
+    offer_pc.create_offer(&mut offer_desc_obs, &opts);
+    let sdp = offer_desc_rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("createOffer がタイムアウトしました")
+        .expect("createOffer が失敗しました");
+
+    let (local_tx, local_rx) = mpsc::channel::<bool>();
+    let local_obs =
+        SetLocalDescriptionObserver::new_with_handler(Box::new(SetDescriptionHandler {
+            tx: local_tx,
+        }));
+    let local_desc =
+        SessionDescription::new(SdpType::Offer, &sdp).expect("Offer の組み立てに失敗しました");
+    offer_pc.set_local_description(local_desc, &local_obs);
+    assert!(
+        local_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("setLocalDescription がタイムアウトしました"),
+        "setLocalDescription が失敗しました"
+    );
+    assert_eq!(
+        offer_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("on_signaling_change (HaveLocalOffer) がタイムアウトしました"),
+        SignalingState::HaveLocalOffer,
+        "setLocalDescription(offer) 後の SignalingState が HaveLocalOffer ではありません"
+    );
+
+    // 受信側に Offer を設定し、HaveRemoteOffer になることを確認する。
+    let (remote_tx, remote_rx) = mpsc::channel::<bool>();
+    let remote_obs =
+        SetRemoteDescriptionObserver::new_with_handler(Box::new(SetDescriptionHandler {
+            tx: remote_tx,
+        }));
+    let remote_desc =
+        SessionDescription::new(SdpType::Offer, &sdp).expect("Offer の組み立てに失敗しました");
+    answer_pc.set_remote_description(remote_desc, &remote_obs);
+    assert!(
+        remote_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("setRemoteDescription がタイムアウトしました"),
+        "setRemoteDescription が失敗しました"
+    );
+    assert_eq!(
+        answer_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("on_signaling_change (HaveRemoteOffer) がタイムアウトしました"),
+        SignalingState::HaveRemoteOffer,
+        "setRemoteDescription(offer) 後の SignalingState が HaveRemoteOffer ではありません"
+    );
+
+    // 受信側で Answer を生成して設定し、Stable に戻ることを確認する。
+    let (answer_desc_tx, answer_desc_rx) = mpsc::channel::<Result<String>>();
+    let mut answer_desc_obs =
+        CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferAnswerHandler {
+            tx: answer_desc_tx,
+        }));
+    answer_pc.create_answer(&mut answer_desc_obs, &opts);
+    let answer_sdp = answer_desc_rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("createAnswer がタイムアウトしました")
+        .expect("createAnswer が失敗しました");
+
+    let (answer_local_tx, answer_local_rx) = mpsc::channel::<bool>();
+    let answer_local_obs =
+        SetLocalDescriptionObserver::new_with_handler(Box::new(SetDescriptionHandler {
+            tx: answer_local_tx,
+        }));
+    let answer_local_desc = SessionDescription::new(SdpType::Answer, &answer_sdp)
+        .expect("Answer の組み立てに失敗しました");
+    answer_pc.set_local_description(answer_local_desc, &answer_local_obs);
+    assert!(
+        answer_local_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("setLocalDescription がタイムアウトしました"),
+        "setLocalDescription が失敗しました"
+    );
+    assert_eq!(
+        answer_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("on_signaling_change (Stable) がタイムアウトしました"),
+        SignalingState::Stable,
+        "setLocalDescription(answer) 後の SignalingState が Stable ではありません"
+    );
+
+    drop(answer_local_obs);
+    drop(answer_desc_obs);
+    drop(remote_obs);
+    drop(local_obs);
+    drop(offer_desc_obs);
+    drop(answer_pc);
+    drop(offer_pc);
+    drop(factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    signaling.stop();
+}
+
+#[test]
 fn media_stream_track_state() {
     // 整数と列挙の対応を確認する。C 側の定数との対応が崩れていないことも見る。
     assert_eq!(

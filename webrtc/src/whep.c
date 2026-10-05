@@ -555,6 +555,12 @@ void SignalingWhep_OnConnectionChange(
   pthread_mutex_unlock(&self->mutex);
 }
 
+void SignalingWhep_OnSignalingChange(
+    webrtc_PeerConnectionInterface_SignalingState new_state,
+    void* user_data) {
+  RTC_LOG_INFO("SignalingWhep_OnSignalingChange: new_state=%d", new_state);
+}
+
 static void SignalingWhep_SetState(struct SignalingWhep* self, int state) {
   pthread_mutex_lock(&self->mutex);
   self->state = state;
@@ -1211,6 +1217,7 @@ struct SignalingWhep* SignalingWhep_Create(struct SignalingWhepConfig* config) {
   struct SignalingWhep* p =
       (struct SignalingWhep*)calloc(1, sizeof(struct SignalingWhep));
   p->ref = webrtc_RefCountInterface_Create(SignalingWhep_delete, p);
+  p->observer_cbs.OnSignalingChange = SignalingWhep_OnSignalingChange;
   p->observer_cbs.OnConnectionChange = SignalingWhep_OnConnectionChange;
   p->observer_cbs.OnTrack = SignalingWhep_OnTrack;
   p->observer_cbs.OnRemoveTrack = SignalingWhep_OnRemoveTrack;

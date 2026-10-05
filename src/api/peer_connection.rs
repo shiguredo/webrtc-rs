@@ -1211,6 +1211,64 @@ impl Drop for PeerConnectionOfferAnswerOptions {
     }
 }
 
+/// SignalingState のラッパー。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SignalingState {
+    Stable,
+    HaveLocalOffer,
+    HaveRemoteOffer,
+    HaveLocalPranswer,
+    HaveRemotePranswer,
+    Closed,
+    Unknown(i32),
+}
+
+impl SignalingState {
+    pub fn from_int(v: i32) -> Self {
+        unsafe {
+            if v == ffi::webrtc_PeerConnectionInterface_SignalingState_kStable {
+                SignalingState::Stable
+            } else if v == ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveLocalOffer {
+                SignalingState::HaveLocalOffer
+            } else if v == ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveRemoteOffer {
+                SignalingState::HaveRemoteOffer
+            } else if v == ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveLocalPranswer {
+                SignalingState::HaveLocalPranswer
+            } else if v == ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveRemotePranswer {
+                SignalingState::HaveRemotePranswer
+            } else if v == ffi::webrtc_PeerConnectionInterface_SignalingState_kClosed {
+                SignalingState::Closed
+            } else {
+                SignalingState::Unknown(v)
+            }
+        }
+    }
+
+    pub fn to_int(self) -> i32 {
+        match self {
+            SignalingState::Stable => unsafe {
+                ffi::webrtc_PeerConnectionInterface_SignalingState_kStable
+            },
+            SignalingState::HaveLocalOffer => unsafe {
+                ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveLocalOffer
+            },
+            SignalingState::HaveRemoteOffer => unsafe {
+                ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveRemoteOffer
+            },
+            SignalingState::HaveLocalPranswer => unsafe {
+                ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveLocalPranswer
+            },
+            SignalingState::HaveRemotePranswer => unsafe {
+                ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveRemotePranswer
+            },
+            SignalingState::Closed => unsafe {
+                ffi::webrtc_PeerConnectionInterface_SignalingState_kClosed
+            },
+            SignalingState::Unknown(v) => v,
+        }
+    }
+}
+
 /// PeerConnectionState のラッパー。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PeerConnectionState {
@@ -1410,6 +1468,8 @@ unsafe impl Send for IceCandidateError {}
 
 pub trait PeerConnectionObserverHandler: Send {
     #[expect(unused_variables)]
+    fn on_signaling_change(&mut self, new_state: SignalingState) {}
+    #[expect(unused_variables)]
     fn on_connection_change(&mut self, new_state: PeerConnectionState) {}
     #[expect(unused_variables)]
     fn on_standardized_ice_connection_change(&mut self, new_state: IceConnectionState) {}
@@ -1428,6 +1488,14 @@ pub trait PeerConnectionObserverHandler: Send {
 }
 
 type PeerConnectionObserverHandlerState = HandlerState<dyn PeerConnectionObserverHandler>;
+
+unsafe extern "C" fn observer_on_signaling_change(new_state: i32, user_data: *mut c_void) {
+    assert!(!user_data.is_null());
+    let state = unsafe { &mut *(user_data as *mut PeerConnectionObserverHandlerState) };
+    state
+        .handler
+        .on_signaling_change(SignalingState::from_int(new_state));
+}
 
 unsafe extern "C" fn observer_on_connection_change(new_state: i32, user_data: *mut c_void) {
     assert!(!user_data.is_null());
@@ -1562,6 +1630,7 @@ impl PeerConnectionObserver {
     pub fn new_with_handler(handler: Box<dyn PeerConnectionObserverHandler>) -> Self {
         let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_PeerConnectionObserver_cbs {
+            OnSignalingChange: Some(observer_on_signaling_change),
             OnStandardizedIceConnectionChange: Some(observer_on_standardized_ice_connection_change),
             OnConnectionChange: Some(observer_on_connection_change),
             OnIceCandidate: Some(observer_on_ice_candidate),
