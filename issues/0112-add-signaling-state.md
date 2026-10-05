@@ -1,7 +1,7 @@
 # SignalingState の変化を購読できるようにする
 
 - Created: 2026-10-05
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-06
 - Branch: feature/add-signaling-state
 - Polished: {YYYY-MM-DD}
 
@@ -48,3 +48,16 @@ C 側には次の欠落がある。
 - `webrtc/src/webrtc_c/api/peer_connection_interface.cc`
 - `webrtc/src/whep.c` と `webrtc/src/whip.c`
 - `skills/shiguredo-webrtc/SKILL.md` (イベント一覧の確認)
+
+## 解決方法
+
+- `src/api/peer_connection.rs` に `SignalingState` を追加し、`PeerConnectionObserverHandler::on_signaling_change` で状態変化を購読できるようにした
+- C API に `webrtc_PeerConnectionInterface_SignalingState` の定数群と `webrtc_PeerConnectionObserver_cbs` の `OnSignalingChange` を追加し、`PeerConnectionObserverImpl::OnSignalingChange` から Rust 側のコールバックへ転送するようにした
+- `webrtc/src/whep.c` と `webrtc/src/whip.c` の `observer_cbs` に `OnSignalingChange` を設定した
+  - コールバックは全関数ポインタが必須のため、設定しないと状態変化時に null 呼び出しになる
+- `src/tests.rs` に `signaling_state_from_int_and_to_int` と `signaling_state_change_is_observed` を追加した
+  - 前者は C 側の 6 定数と `from_int` / `to_int` の対応、および未知の値が `Unknown` として保持されることを確認する
+  - 後者は 2 つの `PeerConnection` で offer / answer を交換し、`HaveLocalOffer` / `HaveRemoteOffer` / `Stable` が observer に届くことを確認する
+- `skills/shiguredo-webrtc/SKILL.md` のイベント一覧を実装に合わせて更新した
+- `CHANGES.md` の `## develop` に `[ADD]` を追記した
+- `cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build --all-targets -- -D warnings` / `cargo test --workspace --features source-build` の成功を確認した
