@@ -1,7 +1,7 @@
 # 参照カウントで複製できる公開型に Clone を実装する
 
 - Created: 2026-10-05
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-05
 - Branch: feature/add-clone-for-refcounted-wrappers
 - Polished: {YYYY-MM-DD}
 
@@ -72,4 +72,17 @@ libwebrtc の `scoped_refptr` と同じように参照カウントで実体を�
 
 ## 解決方法
 
-未着手
+- 「実装する型」の 14 型に `ScopedRef::clone` で参照カウントを増やす `Clone` を実装した
+  - `src/api/audio.rs` の `AudioTrack` / `AudioTrackSource` / `AudioDecoderFactory` / `AudioEncoderFactory`
+  - `src/api/rtp.rs` の `MediaStreamTrack` / `RtpSender` / `RtpReceiver` / `RtpTransceiver`
+  - `src/api/data_channel.rs` の `DataChannel`
+  - `src/api/dtls_transport.rs` の `DtlsTransport`
+  - `src/api/peer_connection.rs` の `PeerConnection` / `PeerConnectionFactory` / `ConnectionContext`
+  - `src/api/video_codec_common.rs` の `EncodedImageBuffer`
+- `Clone` の実装は既存の 6 型と同じく `raw_ref` を `ScopedRef::clone` で複製するだけにした
+- `src/tests.rs` に `audio_refcounted_wrappers_clone` / `rtp_and_peer_connection_refcounted_wrappers_clone` / `encoded_image_buffer_clone` を追加した
+  - 実体のポインタを持つ型はポインタの一致で、`RtpReceiver` と `DtlsTransport` は受信トラックの id と state の一致で実体の共有を確認する
+  - `MediaStreamTrack` と `AudioTrack` は clone 経由の `set_enabled` が元のハンドルから見えることも確認する
+  - いずれも元のハンドルを drop した後に clone を使えることを確認する
+- `CHANGES.md` の `## develop` に `[ADD]` を追記した
+- `cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build --all-targets -- -D warnings` / `cargo test --workspace --features source-build` の成功を確認した

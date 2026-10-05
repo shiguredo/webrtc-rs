@@ -219,6 +219,14 @@ impl AudioDecoderFactory {
     }
 }
 
+impl Clone for AudioDecoderFactory {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
+    }
+}
+
 /// webrtc::AudioEncoderFactory のラッパー。
 pub struct AudioEncoderFactory {
     raw_ref: ScopedRef<AudioEncoderFactoryHandle>,
@@ -245,6 +253,14 @@ impl AudioEncoderFactory {
     }
 }
 
+impl Clone for AudioEncoderFactory {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
+    }
+}
+
 /// webrtc::AudioSourceInterface のラッパー。
 pub struct AudioTrackSource {
     raw_ref: ScopedRef<AudioTrackSourceHandle>,
@@ -263,6 +279,14 @@ impl AudioTrackSource {
 
     pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_AudioSourceInterface_refcounted {
         self.raw_ref.as_refcounted_ptr()
+    }
+}
+
+impl Clone for AudioTrackSource {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
     }
 }
 
@@ -315,6 +339,14 @@ impl AudioTrack {
     pub fn remove_sink(&self, sink: &AudioTrackSink) {
         unsafe {
             ffi::webrtc_AudioTrackInterface_RemoveSink(self.raw_ref.as_ptr(), sink.as_ptr());
+        }
+    }
+}
+
+impl Clone for AudioTrack {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
         }
     }
 }

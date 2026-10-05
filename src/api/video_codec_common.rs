@@ -2616,6 +2616,14 @@ impl EncodedImageBuffer {
     }
 }
 
+impl Clone for EncodedImageBuffer {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
+    }
+}
+
 pub struct EncodedImage {
     raw_unique: NonNull<ffi::webrtc_EncodedImage_unique>,
 }
