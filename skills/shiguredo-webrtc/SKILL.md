@@ -227,7 +227,7 @@ C API のオブジェクトは、所有型と 2 種類の借用型で扱う。
 非 null ポインタは `NonNull` と `ConstNonNull` で表す。`ConstNonNull` は std の `NonNull` が `*mut T` 用の API しか持たないため crate 側で用意している非 null の `*const T` で、借用ハンドルの内部表現にしか使わないためクレート内部の型 (`pub(crate)`) として扱う。
 
 - C API が返すポインタは `expect_non_null` / `expect_non_null_const` で null 検査してから保持する
-- 借用型の `from_raw` / `from_ptr` と、所有権を受け取る `from_unique_ptr` は借用先の寿命や所有権を型で保証できないため `pub(crate)` にしてある。クレート外からは `as_ref()` / `as_mut()` と通常の API を使う。ただし Rust 側で代替できない場合 (JNI から渡されたポインタを取り込む場合など) に限り、用途を限定した `unsafe fn` は公開してよい。その場合は `# Safety` にポインタの出所と所有権・参照カウントの契約を書く (`AudioDeviceModule::from_borrowed_refcounted_ptr` / `AudioDeviceModule::from_refcounted_ptr`)
+- 借用型の `from_raw` / `from_ptr` と、所有権を受け取る `from_unique_ptr` は借用先の寿命や所有権を型で保証できないため `pub(crate)` にしてある。クレート外からは `as_ref()` / `as_mut()` と通常の API を使う。ただし外部が生成・所有するポインタを所有権または参照カウントごと引き受ける必要がある場合 (JNI から渡されたポインタを取り込む場合など) に限り、用途を限定した `unsafe fn` は公開してよい。その場合は `# Safety` にポインタの出所と所有権・参照カウントの契約、誤用した場合の帰結を書く (`AudioDeviceModule::from_borrowed_refcounted_ptr` / `AudioDeviceModule::from_refcounted_ptr`)
 - `pub(crate)` にしたコンストラクタは safe なままでよい。`# Safety` は書かず、crate 内部専用であることと、同じポインタを 2 回渡すと二重解放になるなどの不変条件を書く
 - C API の読み取り専用の借用を返す getter は `XxxRef` が、可変参照を返す getter は `XxxRefMut` が使う (`cast_mut()` は使わない)
 - `_get_const` / `_vector_get_const` / `_inlined_vector_get_const` がある場合、読み取り経路 (所有型の `&self` からコピーや借用を作る場合を含む) は必ず `_const` 版を使う。可変版は書き換える場合だけ使う

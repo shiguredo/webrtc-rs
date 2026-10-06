@@ -11,13 +11,14 @@ use std::slice;
 
 /// webrtc::AudioDeviceModule のラッパー。
 ///
-/// ADM を生成したスレッドと同じスレッドで削除しなければならない。
+/// ADM を生成したスレッドと同じスレッドで使用し、同じスレッドで削除しなければならない。
 pub struct AudioDeviceModule {
     raw_ref: ScopedRef<AudioDeviceModuleHandle>,
 }
 
-// AudioDeviceModule は生成と削除を同じスレッドで実行する必要がある（※）ため Send/Sync にはしない。
-// ※同一スレッドの制約があるのは一部のプラットフォーム（iOS, Android）のみ。実装によってはロックも取っていることもある
+// AudioDeviceModule は生成・使用・削除を同じスレッドで実行する必要がある（※）ため Send/Sync にはしない。
+// ※この制約は libwebrtc の ADM 実装自身が持つ。Windows / iOS / Android / Linux PulseAudio はスレッドチェッカーで
+// 検査し、ALSA と macOS は検査しない（内部の Mutex で保護する）
 
 impl AudioDeviceModule {
     pub fn new(env: &Environment, audio_type: AudioDeviceModuleAudioLayer) -> Result<Self> {
@@ -118,19 +119,21 @@ impl AudioDeviceModule {
     /// 取り込んだ後に `raw_ref` を保持している側が `Release` を呼んだりオブジェクトを
     /// 破棄したりしても、返した [AudioDeviceModule] はそのまま使える。
     ///
-    /// Rust 側の [AudioDeviceModule] が保持している ADM を共有する場合は、
-    /// [AudioDeviceModule::as_refcounted_ptr] の戻り値をそのまま渡す。
-    ///
-    /// `raw_ref` が null の場合は `None` を返す (`from_refcounted_ptr` も同じ)。
+    /// `raw_ref` が null の場合は `None` を返す。
     ///
     /// ```
-    /// use shiguredo_webrtc::AudioDeviceModule;
+    /// use shiguredo_webrtc::{AudioDeviceModule, AudioDeviceModuleAudioLayer, EnvironmentFactory};
     ///
-    /// let adm = unsafe { AudioDeviceModule::from_borrowed_refcounted_ptr(std::ptr::null_mut()) };
-    /// assert!(adm.is_none());
+    /// let env = EnvironmentFactory::new().create();
+    /// let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+    ///     .expect("ADM の生成に失敗しました");
     ///
-    /// let adm = unsafe { AudioDeviceModule::from_refcounted_ptr(std::ptr::null_mut()) };
-    /// assert!(adm.is_none());
+    /// // 借用中のポインタから取り込むと参照カウントが 1 増えるため、元のハンドルを
+    /// // 破棄した後も取り込んだハンドルを使える。
+    /// let shared = unsafe {
+    ///     AudioDeviceModule::from_borrowed_refcounted_ptr(adm.as_refcounted_ptr().cast())
+    /// };
+    /// assert!(shared.is_some());
     /// ```
     ///
     /// # Safety
@@ -168,6 +171,8 @@ impl AudioDeviceModule {
     /// 同じポインタを 2 回この関数に渡してはならない。取り込んだ参照の所有権は返り値が
     /// 引き受けるため、同じ参照を 2 回取り込むと二重解放になる。
     ///
+    /// 呼び出した後、渡した参照を解放してはならない。
+    ///
     /// ADM を生成したスレッドと同じスレッドで呼び出すこと ([AudioDeviceModule] のスレッドの
     /// 契約)。
     pub unsafe fn from_refcounted_ptr(raw_ref: *mut c_void) -> Option<Self> {
@@ -177,14 +182,21 @@ impl AudioDeviceModule {
         })
     }
 
+    /// この ADM の生ポインタを返す。
+    ///
+    /// 参照カウントは変えず、所有権も引き受けない。返したポインタが有効なのは `self` の
+    /// 生存中だけである。
     pub fn as_ptr(&self) -> *mut ffi::webrtc_AudioDeviceModule {
         self.raw_ref.as_ptr()
     }
 
     /// この ADM が保持している参照の refcounted ポインタを返す。
     ///
-    /// 参照カウントは変えず、所有権も移動しない。このポインタが指す参照を別の
-    /// [AudioDeviceModule] と共有する場合は [AudioDeviceModule::from_borrowed_refcounted_ptr] に
+    /// 参照カウントは変えず、所有権も引き受けない。返したポインタが有効なのは `self` の
+    /// 生存中だけである。
+    ///
+    /// このポインタが指す参照を別の [AudioDeviceModule] と共有する場合は `*mut c_void` に
+    /// キャストし、借用中のポインタとして [AudioDeviceModule::from_borrowed_refcounted_ptr] に
     /// 渡す。所有権を受け取る [AudioDeviceModule::from_refcounted_ptr] に渡してはならない。
     pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_AudioDeviceModule_refcounted {
         self.raw_ref.as_refcounted_ptr()
