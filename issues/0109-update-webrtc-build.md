@@ -1,7 +1,7 @@
 # webrtc-build を m154.8037.4.1 に更新する
 
 - Created: 2026-10-05
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-06
 - Branch: feature/update-webrtc-build
 - Polished: {YYYY-MM-DD}
 
@@ -38,4 +38,11 @@ webrtc-build の `m154.8037.4.1` のビルドが完了し、GitHub Release が�
 
 ## 解決方法
 
-（詳細は polish / 実装時に確定する）
+`Cargo.toml` の `package.metadata.external-dependencies.webrtc-build` を `m154.8037.4.1` に更新した。`0.154.1-canary.5` をリリースし、GitHub Release に `libwebrtc_c-android_arm64.tar.gz` を添付した。
+
+その prebuilt に同梱される `jar/webrtc.jar` に、次が含まれる。
+
+- `org.webrtc.audio.JavaAudioDeviceModule` の `pauseRecording` / `resumeRecording`
+- `org.webrtc.AudioTrackSink`
+
+`CHANGES.md` の `## develop` に、libwebrtc を m154.8037.4.1 へ上げた `[UPDATE]` を記載した。Android ターゲットへ `android_audio_pause_resume.patch` と `android_audio_track_sink.patch` が適用されることをその項目に書いた。
