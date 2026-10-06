@@ -36,7 +36,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 薄いラッパー (`XxxRef` / `XxxRefMut` のアクセサなど) は型ごとの網羅テストを書かない。FFI の関数名とシグネチャは bindgen 生成のバインディングでコンパイル時に検査され、setter と getter の往復テストの実体は libwebrtc 側の挙動の確認になるためである。代わりに次の 3 つで守る。
 
 - 借用ハンドル経由の書き換えが所有型に反映されることを、機構 (スカラー / map / vector / フレーム) ごとに 1 本ずつ確認する
-- 型システムの保証 (`XxxRefMut` が `Deref` を実装しない / `'_` に縛る / 可変ハンドルを 2 本作れない / 生ポインタや所有権を受け取るコンストラクタが crate 外から呼べない) は、クレートドキュメントの `compile_fail` doctest で固定する
+- 型システムの保証 (`XxxRefMut` が `Deref` を実装しない / `'_` に縛る / 可変ハンドルを 2 本作れない / 汎用の生ポインタや所有権を受け取るコンストラクタが crate 外から呼べない) は、クレートドキュメントの `compile_fail` doctest で固定する
 - この crate 固有のロジック (`Option` の `has` / `value` 変換、UTF-8 変換、境界チェック、既定値、判定関数) は網羅的にテストする
 
 ## ビルド設定 (`Cargo.toml` メタデータ)
@@ -228,6 +228,7 @@ C API のオブジェクトは、所有型と 2 種類の借用型で扱う。
 
 - C API が返すポインタは `expect_non_null` / `expect_non_null_const` で null 検査してから保持する
 - 借用型の `from_raw` / `from_ptr` と、所有権を受け取る `from_unique_ptr` は借用先の寿命や所有権を型で保証できないため `pub(crate)` にしてある。クレート外からは `as_ref()` / `as_mut()` と通常の API を使う
+- 外部で作成したオブジェクトを取り込む用途に限定した `unsafe fn` は、`# Safety` に契約を書いたうえで公開する (`AudioDeviceModule::from_borrowed_refcounted_ptr` / `AudioDeviceModule::from_refcounted_ptr`)
 - `pub(crate)` にしたコンストラクタは safe なままでよい。`# Safety` は書かず、crate 内部専用であることと、同じポインタを 2 回渡すと二重解放になるなどの不変条件を書く
 - C API の読み取り専用の借用を返す getter は `XxxRef` が、可変参照を返す getter は `XxxRefMut` が使う (`cast_mut()` は使わない)
 - `_get_const` / `_vector_get_const` / `_inlined_vector_get_const` がある場合、読み取り経路 (所有型の `&self` からコピーや借用を作る場合を含む) は必ず `_const` 版を使う。可変版は書き換える場合だけ使う

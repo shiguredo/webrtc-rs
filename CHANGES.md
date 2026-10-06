@@ -91,6 +91,11 @@
 - [ADD] `PeerConnectionObserverHandler::on_signaling_change` を追加する
   - `SignalingState` で offer / answer の交換状態を購読できるようにする
   - @melpon
+- [ADD] 外部で作成した `AudioDeviceModule` を Rust 側で取り込めるようにする
+  - `AudioDeviceModule::from_refcounted_ptr` を追加し、所有権を持つ refcounted ポインタを `unsafe fn` で取り込めるようにする
+  - `AudioDeviceModule::from_borrowed_refcounted_ptr` を追加し、参照カウントを増やして借用中の refcounted ポインタを `unsafe fn` で取り込めるようにする
+  - null ポインタは `None` で表し、取り込む側が panic せずに扱えるようにする
+  - @voluntas
 - [UPDATE] `Error` の表示メッセージを英語にする
   - 利用者に見えるエラーメッセージを英語に統一する
   - @melpon
@@ -162,6 +167,9 @@
 - [UPDATE] webrtc_c の `api/environment.h` を `api/environment/environment.h` / `api/environment/environment_factory.h` / `api/field_trials.h` / `api/field_trials_view.h` に分割する
   - 追加する型が増えたため、元の C++ ファイルのパスに合わせて分割する
   - @melpon
+- [UPDATE] `src/lib.rs` の compile_fail doctest の説明を更新する
+  - 用途を限定した `unsafe fn` を公開する例外を反映する
+  - @voluntas
 
 ## 0.154.0
 

@@ -10,6 +10,8 @@ use std::ptr::NonNull;
 use std::slice;
 
 /// webrtc::AudioDeviceModule のラッパー。
+///
+/// ADM を生成したスレッドと同じスレッドで操作し、同じスレッドで削除しなければならない。
 pub struct AudioDeviceModule {
     raw_ref: ScopedRef<AudioDeviceModuleHandle>,
 }
@@ -110,6 +112,51 @@ impl AudioDeviceModule {
         };
         let raw_ref = ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw);
         Self { raw_ref }
+    }
+
+    /// Rust の外で作成された ADM を、借用中の refcounted ポインタから取り込む。
+    ///
+    /// 参照カウントを 1 増やしてから保持するため、呼び出し側が持つ参照は消費しない。
+    /// 取り込んだ後に `raw_ref` を保持している側が `Release` を呼んだりオブジェクトを
+    /// 破棄したりしても、返した [AudioDeviceModule] はそのまま使える。
+    ///
+    /// `raw_ref` が null の場合は `None` を返す。
+    ///
+    /// # Safety
+    ///
+    /// `raw_ref` が null でない場合、`raw_ref` は有効な `webrtc::AudioDeviceModule` の
+    /// refcounted ポインタを指し、その参照カウントが 1 以上であること。また、この呼び出しの
+    /// 間に他の場所が最後の参照を解放しないこと。
+    ///
+    /// ADM を生成したスレッドと同じスレッドで呼び出すこと ([AudioDeviceModule] のスレッドの
+    /// 契約)。
+    pub unsafe fn from_borrowed_refcounted_ptr(raw_ref: *mut c_void) -> Option<Self> {
+        let raw_ref = NonNull::new(raw_ref.cast::<ffi::webrtc_AudioDeviceModule_refcounted>())?;
+        Some(Self {
+            raw_ref: ScopedRef::<AudioDeviceModuleHandle>::from_borrowed_raw(raw_ref),
+        })
+    }
+
+    /// Rust の外で作成された ADM を、所有権を持つ refcounted ポインタから取り込む。
+    ///
+    /// 参照カウントを増やさずに保持するため、`webrtc_CreateJavaAudioDeviceModule` の
+    /// 戻り値のように呼び出し側が参照 1 つ分の所有権を持つポインタを渡す。渡した参照の
+    /// 所有権は返り値に移るため、呼び出し側は渡した参照を解放してはならない。
+    ///
+    /// `raw_ref` が null の場合は `None` を返す。
+    ///
+    /// # Safety
+    ///
+    /// `raw_ref` が null でない場合、`raw_ref` は有効な `webrtc::AudioDeviceModule` の
+    /// refcounted ポインタを指し、その参照 1 つ分の所有権が呼び出し側にあること。
+    ///
+    /// ADM を生成したスレッドと同じスレッドで呼び出すこと ([AudioDeviceModule] のスレッドの
+    /// 契約)。
+    pub unsafe fn from_refcounted_ptr(raw_ref: *mut c_void) -> Option<Self> {
+        let raw_ref = NonNull::new(raw_ref.cast::<ffi::webrtc_AudioDeviceModule_refcounted>())?;
+        Some(Self {
+            raw_ref: ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw_ref),
+        })
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_AudioDeviceModule {
