@@ -92,8 +92,8 @@ mod compile_fail_doctests {
     //! # let _ = (a, b);
     //! ```
     //!
-    //! 所有権や生ポインタを受け取るコンストラクタは crate 内部専用のため、crate 外からは呼べない
-    //! (E0624)。
+    //! 汎用の所有権・生ポインタ API は crate 内部専用のため、crate 外からは呼べない (E0624)。
+    //! 外部で作成したオブジェクトを取り込む用途に限定した `unsafe fn` は公開している。
     //!
     //! ```compile_fail,E0624
     //! use std::ptr::NonNull;

@@ -1,7 +1,7 @@
 # 外部で作成した AudioDeviceModule を Rust 側で取り込めるようにする
 
 - Created: 2026-10-06
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-06
 - Branch: feature/add-adopt-external-audio-device-module
 - Polished: 2026-10-06
 
@@ -34,6 +34,8 @@ Sora Kotlin SDK 側の呼び分けと実機での接続確認は、本 issue の
 
 ## 設計方針
 
+以下の設計方針は起票時のものである。最終的な API は `## 解決方法` を参照 (引数は `NonNull<ffi::webrtc_AudioDeviceModule_refcounted>`、戻り値は `Self`、取り込みは所有側の 1 つに絞り、借用中のポインタは呼び出し側が `AddRef` する)。
+
 - Java 側で作成した `JavaAudioDeviceModule` を置き換えず、その native ADM を共有する。ネイティブ側で別の ADM を作って差し替えることはしない
 - 生ポインタを受け取る API は `unsafe fn` とし、`# Safety` に契約を書く (`issues/0104-bug-safe-api-use-after-free.md` / `issues/0107-bug-safe-api-data-race.md` と同じ方針)
 - 所有権の意味が異なる 2 つのコンストラクタを分ける
@@ -62,4 +64,17 @@ Sora Kotlin SDK 側の呼び分けと実機での接続確認は、本 issue の
 
 ## 解決方法
 
-未着手
+外部で作成された ADM を所有権付きで取り込む `AudioDeviceModule::from_refcounted_ptr` を追加した。`unsafe fn` で、引数は `NonNull<ffi::webrtc_AudioDeviceModule_refcounted>`、戻り値は `Self` である。null は型で排除するため呼び出し側で `NonNull::new` する。
+
+- 所有権を持つ refcounted ポインタを取り込み、参照カウントを増やさずに `ScopedRef::from_raw` で保持する
+- 借用中のポインタを取り込む場合は、呼び出し側で `webrtc_AudioDeviceModule_AddRef` を呼んで参照 1 つ分の所有権を用意してから渡す。`webrtc_CreateJavaAudioDeviceModule` の戻り値はそのまま渡せる
+- 所有権・参照カウント・スレッドの契約、誤用した場合の帰結、ポインタの出所は `from_refcounted_ptr` の `# Safety` と型 `AudioDeviceModule` の Rustdoc に書いた。`as_ptr` / `as_refcounted_ptr` には、参照カウントを変えず所有権も引き受けないこと、返したポインタが有効なのは `self` の生存中だけであること、`AddRef` してから取り込む手順を書いた
+
+`src/tests.rs` に 2 つのテストを追加した。破棄の観測点には `AudioDeviceModule::new_with_handler` に渡したハンドラの `Drop` (ADM の `OnDestroy` から `destroy_handler` を経て呼ばれる) を使った。
+
+- 借用中のポインタを `AddRef` してから取り込むと、1 つ目のハンドルを drop した後も 2 つ目のハンドルが使え、2 つ目のハンドルを drop したときに 1 回だけ破棄されること
+- 呼び出し側が唯一の参照を持つ状態で取り込むと参照カウントが増えず、drop したときに 1 回だけ破棄されること
+
+`from_refcounted_ptr` の Rustdoc には、外部クレートとしてコンパイルされる doctest で借用中のポインタを `AddRef` してから取り込む例を載せ、公開 API であることを固定した。あわせて `src/lib.rs` の `compile_fail_doctests` と `skills/shiguredo-webrtc/SKILL.md` の同趣旨の記述を更新し、`CHANGES.md` の `## develop` に `[ADD]` と `### misc` の `[UPDATE]` を追記した。
+
+`cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build --all-targets -- -D warnings` / `cargo test --workspace --features source-build` が通ることを確認した。

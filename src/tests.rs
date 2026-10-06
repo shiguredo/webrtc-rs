@@ -4,7 +4,7 @@ use std::cell::Cell;
 use std::ptr::NonNull;
 use std::sync::{
     Arc, Mutex,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicUsize, Ordering},
     mpsc,
 };
 use std::time::Duration;
@@ -1964,6 +1964,108 @@ fn audio_device_module_handler_requires_only_send() {
     // 呼び出しごとに trampoline が &mut self でハンドラを呼ぶため、状態が保持される。
     assert_eq!(adm.recording_devices(), 1);
     assert_eq!(adm.recording_devices(), 2);
+}
+
+/// ADM が破棄されたことをハンドラの破棄で観測するためのハンドラ。
+///
+/// `AudioDeviceModule::new_with_handler` が設定する `OnDestroy` は `destroy_handler` を
+/// 通してハンドラの `Box` を破棄するため、ハンドラの `Drop` は ADM の破棄と同じ回数だけ
+/// 呼ばれる。参照カウントを読む C API は無いので、これを ADM の破棄の観測点にする。
+///
+/// `count` は `recording_devices` の呼び出し回数であり、取り込んだハンドルが生きた
+/// ハンドラへ到達できていることの確認に使う。
+struct TestDestroyCountingHandler {
+    destroyed: Arc<AtomicUsize>,
+    count: i32,
+}
+
+impl Drop for TestDestroyCountingHandler {
+    fn drop(&mut self) {
+        self.destroyed.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+impl AudioDeviceModuleHandler for TestDestroyCountingHandler {
+    fn recording_devices(&mut self) -> i16 {
+        self.count += 1;
+        self.count as i16
+    }
+}
+
+#[test]
+fn audio_device_module_from_refcounted_ptr_shares_adm_after_add_ref() {
+    let destroyed = Arc::new(AtomicUsize::new(0));
+    let adm = AudioDeviceModule::new_with_handler(Box::new(TestDestroyCountingHandler {
+        destroyed: Arc::clone(&destroyed),
+        count: 0,
+    }));
+
+    // 借用中のポインタを共有するため、呼び出し側で参照カウントを 1 増やしてから渡す。
+    let raw_ref = NonNull::new(adm.as_refcounted_ptr())
+        .expect("AudioDeviceModule のポインタが null になりました");
+    unsafe { ffi::webrtc_AudioDeviceModule_AddRef(adm.as_ptr()) };
+    let shared = unsafe { AudioDeviceModule::from_refcounted_ptr(raw_ref) };
+    assert_eq!(
+        shared.recording_devices(),
+        1,
+        "取り込んだハンドルからハンドラに到達できませんでした"
+    );
+
+    // 1 つ目のハンドルを drop しても参照が残るため、ADM は破棄されない。
+    drop(adm);
+    assert_eq!(
+        destroyed.load(Ordering::SeqCst),
+        0,
+        "参照が残っているはずの段階で ADM が破棄されました"
+    );
+    // 同じハンドラが生きているため、呼び出し回数はそのまま増える。
+    assert_eq!(
+        shared.recording_devices(),
+        2,
+        "取り込んだハンドルから同じハンドラに到達できませんでした"
+    );
+
+    // 2 つ目のハンドルを drop すると参照が無くなり、1 回だけ破棄される。
+    drop(shared);
+    assert_eq!(
+        destroyed.load(Ordering::SeqCst),
+        1,
+        "最後の参照を drop したのに ADM が破棄されませんでした"
+    );
+}
+
+#[test]
+fn audio_device_module_from_refcounted_ptr_takes_ownership() {
+    let destroyed = Arc::new(AtomicUsize::new(0));
+    let adm = AudioDeviceModule::new_with_handler(Box::new(TestDestroyCountingHandler {
+        destroyed: Arc::clone(&destroyed),
+        count: 0,
+    }));
+    let raw_ref = NonNull::new(adm.as_refcounted_ptr())
+        .expect("AudioDeviceModule のポインタが null になりました");
+    // 所有権付きの取り込みへ参照 1 つ分を渡すため、adm は drop せずに参照を手放す。
+    std::mem::forget(adm);
+
+    // 参照カウントを増やさずに取り込み、取り込んだハンドルが唯一の参照になる。
+    let owned = unsafe { AudioDeviceModule::from_refcounted_ptr(raw_ref) };
+    assert_eq!(
+        destroyed.load(Ordering::SeqCst),
+        0,
+        "取り込み直後に ADM が破棄されました"
+    );
+    assert_eq!(
+        owned.recording_devices(),
+        1,
+        "取り込んだハンドルからハンドラに到達できませんでした"
+    );
+
+    // 唯一の参照を drop したので 1 回だけ破棄される。参照が余分に残っていれば破棄されない。
+    drop(owned);
+    assert_eq!(
+        destroyed.load(Ordering::SeqCst),
+        1,
+        "唯一の参照を drop したのに ADM が破棄されませんでした"
+    );
 }
 
 #[test]

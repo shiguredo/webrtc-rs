@@ -10,6 +10,10 @@ use std::ptr::NonNull;
 use std::slice;
 
 /// webrtc::AudioDeviceModule のラッパー。
+///
+/// この ADM を生成したスレッドと同じスレッドで利用し、同じスレッドで破棄すること。
+/// `PeerConnectionFactory` に渡した後は libwebrtc が内部の worker thread からこの ADM を呼ぶため、
+/// 別スレッドから直接呼ばないこと ([AudioDeviceModuleHandler] と同じ契約)。
 pub struct AudioDeviceModule {
     raw_ref: ScopedRef<AudioDeviceModuleHandle>,
 }
@@ -20,6 +24,7 @@ pub struct AudioDeviceModule {
 // unsafe impl Sync for AudioDeviceModule {}
 
 impl AudioDeviceModule {
+    /// 指定した音声レイヤーの ADM を生成する。
     pub fn new(env: &Environment, audio_type: AudioDeviceModuleAudioLayer) -> Result<Self> {
         let raw = NonNull::new(unsafe {
             ffi::webrtc_CreateAudioDeviceModule(env.as_ptr(), audio_type.to_int())
@@ -112,10 +117,28 @@ impl AudioDeviceModule {
         Self { raw_ref }
     }
 
+    /// Rust の外で作成された ADM を、所有権を持つ refcounted ポインタから取り込む。
+    ///
+    /// 参照カウントを増やさずに保持するため、呼び出し側が参照の所有権を持つポインタを渡すこと。
+    ///
+    /// # Safety
+    ///
+    /// `raw_ref` は有効な `webrtc::AudioDeviceModule` の refcounted ポインタを指し、その参照
+    /// 1 つ分の所有権が呼び出し側にあること。
+    pub unsafe fn from_refcounted_ptr(
+        raw_ref: NonNull<ffi::webrtc_AudioDeviceModule_refcounted>,
+    ) -> Self {
+        Self {
+            raw_ref: ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw_ref),
+        }
+    }
+
+    /// この ADM の生ポインタを返す。
     pub fn as_ptr(&self) -> *mut ffi::webrtc_AudioDeviceModule {
         self.raw_ref.as_ptr()
     }
 
+    /// この ADM が保持している参照の refcounted ポインタを返す。
     pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_AudioDeviceModule_refcounted {
         self.raw_ref.as_refcounted_ptr()
     }
