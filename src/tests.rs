@@ -1976,7 +1976,7 @@ fn audio_device_module_handler_requires_only_send() {
 /// ハンドラへ到達できていることの確認に使う。
 struct TestDestroyCountingHandler {
     destroyed: Arc<AtomicUsize>,
-    count: Cell<i32>,
+    count: i32,
 }
 
 impl Drop for TestDestroyCountingHandler {
@@ -1987,8 +1987,8 @@ impl Drop for TestDestroyCountingHandler {
 
 impl AudioDeviceModuleHandler for TestDestroyCountingHandler {
     fn recording_devices(&mut self) -> i16 {
-        self.count.set(self.count.get() + 1);
-        self.count.get() as i16
+        self.count += 1;
+        self.count as i16
     }
 }
 
@@ -1997,7 +1997,7 @@ fn audio_device_module_from_borrowed_refcounted_ptr_keeps_adm_alive() {
     let destroyed = Arc::new(AtomicUsize::new(0));
     let adm = AudioDeviceModule::new_with_handler(Box::new(TestDestroyCountingHandler {
         destroyed: Arc::clone(&destroyed),
-        count: Cell::new(0),
+        count: 0,
     }));
 
     // 借用中のポインタから取り込むと参照カウントが 1 増える。
@@ -2038,7 +2038,7 @@ fn audio_device_module_from_refcounted_ptr_takes_ownership() {
     let destroyed = Arc::new(AtomicUsize::new(0));
     let adm = AudioDeviceModule::new_with_handler(Box::new(TestDestroyCountingHandler {
         destroyed: Arc::clone(&destroyed),
-        count: Cell::new(0),
+        count: 0,
     }));
     let raw_ref = adm.as_refcounted_ptr();
     // 所有権付きの取り込みへ参照 1 つ分を渡すため、adm は drop せずに参照を手放す。

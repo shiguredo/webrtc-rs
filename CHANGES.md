@@ -171,6 +171,9 @@
 - [UPDATE] `src/lib.rs` の compile_fail doctest の説明を更新する
   - 用途を限定した `unsafe fn` を公開する例外を反映する
   - @voluntas
+- [UPDATE] `ScopedRef` の `Clone` の参照カウント増加を `from_borrowed_raw` に委譲する
+  - 参照カウントを増やして保持する処理を 1 箇所にまとめる (挙動は変更しない)
+  - @voluntas
 
 ## 0.154.0
 
