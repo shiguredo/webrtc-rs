@@ -1,7 +1,7 @@
 # safe API だけでデータ競合に到達できる箇所を無くす
 
 - Created: 2026-09-20
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-07
 - Branch: feature/fix-safe-api-data-race
 - Polished: 2026-10-06
 
@@ -211,4 +211,34 @@ libwebrtc の独自パッチ、未取り込み変更の backport、`make_ref_cou
 
 ## 解決方法
 
-未実装。上記の対応順で進め、実装完了後に変更内容と検証結果を記載する。
+### 共有 callback と排他契約
+
+- ログ、カスタム映像バッファ、音声・映像 factory、映像・音声 sink、エンコード完了 callback、SDP 完了 observer の計 12 系統を `Send + Sync` と `&self` に変更した。通常の trampoline は共有参照を使い、最終破棄時の所有権回収と区別した。カスタム映像バッファのスレッド固定状態と検査も削除し、handler state を既存の共通型へ揃えた
+- `src/api/video_codec_common.rs` の I420 / NV12 の全画素書き込み API を unsafe にし、書き込み先または返却領域に重なる Rust 参照の生存禁止と、cast・VideoFrame・native 利用者を含む排他条件を記載した。stride の余白を含む返却領域の有効期間全体が対象で、返却 slice からの有効な再借用と由来ポインタの同期利用は許可する。`as_native_mut` は返却参照が生存する全期間の排他を要求する
+- `src/rtc_base/logging.rs` の `initialize_logging` を unsafe にし、WebRTC 利用・ログ出力の開始前の初期適用と、再適用を含む呼び出し中の全体排他を要求した。遅い初期化・再適用が `false` を返す動作は維持した
+- `src/api/audio_device_module.rs` の 4 個の直接操作と、`PeerConnectionFactoryDependencies::set_audio_device_module` を unsafe にした。ハンドル・clone・factory・native・callback からの同時操作と再入を排除し、異なる worker thread の factory 間での共有を禁止した
+- `PeerConnectionDependencies::new`、`DataChannel::register_observer`、`DtlsTransport::register_observer` に、observer の生存期間、1 登録先だけでの利用、同時・再入 callback の排除を要求する unsafe 契約を設けた。DTLS の登録・解除は owning network thread で行う unsafe 操作とした。PC observer の保持期間は dependencies の生存中と、生成した PC の close 復帰または全ハンドル破棄までに揃えた
+- `src/util.rs` の `RawBufferWriter` の `Send` を `T: Send` に限定し、`SdpAudioFormatRef` の readonly な `Send` の根拠を記載した。codec 本体と ADM の直列 handler は `Send` と `&mut self` を維持した
+
+### 利用箇所と native 通知入口
+
+- 既存テストと WHIP / WHEP の handler を新しい trait に合わせ、unsafe 呼び出しの排他・生存期間の根拠を記載した
+- `README.md` と `skills/shiguredo-webrtc/SKILL.md` の factory 生成例を unsafe な ADM 引き渡しへ追従させ、掲載コードのコンパイルを確認した
+- WHIP / WHEP は接続中の再 connect を拒否し、Drop で factory・native thread が生存する間に PC と observer を破棄する。WHEP は close の復帰後に sink と remote track を解除するため、保留中の OnTrack による再保持を排除する
+- `webrtc/src/webrtc_c/api/media_stream_interface.h` / `.cc` に、public virtual method を直接転送する `webrtc_AudioTrackSinkInterface_OnData` を追加した。実際に 2 個の remote audio track へ登録した sink の並行通知を検証できる
+- `CHANGES.md` に `[CHANGE]`、`[ADD]`、`[FIX]` を記載した。`webrtc/src/webrtc_c/rtc_base/logging.h` は C の整形チェックで検出した macro の空白・改行だけを整えた
+
+### 検証
+
+- 実物の C ラッパーを使い、ログの並行通知、映像バッファの全 callback の重複とスレッド移動、排他的書き込み後の共有画素読み取り、実 Opus factory の並行利用、2 映像 source への sink 登録、2 encoder への完了 callback 登録、映像 factory の全通知入口、2 remote audio track への sink 登録、異なる signaling thread の 2 PC による SDP observer の成功・失敗・完了通知を検証した
+- SDP の通知は操作ごとに両 PC の通知完了を待ってから次へ進める。各 callback は有限の待ち合わせを使い、両通知がタイムアウトせず重なったことを検証する
+- 音声 sink とエンコード完了 callback の重複通知は、実登録を行ったうえで public C 通知入口を直接呼ぶ検証である。RTP の受信・デコードや実圧縮による通知の全経路を検証したとはしない
+- WHIP / WHEP の再 connect と自動 Drop、実 remote video track の保持から WHEP の Closed 通知・sink 解除までの順序を検証した。モック・スタブ・未修正 UB の実行は用いていない
+- logging の初期適用・暗黙初期化後の拒否・再適用と並行通知は独立プロセスで検証した
+- 新しい 21 個の unsafe API と `RawBufferWriter` の Send 制約に、22 個の compile-fail テストを追加した
+- `cargo test --workspace --features source-build` と同じコマンドの `--release` は、それぞれ 240 件成功した。内訳は lib 170 件、libyuv 35 件、WHEP 2 件、WHIP 1 件、通常 doctest 2 件、compile-fail doctest 30 件である
+- `cargo fmt --all -- --check`、`cargo clippy --workspace --features source-build --all-targets -- -D warnings`、`python3 webrtc/run.py format --check`、`git diff --check` が通過した
+
+### 保証の範囲
+
+本 issue が依存する 3 系統の observer 登録は、上記の unsafe 契約で安全化した。0104 にあるその他の非所有登録の生存期間は、共有 handler の変更だけで解消したとはしない。エンコード完了 callback についても、生存中の重複通知の安全性と、登録先より先に破棄しない責務は別である。
