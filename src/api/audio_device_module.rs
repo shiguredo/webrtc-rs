@@ -11,16 +11,19 @@ use std::slice;
 
 /// webrtc::AudioDeviceModule のラッパー。
 ///
-/// ADM を生成したスレッドと同じスレッドで使用し、同じスレッドで削除しなければならない。
+/// この ADM のメソッドを利用者が直接呼ぶ場合は、同じスレッドから呼ぶこと。`PeerConnectionFactory`
+/// に渡した後は libwebrtc が内部の worker thread からこの ADM を呼ぶため、別スレッドから直接呼ぶと
+/// 同時に呼ばれることになる ([AudioDeviceModuleHandler] と同じ契約)。
 pub struct AudioDeviceModule {
     raw_ref: ScopedRef<AudioDeviceModuleHandle>,
 }
 
-// AudioDeviceModule は生成・使用・削除を同じスレッドで実行する必要がある（※）ため Send/Sync にはしない。
-// ※この制約は libwebrtc の ADM 実装自身が持つ。Windows / iOS / Android / Linux PulseAudio はスレッドチェッカーで
-// 検査し、ALSA と macOS は検査しない（内部の Mutex で保護する）
+// AudioDeviceModule は利用者が同じスレッドから扱う必要がある（※）ため Send/Sync にはしない。
+// ※libwebrtc の ADM 実装は公開メソッドを同じスレッドから呼ぶ前提で、iOS / Android / Linux PulseAudio は
+// デバッグビルドでスレッドチェッカーにより検査する。Windows / ALSA / macOS は検査せず内部の Mutex で保護する
 
 impl AudioDeviceModule {
+    /// 指定した音声レイヤーの ADM を生成する。
     pub fn new(env: &Environment, audio_type: AudioDeviceModuleAudioLayer) -> Result<Self> {
         let raw = NonNull::new(unsafe {
             ffi::webrtc_CreateAudioDeviceModule(env.as_ptr(), audio_type.to_int())
@@ -128,8 +131,7 @@ impl AudioDeviceModule {
     /// let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
     ///     .expect("ADM の生成に失敗しました");
     ///
-    /// // 借用中のポインタから取り込むと参照カウントが 1 増えるため、元のハンドルを
-    /// // 破棄した後も取り込んだハンドルを使える。
+    /// // 借用中のポインタから取り込むと参照カウントが 1 増える。
     /// let shared = unsafe {
     ///     AudioDeviceModule::from_borrowed_refcounted_ptr(adm.as_refcounted_ptr().cast())
     /// };
@@ -142,12 +144,13 @@ impl AudioDeviceModule {
     /// refcounted ポインタを指し、その参照カウントが 1 以上であること。また、この呼び出しの
     /// 間に他の場所が最後の参照を解放しないこと。
     ///
-    /// 渡す参照は借用中のものでなければならない。参照 1 つ分の所有権を持つポインタ
-    /// (`webrtc_CreateJavaAudioDeviceModule` の戻り値など) を渡すと解放する者がいなくなり
-    /// 参照が 1 つリークするため、その場合は [AudioDeviceModule::from_refcounted_ptr] を使うこと。
+    /// 渡す参照は借用中のものでなければならない。Java 側が参照を保持している
+    /// `JavaAudioDeviceModule.getNative(long)` の戻り値のようなポインタであり、参照 1 つ分の
+    /// 所有権を持つポインタ (`webrtc_CreateJavaAudioDeviceModule` の戻り値など) を渡すと
+    /// 解放する者がいなくなり参照が 1 つリークするため、その場合は
+    /// [AudioDeviceModule::from_refcounted_ptr] を使うこと。
     ///
-    /// ADM を生成したスレッドと同じスレッドで呼び出すこと ([AudioDeviceModule] のスレッドの
-    /// 契約)。
+    /// ADM のメソッドを別スレッドから直接呼ばないこと ([AudioDeviceModule] のスレッドの契約)。
     pub unsafe fn from_borrowed_refcounted_ptr(raw_ref: *mut c_void) -> Option<Self> {
         let raw_ref = NonNull::new(raw_ref.cast::<ffi::webrtc_AudioDeviceModule_refcounted>())?;
         Some(Self {
@@ -159,7 +162,7 @@ impl AudioDeviceModule {
     ///
     /// 参照カウントを増やさずに保持するため、`webrtc_CreateJavaAudioDeviceModule` の
     /// 戻り値のように呼び出し側が参照 1 つ分の所有権を持つポインタを渡す。渡した参照の
-    /// 所有権は返り値が引き受けるため、呼び出し側は渡した参照を解放してはならない。
+    /// 所有権は返り値が引き受ける。
     ///
     /// `raw_ref` が null の場合は `None` を返す。
     ///
@@ -171,10 +174,10 @@ impl AudioDeviceModule {
     /// 同じポインタを 2 回この関数に渡してはならない。取り込んだ参照の所有権は返り値が
     /// 引き受けるため、同じ参照を 2 回取り込むと二重解放になる。
     ///
-    /// 呼び出した後、渡した参照を解放してはならない。
+    /// 呼び出した後、渡した参照を解放してはならない。借用中のポインタを渡した場合は、
+    /// 呼び出し側の解放と返り値の解放で過剰に解放される。
     ///
-    /// ADM を生成したスレッドと同じスレッドで呼び出すこと ([AudioDeviceModule] のスレッドの
-    /// 契約)。
+    /// ADM のメソッドを別スレッドから直接呼ばないこと ([AudioDeviceModule] のスレッドの契約)。
     pub unsafe fn from_refcounted_ptr(raw_ref: *mut c_void) -> Option<Self> {
         let raw_ref = NonNull::new(raw_ref.cast::<ffi::webrtc_AudioDeviceModule_refcounted>())?;
         Some(Self {
