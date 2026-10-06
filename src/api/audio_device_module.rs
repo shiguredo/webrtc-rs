@@ -19,17 +19,17 @@ pub struct AudioDeviceModule {
 }
 
 // AudioDeviceModule は生成したスレッドと同じスレッドで扱う必要がある（※）ため Send/Sync にはしない。
-// ※libwebrtc の ADM 実装は公開メソッドを同じスレッドから呼ぶ前提で、iOS / Android / Linux PulseAudio は
-// デバッグビルドでスレッドチェッカーにより検査する。Windows / ALSA / macOS は検査せず内部の Mutex で保護する
-// (audio_device_ios.h / audio_device_module.cc / audio_device_pulse_linux.h / audio_device_core_win.h /
-// audio_device_alsa_linux.h / audio_device_mac.h)
+// ※libwebrtc の ADM 実装は公開メソッドを同じスレッドから呼ぶ前提で、同じスレッド以外から呼ばれたことを
+// 検出できるのは iOS / Android / Linux PulseAudio のスレッドチェッカーと、全プラットフォーム共通の
+// AudioDeviceBuffer の検査だけで、いずれもデバッグビルドのみ有効である
+// (audio_device_ios.h / audio_device_module.cc / audio_device_pulse_linux.h / audio_device_buffer.h)
 
 impl AudioDeviceModule {
     /// 指定した音声レイヤーの ADM を生成する。
     ///
     /// 専用のファクトリが必要なレイヤー (`WindowsCoreAudio2` と Android 系) は生成できず `Err` を
-    /// 返す。Android では Java 側で作成した ADM を [AudioDeviceModule::from_refcounted_ptr] で
-    /// 取り込む。
+    /// 返す。Android では Java 側で作成した ADM に `webrtc_AudioDeviceModule_AddRef` を呼んで
+    /// 参照 1 つ分の所有権を用意してから [AudioDeviceModule::from_refcounted_ptr] で取り込む。
     pub fn new(env: &Environment, audio_type: AudioDeviceModuleAudioLayer) -> Result<Self> {
         let raw = NonNull::new(unsafe {
             ffi::webrtc_CreateAudioDeviceModule(env.as_ptr(), audio_type.to_int())
@@ -40,6 +40,8 @@ impl AudioDeviceModule {
     }
 
     /// Rust 側で拡張可能な AudioDeviceModule を生成する。
+    ///
+    /// `handler` は ADM が保持し、ADM の破棄時 (`OnDestroy`) に破棄される。
     pub fn new_with_handler(handler: Box<dyn AudioDeviceModuleHandler>) -> Self {
         let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let mut cbs = ffi::webrtc_AudioDeviceModule_cbs {
@@ -125,9 +127,10 @@ impl AudioDeviceModule {
     /// Rust の外で作成された ADM を、所有権を持つ refcounted ポインタから取り込む。
     ///
     /// 参照カウントを増やさずに保持するため、呼び出し側が参照 1 つ分の所有権を持つポインタを渡す。
-    /// `webrtc_CreateJavaAudioDeviceModule` の戻り値や、借用中のポインタに対して
-    /// `webrtc_AudioDeviceModule_AddRef` を呼んで用意した参照を渡す。渡した参照の所有権は返り値が
-    /// 引き受ける。
+    /// `webrtc_CreateJavaAudioDeviceModule` の戻り値はそのまま渡せる。Java の
+    /// `JavaAudioDeviceModule.getNative(long)` が返すポインタのような借用中のポインタは、
+    /// `webrtc_AudioDeviceModule_AddRef` で参照カウントを 1 増やしてから渡す。JNI から得た
+    /// ポインタは `*mut ffi::webrtc_AudioDeviceModule_refcounted` にキャストして渡す。
     ///
     /// ```
     /// use shiguredo_webrtc::{AudioDeviceModule, AudioDeviceModuleAudioLayer, EnvironmentFactory, ffi};
@@ -139,14 +142,13 @@ impl AudioDeviceModule {
     ///
     /// // 借用中のポインタを取り込む場合は、参照カウントを 1 増やしてから渡す。
     /// let raw_ref = NonNull::new(adm.as_refcounted_ptr()).expect("ADM のポインタが null です");
-    /// unsafe {
-    ///     let raw = ffi::webrtc_AudioDeviceModule_refcounted_get(raw_ref.as_ptr());
-    ///     ffi::webrtc_AudioDeviceModule_AddRef(raw);
-    /// }
-    /// let shared = unsafe { AudioDeviceModule::from_refcounted_ptr(raw_ref) };
+    /// unsafe { ffi::webrtc_AudioDeviceModule_AddRef(adm.as_ptr()) };
+    /// let mut shared = unsafe { AudioDeviceModule::from_refcounted_ptr(raw_ref) };
     /// drop(adm);
     ///
-    /// // Dummy の ADM は録音デバイスを持たないため -1 を返す。
+    /// // 借用元を破棄した後も取り込んだハンドルは使える。Dummy の ADM は録音デバイスを
+    /// // 持たないため -1 を返す。
+    /// shared.init().expect("ADM の初期化に失敗しました");
     /// assert_eq!(shared.recording_devices(), -1);
     /// ```
     ///
@@ -158,8 +160,9 @@ impl AudioDeviceModule {
     /// 同じポインタを 2 回この関数に渡してはならない。取り込んだ参照の所有権は返り値が
     /// 引き受けるため、同じ参照を 2 回取り込むと二重解放になる。
     ///
-    /// 呼び出した後、渡した参照を解放してはならない。借用中のポインタをそのまま渡した場合は、
-    /// 呼び出し側の解放と返り値の解放で過剰に解放される。
+    /// 呼び出した後、渡した参照 (渡すために用意した 1 つ分) を解放してはならない。借用中の
+    /// ポインタをそのまま渡した場合は、呼び出し側の解放と返り値の解放で過剰に解放される。
+    /// 取り込み元のハンドルが持つ参照は、そのハンドルが解放してよい。
     ///
     /// ADM のメソッドを別スレッドから直接呼ばないこと ([AudioDeviceModule] のスレッドの契約)。
     pub unsafe fn from_refcounted_ptr(
@@ -183,8 +186,10 @@ impl AudioDeviceModule {
     /// 参照カウントは変えず、所有権も引き受けない。返したポインタが有効なのは `self` の
     /// 生存中だけである。
     ///
-    /// この参照を別の [AudioDeviceModule] と共有する場合は、`webrtc_AudioDeviceModule_AddRef` で
-    /// 参照カウントを 1 増やしてから [AudioDeviceModule::from_refcounted_ptr] に渡す。
+    /// Rust 側のハンドルを増やすだけなら [AudioDeviceModule::clone] を使う。外部から渡された
+    /// 借用中のポインタを取り込む場合は、`webrtc_AudioDeviceModule_AddRef` で参照カウントを
+    /// 1 増やしてから [AudioDeviceModule::from_refcounted_ptr] に渡す (`AddRef` は
+    /// [AudioDeviceModule::as_ptr] が返すポインタを取る)。
     pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_AudioDeviceModule_refcounted {
         self.raw_ref.as_refcounted_ptr()
     }

@@ -2003,10 +2003,7 @@ fn audio_device_module_from_refcounted_ptr_shares_adm_after_add_ref() {
     // 借用中のポインタを共有するため、呼び出し側で参照カウントを 1 増やしてから渡す。
     let raw_ref = NonNull::new(adm.as_refcounted_ptr())
         .expect("AudioDeviceModule のポインタが null になりました");
-    unsafe {
-        let raw = ffi::webrtc_AudioDeviceModule_refcounted_get(raw_ref.as_ptr());
-        ffi::webrtc_AudioDeviceModule_AddRef(raw);
-    }
+    unsafe { ffi::webrtc_AudioDeviceModule_AddRef(adm.as_ptr()) };
     let shared = unsafe { AudioDeviceModule::from_refcounted_ptr(raw_ref) };
     assert_eq!(
         shared.recording_devices(),

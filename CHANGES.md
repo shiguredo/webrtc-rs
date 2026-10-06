@@ -94,7 +94,7 @@
 - [ADD] 外部で作成した `AudioDeviceModule` を Rust 側で取り込めるようにする
   - `AudioDeviceModule::from_refcounted_ptr` を追加し、所有権を持つ refcounted ポインタを `unsafe fn` で取り込めるようにする
   - 引数は `NonNull<ffi::webrtc_AudioDeviceModule_refcounted>` とし、null は型で排除する
-  - 借用中のポインタを取り込む場合は、呼び出し側で `AddRef` して参照 1 つ分の所有権を用意してから渡す
+  - 借用中のポインタを取り込む場合は、呼び出し側で `webrtc_AudioDeviceModule_AddRef` して参照 1 つ分の所有権を用意してから渡す
   - @voluntas
 - [UPDATE] `Error` の表示メッセージを英語にする
   - 利用者に見えるエラーメッセージを英語に統一する
@@ -170,9 +170,6 @@
   - @melpon
 - [UPDATE] `src/lib.rs` の compile_fail doctest の説明を更新する
   - 用途を限定した `unsafe fn` を公開する例外を反映する
-  - @voluntas
-- [UPDATE] `ScopedRef` の `Clone` の参照カウント増加を `from_borrowed_raw` に委譲する
-  - 参照カウントを増やして保持する処理を 1 箇所にまとめる (挙動は変更しない)
   - @voluntas
 
 ## 0.154.0

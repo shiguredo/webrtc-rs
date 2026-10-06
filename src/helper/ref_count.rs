@@ -42,22 +42,6 @@ impl<H: RefCountedHandle> ScopedRef<H> {
         }
     }
 
-    /// 借用中の refcounted ポインタから生成する crate 内部専用のコンストラクタ。
-    ///
-    /// `raw_ref` が指す実体の参照カウントを 1 増やしてから保持するため、
-    /// 呼び出し側が持つ参照は消費しない。
-    ///
-    /// `raw_ref` は有効な実体を指し、参照カウントが 1 以上であること。`H::get` が null を
-    /// 返した場合は panic する。
-    pub(crate) fn from_borrowed_raw(raw_ref: NonNull<H::Refcounted>) -> Self {
-        let raw = expect_non_null(unsafe { H::get(raw_ref.as_ptr()) }, "RefCountedHandle::get");
-        unsafe { H::add_ref(raw.as_ptr()) };
-        Self {
-            raw_ref,
-            _marker: PhantomData,
-        }
-    }
-
     pub(crate) fn as_refcounted_ptr(&self) -> *mut H::Refcounted {
         self.raw_ref.as_ptr()
     }
@@ -74,7 +58,12 @@ impl<H: RefCountedHandle> ScopedRef<H> {
 
 impl<H: RefCountedHandle> Clone for ScopedRef<H> {
     fn clone(&self) -> Self {
-        Self::from_borrowed_raw(self.raw_ref)
+        let raw = self.raw();
+        unsafe { H::add_ref(raw.as_ptr()) };
+        Self {
+            raw_ref: self.raw_ref,
+            _marker: PhantomData,
+        }
     }
 }
 
