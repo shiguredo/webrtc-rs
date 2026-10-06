@@ -72,7 +72,7 @@ LogSink の `handler_state` も `&mut LogSinkHandlerState` を返す。ハンド
 
 カスタム映像バッファの debug 用 `callback_thread` は通常の `Option<ThreadId>` であり、trampoline が `&mut` を作った後に読み書きされる。release には存在せず、直列のスレッド移動まで拒否するため、排他の保証には使えない。
 
-### (4) 同じ sink を複数の登録先で使えるハンドラ
+### (4) 同じ sink / 完了 callback を複数の登録先で使えるハンドラ
 
 `VideoSink` / `AudioTrackSink` の登録 API は `&self` と `&sink` を取るため、同じ sink を複数の track に登録できる。登録先が別スレッドで配信する場合は同時呼び出しになる。
 
@@ -80,6 +80,10 @@ LogSink の `handler_state` も `&mut LogSinkHandlerState` を返す。ハンド
 - `RemoteAudioSource::OnData` (`pc/remote_audio_source.cc`) は source ごとの `sink_lock_` の下で audio sink を呼ぶ
 
 これらのロックは登録先をまたぐ排他を保証しない。現在の `VideoSinkHandler` / `AudioTrackSinkHandler` は `Send` と `&mut self` を使い、trampoline も可変 state を作るため、複数登録は本 issue の必須修正対象である。
+
+`VideoEncoderEncodedImageCallbackHandler` (`src/api/video_encoder.rs`) も `Send` と `&mut self` を使い、`video_encoder_encoded_image_callback_on_encoded_image` は可変 state を作る。safe な `VideoEncoder::register_encode_complete_callback` は `VideoEncoderEncodedImageCallbackRefMut<'_>` を受け取るが、借用は登録呼び出しだけで終わり、同じ callback を複数の encoder に逐次登録できる。
+
+`webrtc/src/webrtc_c/api/video_codecs/video_encoder.cc` の `webrtc_VideoEncoder_RegisterEncodeCompleteCallback` は非所有の callback ポインタを native encoder へ渡す。例えば `modules/video_coding/codecs/vp8/libvpx_vp8_encoder.cc` の `LibvpxVp8Encoder::RegisterEncodeCompleteCallback` は `encoded_complete_callback_ = callback;` で保存し、エンコード時に `OnEncodedImage` を呼ぶ。各 encoder が一意所有でも、別スレッドに移した 2 個の encoder から同じ完了 callback へ通知できるため、encoder 本体の直列性だけではこの handler の排他を保証できない。
 
 ### (5) `Send` の根拠を確認する型
 
@@ -94,6 +98,16 @@ LogSink の `handler_state` も `&mut LogSinkHandlerState` を返す。ハンド
 
 設定が先行するログ出力で確定した場合や、既に初期化済みの場合の `false` は native の仕様である。これと、初回の設定適用中に別スレッドからログを出す競合は区別する。
 
+### (7) 共有 ADM の直接操作と native 呼び出し
+
+`AudioDeviceModule` (`src/api/audio_device_module.rs`) は `Clone` を持つが `Send` / `Sync` を持たない。一方、safe な `PeerConnectionFactoryDependencies::set_audio_device_module` (`src/api/peer_connection.rs`) は同じ ADM を `scoped_refptr` で保存し、dependencies 自体は `Send` である。元の ADM を生成スレッドに残しても、dependencies を渡した先の native worker は同じ実体を呼べる。同じ ADM を 2 個の dependencies に設定し、異なる factory から使うことも safe API では禁止されていない。
+
+`pc/connection_context.cc` の `ConnectionContext::AddRefMediaEngine` は worker thread 上で `media_engine_->Init()` を呼ぶ。`media/engine/webrtc_voice_engine.cc` の `WebRtcVoiceEngine::Init` は `adm_helpers::Init(adm())` と `RegisterAudioCallback` を呼び、`media/engine/adm_helpers.cc` の `Init` は `adm->Init()` などを呼ぶ。これらと元のハンドルの safe な `init` / `recording_devices` / `recording_device_name` / `set_recording_device` が重なると、同じ `adm_state` が排他参照を重複生成する。`AudioDeviceModuleHandler` の `Send` と `&mut self` は、1 個の native 利用者の直列呼び出しだけを根拠にしている。
+
+未登録のカスタム ADM でも、handler が同じ実体の別ハンドルへ再入すれば排他参照は重なる。例えば `recording_devices(&self)` の callback が thread-local に保持した同じ ADM の `recording_devices` を再度呼ぶ場合、Rust の共有借用は通るが、両 trampoline は `&mut AudioDeviceModuleHandlerState` を作る。`&mut self` を取る直接操作も、`Clone` で作った別ハンドル経由の再入を防げない。
+
+`issues/closed/0104-change-adm-handler-bounds.md` は native 利用中の直接操作を Rustdoc で禁止する方針を採っているが、safe API からの到達を防いでいない。本 issue では通常の native 呼び出しの直列性と、共有・直接操作・再入の排他契約を区別して安全化する。
+
 ### 対象外 (調査の結果 safe API からデータ競合に到達しないと確認したもの)
 
 - `BufferRef` / `BufferRefMut` / `BufferS16Ref` / `BufferS16RefMut` (`src/rtc_base/buffer.rs`): 借用が生きている間は元の `Buffer` を可変で借りられないため、別スレッドの読み書きと競合しない
@@ -102,7 +116,7 @@ LogSink の `handler_state` も `&mut LogSinkHandlerState` を返す。ハンド
 
 ## 設計方針
 
-共有実体への書き込みは `unsafe fn` の排他契約とし、並行 callback が到達する handler は `Send + Sync` と共有参照で扱う。既存の `Send` と `Clone` は維持する。handler が可変状態を持つ場合は、実装側で Mutex や atomic などにより保護する。
+共有実体への書き込みと、直列性を内部で保証できない ADM の利用は `unsafe fn` の排他契約とし、並行 callback を許す handler は `Send + Sync` と共有参照で扱う。既存の `Send` と `Clone` は維持する。handler が可変状態を持つ場合は、実装側で Mutex や atomic などにより保護する。
 
 libwebrtc の独自パッチ、未取り込み変更の backport、`make_ref_counted` の内部型に依存する唯一性判定は採らない。既存の LoggingConfig 経路を使い、legacy な `AddLogToStream` 経路へ切り替えない。
 
@@ -135,11 +149,13 @@ libwebrtc の独自パッチ、未取り込み変更の backport、`make_ref_cou
 
 通常 callback の入口で state 自体を可変借用せず、handler 内で必要な状態だけを保護する。最終破棄時に Box の所有権を回収する処理とは区別する。`VideoFrameBuffer::as_native_mut` は unsafe のままとし、返した可変参照の有効期間全体で他の参照と callback を排除する契約を維持する。
 
-### (4) 複数登録できる sink
+### (4) 複数登録できる sink / 完了 callback
 
-- `VideoSinkHandler` / `AudioTrackSinkHandler` は `Send + Sync` とし、全メソッドを `&self` にする。対応する全 trampoline を共有参照へ変更する
-- 同じ sink が複数の登録先から同時に呼ばれても、Rust の排他参照を重複生成しない設計にする。1 sink 1 登録先という文書化だけで解決したことにしない
-- 登録中の生存期間と解除後の破棄の契約は 0104 で扱う。handler の共有参照化では use-after-free は解消しない
+- `VideoSinkHandler` / `AudioTrackSinkHandler` / `VideoEncoderEncodedImageCallbackHandler` は `Send + Sync` とし、全メソッドを `&self` にする。対応する全 trampoline を共有参照へ変更する
+- 同じ sink / 完了 callback が複数の登録先から同時に呼ばれても、Rust の排他参照を重複生成しない設計にする。1 sink / callback につき 1 登録先という文書化だけで解決したことにしない
+- video / audio sink の登録中の生存期間と解除後の破棄の契約は 0104 で扱う。handler の共有参照化では use-after-free は解消しない
+
+エンコード完了 callback についても、共有参照化が保証するのは callback が生存している間の重複通知の安全性である。非所有登録の生存期間の安全化はデータ競合とは別の問題として扱い、共有参照化だけで解消したとはしない。
 
 ### (5) `Send` の宣言
 
@@ -154,26 +170,34 @@ libwebrtc の独自パッチ、未取り込み変更の backport、`make_ref_cou
 
 ログ severity の設定・フィルタリング機能、`log::print` の文字列の扱い、ログの付加情報を増やす変更は、本 issue のデータ競合修正には含めない。上流のログレベル修正を待つことと、現在の API の安全性を直すことを混同しない。
 
+### (7) ADM の共有と直接操作
+
+- `PeerConnectionFactoryDependencies::set_audio_device_module` を `unsafe fn` にする。`# Safety` には、dependencies への設定時から native 利用の終了まで、同じ ADM の callback が他の factory・元のハンドル・clone からの操作と同時または再入で重ならないことを要求する。異なる worker thread の factory 間で共有しないことも明記する
+- `AudioDeviceModule::init` / `recording_devices` / `recording_device_name` / `set_recording_device` を `unsafe fn` にする。呼び出し中は同じ実体への他の直接操作・native 呼び出し・callback からの再入が無いことを `# Safety` に要求する。getter も可変 handler を呼ぶため対象に含める
+- `AudioDeviceModuleHandler` の `Send` と `&mut self`、ADM の `Clone` と `!Send` / `!Sync` は維持する。通常の native 呼び出しの直列性を、共有ハンドルの直接操作まで safe にする根拠として使わない
+- 既存のテスト・サンプルでは、factory への引き渡し前の直接操作と引き渡し後の native 利用を区別し、同時・再入 callback を排除する根拠を示す。unsafe 化対象を safe に呼べないことも確認し、未修正の競合や排他参照の重複を実行して検証しない
+
 ### 対応順
 
 1. LogSink の trait・trampoline と LoggingConfig 初期化を安全化し、利用箇所とテストを更新する。この段階で SDK が安全な LoggingConfig 経路へ接続できる
 2. I420 / NV12 の全画素書き込み操作と、カスタム VideoFrameBuffer の全 callback を安全化する
-3. 共有 audio factory と複数登録できる video / audio sink を安全化する
-4. `Send` の根拠を反映し、0104 と組み合わせた observer 登録の排他条件を確認する
+3. 共有 audio factory と複数登録できる video / audio sink、エンコード完了 callback を安全化する
+4. ADM の共有・直接操作の排他契約と `Send` の根拠を反映し、0104 と組み合わせた observer 登録の排他条件を確認する
 
 各段階で必要な公開 API の変更と検証を行い、全段階の完了をもって本 issue を完了とする。
 
 ## 完了条件
 
 - I420 / NV12 の可変 slice と `scale_from` / `crop_and_scale_from` が safe API から呼べず、書き込み同士と読み取り・書き込みの排他契約が `# Safety` に記載されていること。cast と VideoFrame 経由の共有も含むこと
-- `LogSinkHandler` / `VideoFrameBufferHandler` / `AudioEncoderFactoryHandler` / `AudioDecoderFactoryHandler` / `VideoSinkHandler` / `AudioTrackSinkHandler` が `Send + Sync` と `&self` を使い、通常 callback の trampoline も共有参照を使うこと
+- `LogSinkHandler` / `VideoFrameBufferHandler` / `AudioEncoderFactoryHandler` / `AudioDecoderFactoryHandler` / `VideoSinkHandler` / `AudioTrackSinkHandler` / `VideoEncoderEncodedImageCallbackHandler` が `Send + Sync` と `&self` を使い、通常 callback の trampoline も共有参照を使うこと
 - カスタム VideoFrameBuffer の getter を含む callback に可変 state の生成が残らず、debug / release の両方で並行アクセスと直列のスレッド移動を扱えること
 - `initialize_logging` が unsafe となり、初期化順序と並行 native ログ出力の排除契約、初期化失敗時の `false` の意味が記載されていること
 - 上記の公開 API に合わせて既存の handler 実装、テスト、サンプルが更新され、unsafe 呼び出しの排他条件が確認できること
-- 実物の C ラッパーを通じ、複数スレッドの LogSink、clone した映像バッファと audio factory、複数登録先の sink の callback を検証すること。モックやスタブ、未修正の UB を実行するテストは使わないこと
+- 実物の C ラッパーを通じ、複数スレッドの LogSink、clone した映像バッファと audio factory、複数登録先の sink / エンコード完了 callback を検証すること。モックやスタブ、未修正の UB を実行するテストは使わないこと
 - logging のグローバル初期化の検証は独立プロセスで行い、初期適用・再適用の結果と複数スレッドからのログ受信を検証すること
 - 直列性を前提にする handler の Rustdoc が保証の範囲を示し、observer の登録 API で同時・再入 callback が排除されていること。0104 の登録 API の安全化が未完了なら、本 issue 全体を完了としないこと
 - `SdpAudioFormatRef` の readonly な `Send` の根拠がコメントに記載され、`RawBufferWriter` の `Send` が `T: Send` に限定されていること
+- ADM の factory 引き渡しと 4 個の直接操作が unsafe となり、native 利用者・他のハンドル・callback からの同時・再入を排除する契約が記載されていること。`AudioDeviceModuleHandler` は `Send` と `&mut self` を維持し、通常の直列呼び出しを実物の C ラッパーで検証すること
 - `unsafe impl Send` / `Sync` を追加・変更した箇所には、その根拠がコメントで書かれていること
 - `src/tests.rs` の既存テストがパスすること
 - `cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build --all-targets -- -D warnings` / `cargo test --workspace --features source-build` が通ること
