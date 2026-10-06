@@ -713,9 +713,12 @@ fn scalability_mode_round_trip() {
 #[test]
 fn i420_buffer_and_video_frame() {
     let mut buf = I420Buffer::new(4, 4);
-    buf.y_data_mut().fill(0x10);
-    buf.u_data_mut().fill(0x80);
-    buf.v_data_mut().fill(0x90);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { buf.y_data_mut() }.fill(0x10);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { buf.u_data_mut() }.fill(0x80);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { buf.v_data_mut() }.fill(0x90);
 
     let frame_buffer = buf.cast_to_video_frame_buffer();
     let frame = VideoFrame::builder(&frame_buffer)
@@ -817,9 +820,12 @@ fn video_codec_ref_getter_setter_and_simulcast_stream_ref_roundtrip() {
 #[test]
 fn i420_buffer_mutable_planes_and_video_frame_rtp_timestamp() {
     let mut buf = I420Buffer::new(4, 4);
-    buf.y_data_mut().fill(0x11);
-    buf.u_data_mut().fill(0x22);
-    buf.v_data_mut().fill(0x33);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { buf.y_data_mut() }.fill(0x11);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { buf.u_data_mut() }.fill(0x22);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { buf.v_data_mut() }.fill(0x33);
     assert!(buf.y_data().iter().all(|&v| v == 0x11));
     assert!(buf.u_data().iter().all(|&v| v == 0x22));
     assert!(buf.v_data().iter().all(|&v| v == 0x33));
@@ -837,9 +843,12 @@ fn i420_buffer_mutable_planes_and_video_frame_rtp_timestamp() {
 #[test]
 fn video_frame_clone() {
     let mut buf = I420Buffer::new(4, 4);
-    buf.y_data_mut().fill(0x44);
-    buf.u_data_mut().fill(0x55);
-    buf.v_data_mut().fill(0x66);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { buf.y_data_mut() }.fill(0x44);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { buf.u_data_mut() }.fill(0x55);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { buf.v_data_mut() }.fill(0x66);
 
     let frame_buffer = buf.cast_to_video_frame_buffer();
     let frame = VideoFrame::builder(&frame_buffer)
@@ -864,9 +873,12 @@ fn video_frame_clone() {
 #[test]
 fn video_frame_ref_to_owned() {
     let mut buf = I420Buffer::new(4, 4);
-    buf.y_data_mut().fill(0x77);
-    buf.u_data_mut().fill(0x88);
-    buf.v_data_mut().fill(0x99);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { buf.y_data_mut() }.fill(0x77);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { buf.u_data_mut() }.fill(0x88);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { buf.v_data_mut() }.fill(0x99);
 
     let frame_buffer = buf.cast_to_video_frame_buffer();
     let frame = VideoFrame::builder(&frame_buffer)
@@ -1058,7 +1070,8 @@ fn i420_buffer_data_and_data_mut_use_contiguous_memory_with_padding() {
     assert_eq!(buf.v_data().as_ptr() as usize - base, len_y + len_u);
 
     {
-        let data = buf.data_mut();
+        // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+        let data = unsafe { buf.data_mut() };
         data[0] = 0x11;
         data[len_y] = 0x22;
         data[len_y + len_u] = 0x33;
@@ -1085,10 +1098,12 @@ fn nv12_buffer_planes_kind_and_to_i420() {
         (buf.stride_uv() as usize) * (height as usize).div_ceil(2)
     );
 
-    for (i, v) in buf.y_data_mut().iter_mut().enumerate() {
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    for (i, v) in unsafe { buf.y_data_mut() }.iter_mut().enumerate() {
         *v = (i as u8).wrapping_add(0x10);
     }
-    for uv in buf.uv_data_mut().as_chunks_mut::<2>().0 {
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    for uv in unsafe { buf.uv_data_mut() }.as_chunks_mut::<2>().0 {
         uv[0] = 0x44;
         uv[1] = 0x88;
     }
@@ -1155,7 +1170,8 @@ fn nv12_buffer_data_and_data_mut_use_contiguous_memory_with_padding() {
     assert_eq!(buf.uv_data().as_ptr() as usize - base, len_y);
 
     {
-        let data = buf.data_mut();
+        // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+        let data = unsafe { buf.data_mut() };
         data[0] = 0x11;
         data[len_y] = 0x22;
         data[total_len - 1] = 0x33;
@@ -1169,14 +1185,17 @@ fn nv12_buffer_data_and_data_mut_use_contiguous_memory_with_padding() {
 #[test]
 fn nv12_buffer_crop_and_scale_from() {
     let mut src = NV12Buffer::new(4, 4);
-    src.y_data_mut().fill(0x11);
-    for uv in src.uv_data_mut().as_chunks_mut::<2>().0 {
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { src.y_data_mut() }.fill(0x11);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    for uv in unsafe { src.uv_data_mut() }.as_chunks_mut::<2>().0 {
         uv[0] = 0x22;
         uv[1] = 0x66;
     }
 
     let mut dst = NV12Buffer::new(2, 2);
-    dst.crop_and_scale_from(&src, 0, 0, 4, 4);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { dst.crop_and_scale_from(&src, 0, 0, 4, 4) };
 
     assert!(dst.y_data().iter().all(|&v| v == 0x11));
     for uv in dst.uv_data().as_chunks::<2>().0 {
@@ -1207,11 +1226,14 @@ fn video_frame_buffer_handler_native_roundtrip() {
             2
         }
 
-        fn to_i420(&mut self) -> Option<I420Buffer> {
+        fn to_i420(&self) -> Option<I420Buffer> {
             let mut buffer = I420Buffer::new(2, 2);
-            buffer.y_data_mut().fill(0x12);
-            buffer.u_data_mut().fill(0x34);
-            buffer.v_data_mut().fill(0x56);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.y_data_mut() }.fill(0x12);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.u_data_mut() }.fill(0x34);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.v_data_mut() }.fill(0x56);
             Some(buffer)
         }
     }
@@ -1260,11 +1282,14 @@ fn video_frame_buffer_handler_custom_type_roundtrip() {
             2
         }
 
-        fn to_i420(&mut self) -> Option<I420Buffer> {
+        fn to_i420(&self) -> Option<I420Buffer> {
             let mut buffer = I420Buffer::new(2, 2);
-            buffer.y_data_mut().fill(0x77);
-            buffer.u_data_mut().fill(0x88);
-            buffer.v_data_mut().fill(0x99);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.y_data_mut() }.fill(0x77);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.u_data_mut() }.fill(0x88);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.v_data_mut() }.fill(0x99);
             Some(buffer)
         }
     }
@@ -1298,7 +1323,7 @@ fn video_frame_buffer_handler_to_i420_none() {
             2
         }
 
-        fn to_i420(&mut self) -> Option<I420Buffer> {
+        fn to_i420(&self) -> Option<I420Buffer> {
             None
         }
     }
@@ -1317,9 +1342,12 @@ fn video_frame_buffer_handler_to_i420_none() {
 #[test]
 fn video_frame_buffer_crop_and_scale_from_i420_buffer() {
     let mut src = I420Buffer::new(4, 4);
-    src.y_data_mut().fill(0x10);
-    src.u_data_mut().fill(0x20);
-    src.v_data_mut().fill(0x30);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { src.y_data_mut() }.fill(0x10);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { src.u_data_mut() }.fill(0x20);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { src.v_data_mut() }.fill(0x30);
 
     let mut frame_buffer = src.cast_to_video_frame_buffer();
     let scaled = frame_buffer
@@ -1355,12 +1383,12 @@ fn video_frame_buffer_handler_crop_and_scale_callback() {
             8
         }
 
-        fn to_i420(&mut self) -> Option<I420Buffer> {
+        fn to_i420(&self) -> Option<I420Buffer> {
             Some(I420Buffer::new(8, 8))
         }
 
         fn crop_and_scale(
-            &mut self,
+            &self,
             offset_x: i32,
             offset_y: i32,
             crop_width: i32,
@@ -1415,11 +1443,14 @@ fn video_frame_buffer_handler_crop_and_scale_fallback() {
             4
         }
 
-        fn to_i420(&mut self) -> Option<I420Buffer> {
+        fn to_i420(&self) -> Option<I420Buffer> {
             let mut buffer = I420Buffer::new(4, 4);
-            buffer.y_data_mut().fill(0x55);
-            buffer.u_data_mut().fill(0x66);
-            buffer.v_data_mut().fill(0x77);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.y_data_mut() }.fill(0x55);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.u_data_mut() }.fill(0x66);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.v_data_mut() }.fill(0x77);
             Some(buffer)
         }
     }
@@ -1447,11 +1478,14 @@ fn video_frame_buffer_as_native_roundtrip() {
             2
         }
 
-        fn to_i420(&mut self) -> Option<I420Buffer> {
+        fn to_i420(&self) -> Option<I420Buffer> {
             let mut buffer = I420Buffer::new(2, 2);
-            buffer.y_data_mut().fill(self.value);
-            buffer.u_data_mut().fill(0x01);
-            buffer.v_data_mut().fill(0x02);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.y_data_mut() }.fill(self.value);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.u_data_mut() }.fill(0x01);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.v_data_mut() }.fill(0x02);
             Some(buffer)
         }
     }
@@ -1494,11 +1528,14 @@ fn video_frame_buffer_as_native_clone_and_frame_buffer() {
             2
         }
 
-        fn to_i420(&mut self) -> Option<I420Buffer> {
+        fn to_i420(&self) -> Option<I420Buffer> {
             let mut buffer = I420Buffer::new(2, 2);
-            buffer.y_data_mut().fill(self.value);
-            buffer.u_data_mut().fill(0x11);
-            buffer.v_data_mut().fill(0x22);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.y_data_mut() }.fill(self.value);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.u_data_mut() }.fill(0x11);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { buffer.v_data_mut() }.fill(0x22);
             Some(buffer)
         }
     }
@@ -1540,7 +1577,7 @@ fn video_frame_buffer_as_native_returns_none_for_builtin_buffers() {
             1
         }
 
-        fn to_i420(&mut self) -> Option<I420Buffer> {
+        fn to_i420(&self) -> Option<I420Buffer> {
             Some(I420Buffer::new(1, 1))
         }
     }
@@ -1610,7 +1647,7 @@ fn video_frame_buffer_as_i420_and_as_nv12_return_none_for_native() {
             2
         }
 
-        fn to_i420(&mut self) -> Option<I420Buffer> {
+        fn to_i420(&self) -> Option<I420Buffer> {
             Some(I420Buffer::new(2, 2))
         }
     }
@@ -1622,9 +1659,32 @@ fn video_frame_buffer_as_i420_and_as_nv12_return_none_for_native() {
 
 #[test]
 fn logging_functions_are_callable() {
+    // グローバル初期化はこのテストだけを実行する独立プロセスで検証する。
+    if std::env::var_os("WEBRTC_LOG_FUNCTIONS_CHILD").is_none() {
+        for mode in ["explicit", "implicit"] {
+            let output = std::process::Command::new(
+                std::env::current_exe().expect("テスト実行ファイルを取得できません"),
+            )
+            .args(["--exact", "tests::logging_functions_are_callable"])
+            .env("WEBRTC_LOG_FUNCTIONS_CHILD", mode)
+            .output()
+            .expect("独立プロセスを実行できません");
+            assert!(
+                output.status.success(),
+                "ログ初期化の {mode} 検証に失敗しました: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        return;
+    }
+    if std::env::var("WEBRTC_LOG_FUNCTIONS_CHILD").expect("検証モードがありません") == "implicit"
+    {
+        log::print(log::Severity::Info, "implicit", 0, "暗黙のログ初期化の検証");
+        // 暗黙の初期化後だが、別スレッドからのログ出力は行っていない。
+        assert!(!unsafe { log::initialize_logging(log::LoggingConfig::new()) });
+        return;
+    }
     // severity は Info にしておく。実際のログ内容は検証しない。
-    // initialize_logging は最初のログ出力前に呼ぶ必要があるが、テストの実行順序は
-    // 保証されないため戻り値の検証は行わない。
     let mut config = log::LoggingConfig::new();
     config.set_min_severity(log::Severity::Info);
     config.set_debug_severity(log::Severity::Info);
@@ -1640,8 +1700,11 @@ fn logging_functions_are_callable() {
     assert!(config.log_queue_name());
     assert!(config.log_to_stderr());
     assert_eq!(config.log_prefix().unwrap(), "prefix");
-    log::initialize_logging(config);
-    log::print(log::Severity::Info, "webrtc-c", 0, "log test");
+    // 他の WebRTC API もログ出力もまだ呼んでおらず、並行するテストは無い。
+    assert!(unsafe { log::initialize_logging(config) });
+    // 再適用中にも他のスレッドは WebRTC を利用しない。
+    assert!(!unsafe { log::initialize_logging(log::LoggingConfig::new()) });
+    log::print(log::Severity::Info, "webrtc-c", 0, "ログ関数の検証");
 }
 
 #[test]
@@ -1685,11 +1748,16 @@ fn logging_long_message_is_not_truncated() {
 
 #[test]
 fn logging_message_helper() {
+    // 通常のテストプロセスではグローバル初期化を行わない。
+    if std::env::var_os("WEBRTC_LOG_MESSAGE_LEN").is_none() {
+        return;
+    }
     // 検証用ヘルパー。ログ (webrtc::LogMessage) は stderr へ直接書き込まれるため、
     // logging_long_message_is_not_truncated からサブプロセスとして実行される。
     let config = log::LoggingConfig::new();
-    log::initialize_logging(config);
-    // 環境変数でメッセージ長を指定する（指定なしの場合は短いメッセージ）。
+    // 独立プロセスのログ出力前で、並行する WebRTC 利用者はいない。
+    unsafe { log::initialize_logging(config) };
+    // 環境変数で指定した長さのメッセージを出力する。
     let len = std::env::var("WEBRTC_LOG_MESSAGE_LEN")
         .map(|v| {
             v.parse::<usize>()
@@ -1755,7 +1823,7 @@ fn logging_sink_helper() {
     }
 
     impl log::LogSinkHandler for TestSinkHandler {
-        fn on_log_message(&mut self, line: log::LogLineRef<'_>) {
+        fn on_log_message(&self, line: log::LogLineRef<'_>) {
             if line.message().contains(&self.expected) && line.severity() == log::Severity::Info {
                 *self.seen.lock().unwrap() = true;
             }
@@ -1778,7 +1846,8 @@ fn logging_sink_helper() {
         expected: expected.clone(),
         seen: seen.clone(),
     })));
-    if !log::initialize_logging(config) {
+    // 独立プロセスのログ出力前で、並行する WebRTC 利用者はいない。
+    if !unsafe { log::initialize_logging(config) } {
         panic!("logging_sink_helper: initialize_logging が失敗しました");
     }
     log::print(log::Severity::Info, "webrtc-c", 0, &expected);
@@ -1884,7 +1953,8 @@ fn builtin_audio_factories_create() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps.set_audio_device_module(&adm) };
     deps.enable_media();
     assert!(!deps.as_ptr().is_null());
     drop(deps);
@@ -1931,11 +2001,13 @@ fn audio_device_module_recording_device_name_roundtrip() {
             name,
             guid,
         }));
-        adm.init().expect("AudioDeviceModule::init が失敗しました");
-        assert_eq!(adm.recording_devices(), 1);
-        let (got_name, got_guid) = adm
-            .recording_device_name(0)
-            .expect("recording_device_name が失敗しました");
+        // Safety: この ADM は factory に渡しておらず、別ハンドルの操作と callback からの再入は行わない。
+        unsafe { adm.init() }.expect("AudioDeviceModule::init が失敗しました");
+        // Safety: この ADM は factory に渡しておらず、別ハンドルの操作と callback からの再入は行わない。
+        assert_eq!(unsafe { adm.recording_devices() }, 1);
+        // Safety: この ADM は factory に渡しておらず、別ハンドルの操作と callback からの再入は行わない。
+        let (got_name, got_guid) =
+            unsafe { adm.recording_device_name(0) }.expect("recording_device_name が失敗しました");
         assert_eq!(got_name, expected_name);
         assert_eq!(got_guid, expected_guid);
     }
@@ -1962,8 +2034,10 @@ fn audio_device_module_handler_requires_only_send() {
         count: Cell::new(0),
     }));
     // 呼び出しごとに trampoline が &mut self でハンドラを呼ぶため、状態が保持される。
-    assert_eq!(adm.recording_devices(), 1);
-    assert_eq!(adm.recording_devices(), 2);
+    // Safety: この ADM は factory に渡しておらず、別ハンドルの操作と callback からの再入は行わない。
+    assert_eq!(unsafe { adm.recording_devices() }, 1);
+    // Safety: この ADM は factory に渡しておらず、別ハンドルの操作と callback からの再入は行わない。
+    assert_eq!(unsafe { adm.recording_devices() }, 2);
 }
 
 /// ADM が破棄されたことをハンドラの破棄で観測するためのハンドラ。
@@ -2006,7 +2080,8 @@ fn audio_device_module_from_refcounted_ptr_shares_adm_after_add_ref() {
     unsafe { ffi::webrtc_AudioDeviceModule_AddRef(adm.as_ptr()) };
     let shared = unsafe { AudioDeviceModule::from_refcounted_ptr(raw_ref) };
     assert_eq!(
-        shared.recording_devices(),
+        // Safety: この ADM は factory に渡しておらず、別ハンドルの操作と callback からの再入は行わない。
+        unsafe { shared.recording_devices() },
         1,
         "取り込んだハンドルからハンドラに到達できませんでした"
     );
@@ -2020,7 +2095,8 @@ fn audio_device_module_from_refcounted_ptr_shares_adm_after_add_ref() {
     );
     // 同じハンドラが生きているため、呼び出し回数はそのまま増える。
     assert_eq!(
-        shared.recording_devices(),
+        // Safety: この ADM は factory に渡しておらず、別ハンドルの操作と callback からの再入は行わない。
+        unsafe { shared.recording_devices() },
         2,
         "取り込んだハンドルから同じハンドラに到達できませんでした"
     );
@@ -2054,7 +2130,8 @@ fn audio_device_module_from_refcounted_ptr_takes_ownership() {
         "取り込み直後に ADM が破棄されました"
     );
     assert_eq!(
-        owned.recording_devices(),
+        // Safety: この ADM は factory に渡しておらず、別ハンドルの操作と callback からの再入は行わない。
+        unsafe { owned.recording_devices() },
         1,
         "取り込んだハンドルからハンドラに到達できませんでした"
     );
@@ -2207,7 +2284,8 @@ fn peer_connection_factory_and_capabilities() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps.set_audio_device_module(&adm) };
     deps.enable_media();
 
     // Factory を生成し、オプションと RTP 能力を取得する。
@@ -2383,7 +2461,8 @@ fn create_modular_with_context_returns_default_network_objects() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps.set_audio_device_module(&adm) };
     deps.enable_media();
 
     let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps)
@@ -2735,7 +2814,8 @@ fn rtp_sender_get_set_parameters() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -2748,7 +2828,8 @@ fn rtp_sender_get_set_parameters() {
 
     let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let pc_deps = PeerConnectionDependencies::new(&observer);
+    // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+    let pc_deps = unsafe { PeerConnectionDependencies::new(&observer) };
     let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("PeerConnection の生成に失敗しました");
 
@@ -2785,11 +2866,11 @@ fn rtp_and_peer_connection_refcounted_wrappers_clone() {
     }
 
     impl CreateSessionDescriptionObserverHandler for OfferHandler {
-        fn on_success(&mut self, desc: SessionDescription) {
+        fn on_success(&self, desc: SessionDescription) {
             let _ = self.tx.send(desc.to_string());
         }
 
-        fn on_failure(&mut self, err: RtcError) {
+        fn on_failure(&self, err: RtcError) {
             let _ = self.tx.send(Err(err.into()));
         }
     }
@@ -2800,7 +2881,7 @@ fn rtp_and_peer_connection_refcounted_wrappers_clone() {
     }
 
     impl SetLocalDescriptionObserverHandler for SetLocalDescriptionHandler {
-        fn on_set_local_description_complete(&mut self, error: RtcError) {
+        fn on_set_local_description_complete(&self, error: RtcError) {
             let _ = self.tx.send(error.ok());
         }
     }
@@ -2827,7 +2908,8 @@ fn rtp_and_peer_connection_refcounted_wrappers_clone() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -2860,7 +2942,8 @@ fn rtp_and_peer_connection_refcounted_wrappers_clone() {
     // PeerConnection の clone。
     let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let pc_deps = PeerConnectionDependencies::new(&observer);
+    // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+    let pc_deps = unsafe { PeerConnectionDependencies::new(&observer) };
     let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("PeerConnection の生成に失敗しました");
     let pc_clone = pc.clone();
@@ -3029,11 +3112,21 @@ fn rtp_and_peer_connection_refcounted_wrappers_clone() {
         "元の DtlsTransport の drop 後に clone が使えません"
     );
     let dtls_observer = DtlsTransportObserver::new_with_handler(Box::new(NoopHandler));
-    dtls_transport_clone.register_observer(&dtls_observer);
-    dtls_transport_clone.unregister_observer();
+    let transport_for_observer = dtls_transport_clone.clone();
+    assert!(
+        network.blocking_call(move || {
+            // この factory に設定した owner network thread で登録・解除し、
+            // 専用 observer は解除が戻るまで保持する。handler から再入しない。
+            unsafe {
+                transport_for_observer.register_observer(&dtls_observer);
+                transport_for_observer.unregister_observer();
+            }
+            true
+        }),
+        "network thread で observer 操作を実行できませんでした"
+    );
 
     // webrtc オブジェクトを先に解放してからスレッドを停止する。
-    drop(dtls_observer);
     drop(dtls_transport_clone);
     drop(data_channel_clone);
     drop(data_channel_init);
@@ -3079,7 +3172,8 @@ fn peer_connection_create_and_transceiver() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3087,7 +3181,8 @@ fn peer_connection_create_and_transceiver() {
     // PC 用の構成と observer/dependencies を準備する。
     let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let pc_deps = PeerConnectionDependencies::new(&observer);
+    // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+    let pc_deps = unsafe { PeerConnectionDependencies::new(&observer) };
 
     // PeerConnection を生成し、取得できることを確認する。
     let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
@@ -3124,11 +3219,11 @@ fn rtp_receiver_stream_ids() {
     }
 
     impl CreateSessionDescriptionObserverHandler for OfferHandler {
-        fn on_success(&mut self, desc: SessionDescription) {
+        fn on_success(&self, desc: SessionDescription) {
             let _ = self.tx.send(desc.to_string());
         }
 
-        fn on_failure(&mut self, err: RtcError) {
+        fn on_failure(&self, err: RtcError) {
             let _ = self.tx.send(Err(err.into()));
         }
     }
@@ -3139,13 +3234,13 @@ fn rtp_receiver_stream_ids() {
     }
 
     impl SetLocalDescriptionObserverHandler for SetDescriptionHandler {
-        fn on_set_local_description_complete(&mut self, error: RtcError) {
+        fn on_set_local_description_complete(&self, error: RtcError) {
             let _ = self.tx.send(error.ok());
         }
     }
 
     impl SetRemoteDescriptionObserverHandler for SetDescriptionHandler {
-        fn on_set_remote_description_complete(&mut self, error: RtcError) {
+        fn on_set_remote_description_complete(&self, error: RtcError) {
             let _ = self.tx.send(error.ok());
         }
     }
@@ -3172,7 +3267,8 @@ fn rtp_receiver_stream_ids() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3181,7 +3277,8 @@ fn rtp_receiver_stream_ids() {
     // 1 件目には Stream ID を 1 件付け、2 件目には付けず、空の場合の振る舞いも確認する。
     let pc_config = PeerConnectionRtcConfiguration::new();
     let offer_observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let offer_deps = PeerConnectionDependencies::new(&offer_observer);
+    // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+    let offer_deps = unsafe { PeerConnectionDependencies::new(&offer_observer) };
     let offer_pc = PeerConnection::create(&factory, &pc_config, offer_deps)
         .expect("PeerConnection の生成に失敗しました");
     let source = AdaptedVideoTrackSource::new();
@@ -3208,7 +3305,8 @@ fn rtp_receiver_stream_ids() {
     let (track_tx, track_rx) = mpsc::channel::<Vec<String>>();
     let answer_observer =
         PeerConnectionObserver::new_with_handler(Box::new(TrackHandler { tx: track_tx }));
-    let answer_deps = PeerConnectionDependencies::new(&answer_observer);
+    // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+    let answer_deps = unsafe { PeerConnectionDependencies::new(&answer_observer) };
     let answer_pc = PeerConnection::create(&factory, &pc_config, answer_deps)
         .expect("PeerConnection の生成に失敗しました");
 
@@ -3353,11 +3451,11 @@ fn signaling_state_change_is_observed() {
     }
 
     impl CreateSessionDescriptionObserverHandler for OfferAnswerHandler {
-        fn on_success(&mut self, desc: SessionDescription) {
+        fn on_success(&self, desc: SessionDescription) {
             let _ = self.tx.send(desc.to_string());
         }
 
-        fn on_failure(&mut self, err: RtcError) {
+        fn on_failure(&self, err: RtcError) {
             let _ = self.tx.send(Err(err.into()));
         }
     }
@@ -3368,13 +3466,13 @@ fn signaling_state_change_is_observed() {
     }
 
     impl SetLocalDescriptionObserverHandler for SetDescriptionHandler {
-        fn on_set_local_description_complete(&mut self, error: RtcError) {
+        fn on_set_local_description_complete(&self, error: RtcError) {
             let _ = self.tx.send(error.ok());
         }
     }
 
     impl SetRemoteDescriptionObserverHandler for SetDescriptionHandler {
-        fn on_set_remote_description_complete(&mut self, error: RtcError) {
+        fn on_set_remote_description_complete(&self, error: RtcError) {
             let _ = self.tx.send(error.ok());
         }
     }
@@ -3401,7 +3499,8 @@ fn signaling_state_change_is_observed() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3411,13 +3510,15 @@ fn signaling_state_change_is_observed() {
     let (offer_tx, offer_rx) = mpsc::channel::<SignalingState>();
     let offer_observer =
         PeerConnectionObserver::new_with_handler(Box::new(SignalingHandler { tx: offer_tx }));
-    let offer_deps = PeerConnectionDependencies::new(&offer_observer);
+    // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+    let offer_deps = unsafe { PeerConnectionDependencies::new(&offer_observer) };
     let offer_pc = PeerConnection::create(&factory, &pc_config, offer_deps)
         .expect("PeerConnection の生成に失敗しました");
     let (answer_tx, answer_rx) = mpsc::channel::<SignalingState>();
     let answer_observer =
         PeerConnectionObserver::new_with_handler(Box::new(SignalingHandler { tx: answer_tx }));
-    let answer_deps = PeerConnectionDependencies::new(&answer_observer);
+    // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+    let answer_deps = unsafe { PeerConnectionDependencies::new(&answer_observer) };
     let answer_pc = PeerConnection::create(&factory, &pc_config, answer_deps)
         .expect("PeerConnection の生成に失敗しました");
 
@@ -3569,7 +3670,8 @@ fn media_stream_track_state() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3613,14 +3715,16 @@ fn peer_connection_lookup_dtls_transport() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let pc_deps = PeerConnectionDependencies::new(&observer);
+    // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+    let pc_deps = unsafe { PeerConnectionDependencies::new(&observer) };
     let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("PeerConnection の生成に失敗しました");
 
@@ -3633,8 +3737,18 @@ fn peer_connection_lookup_dtls_transport() {
     if let Some(dtls_transport) = pc.lookup_dtls_transport_by_mid("0") {
         let observer = DtlsTransportObserver::new_with_handler(Box::new(NoopHandler));
         let _ = dtls_transport.state();
-        dtls_transport.register_observer(&observer);
-        dtls_transport.unregister_observer();
+        assert!(
+            network.blocking_call(move || {
+                // この factory の owner network thread で操作し、専用 observer を
+                // 解除完了まで保持する。callback から handler に再入しない。
+                unsafe {
+                    dtls_transport.register_observer(&observer);
+                    dtls_transport.unregister_observer();
+                }
+                true
+            }),
+            "network thread で observer 操作を実行できませんでした"
+        );
     }
 
     drop(pc);
@@ -3662,14 +3776,16 @@ fn get_stats_delivers_report() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
 
     let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let pc_deps = PeerConnectionDependencies::new(&observer);
+    // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+    let pc_deps = unsafe { PeerConnectionDependencies::new(&observer) };
     let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("PeerConnection の生成に失敗しました");
 
@@ -3707,7 +3823,8 @@ fn peer_connection_create_with_proxy_allocator() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps_factory)
         .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
@@ -3719,7 +3836,8 @@ fn peer_connection_create_with_proxy_allocator() {
 
     let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let mut pc_deps = PeerConnectionDependencies::new(&observer);
+    // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+    let mut pc_deps = unsafe { PeerConnectionDependencies::new(&observer) };
     pc_deps.set_proxy(
         network_manager,
         socket_factory,
@@ -3764,7 +3882,8 @@ fn video_track_and_transceiver_with_track() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3787,7 +3906,8 @@ fn video_track_and_transceiver_with_track() {
     // PeerConnection を作成し、トラック付きで transceiver を追加する。
     let pc_config = PeerConnectionRtcConfiguration::new();
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let pc_deps = PeerConnectionDependencies::new(&observer);
+    // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+    let pc_deps = unsafe { PeerConnectionDependencies::new(&observer) };
     let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
         .expect("PeerConnection の生成に失敗しました");
 
@@ -3811,7 +3931,8 @@ fn video_track_and_transceiver_with_track() {
 #[test]
 fn peer_connection_observer_and_dependencies() {
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let deps = PeerConnectionDependencies::new(&observer);
+    // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+    let deps = unsafe { PeerConnectionDependencies::new(&observer) };
     assert!(!deps.as_ptr().is_null());
     drop(deps);
 }
@@ -3836,7 +3957,8 @@ fn peer_connection_dependencies_set_tls_cert_verifier() {
 
     let dropped = Arc::new(AtomicBool::new(false));
     let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-    let mut deps = PeerConnectionDependencies::new(&observer);
+    // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+    let mut deps = unsafe { PeerConnectionDependencies::new(&observer) };
     let verifier = SSLCertificateVerifier::new_with_handler(Box::new(TestVerifier {
         dropped: dropped.clone(),
     }));
@@ -3863,12 +3985,12 @@ fn always_negotiate_data_channels_adds_data_section() {
     }
 
     impl CreateSessionDescriptionObserverHandler for OfferHandler {
-        fn on_success(&mut self, desc: SessionDescription) {
+        fn on_success(&self, desc: SessionDescription) {
             let sdp = desc.to_string();
             let _ = self.tx.send(sdp);
         }
 
-        fn on_failure(&mut self, err: RtcError) {
+        fn on_failure(&self, err: RtcError) {
             let _ = self.tx.send(Err(err.into()));
         }
     }
@@ -3878,7 +4000,8 @@ fn always_negotiate_data_channels_adds_data_section() {
         config: &PeerConnectionRtcConfiguration,
     ) -> String {
         let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-        let pc_deps = PeerConnectionDependencies::new(&observer);
+        // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+        let pc_deps = unsafe { PeerConnectionDependencies::new(&observer) };
         let pc = PeerConnection::create(factory, config, pc_deps)
             .expect("PeerConnection の生成に失敗しました");
 
@@ -3914,7 +4037,8 @@ fn always_negotiate_data_channels_adds_data_section() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3952,12 +4076,12 @@ fn field_trials_reach_offer_sdp() {
     }
 
     impl CreateSessionDescriptionObserverHandler for OfferHandler {
-        fn on_success(&mut self, desc: SessionDescription) {
+        fn on_success(&self, desc: SessionDescription) {
             let sdp = desc.to_string();
             let _ = self.tx.send(sdp);
         }
 
-        fn on_failure(&mut self, err: RtcError) {
+        fn on_failure(&self, err: RtcError) {
             let _ = self.tx.send(Err(err.into()));
         }
     }
@@ -3982,7 +4106,8 @@ fn field_trials_reach_offer_sdp() {
         deps_factory.set_audio_processing_builder(apb);
         let adm = AudioDeviceModule::new(env, AudioDeviceModuleAudioLayer::Dummy)
             .expect("AudioDeviceModule の生成に失敗しました");
-        deps_factory.set_audio_device_module(&adm);
+        // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+        unsafe { deps_factory.set_audio_device_module(&adm) };
         // フィールドトライアルを持つ Environment をファクトリに設定する
         deps_factory.set_env(Some(env.clone()));
         deps_factory.enable_media();
@@ -3990,7 +4115,8 @@ fn field_trials_reach_offer_sdp() {
             .expect("PeerConnectionFactory の生成に失敗しました");
 
         let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
-        let pc_deps = PeerConnectionDependencies::new(&observer);
+        // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+        let pc_deps = unsafe { PeerConnectionDependencies::new(&observer) };
         let pc_config = PeerConnectionRtcConfiguration::new();
         let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
             .expect("PeerConnection の生成に失敗しました");
@@ -4053,14 +4179,14 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
     }
 
     struct TestVideoEncoderFactoryHandler {
-        created: bool,
+        created: AtomicBool,
     }
     impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
-        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+        fn get_supported_formats(&self) -> Vec<SdpVideoFormat> {
             vec![SdpVideoFormat::new("VP8")]
         }
         fn create(
-            &mut self,
+            &self,
             env: EnvironmentRef<'_>,
             format: SdpVideoFormatRef<'_>,
         ) -> Option<VideoEncoder> {
@@ -4071,10 +4197,9 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
                     .expect("SdpVideoFormatRef::name に失敗しました"),
                 "VP8"
             );
-            if self.created {
+            if self.created.swap(true, Ordering::SeqCst) {
                 return None;
             }
-            self.created = true;
             Some(VideoEncoder::new_with_handler(Box::new(
                 TestVideoEncoderHandler { encode_count: 0 },
             )))
@@ -4082,7 +4207,7 @@ fn custom_video_encoder_factory_create_and_encode_calls_callbacks() {
     }
 
     let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler {
-        created: false,
+        created: AtomicBool::new(false),
     }));
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
@@ -4323,7 +4448,7 @@ fn video_encoder_resolution_bitrate_limits_vector_get_mut() {
 fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
     struct TestVideoEncoderFactoryHandler;
     impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
-        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+        fn get_supported_formats(&self) -> Vec<SdpVideoFormat> {
             let mut h264 = SdpVideoFormat::new("H264");
             h264.parameters_mut().set("profile-level-id", "42e01f");
             let mut vp8 = SdpVideoFormat::new("VP8");
@@ -4331,7 +4456,7 @@ fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
             vec![h264, vp8]
         }
         fn create(
-            &mut self,
+            &self,
             env: EnvironmentRef<'_>,
             _format: SdpVideoFormatRef<'_>,
         ) -> Option<VideoEncoder> {
@@ -4538,13 +4663,13 @@ fn objc_video_factory_functions_return_null_on_non_apple() {
 fn video_decoder_factory_get_supported_formats_returns_owned_formats() {
     struct TestVideoDecoderFactoryHandler;
     impl VideoDecoderFactoryHandler for TestVideoDecoderFactoryHandler {
-        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+        fn get_supported_formats(&self) -> Vec<SdpVideoFormat> {
             let mut h264 = SdpVideoFormat::new("H264");
             h264.parameters_mut().set("packetization-mode", "1");
             vec![h264]
         }
         fn create(
-            &mut self,
+            &self,
             env: EnvironmentRef<'_>,
             _format: SdpVideoFormatRef<'_>,
         ) -> Option<VideoDecoder> {
@@ -4579,11 +4704,11 @@ fn video_encoder_factory_create_calls_create_callback() {
         called: std::sync::Arc<std::sync::atomic::AtomicBool>,
     }
     impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
-        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+        fn get_supported_formats(&self) -> Vec<SdpVideoFormat> {
             vec![SdpVideoFormat::new("H264")]
         }
         fn create(
-            &mut self,
+            &self,
             env: EnvironmentRef<'_>,
             format: SdpVideoFormatRef<'_>,
         ) -> Option<VideoEncoder> {
@@ -4619,11 +4744,11 @@ fn video_decoder_factory_create_calls_create_callback() {
         called: std::sync::Arc<std::sync::atomic::AtomicBool>,
     }
     impl VideoDecoderFactoryHandler for TestVideoDecoderFactoryHandler {
-        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+        fn get_supported_formats(&self) -> Vec<SdpVideoFormat> {
             vec![SdpVideoFormat::new("H264")]
         }
         fn create(
-            &mut self,
+            &self,
             env: EnvironmentRef<'_>,
             format: SdpVideoFormatRef<'_>,
         ) -> Option<VideoDecoder> {
@@ -4665,17 +4790,8 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
         order: Vec<&'static str>,
     }
 
-    #[derive(Clone, Copy)]
-    struct StatePtr(*mut State);
-    unsafe impl Send for StatePtr {}
-    impl StatePtr {
-        unsafe fn get_mut<'a>(&self) -> &'a mut State {
-            unsafe { &mut *self.0 }
-        }
-    }
-
     struct TestVideoEncoderHandler {
-        state_ptr: StatePtr,
+        state_ptr: Arc<Mutex<State>>,
     }
     impl VideoEncoderHandler for TestVideoEncoderHandler {
         fn register_encode_complete_callback(
@@ -4683,7 +4799,7 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
             callback: Option<VideoEncoderEncodedImageCallbackRefMut<'_>>,
         ) -> VideoCodecStatus {
             let callback = callback.expect("register 側 callback が None です");
-            let state = unsafe { self.state_ptr.get_mut() };
+            let mut state = self.state_ptr.lock().expect("状態のロックに失敗しました");
             state.register_called = true;
             state.order.push("register");
             state.callback_ptr =
@@ -4697,13 +4813,13 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
             _frame_types: Option<VideoFrameTypeVectorRef<'_>>,
         ) -> VideoCodecStatus {
             {
-                let state = unsafe { self.state_ptr.get_mut() };
+                let mut state = self.state_ptr.lock().expect("状態のロックに失敗しました");
                 state.encode_called = true;
                 state.order.push("encode");
             }
 
             let callback_ptr = {
-                let state = unsafe { self.state_ptr.get_mut() };
+                let state = self.state_ptr.lock().expect("状態のロックに失敗しました");
                 state
                     .callback_ptr
                     .expect("encode 側 callback_ptr が未設定です")
@@ -4740,15 +4856,15 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     }
 
     struct TestEncodedImageCallbackHandler {
-        state_ptr: StatePtr,
+        state_ptr: Arc<Mutex<State>>,
     }
     impl VideoEncoderEncodedImageCallbackHandler for TestEncodedImageCallbackHandler {
         fn on_encoded_image(
-            &mut self,
+            &self,
             image: EncodedImageRef<'_>,
             codec_specific_info: Option<CodecSpecificInfoRef<'_>>,
         ) -> VideoEncoderEncodedImageCallbackResult {
-            let state = unsafe { self.state_ptr.get_mut() };
+            let mut state = self.state_ptr.lock().expect("状態のロックに失敗しました");
             state.on_encoded_image_called = true;
             state.order.push("on_encoded_image");
 
@@ -4779,12 +4895,15 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
         }
     }
 
-    let mut state = Box::new(State::default());
-    let state_ptr = StatePtr((&mut *state) as *mut State);
-    let mut encoder =
-        VideoEncoder::new_with_handler(Box::new(TestVideoEncoderHandler { state_ptr }));
+    // encode と完了 callback が同じ検証結果を同期的に更新するためロックで共有する。
+    let state = Arc::new(Mutex::new(State::default()));
+    let mut encoder = VideoEncoder::new_with_handler(Box::new(TestVideoEncoderHandler {
+        state_ptr: state.clone(),
+    }));
     let mut encoded_image_callback = VideoEncoderEncodedImageCallback::new_with_handler(Box::new(
-        TestEncodedImageCallbackHandler { state_ptr },
+        TestEncodedImageCallbackHandler {
+            state_ptr: state.clone(),
+        },
     ));
 
     assert_eq!(
@@ -4803,6 +4922,7 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
         VideoCodecStatus::Unknown(88)
     );
 
+    let state = state.lock().expect("状態のロックに失敗しました");
     assert!(state.register_called, "register が呼ばれていません");
     assert!(state.encode_called, "encode が呼ばれていません");
     assert!(
@@ -4861,22 +4981,21 @@ fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
     }
 
     struct TestVideoDecoderFactoryHandler {
-        created: bool,
+        created: AtomicBool,
     }
     impl VideoDecoderFactoryHandler for TestVideoDecoderFactoryHandler {
-        fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat> {
+        fn get_supported_formats(&self) -> Vec<SdpVideoFormat> {
             vec![SdpVideoFormat::new("VP8")]
         }
         fn create(
-            &mut self,
+            &self,
             env: EnvironmentRef<'_>,
             _format: SdpVideoFormatRef<'_>,
         ) -> Option<VideoDecoder> {
             assert!(!env.as_ptr().is_null());
-            if self.created {
+            if self.created.swap(true, Ordering::SeqCst) {
                 return None;
             }
-            self.created = true;
             Some(VideoDecoder::new_with_handler(Box::new(
                 TestVideoDecoderHandler { decode_count: 0 },
             )))
@@ -4884,7 +5003,7 @@ fn custom_video_decoder_factory_create_and_decode_calls_callbacks() {
     }
 
     let factory = VideoDecoderFactory::new_with_handler(Box::new(TestVideoDecoderFactoryHandler {
-        created: false,
+        created: AtomicBool::new(false),
     }));
     let env = Environment::new();
     let format = SdpVideoFormat::new("VP8");
@@ -4996,7 +5115,8 @@ fn create_local_media_stream_returns_requested_id() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -5040,7 +5160,8 @@ fn media_stream_track_round_trip() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -5178,7 +5299,8 @@ fn create_audio_source_with_audio_options() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -5221,7 +5343,8 @@ fn create_audio_source_with_default_audio_options() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -5277,7 +5400,8 @@ fn audio_refcounted_wrappers_clone() {
     let env = Environment::new();
     let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
+    // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+    unsafe { deps_factory.set_audio_device_module(&adm) };
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -5921,21 +6045,21 @@ impl AudioEncoderHandler for TestAudioEncoderHandler {
 }
 
 struct TestAudioEncoderFactoryHandler {
-    created: bool,
+    created: AtomicBool,
 }
 
 impl AudioEncoderFactoryHandler for TestAudioEncoderFactoryHandler {
-    fn get_supported_encoders(&mut self) -> Vec<AudioCodecSpec> {
+    fn get_supported_encoders(&self) -> Vec<AudioCodecSpec> {
         vec![AudioCodecSpec::new(
             SdpAudioFormat::new("opus", 48000, 2),
             AudioCodecInfo::new(48000, 2, 32000, 6000, 510000),
         )]
     }
-    fn query_audio_encoder(&mut self, _format: SdpAudioFormatRef<'_>) -> Option<AudioCodecInfo> {
+    fn query_audio_encoder(&self, _format: SdpAudioFormatRef<'_>) -> Option<AudioCodecInfo> {
         None
     }
     fn create(
-        &mut self,
+        &self,
         env: EnvironmentRef<'_>,
         format: SdpAudioFormatRef<'_>,
         _options: &AudioEncoderFactoryOptions,
@@ -5944,10 +6068,9 @@ impl AudioEncoderFactoryHandler for TestAudioEncoderFactoryHandler {
         assert_eq!(format.name().expect("名前の取得に失敗しました"), "opus");
         // パラメータを設定していないので空になる。
         assert!(format.parameters().is_empty());
-        if self.created {
+        if self.created.swap(true, Ordering::SeqCst) {
             return None;
         }
-        self.created = true;
         Some(AudioEncoder::new_with_handler(Box::new(
             TestAudioEncoderHandler { encoded: false },
         )))
@@ -5957,7 +6080,7 @@ impl AudioEncoderFactoryHandler for TestAudioEncoderFactoryHandler {
 #[test]
 fn custom_audio_encoder_factory_roundtrip() {
     let factory = AudioEncoderFactory::new_with_handler(Box::new(TestAudioEncoderFactoryHandler {
-        created: false,
+        created: AtomicBool::new(false),
     }));
     assert_eq!(factory.get_supported_encoders().len(), 1);
     let env = Environment::new();
@@ -6052,21 +6175,21 @@ impl AudioDecoderHandler for TestAudioDecoderHandler {
 }
 
 struct TestAudioDecoderFactoryHandler {
-    created: bool,
+    created: AtomicBool,
 }
 
 impl AudioDecoderFactoryHandler for TestAudioDecoderFactoryHandler {
-    fn get_supported_decoders(&mut self) -> Vec<AudioCodecSpec> {
+    fn get_supported_decoders(&self) -> Vec<AudioCodecSpec> {
         vec![AudioCodecSpec::new(
             SdpAudioFormat::new("opus", 48000, 2),
             AudioCodecInfo::new(48000, 2, 32000, 6000, 510000),
         )]
     }
-    fn is_supported_decoder(&mut self, format: SdpAudioFormatRef<'_>) -> bool {
+    fn is_supported_decoder(&self, format: SdpAudioFormatRef<'_>) -> bool {
         format.name().map(|name| name == "opus").unwrap_or(false)
     }
     fn create(
-        &mut self,
+        &self,
         env: EnvironmentRef<'_>,
         format: SdpAudioFormatRef<'_>,
     ) -> Option<AudioDecoder> {
@@ -6074,10 +6197,9 @@ impl AudioDecoderFactoryHandler for TestAudioDecoderFactoryHandler {
         assert_eq!(format.name().expect("名前の取得に失敗しました"), "opus");
         // パラメータを設定していないので空になる。
         assert!(format.parameters().is_empty());
-        if self.created {
+        if self.created.swap(true, Ordering::SeqCst) {
             return None;
         }
-        self.created = true;
         Some(AudioDecoder::new_with_handler(Box::new(
             TestAudioDecoderHandler,
         )))
@@ -6087,7 +6209,7 @@ impl AudioDecoderFactoryHandler for TestAudioDecoderFactoryHandler {
 #[test]
 fn custom_audio_decoder_factory_roundtrip() {
     let factory = AudioDecoderFactory::new_with_handler(Box::new(TestAudioDecoderFactoryHandler {
-        created: false,
+        created: AtomicBool::new(false),
     }));
     assert_eq!(factory.get_supported_decoders().len(), 1);
     let env = Environment::new();
@@ -6205,4 +6327,753 @@ fn encoded_image_buffer_clone() {
         &[1, 2, 3, 4],
         "元の EncodedImageBuffer の drop 後に clone が使えません"
     );
+}
+
+#[test]
+fn logging_parallel_callbacks_in_separate_process() {
+    // native のグローバル設定をほかのテストから隔離する。
+    if std::env::var_os("WEBRTC_LOG_PARALLEL_CHILD").is_none() {
+        let output = std::process::Command::new(
+            std::env::current_exe().expect("テスト実行ファイルを取得できません"),
+        )
+        .args([
+            "--exact",
+            "tests::logging_parallel_callbacks_in_separate_process",
+        ])
+        .env("WEBRTC_LOG_PARALLEL_CHILD", "1")
+        .output()
+        .expect("独立プロセスを実行できません");
+        assert!(
+            output.status.success(),
+            "並行ログの検証に失敗しました: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+    struct Sink {
+        barrier: std::sync::Barrier,
+        seen: Arc<AtomicUsize>,
+    }
+    impl log::LogSinkHandler for Sink {
+        fn on_log_message(&self, line: log::LogLineRef<'_>) {
+            if line.message().contains("並行ログの検証") {
+                self.seen.fetch_add(1, Ordering::SeqCst);
+                // callback が同時に生きていることを、同じハンドラ内で確認する。
+                self.barrier.wait();
+            }
+        }
+    }
+    let seen = Arc::new(AtomicUsize::new(0));
+    let mut config = log::LoggingConfig::new();
+    config.set_min_severity(log::Severity::Info);
+    config.set_log_to_stderr(false);
+    config.add_sink(log::LogSink::new_with_handler(Box::new(Sink {
+        barrier: std::sync::Barrier::new(2),
+        seen: seen.clone(),
+    })));
+    // この独立プロセスではログ出力も WebRTC の利用スレッドもまだ開始していない。
+    assert!(unsafe { log::initialize_logging(config) });
+    std::thread::scope(|scope| {
+        for _ in 0..2 {
+            scope.spawn(|| log::print(log::Severity::Info, "parallel", 0, "並行ログの検証"));
+        }
+    });
+    assert_eq!(
+        seen.load(Ordering::SeqCst),
+        2,
+        "両スレッドのログを受信していません"
+    );
+}
+
+#[test]
+fn shared_video_buffer_callbacks_overlap_and_move_between_threads() {
+    struct BufferHandler {
+        barrier: std::sync::Barrier,
+        seen: Arc<AtomicUsize>,
+    }
+    impl BufferHandler {
+        fn enter(&self) {
+            self.seen.fetch_add(1, Ordering::SeqCst);
+            self.barrier.wait();
+        }
+    }
+    impl VideoFrameBufferHandler for BufferHandler {
+        fn kind(&self) -> VideoFrameBufferKind {
+            self.enter();
+            VideoFrameBufferKind::Native
+        }
+        fn width(&self) -> i32 {
+            self.enter();
+            2
+        }
+        fn height(&self) -> i32 {
+            self.enter();
+            2
+        }
+        fn to_i420(&self) -> Option<I420Buffer> {
+            self.enter();
+            Some(I420Buffer::new(2, 2))
+        }
+        fn crop_and_scale(
+            &self,
+            _x: i32,
+            _y: i32,
+            _w: i32,
+            _h: i32,
+            width: i32,
+            height: i32,
+        ) -> Option<VideoFrameBuffer> {
+            self.enter();
+            Some(I420Buffer::new(width, height).cast_to_video_frame_buffer())
+        }
+    }
+    let seen = Arc::new(AtomicUsize::new(0));
+    let buffer = VideoFrameBuffer::new_with_handler(Box::new(BufferHandler {
+        barrier: std::sync::Barrier::new(2),
+        seen: seen.clone(),
+    }));
+    // 別 clone から getter、変換、クロップの全入口を C ラッパー経由で重ねる。
+    // 同じ実体を新しいスレッド組に移す周も実施し、スレッド固定に依存しないことを確認する。
+    for _ in 0..2 {
+        std::thread::scope(|scope| {
+            for _ in 0..2 {
+                let mut clone = buffer.clone();
+                scope.spawn(move || {
+                    assert_eq!(clone.kind(), VideoFrameBufferKind::Native);
+                    assert_eq!(clone.width(), 2);
+                    assert_eq!(clone.height(), 2);
+                    assert!(clone.to_i420().is_some());
+                    assert!(clone.crop_and_scale(0, 0, 2, 2, 1, 1).is_some());
+                });
+            }
+        });
+    }
+    assert_eq!(
+        seen.load(Ordering::SeqCst),
+        20,
+        "全 callback が呼ばれていません"
+    );
+}
+
+#[test]
+fn shared_i420_pixels_are_read_after_exclusive_write() {
+    let mut buffer = I420Buffer::new(2, 2);
+    // 共有ハンドルを作る前に書き込みを完了し、slice を呼び出しの外へ保持しない。
+    unsafe { buffer.data_mut() }.fill(17);
+    let shared = buffer.cast_to_video_frame_buffer();
+    std::thread::scope(|scope| {
+        for _ in 0..2 {
+            let clone = shared.clone();
+            scope.spawn(move || {
+                let view = clone
+                    .as_i420()
+                    .expect("I420 の共有ハンドルを取得できません");
+                assert!(
+                    view.data().iter().all(|v| *v == 17),
+                    "共有画素が一致しません"
+                );
+            });
+        }
+    });
+}
+
+#[test]
+fn shared_audio_factories_use_real_codecs_concurrently() {
+    struct EncoderFactory {
+        barrier: std::sync::Barrier,
+        seen: Arc<AtomicUsize>,
+    }
+    impl EncoderFactory {
+        fn enter(&self) {
+            self.seen.fetch_add(1, Ordering::SeqCst);
+            self.barrier.wait();
+        }
+    }
+    impl AudioEncoderFactoryHandler for EncoderFactory {
+        fn get_supported_encoders(&self) -> Vec<AudioCodecSpec> {
+            self.enter();
+            AudioEncoderFactory::builtin().get_supported_encoders()
+        }
+        fn query_audio_encoder(&self, format: SdpAudioFormatRef<'_>) -> Option<AudioCodecInfo> {
+            self.enter();
+            AudioEncoderFactory::builtin().query_audio_encoder(format)
+        }
+        fn create(
+            &self,
+            env: EnvironmentRef<'_>,
+            format: SdpAudioFormatRef<'_>,
+            options: &AudioEncoderFactoryOptions,
+        ) -> Option<AudioEncoder> {
+            self.enter();
+            AudioEncoderFactory::builtin().create(env, format, options)
+        }
+    }
+    struct DecoderFactory {
+        barrier: std::sync::Barrier,
+        seen: Arc<AtomicUsize>,
+    }
+    impl DecoderFactory {
+        fn enter(&self) {
+            self.seen.fetch_add(1, Ordering::SeqCst);
+            self.barrier.wait();
+        }
+    }
+    impl AudioDecoderFactoryHandler for DecoderFactory {
+        fn get_supported_decoders(&self) -> Vec<AudioCodecSpec> {
+            self.enter();
+            AudioDecoderFactory::builtin().get_supported_decoders()
+        }
+        fn is_supported_decoder(&self, format: SdpAudioFormatRef<'_>) -> bool {
+            self.enter();
+            AudioDecoderFactory::builtin().is_supported_decoder(format)
+        }
+        fn create(
+            &self,
+            env: EnvironmentRef<'_>,
+            format: SdpAudioFormatRef<'_>,
+        ) -> Option<AudioDecoder> {
+            self.enter();
+            AudioDecoderFactory::builtin().create(env, format)
+        }
+    }
+    // codec 本体は libwebrtc の Opus を生成し、ハンドラだけで結果を代用しない。
+    let seen = Arc::new(AtomicUsize::new(0));
+    let enc = AudioEncoderFactory::new_with_handler(Box::new(EncoderFactory {
+        barrier: std::sync::Barrier::new(2),
+        seen: seen.clone(),
+    }));
+    let dec = AudioDecoderFactory::new_with_handler(Box::new(DecoderFactory {
+        barrier: std::sync::Barrier::new(2),
+        seen: seen.clone(),
+    }));
+    std::thread::scope(|scope| {
+        for _ in 0..2 {
+            let enc = enc.clone();
+            let dec = dec.clone();
+            scope.spawn(move || {
+                let env = Environment::new();
+                let format = SdpAudioFormat::new("opus", 48000, 2);
+                assert!(!enc.get_supported_encoders().is_empty());
+                assert!(enc.query_audio_encoder(format.as_ref()).is_some());
+                let options = AudioEncoderFactoryOptions::new();
+                let encoder = enc
+                    .create(env.as_ref(), format.as_ref(), &options)
+                    .expect("Opus encoder を生成できません");
+                assert_eq!(encoder.sample_rate_hz(), 48000);
+                assert!(!dec.get_supported_decoders().is_empty());
+                assert!(dec.is_supported_decoder(format.as_ref()));
+                let decoder = dec
+                    .create(env.as_ref(), format.as_ref())
+                    .expect("Opus decoder を生成できません");
+                assert_eq!(decoder.sample_rate_hz(), 48000);
+            });
+        }
+    });
+    assert_eq!(
+        seen.load(Ordering::SeqCst),
+        12,
+        "factory の全入口を呼び出していません"
+    );
+}
+
+#[test]
+fn video_sink_registered_to_two_sources_receives_overlapping_frames() {
+    struct Sink {
+        barrier: std::sync::Barrier,
+        seen: Arc<AtomicUsize>,
+    }
+    impl VideoSinkHandler for Sink {
+        fn on_frame(&self, _frame: VideoFrameRef<'_>) {
+            self.seen.fetch_add(1, Ordering::SeqCst);
+            self.barrier.wait();
+        }
+    }
+    let mut network = Thread::new();
+    let mut signaling = Thread::new();
+    assert!(network.start());
+    assert!(signaling.start());
+    let mut deps = PeerConnectionFactoryDependencies::new();
+    deps.set_network_thread(&network);
+    deps.set_worker_thread(&network);
+    deps.set_signaling_thread(&signaling);
+    deps.set_audio_encoder_factory(&AudioEncoderFactory::builtin());
+    deps.set_audio_decoder_factory(&AudioDecoderFactory::builtin());
+    deps.set_audio_processing_builder(AudioProcessingBuilder::new_builtin());
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("ADM を生成できません");
+    // 同じ ADM を利用する factory は 1 個だけで、直接操作は行わない。
+    unsafe { deps.set_audio_device_module(&adm) };
+    deps.set_video_encoder_factory(VideoEncoderFactory::builtin());
+    deps.set_video_decoder_factory(VideoDecoderFactory::builtin());
+    deps.enable_media();
+    let factory = PeerConnectionFactory::create_modular(deps).expect("factory を生成できません");
+    let a = AdaptedVideoTrackSource::new();
+    let b = AdaptedVideoTrackSource::new();
+    let ta = factory
+        .create_video_track(&a.cast_to_video_track_source(), "a")
+        .expect("track を生成できません");
+    let tb = factory
+        .create_video_track(&b.cast_to_video_track_source(), "b")
+        .expect("track を生成できません");
+    let seen = Arc::new(AtomicUsize::new(0));
+    let sink = VideoSink::new_with_handler(Box::new(Sink {
+        barrier: std::sync::Barrier::new(2),
+        seen: seen.clone(),
+    }));
+    let wants = VideoSinkWants::new();
+    ta.add_or_update_sink(&sink, &wants);
+    tb.add_or_update_sink(&sink, &wants);
+    // 2 個の実物の broadcaster が別スレッドから同じ sink を呼ぶ。
+    std::thread::scope(|scope| {
+        for source in [&a, &b] {
+            scope.spawn(move || {
+                let pixels = I420Buffer::new(2, 2);
+                let frame = VideoFrame::builder(&pixels.cast_to_video_frame_buffer()).build();
+                source.on_frame(&frame);
+            });
+        }
+    });
+    // source の投入が終わり、callback を実行していない状態で登録を解除する。
+    ta.remove_sink(&sink);
+    tb.remove_sink(&sink);
+    assert_eq!(
+        seen.load(Ordering::SeqCst),
+        2,
+        "両 source のフレームを受信していません"
+    );
+}
+
+#[test]
+fn encode_callback_registered_to_two_encoders_accepts_overlapping_notifications() {
+    struct Callback {
+        barrier: std::sync::Barrier,
+        seen: Arc<AtomicUsize>,
+    }
+    impl VideoEncoderEncodedImageCallbackHandler for Callback {
+        fn on_encoded_image(
+            &self,
+            _image: EncodedImageRef<'_>,
+            _info: Option<CodecSpecificInfoRef<'_>>,
+        ) -> VideoEncoderEncodedImageCallbackResult {
+            self.seen.fetch_add(1, Ordering::SeqCst);
+            self.barrier.wait();
+            VideoEncoderEncodedImageCallbackResult::new(
+                VideoEncoderEncodedImageCallbackResultError::Ok,
+            )
+        }
+    }
+    let seen = Arc::new(AtomicUsize::new(0));
+    let mut callback = VideoEncoderEncodedImageCallback::new_with_handler(Box::new(Callback {
+        barrier: std::sync::Barrier::new(2),
+        seen: seen.clone(),
+    }));
+    let env = Environment::new();
+    let factory = VideoEncoderFactory::builtin();
+    let format = SdpVideoFormat::new("VP8");
+    let mut a = factory
+        .create(env.as_ref(), format.as_ref())
+        .expect("VP8 encoder を生成できません");
+    let mut b = factory
+        .create(env.as_ref(), format.as_ref())
+        .expect("VP8 encoder を生成できません");
+    assert_eq!(
+        a.register_encode_complete_callback(Some(callback.as_mut())),
+        VideoCodecStatus::Ok
+    );
+    assert_eq!(
+        b.register_encode_complete_callback(Some(callback.as_mut())),
+        VideoCodecStatus::Ok
+    );
+    let address = callback.as_ptr() as usize;
+    // 同じ生存中の Rust handler を持つ C ラッパーへ、2 個の通知を同時に投入する。
+    // encoder 本体の初期化・圧縮とは切り離し、非所有登録と通知入口の排他を検証する。
+    std::thread::scope(|scope| {
+        for _ in 0..2 {
+            scope.spawn(move || {
+                let image = EncodedImage::new();
+                // callback は親スレッドが保持し、join まで破棄しない。C++ ラッパーは
+                // callback 状態を書き換えず、Sync な Rust handler へ共有参照で通知する。
+                let raw = unsafe {
+                    ffi::webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage(
+                        address as *mut ffi::webrtc_VideoEncoder_EncodedImageCallback,
+                        image.as_ref().as_ptr(),
+                        std::ptr::null(),
+                    )
+                };
+                // C API が返した所有結果を読み取り、同じ API で解放する。
+                let raw = NonNull::new(raw).expect("通知結果が null です");
+                let error = unsafe {
+                    let result = ffi::webrtc_VideoEncoder_EncodedImageCallback_Result_unique_get(
+                        raw.as_ptr(),
+                    );
+                    let error = ffi::webrtc_VideoEncoder_EncodedImageCallback_Result_error(result);
+                    ffi::webrtc_VideoEncoder_EncodedImageCallback_Result_unique_delete(
+                        raw.as_ptr(),
+                    );
+                    error
+                };
+                assert_eq!(error, 0);
+            });
+        }
+    });
+    assert_eq!(
+        a.register_encode_complete_callback(None),
+        VideoCodecStatus::Ok
+    );
+    assert_eq!(
+        b.register_encode_complete_callback(None),
+        VideoCodecStatus::Ok
+    );
+    assert_eq!(
+        seen.load(Ordering::SeqCst),
+        2,
+        "両方の完了通知を受信していません"
+    );
+}
+
+#[test]
+fn video_factories_accept_overlapping_native_requests() {
+    struct Factory {
+        barrier: std::sync::Barrier,
+        seen: Arc<AtomicUsize>,
+    }
+    impl Factory {
+        fn enter(&self) {
+            self.seen.fetch_add(1, Ordering::SeqCst);
+            self.barrier.wait();
+        }
+    }
+    impl VideoEncoderFactoryHandler for Factory {
+        fn get_supported_formats(&self) -> Vec<SdpVideoFormat> {
+            self.enter();
+            VideoEncoderFactory::builtin().get_supported_formats()
+        }
+        fn create(
+            &self,
+            env: EnvironmentRef<'_>,
+            format: SdpVideoFormatRef<'_>,
+        ) -> Option<VideoEncoder> {
+            self.enter();
+            VideoEncoderFactory::builtin().create(env, format)
+        }
+    }
+    impl VideoDecoderFactoryHandler for Factory {
+        fn get_supported_formats(&self) -> Vec<SdpVideoFormat> {
+            self.enter();
+            VideoDecoderFactory::builtin().get_supported_formats()
+        }
+        fn create(
+            &self,
+            env: EnvironmentRef<'_>,
+            format: SdpVideoFormatRef<'_>,
+        ) -> Option<VideoDecoder> {
+            self.enter();
+            VideoDecoderFactory::builtin().create(env, format)
+        }
+    }
+    let seen = Arc::new(AtomicUsize::new(0));
+    let encoder_factory = VideoEncoderFactory::new_with_handler(Box::new(Factory {
+        barrier: std::sync::Barrier::new(2),
+        seen: seen.clone(),
+    }));
+    let decoder_factory = VideoDecoderFactory::new_with_handler(Box::new(Factory {
+        barrier: std::sync::Barrier::new(2),
+        seen: seen.clone(),
+    }));
+    let encoder_address = encoder_factory.as_ptr() as usize;
+    let decoder_address = decoder_factory.as_ptr() as usize;
+    // native stream ごとの queue が共有する factory の C 入口を並行に呼ぶ。
+    // factory の所有者は join まで保持し、codec 本体は実物の VP8 を生成する。
+    std::thread::scope(|scope| {
+        for _ in 0..2 {
+            scope.spawn(move || {
+                let env = Environment::new();
+                let format = SdpVideoFormat::new("VP8");
+                // C wrapper の全通常入口は不変の callback 表と Sync な handler を共有する。
+                // env / format はこのスレッドが保持し、返った所有値は同じ C API で解放する。
+                unsafe {
+                    let enc = encoder_address as *mut ffi::webrtc_VideoEncoderFactory;
+                    let dec = decoder_address as *mut ffi::webrtc_VideoDecoderFactory;
+                    let enc_formats = ffi::webrtc_VideoEncoderFactory_GetSupportedFormats(enc);
+                    let dec_formats = ffi::webrtc_VideoDecoderFactory_GetSupportedFormats(dec);
+                    assert!(!enc_formats.is_null(), "encoder の形式一覧が null です");
+                    assert!(!dec_formats.is_null(), "decoder の形式一覧が null です");
+                    assert!(ffi::webrtc_SdpVideoFormat_vector_size(enc_formats) > 0);
+                    assert!(ffi::webrtc_SdpVideoFormat_vector_size(dec_formats) > 0);
+                    ffi::webrtc_SdpVideoFormat_vector_delete(enc_formats);
+                    ffi::webrtc_SdpVideoFormat_vector_delete(dec_formats);
+                    let encoder = ffi::webrtc_VideoEncoderFactory_Create(
+                        enc,
+                        env.as_ref().as_ptr(),
+                        format.as_ref().as_ptr(),
+                    );
+                    let decoder = ffi::webrtc_VideoDecoderFactory_Create(
+                        dec,
+                        env.as_ref().as_ptr(),
+                        format.as_ref().as_ptr(),
+                    );
+                    assert!(!encoder.is_null(), "VP8 encoder を生成できません");
+                    assert!(!decoder.is_null(), "VP8 decoder を生成できません");
+                    ffi::webrtc_VideoEncoder_unique_delete(encoder);
+                    ffi::webrtc_VideoDecoder_unique_delete(decoder);
+                }
+            });
+        }
+    });
+    assert_eq!(
+        seen.load(Ordering::SeqCst),
+        8,
+        "factory の全入口が重なっていません"
+    );
+}
+
+#[test]
+fn audio_sink_registered_to_two_remote_tracks_accepts_overlapping_notifications() {
+    struct Sink {
+        barrier: std::sync::Barrier,
+        bytes: Arc<AtomicUsize>,
+    }
+    impl AudioTrackSinkHandler for Sink {
+        fn on_data(&self, data: &[u8], bits: i32, rate: i32, channels: usize, frames: usize) {
+            assert_eq!((bits, rate, channels, frames), (16, 48000, 1, 480));
+            assert_eq!(data.len(), 960, "PCM の byte 長が一致しません");
+            self.bytes.fetch_add(data.len(), Ordering::SeqCst);
+            self.barrier.wait();
+        }
+    }
+    let mut network = Thread::new();
+    let mut signaling = Thread::new();
+    assert!(network.start());
+    assert!(signaling.start());
+    let mut deps = PeerConnectionFactoryDependencies::new();
+    deps.set_network_thread(&network);
+    deps.set_worker_thread(&network);
+    deps.set_signaling_thread(&signaling);
+    deps.set_audio_encoder_factory(&AudioEncoderFactory::builtin());
+    deps.set_audio_decoder_factory(&AudioDecoderFactory::builtin());
+    deps.set_audio_processing_builder(AudioProcessingBuilder::new_builtin());
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("ADM を生成できません");
+    // 同じ ADM を利用する factory は 1 個だけで、直接操作は行わない。
+    unsafe { deps.set_audio_device_module(&adm) };
+    deps.enable_media();
+    let factory = PeerConnectionFactory::create_modular(deps).expect("factory を生成できません");
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
+    // observer はこの PC 専用で、callback から再入せず、全 PC ハンドルの破棄まで保持する。
+    let pc_deps = unsafe { PeerConnectionDependencies::new(&observer) };
+    let pc = PeerConnection::create(&factory, &PeerConnectionRtcConfiguration::new(), pc_deps)
+        .expect("PeerConnection を生成できません");
+    let mut init = RtpTransceiverInit::new();
+    init.set_direction(RtpTransceiverDirection::RecvOnly);
+    let a = pc
+        .add_transceiver(MediaType::Audio, &init)
+        .expect("受信器を生成できません");
+    let b = pc
+        .add_transceiver(MediaType::Audio, &init)
+        .expect("受信器を生成できません");
+    let ta = a.receiver().track().cast_to_audio_track();
+    let tb = b.receiver().track().cast_to_audio_track();
+    let bytes = Arc::new(AtomicUsize::new(0));
+    let sink = AudioTrackSink::new_with_handler(Box::new(Sink {
+        barrier: std::sync::Barrier::new(2),
+        bytes: bytes.clone(),
+    }));
+    // 各 receiver が持つ実物の RemoteAudioSource に同じ sink を登録する。
+    ta.add_sink(&sink);
+    tb.add_sink(&sink);
+    let address = sink.as_ptr() as usize;
+    // 登録と通知入口を独立して検証する。C wrapper の public OnData を呼び、
+    // source の受信・復号・fan-out の全処理を実行する検証とは区別する。
+    std::thread::scope(|scope| {
+        for _ in 0..2 {
+            scope.spawn(move || {
+                let pcm = [7i16; 480];
+                // sink は親が join まで保持する。PCM は 16 bit / 1 ch / 480 frame で、
+                // 呼び出し中に有効な 960 byte の読み取り専用領域を持つ。
+                unsafe {
+                    ffi::webrtc_AudioTrackSinkInterface_OnData(
+                        address as *mut ffi::webrtc_AudioTrackSinkInterface,
+                        pcm.as_ptr().cast(),
+                        16,
+                        48000,
+                        1,
+                        480,
+                    )
+                };
+            });
+        }
+    });
+    // 通知が戻った後で両登録を解除し、sink より後に native 所有者を破棄する。
+    ta.remove_sink(&sink);
+    tb.remove_sink(&sink);
+    assert_eq!(
+        bytes.load(Ordering::SeqCst),
+        1920,
+        "両通知の PCM を受信していません"
+    );
+}
+
+#[test]
+fn sdp_observers_shared_by_two_peer_connections_receive_overlapping_notifications() {
+    struct Handler {
+        // 別 signaling thread の callback が重なることを、直列化せずに待ち合わせる。
+        // 通知ごとの到着数を共有するため、短い更新だけ Mutex で保護する。
+        arrived: std::sync::Mutex<[usize; 4]>,
+        changed: std::sync::Condvar,
+        tx: std::sync::mpsc::Sender<(usize, bool)>,
+    }
+    impl Handler {
+        fn notify(&self, kind: usize) {
+            let mut arrived = self.arrived.lock().expect("通知数をロックできません");
+            arrived[kind] += 1;
+            self.changed.notify_all();
+            let (arrived, timeout) = self
+                .changed
+                .wait_timeout_while(arrived, Duration::from_secs(10), |arrived| {
+                    arrived[kind] < 2
+                })
+                .expect("並列通知を待機できません");
+            let overlapped = !timeout.timed_out() && arrived[kind] == 2;
+            drop(arrived);
+            self.tx
+                .send((kind, overlapped))
+                .expect("完了通知を送信できません");
+        }
+    }
+    impl CreateSessionDescriptionObserverHandler for Handler {
+        fn on_success(&self, _desc: SessionDescription) {
+            self.notify(0);
+        }
+        fn on_failure(&self, error: RtcError) {
+            assert!(!error.ok(), "失敗通知が成功を示しています");
+            self.notify(1);
+        }
+    }
+    impl SetLocalDescriptionObserverHandler for Handler {
+        fn on_set_local_description_complete(&self, error: RtcError) {
+            assert!(!error.ok(), "Stable 状態で Answer を適用できています");
+            self.notify(2);
+        }
+    }
+    impl SetRemoteDescriptionObserverHandler for Handler {
+        fn on_set_remote_description_complete(&self, error: RtcError) {
+            assert!(!error.ok(), "Stable 状態で Answer を適用できています");
+            self.notify(3);
+        }
+    }
+    let (completed_tx, completed_rx) = std::sync::mpsc::channel();
+    let handler = || Handler {
+        arrived: std::sync::Mutex::new([0; 4]),
+        changed: std::sync::Condvar::new(),
+        tx: completed_tx.clone(),
+    };
+    let create = CreateSessionDescriptionObserver::new_with_handler(Box::new(handler()));
+    let local = SetLocalDescriptionObserver::new_with_handler(Box::new(handler()));
+    let remote = SetRemoteDescriptionObserver::new_with_handler(Box::new(handler()));
+    let create_address = create.as_ptr() as usize;
+    let local_address = local.as_refcounted_ptr() as usize;
+    let remote_address = remote.as_refcounted_ptr() as usize;
+    let mut threads = Vec::new();
+    let mut factories = Vec::new();
+    let mut observers = Vec::new();
+    let mut pcs = Vec::new();
+    for _ in 0..2 {
+        let mut network = Thread::new();
+        let mut signaling = Thread::new();
+        assert!(network.start());
+        assert!(signaling.start());
+        let mut deps = PeerConnectionFactoryDependencies::new();
+        deps.set_network_thread(&network);
+        deps.set_worker_thread(&network);
+        deps.set_signaling_thread(&signaling);
+        deps.set_audio_encoder_factory(&AudioEncoderFactory::builtin());
+        deps.set_audio_decoder_factory(&AudioDecoderFactory::builtin());
+        deps.set_audio_processing_builder(AudioProcessingBuilder::new_builtin());
+        let env = Environment::new();
+        let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+            .expect("ADM を生成できません");
+        // 各 factory は固有の ADM を使い、引き渡した後で直接操作しない。
+        unsafe { deps.set_audio_device_module(&adm) };
+        deps.enable_media();
+        let factory =
+            PeerConnectionFactory::create_modular(deps).expect("factory を生成できません");
+        let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
+        // 接続 observer は PC ごとに固有で、callback から再入せず、PC より後で破棄する。
+        let pc_deps = unsafe { PeerConnectionDependencies::new(&observer) };
+        let pc = PeerConnection::create(&factory, &PeerConnectionRtcConfiguration::new(), pc_deps)
+            .expect("PeerConnection を生成できません");
+        threads.push((network, signaling));
+        factories.push(factory);
+        observers.push(observer);
+        pcs.push(pc);
+    }
+    // native の operation chain は完了処理中に次の操作を開始することがある。
+    // 操作ごとに両 PC の通知を待ち、異なる通知の待ち合わせを同時に持ち込まない。
+    for operation in 0..4 {
+        std::thread::scope(|scope| {
+            for pc in &pcs {
+                scope.spawn(move || {
+                    let options = PeerConnectionOfferAnswerOptions::new();
+                    let empty_sdp = "v=0\r\no=- 0 0 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n";
+                    // C ラッパーから実物 PC の処理を開始し、別 signaling thread から通知させる。
+                    // PC / observer / factory / thread は親が全操作の完了まで保持する。
+                    // 完了 observer は native も参照カウントで保持し、handler は Sync である。
+                    unsafe {
+                        let create =
+                            create_address as *mut ffi::webrtc_CreateSessionDescriptionObserver;
+                        match operation {
+                            0 => ffi::webrtc_PeerConnectionInterface_CreateOffer(
+                                pc.as_ptr(),
+                                create,
+                                options.as_ptr(),
+                            ),
+                            // Offer を適用していない Stable 状態なので Answer 生成・適用は失敗する。
+                            1 => ffi::webrtc_PeerConnectionInterface_CreateAnswer(
+                                pc.as_ptr(),
+                                create,
+                                options.as_ptr(),
+                            ),
+                            2 => {
+                                let answer = SessionDescription::new(SdpType::Answer, empty_sdp)
+                                    .expect("Answer を構築できません");
+                                ffi::webrtc_PeerConnectionInterface_SetLocalDescription(
+                                    pc.as_ptr(),
+                                    answer.into_raw(),
+                                    local_address
+                                        as *mut ffi::webrtc_SetLocalDescriptionObserverInterface_refcounted,
+                                );
+                            }
+                            3 => {
+                                let answer = SessionDescription::new(SdpType::Answer, empty_sdp)
+                                    .expect("Answer を構築できません");
+                                ffi::webrtc_PeerConnectionInterface_SetRemoteDescription(
+                                    pc.as_ptr(),
+                                    answer.into_raw(),
+                                    remote_address
+                                        as *mut ffi::webrtc_SetRemoteDescriptionObserverInterface_refcounted,
+                                );
+                            }
+                            _ => unreachable!("未知の SDP 操作です"),
+                        }
+                    }
+                });
+            }
+            for _ in 0..2 {
+                let (kind, overlapped) = completed_rx
+                    .recv_timeout(Duration::from_secs(20))
+                    .expect("SDP observer の通知がタイムアウトしました");
+                assert_eq!(kind, operation, "操作と通知の種類が一致しません");
+                assert!(overlapped, "別 signaling thread の通知が重なっていません");
+            }
+        });
+    }
+    drop(pcs);
+    drop(observers);
+    drop(factories);
+    for (mut network, mut signaling) in threads {
+        network.stop();
+        signaling.stop();
+    }
 }

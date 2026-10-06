@@ -11,13 +11,21 @@ use core::ptr::NonNull;
 ///
 /// 実際の容量は生成側（危険関数 `from_raw` を呼ぶ側）が保証するものとし、
 /// 呼び出し側は `write` で渡す要素数が領域の容量を超えないようにしなければならない。
+///
+/// ```compile_fail,E0277
+/// use shiguredo_webrtc::RawBufferWriter;
+/// use std::rc::Rc;
+/// fn require_send<T: Send>() {}
+/// require_send::<RawBufferWriter<'static, Rc<u8>>>();
+/// ```
 pub struct RawBufferWriter<'a, T> {
     current: NonNull<T>,
     written: usize,
     _marker: PhantomData<&'a mut T>,
 }
 
-unsafe impl<'a, T> Send for RawBufferWriter<'a, T> {}
+// 排他借用を別スレッドへ移すため、対象要素自身も Send である必要がある。
+unsafe impl<'a, T: Send> Send for RawBufferWriter<'a, T> {}
 
 impl<'a, T> RawBufferWriter<'a, T> {
     /// # Safety

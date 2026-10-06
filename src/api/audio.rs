@@ -352,10 +352,12 @@ impl Clone for AudioTrack {
 }
 
 /// 音声データを受信するためのコールバックハンドラ。
-pub trait AudioTrackSinkHandler: Send {
+/// 複数の native 利用者から同時に呼ばれるコールバックハンドラ。
+/// 可変状態は実装側で同期し、callback 間で共有参照を利用する。
+pub trait AudioTrackSinkHandler: Send + Sync {
     /// 音声データを受信した際に呼ばれる。
     fn on_data(
-        &mut self,
+        &self,
         audio_data: &[u8],
         bits_per_sample: i32,
         sample_rate: i32,
@@ -374,7 +376,7 @@ unsafe extern "C" fn audio_track_sink_on_data(
     number_of_frames: usize,
     user_data: *mut c_void,
 ) {
-    let state = unsafe { &mut *(user_data as *mut AudioTrackSinkHandlerState) };
+    let state = unsafe { &*(user_data as *const AudioTrackSinkHandlerState) };
     let byte_len = number_of_frames * number_of_channels * (bits_per_sample as usize) / 8;
     let data = if audio_data.is_null() || byte_len == 0 {
         &[]
@@ -702,6 +704,7 @@ pub struct SdpAudioFormatRef<'a> {
     _marker: PhantomData<&'a ffi::webrtc_SdpAudioFormat>,
 }
 
+// const の読み取りとコピーだけを公開し、借用中の元の値への可変アクセスは Rust の借用で排除する。
 unsafe impl<'a> Send for SdpAudioFormatRef<'a> {}
 
 impl<'a> SdpAudioFormatRef<'a> {
@@ -2960,16 +2963,18 @@ impl Drop for AudioEncoderFactoryOptions {
 }
 
 /// `AudioEncoderFactory` のコールバックハンドラ。
-pub trait AudioEncoderFactoryHandler: Send {
+/// 複数の native 利用者から同時に呼ばれるコールバックハンドラ。
+/// 可変状態は実装側で同期し、callback 間で共有参照を利用する。
+pub trait AudioEncoderFactoryHandler: Send + Sync {
     /// サポートされるエンコーダーの一覧を返す。
-    fn get_supported_encoders(&mut self) -> Vec<AudioCodecSpec>;
+    fn get_supported_encoders(&self) -> Vec<AudioCodecSpec>;
 
     /// エンコーダーがフォーマットに対応するかを問い合わせる。
-    fn query_audio_encoder(&mut self, format: SdpAudioFormatRef<'_>) -> Option<AudioCodecInfo>;
+    fn query_audio_encoder(&self, format: SdpAudioFormatRef<'_>) -> Option<AudioCodecInfo>;
 
     /// エンコーダーを生成する。
     fn create(
-        &mut self,
+        &self,
         env: EnvironmentRef<'_>,
         format: SdpAudioFormatRef<'_>,
         options: &AudioEncoderFactoryOptions,
@@ -2985,7 +2990,7 @@ unsafe extern "C" fn audio_encoder_factory_get_supported_encoders(
         !user_data.is_null(),
         "audio_encoder_factory_get_supported_encoders: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut AudioEncoderFactoryHandlerState) };
+    let state = unsafe { &*(user_data as *const AudioEncoderFactoryHandlerState) };
     let specs = state.handler.get_supported_encoders();
     let vec = expect_non_null(
         unsafe { ffi::webrtc_AudioCodecSpec_vector_new() },
@@ -3006,7 +3011,7 @@ unsafe extern "C" fn audio_encoder_factory_query_audio_encoder(
         !user_data.is_null(),
         "audio_encoder_factory_query_audio_encoder: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut AudioEncoderFactoryHandlerState) };
+    let state = unsafe { &*(user_data as *const AudioEncoderFactoryHandlerState) };
     let format =
         expect_non_null_const(format, "audio_encoder_factory_query_audio_encoder (format)");
     let format = SdpAudioFormatRef::from_raw(format);
@@ -3026,7 +3031,7 @@ unsafe extern "C" fn audio_encoder_factory_create(
         !user_data.is_null(),
         "audio_encoder_factory_create: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut AudioEncoderFactoryHandlerState) };
+    let state = unsafe { &*(user_data as *const AudioEncoderFactoryHandlerState) };
     let env = expect_non_null_const(env, "audio_encoder_factory_create (env)");
     let format = expect_non_null_const(format, "audio_encoder_factory_create (format)");
     let options = expect_non_null(options, "audio_encoder_factory_create (options)");
@@ -3119,16 +3124,18 @@ impl AudioEncoderFactory {
 }
 
 /// `AudioDecoderFactory` のコールバックハンドラ。
-pub trait AudioDecoderFactoryHandler: Send {
+/// 複数の native 利用者から同時に呼ばれるコールバックハンドラ。
+/// 可変状態は実装側で同期し、callback 間で共有参照を利用する。
+pub trait AudioDecoderFactoryHandler: Send + Sync {
     /// サポートされるデコーダーの一覧を返す。
-    fn get_supported_decoders(&mut self) -> Vec<AudioCodecSpec>;
+    fn get_supported_decoders(&self) -> Vec<AudioCodecSpec>;
 
     /// デコーダーがフォーマットに対応するかを返す。
-    fn is_supported_decoder(&mut self, format: SdpAudioFormatRef<'_>) -> bool;
+    fn is_supported_decoder(&self, format: SdpAudioFormatRef<'_>) -> bool;
 
     /// デコーダーを生成する。
     fn create(
-        &mut self,
+        &self,
         env: EnvironmentRef<'_>,
         format: SdpAudioFormatRef<'_>,
     ) -> Option<AudioDecoder>;
@@ -3143,7 +3150,7 @@ unsafe extern "C" fn audio_decoder_factory_get_supported_decoders(
         !user_data.is_null(),
         "audio_decoder_factory_get_supported_decoders: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut AudioDecoderFactoryHandlerState) };
+    let state = unsafe { &*(user_data as *const AudioDecoderFactoryHandlerState) };
     let specs = state.handler.get_supported_decoders();
     let vec = expect_non_null(
         unsafe { ffi::webrtc_AudioCodecSpec_vector_new() },
@@ -3164,7 +3171,7 @@ unsafe extern "C" fn audio_decoder_factory_is_supported_decoder(
         !user_data.is_null(),
         "audio_decoder_factory_is_supported_decoder: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut AudioDecoderFactoryHandlerState) };
+    let state = unsafe { &*(user_data as *const AudioDecoderFactoryHandlerState) };
     let format = expect_non_null_const(
         format,
         "audio_decoder_factory_is_supported_decoder (format)",
@@ -3186,7 +3193,7 @@ unsafe extern "C" fn audio_decoder_factory_create(
         !user_data.is_null(),
         "audio_decoder_factory_create: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut AudioDecoderFactoryHandlerState) };
+    let state = unsafe { &*(user_data as *const AudioDecoderFactoryHandlerState) };
     let env = expect_non_null_const(env, "audio_decoder_factory_create (env)");
     let format = expect_non_null_const(format, "audio_decoder_factory_create (format)");
     let env = EnvironmentRef::from_raw(env);

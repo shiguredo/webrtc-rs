@@ -203,7 +203,17 @@ pub mod log {
     /// 最初のログ出力前に 1 回だけ呼ぶこと。すでに初期化済みの場合（明示的な
     /// 初期化あるいは最初のログ出力による暗黙の初期化を含む）は `false` を
     /// 返し、設定は反映されない。
-    pub fn initialize_logging(config: LoggingConfig) -> bool {
+    ///
+    /// # Safety
+    /// 初回の設定適用は、他の WebRTC API 呼び出しとログ出力を開始する前に行うこと。
+    /// 再適用も含め呼び出し中は、他スレッドの WebRTC 利用と native ログ出力を排除すること。
+    /// 初期化関数だけをロックしても、native 内部のログ出力との排他にはならない。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::log;
+    /// let _ = log::initialize_logging(log::LoggingConfig::new());
+    /// ```
+    pub unsafe fn initialize_logging(config: LoggingConfig) -> bool {
         unsafe { ffi::webrtc_LogMessage_InitializeLogging(config.as_ptr()) }
     }
 
@@ -314,9 +324,11 @@ pub mod log {
     ///
     /// [LogSinkHandler::on_log_message] には、ログ 1 行分の全情報を持つ
     /// [LogLineRef] が渡される。
-    pub trait LogSinkHandler: Send {
+    /// 複数の native 利用者から同時に呼ばれるコールバックハンドラ。
+    /// 可変状態は実装側で同期し、callback 間で共有参照を利用する。
+    pub trait LogSinkHandler: Send + Sync {
         #[expect(unused_variables)]
-        fn on_log_message(&mut self, line: LogLineRef<'_>) {}
+        fn on_log_message(&self, line: LogLineRef<'_>) {}
     }
 
     type LogSinkHandlerState = HandlerState<dyn LogSinkHandler>;
@@ -369,12 +381,12 @@ pub mod log {
         std::str::from_utf8(bytes).unwrap_or("")
     }
 
-    fn handler_state<'a>(user_data: *mut c_void) -> &'a mut LogSinkHandlerState {
+    fn handler_state<'a>(user_data: *mut c_void) -> &'a LogSinkHandlerState {
         assert!(
             !user_data.is_null(),
             "null user_data passed to the LogSink callback"
         );
-        unsafe { &mut *(user_data as *mut LogSinkHandlerState) }
+        unsafe { &*(user_data as *const LogSinkHandlerState) }
     }
 
     unsafe extern "C" fn log_sink_on_destroy(user_data: *mut c_void) {

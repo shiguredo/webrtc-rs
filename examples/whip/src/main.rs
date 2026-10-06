@@ -73,7 +73,8 @@ fn i420_planes_to_buffer(
     let dst_stride_u = dst.stride_u();
     let dst_stride_v = dst.stride_v();
     copy_plane(
-        dst.y_data_mut(),
+        // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+        unsafe { dst.y_data_mut() },
         dst_stride_y,
         y_plane,
         width,
@@ -81,7 +82,8 @@ fn i420_planes_to_buffer(
         height,
     )?;
     copy_plane(
-        dst.u_data_mut(),
+        // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+        unsafe { dst.u_data_mut() },
         dst_stride_u,
         u_plane,
         chroma_width,
@@ -89,7 +91,8 @@ fn i420_planes_to_buffer(
         chroma_height,
     )?;
     copy_plane(
-        dst.v_data_mut(),
+        // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+        unsafe { dst.v_data_mut() },
         dst_stride_v,
         v_plane,
         chroma_width,
@@ -121,7 +124,8 @@ impl FactoryHolder {
         let event_log = RtcEventLogFactory::new();
         deps.set_event_log_factory(event_log);
         let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy).ok()?;
-        deps.set_audio_device_module(&adm);
+        // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+        unsafe { deps.set_audio_device_module(&adm) };
         let audio_enc = AudioEncoderFactory::builtin();
         let audio_dec = AudioDecoderFactory::builtin();
         deps.set_audio_encoder_factory(&audio_enc);
@@ -345,7 +349,8 @@ fn tick_once(
             && (size.adapted_width != buffer.width() || size.adapted_height != buffer.height())
         {
             let mut scaled = I420Buffer::new(size.adapted_width, size.adapted_height);
-            scaled.scale_from(&buffer);
+            // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+            unsafe { scaled.scale_from(&buffer) };
             let scaled_buffer = scaled.cast_to_video_frame_buffer();
             VideoFrame::builder(&scaled_buffer)
                 .set_timestamp_us(timestamp_aligner.translate(timestamp_us, time_millis() * 1000))
@@ -417,14 +422,14 @@ struct CreateOfferObserverHandler {
 }
 
 impl CreateSessionDescriptionObserverHandler for CreateOfferObserverHandler {
-    fn on_success(&mut self, desc: SessionDescription) {
+    fn on_success(&self, desc: SessionDescription) {
         let sdp = desc
             .to_string()
             .map_err(|e| format!("offer to_string failed: {e}"));
         let _ = self.tx.send(sdp);
     }
 
-    fn on_failure(&mut self, err: RtcError) {
+    fn on_failure(&self, err: RtcError) {
         let msg = err.message().unwrap_or_else(|_| "unknown".to_string());
         let _ = self.tx.send(Err(msg));
     }
@@ -435,7 +440,7 @@ struct SetLocalObserverHandler {
 }
 
 impl SetLocalDescriptionObserverHandler for SetLocalObserverHandler {
-    fn on_set_local_description_complete(&mut self, err: RtcError) {
+    fn on_set_local_description_complete(&self, err: RtcError) {
         let msg = if err.ok() {
             None
         } else {
@@ -450,7 +455,7 @@ struct SetRemoteObserverHandler {
 }
 
 impl SetRemoteDescriptionObserverHandler for SetRemoteObserverHandler {
-    fn on_set_remote_description_complete(&mut self, err: RtcError) {
+    fn on_set_remote_description_complete(&self, err: RtcError) {
         let msg = if err.ok() {
             None
         } else {
@@ -505,6 +510,9 @@ impl SignalingWhip {
     }
 
     pub fn connect(&mut self) -> Result<(), String> {
+        if self.pc.is_some() {
+            return Err("peer connection already exists".to_string());
+        }
         self.set_state(WhipState::Connecting);
         let pc_factory = self.config.pc_factory.factory();
         let observer_state = self.state.clone();
@@ -512,9 +520,8 @@ impl SignalingWhip {
             PeerConnectionObserver::new_with_handler(Box::new(WhipPeerConnectionObserverHandler {
                 observer_state,
             }));
-        // Keep observer alive for the lifetime of the PeerConnection.
-        let deps = PeerConnectionDependencies::new(&observer);
-        // Store observer so it lives as long as SignalingWhip.
+        // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+        let deps = unsafe { PeerConnectionDependencies::new(&observer) };
         self.pc_observer = Some(observer);
         let config = PeerConnectionRtcConfiguration::new();
         let pc = PeerConnection::create(pc_factory, &config, deps)
@@ -707,6 +714,13 @@ impl SignalingWhip {
         }
         self.pc_observer = None;
         self.set_state(WhipState::Closed);
+    }
+}
+
+impl Drop for SignalingWhip {
+    fn drop(&mut self) {
+        // factory と native thread を保持した状態で、track・PeerConnection・observer を片付ける。
+        self.disconnect();
     }
 }
 
@@ -952,7 +966,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.set_debug_severity(log::Severity::Info);
     config.set_log_timestamp(true);
     config.set_log_thread(true);
-    log::initialize_logging(config);
+    // WebRTC オブジェクトと capturer のスレッドを生成する前に初期化する。
+    unsafe { log::initialize_logging(config) };
 
     let factory = FactoryHolder::new().ok_or("factory create failed")?;
 
@@ -999,4 +1014,75 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     whip.disconnect();
     capturer.stop();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    #[test]
+    fn connect_keeps_existing_observer_and_drop_disconnects() {
+        struct Observer {
+            destroyed: Arc<AtomicBool>,
+        }
+        impl PeerConnectionObserverHandler for Observer {}
+        impl Drop for Observer {
+            fn drop(&mut self) {
+                self.destroyed.store(true, Ordering::SeqCst);
+            }
+        }
+        let factory = FactoryHolder::new().expect("factory を生成できません");
+        let mut client = SignalingWhip::new(SignalingWhipConfig::new(factory));
+        assert_eq!(
+            Arc::strong_count(&client.config.pc_factory),
+            1,
+            "factory の余分な所有者があります"
+        );
+        let destroyed = Arc::new(AtomicBool::new(false));
+        let observer = PeerConnectionObserver::new_with_handler(Box::new(Observer {
+            destroyed: destroyed.clone(),
+        }));
+        // observer はこの PC 専用で、handler から再入せず、client が PC より後で破棄する。
+        let deps = unsafe { PeerConnectionDependencies::new(&observer) };
+        let pc = PeerConnection::create(
+            client.config.pc_factory.factory(),
+            &PeerConnectionRtcConfiguration::new(),
+            deps,
+        )
+        .expect("PeerConnection を生成できません");
+        let pc_address = pc.as_ptr();
+        let observer_address = observer.as_ptr();
+        client.pc_observer = Some(observer);
+        client.pc = Some(pc);
+        // 接続済みなら HTTP 処理を開始せず、既存 PC と observer を保持する。
+        assert_eq!(
+            client
+                .connect()
+                .expect_err("接続中の connect が成功しました"),
+            "peer connection already exists"
+        );
+        assert_eq!(
+            client.pc.as_ref().expect("PC が失われました").as_ptr(),
+            pc_address
+        );
+        assert_eq!(
+            client
+                .pc_observer
+                .as_ref()
+                .expect("observer が失われました")
+                .as_ptr(),
+            observer_address
+        );
+        assert!(
+            !destroyed.load(Ordering::SeqCst),
+            "接続中の observer が破棄されました"
+        );
+        // factory の最後の所有者である client を明示 disconnect なしで破棄する。
+        drop(client);
+        assert!(
+            destroyed.load(Ordering::SeqCst),
+            "observer が破棄されていません"
+        );
+    }
 }

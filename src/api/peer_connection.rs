@@ -145,7 +145,19 @@ impl PeerConnectionFactoryDependencies {
         }
     }
 
-    pub fn set_audio_device_module(&mut self, adm: &AudioDeviceModule) {
+    /// factory が利用する ADM を設定する。
+    ///
+    /// # Safety
+    /// 設定時から native 利用の終了まで、同じ ADM の callback に他の factory、元のハンドル、
+    /// clone の操作が同時または再入で重ならないこと。異なる worker thread の factory 間で共有しないこと。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(deps: &mut PeerConnectionFactoryDependencies, adm: &AudioDeviceModule) {
+    ///     deps.set_audio_device_module(adm);
+    /// }
+    /// ```
+    pub unsafe fn set_audio_device_module(&mut self, adm: &AudioDeviceModule) {
         let raw_ref = adm.as_refcounted_ptr();
         unsafe {
             ffi::webrtc_PeerConnectionFactoryDependencies_set_adm(self.raw.as_ptr(), raw_ref);
@@ -1466,6 +1478,8 @@ pub struct IceCandidateError {
 
 unsafe impl Send for IceCandidateError {}
 
+/// signaling thread で直列に呼ばれる PeerConnection の observer。
+/// 登録先をまたぐ排他は保証されず、同時呼び出しと再入は登録側で排除する。
 pub trait PeerConnectionObserverHandler: Send {
     #[expect(unused_variables)]
     fn on_signaling_change(&mut self, new_state: SignalingState) {}
@@ -1670,7 +1684,20 @@ pub struct PeerConnectionDependencies {
 unsafe impl Send for PeerConnectionDependencies {}
 
 impl PeerConnectionDependencies {
-    pub fn new(observer: &PeerConnectionObserver) -> Self {
+    /// observer を指定して PeerConnection の依存関係を生成する。
+    ///
+    /// # Safety
+    /// この依存関係の生存中は observer を生存させること。生成した PeerConnection では、
+    /// `close` が戻るか、全ハンドルを破棄するまで observer を生存させること。
+    /// 1 observer を 1 登録先だけで使い、callback 中の操作で同じ handler に再入させないこと。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(observer: &PeerConnectionObserver) {
+    ///     let _ = PeerConnectionDependencies::new(observer);
+    /// }
+    /// ```
+    pub unsafe fn new(observer: &PeerConnectionObserver) -> Self {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_PeerConnectionDependencies_new(observer.as_ptr()) },
             "webrtc_PeerConnectionDependencies_new",
@@ -1764,11 +1791,15 @@ unsafe extern "C" fn peer_connection_on_destroy(user_data: *mut c_void) {
     };
 }
 
-pub trait CreateSessionDescriptionObserverHandler: Send {
+/// 複数の PeerConnection から同時に完了通知を受け取れる observer。
+/// 可変状態は実装側で同期し、callback 間で共有参照を利用する。
+pub trait CreateSessionDescriptionObserverHandler: Send + Sync {
+    /// 生成に成功した SDP を受け取る。
     #[expect(unused_variables)]
-    fn on_success(&mut self, desc: SessionDescription) {}
+    fn on_success(&self, desc: SessionDescription) {}
+    /// SDP の生成に失敗した理由を受け取る。
     #[expect(unused_variables)]
-    fn on_failure(&mut self, error: RtcError) {}
+    fn on_failure(&self, error: RtcError) {}
 }
 
 type CreateSessionDescriptionObserverHandlerState =
@@ -1778,7 +1809,7 @@ unsafe extern "C" fn csd_on_success(
     desc: *mut ffi::webrtc_SessionDescriptionInterface_unique,
     user_data: *mut c_void,
 ) {
-    let state = unsafe { &mut *(user_data as *mut CreateSessionDescriptionObserverHandlerState) };
+    let state = unsafe { &*(user_data as *const CreateSessionDescriptionObserverHandlerState) };
     let desc = SessionDescription::from_unique_ptr(expect_non_null(desc, "desc"));
     state.handler.on_success(desc);
 }
@@ -1787,7 +1818,7 @@ unsafe extern "C" fn csd_on_failure(
     error: *mut ffi::webrtc_RTCError_unique,
     user_data: *mut c_void,
 ) {
-    let state = unsafe { &mut *(user_data as *mut CreateSessionDescriptionObserverHandlerState) };
+    let state = unsafe { &*(user_data as *const CreateSessionDescriptionObserverHandlerState) };
     let err = RtcError::from_unique_ptr(expect_non_null(error, "error"));
     state.handler.on_failure(err);
 }
@@ -1836,9 +1867,12 @@ impl Drop for CreateSessionDescriptionObserver {
     }
 }
 
-pub trait SetLocalDescriptionObserverHandler: Send {
+/// 複数の PeerConnection から同時に完了通知を受け取れる observer。
+/// 可変状態は実装側で同期し、callback 間で共有参照を利用する。
+pub trait SetLocalDescriptionObserverHandler: Send + Sync {
+    /// local SDP の設定結果を受け取る。error.ok() が true なら成功である。
     #[expect(unused_variables)]
-    fn on_set_local_description_complete(&mut self, error: RtcError) {}
+    fn on_set_local_description_complete(&self, error: RtcError) {}
 }
 
 type SetLocalDescriptionObserverHandlerState = HandlerState<dyn SetLocalDescriptionObserverHandler>;
@@ -1847,7 +1881,7 @@ unsafe extern "C" fn sld_on_complete(
     error: *mut ffi::webrtc_RTCError_unique,
     user_data: *mut c_void,
 ) {
-    let state = unsafe { &mut *(user_data as *mut SetLocalDescriptionObserverHandlerState) };
+    let state = unsafe { &*(user_data as *const SetLocalDescriptionObserverHandlerState) };
     let err = RtcError::from_unique_ptr(expect_non_null(error, "error"));
     state.handler.on_set_local_description_complete(err);
 }
@@ -1898,9 +1932,12 @@ impl SetLocalDescriptionObserver {
     }
 }
 
-pub trait SetRemoteDescriptionObserverHandler: Send {
+/// 複数の PeerConnection から同時に完了通知を受け取れる observer。
+/// 可変状態は実装側で同期し、callback 間で共有参照を利用する。
+pub trait SetRemoteDescriptionObserverHandler: Send + Sync {
+    /// remote SDP の設定結果を受け取る。error.ok() が true なら成功である。
     #[expect(unused_variables)]
-    fn on_set_remote_description_complete(&mut self, error: RtcError) {}
+    fn on_set_remote_description_complete(&self, error: RtcError) {}
 }
 
 type SetRemoteDescriptionObserverHandlerState =
@@ -1910,7 +1947,7 @@ unsafe extern "C" fn srd_on_complete(
     error: *mut ffi::webrtc_RTCError_unique,
     user_data: *mut c_void,
 ) {
-    let state = unsafe { &mut *(user_data as *mut SetRemoteDescriptionObserverHandlerState) };
+    let state = unsafe { &*(user_data as *const SetRemoteDescriptionObserverHandlerState) };
     let err = RtcError::from_unique_ptr(expect_non_null(error, "error"));
     state.handler.on_set_remote_description_complete(err);
 }
@@ -1976,7 +2013,8 @@ unsafe impl Sync for PeerConnection {}
 impl PeerConnection {
     /// PeerConnection を生成する。
     ///
-    /// `deps` に渡した observer は、`PeerConnection::close` を呼ぶまで drop してはならない。
+    /// `deps` に渡した observer は、`PeerConnection::close` が戻るか、
+    /// 生成した PeerConnection の全ハンドルを破棄するまで生存させること。
     pub fn create(
         factory: &PeerConnectionFactory,
         config: &PeerConnectionRtcConfiguration,

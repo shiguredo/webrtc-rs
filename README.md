@@ -113,7 +113,8 @@ impl FactoryHolder {
         let adm = AudioDeviceModule::new(
             &env, AudioDeviceModuleAudioLayer::Dummy,
         ).ok()?;
-        deps.set_audio_device_module(&adm);
+        // Safety: この ADM は 1 factory 専用で、引き渡した後はハンドルから直接操作しない。
+        unsafe { deps.set_audio_device_module(&adm) };
         let audio_enc = AudioEncoderFactory::builtin();
         let audio_dec = AudioDecoderFactory::builtin();
         deps.set_audio_encoder_factory(&audio_enc);

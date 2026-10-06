@@ -177,6 +177,19 @@ WEBRTC_EXPORT void webrtc_AudioTrackSinkInterface_delete(
   auto sink = reinterpret_cast<AudioTrackSinkInterfaceImpl*>(self);
   delete sink;
 }
+
+WEBRTC_EXPORT void webrtc_AudioTrackSinkInterface_OnData(
+    struct webrtc_AudioTrackSinkInterface* self,
+    const void* audio_data,
+    int bits_per_sample,
+    int sample_rate,
+    size_t number_of_channels,
+    size_t number_of_frames) {
+  assert(self != nullptr);
+  auto sink = reinterpret_cast<webrtc::AudioTrackSinkInterface*>(self);
+  sink->OnData(audio_data, bits_per_sample, sample_rate, number_of_channels,
+               number_of_frames);
+}
 }
 
 // -------------------------

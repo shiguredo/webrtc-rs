@@ -8,9 +8,11 @@ use crate::{MediaStreamTrack, ScopedRef, ffi};
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 
-pub trait VideoSinkHandler: Send {
-    fn on_frame(&mut self, frame: VideoFrameRef<'_>);
-    fn on_discarded_frame(&mut self) {}
+/// 複数の native 利用者から同時に呼ばれるコールバックハンドラ。
+/// 可変状態は実装側で同期し、callback 間で共有参照を利用する。
+pub trait VideoSinkHandler: Send + Sync {
+    fn on_frame(&self, frame: VideoFrameRef<'_>);
+    fn on_discarded_frame(&self) {}
 }
 
 type VideoSinkHandlerState = HandlerState<dyn VideoSinkHandler>;
@@ -19,7 +21,7 @@ unsafe extern "C" fn video_sink_on_frame(
     frame: *const ffi::webrtc_VideoFrame,
     user_data: *mut c_void,
 ) {
-    let state = unsafe { &mut *(user_data as *mut VideoSinkHandlerState) };
+    let state = unsafe { &*(user_data as *const VideoSinkHandlerState) };
     let frame = expect_non_null_const(frame, "video_sink_on_frame (frame)");
     let frame = VideoFrameRef::from_raw(frame);
     state.handler.on_frame(frame);
@@ -30,7 +32,7 @@ unsafe extern "C" fn video_sink_on_discarded_frame(user_data: *mut c_void) {
         !user_data.is_null(),
         "video_sink_on_discarded_frame: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoSinkHandlerState) };
+    let state = unsafe { &*(user_data as *const VideoSinkHandlerState) };
     state.handler.on_discarded_frame();
 }
 

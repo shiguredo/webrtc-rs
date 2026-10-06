@@ -57,7 +57,20 @@ impl DtlsTransport {
     ///
     /// この DtlsTransport に登録した `observer` は、`unregister_observer` で登録を解除する
     /// まで drop してはならない。
-    pub fn register_observer(&self, observer: &DtlsTransportObserver) {
+    ///
+    /// # Safety
+    /// この transport を所有する native network thread 上で呼び出すこと。
+    /// 登録中の observer 操作と通知は同じ network thread で直列に行うこと。
+    /// 登録解除が完了するまで observer を生存させること。1 observer を 1 登録先だけで使い、
+    /// callback 中の操作で同じ handler に再入させないこと。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(channel: &DtlsTransport, observer: &DtlsTransportObserver) {
+    ///     channel.register_observer(observer);
+    /// }
+    /// ```
+    pub unsafe fn register_observer(&self, observer: &DtlsTransportObserver) {
         unsafe {
             ffi::webrtc_DtlsTransportInterface_RegisterObserver(
                 self.raw_ref.as_ptr(),
@@ -67,7 +80,18 @@ impl DtlsTransport {
     }
 
     /// Observer を解除する。
-    pub fn unregister_observer(&self) {
+    ///
+    /// # Safety
+    /// この transport を所有する native network thread 上で呼び出すこと。
+    /// observer の callback を実行中ではないこと。解除が戻るまで observer を生存させること。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::DtlsTransport;
+    /// fn check(transport: &DtlsTransport) {
+    ///     transport.unregister_observer();
+    /// }
+    /// ```
+    pub unsafe fn unregister_observer(&self) {
         unsafe { ffi::webrtc_DtlsTransportInterface_UnregisterObserver(self.raw_ref.as_ptr()) };
     }
 }
@@ -84,6 +108,8 @@ impl Clone for DtlsTransport {
 // DtlsTransportObserver
 // -------------------------
 
+/// network thread で直列に呼ばれる observer。
+/// 登録先をまたぐ排他は保証されず、同時呼び出しと再入は登録側で排除する。
 pub trait DtlsTransportObserverHandler: Send {
     #[expect(unused_variables)]
     fn on_state_change(&mut self, new_state: DtlsTransportState) {}

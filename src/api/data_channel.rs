@@ -95,7 +95,18 @@ impl DataChannel {
     /// 本メソッドと `unregister_observer` は network thread 以外のどのスレッドからでも
     /// 呼べるが、コールバック内から呼んではならない。コールバックは signaling thread
     /// で発火する。
-    pub fn register_observer(&self, observer: &DataChannelObserver) {
+    ///
+    /// # Safety
+    /// 登録解除が完了するまで observer を生存させること。1 observer を 1 登録先だけで使い、
+    /// callback 中の操作で同じ handler に再入させないこと。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(channel: &DataChannel, observer: &DataChannelObserver) {
+    ///     channel.register_observer(observer);
+    /// }
+    /// ```
+    pub unsafe fn register_observer(&self, observer: &DataChannelObserver) {
         unsafe {
             ffi::webrtc_DataChannelInterface_RegisterObserver(
                 self.raw_ref.as_ptr(),
@@ -129,6 +140,8 @@ impl Clone for DataChannel {
 // DataChannelObserver
 // -------------------------
 
+/// signaling thread で直列に呼ばれる observer。
+/// 登録先をまたぐ排他は保証されず、同時呼び出しと再入は登録側で排除する。
 pub trait DataChannelObserverHandler: Send {
     fn on_state_change(&mut self) {}
     #[expect(unused_variables)]

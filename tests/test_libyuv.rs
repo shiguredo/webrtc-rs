@@ -216,7 +216,8 @@ fn i420_buffer_planes_mut_to_nv12_round_trip() {
     let chroma_height = src.chroma_height();
 
     {
-        let (src_y, src_u, src_v) = src.planes_mut();
+        // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+        let (src_y, src_u, src_v) = unsafe { src.planes_mut() };
         for row in 0..height as usize {
             let begin = row * src_stride_y as usize;
             let end = begin + width as usize;
@@ -248,7 +249,8 @@ fn i420_buffer_planes_mut_to_nv12_round_trip() {
     let dst_stride_y = nv12.stride_y();
     let dst_stride_uv = nv12.stride_uv();
     {
-        let (dst_y, dst_uv) = nv12.planes_mut();
+        // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+        let (dst_y, dst_uv) = unsafe { nv12.planes_mut() };
         assert!(i420_to_nv12(
             src.y_data(),
             src_stride_y,
@@ -270,7 +272,8 @@ fn i420_buffer_planes_mut_to_nv12_round_trip() {
     let restored_stride_u = restored.stride_u();
     let restored_stride_v = restored.stride_v();
     {
-        let (restored_y, restored_u, restored_v) = restored.planes_mut();
+        // Safety: 復元先は共有しておらず、変換処理中にほかの利用者はアクセスしない。
+        let (restored_y, restored_u, restored_v) = unsafe { restored.planes_mut() };
         assert!(nv12_to_i420(
             nv12.y_data(),
             nv12.stride_y(),

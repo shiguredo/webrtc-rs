@@ -89,7 +89,11 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 
 ## 主要な Observer / Handler trait
 
-コールバックは trait として定義されている。`Send` 必須。
+コールバックは trait として定義されている。すべて `Send` を要求する。
+ログ、映像バッファ、音声・映像 factory、sink、エンコード完了 callback、SDP 完了 observer の共有 handler は、`Sync` と `&self` も要求し、可変状態は実装側で同期する。
+通常 observer、codec 本体、ADM の handler は `&mut self` を使う。通常の native 経路の直列性と、複数登録先・共有ハンドルからの操作に必要な排他契約を区別する。
+
+共有画素の書き込み、ADM の直接操作と factory への引き渡し、logging 初期化、observer 登録と DTLS observer 解除は unsafe 操作である。各メソッドの `# Safety` に従い、native 利用者を含む排他・生存期間・呼び出しスレッドの根拠をコメントに示す。
 
 | trait | 主なメソッド | 用途 |
 |-------|-------------|------|
@@ -134,7 +138,8 @@ deps.set_env(Some(env.clone()));
 deps.set_event_log_factory(RtcEventLogFactory::new());
 
 let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)?;
-deps.set_audio_device_module(&adm);
+// Safety: この ADM は 1 factory 専用で、引き渡した後はハンドルから直接操作しない。
+unsafe { deps.set_audio_device_module(&adm) };
 deps.set_audio_encoder_factory(&AudioEncoderFactory::builtin());
 deps.set_audio_decoder_factory(&AudioDecoderFactory::builtin());
 deps.set_video_encoder_factory(VideoEncoderFactory::builtin());
@@ -262,7 +267,8 @@ libwebrtc の `scoped_refptr` 相当を Rust 側で安全に扱うための型:
 - `log` モジュール (`rtc_base::logging::log`):
   - `Severity` enum (`Verbose`, `Info`, `Warning`, `Error`, `None`, `Raw(i32)`)
   - `LoggingConfig` (new / set_* / getter で `min_severity` / `debug_severity` / `log_thread` / `log_timestamp` / `log_queue_name` / `log_to_stderr` / `log_prefix` を設定できる)
-  - `initialize_logging(LoggingConfig)`, `print(severity, file, line, message)`
+  - `initialize_logging(LoggingConfig)` は unsafe。初回の適用は WebRTC 利用・ログ出力の開始前に行い、再適用を含め呼び出し中の並行 native 利用を排除する。遅い初期化・再適用は `false` を返す
+  - `print(severity, file, line, message)`
 - ログマクロ: `rtc_log_verbose!`, `rtc_log_info!`, `rtc_log_warning!`, `rtc_log_error!`
   - 内部で `rtc_log_format_file(env!("CARGO_PKG_NAME"), file!())` を呼んで `<crate>::<filename>` 形式に整形する
 

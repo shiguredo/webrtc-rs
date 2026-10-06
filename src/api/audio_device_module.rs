@@ -144,7 +144,18 @@ impl AudioDeviceModule {
     }
 
     /// ADM を初期化する。デバイス列挙・選択の前に呼び出す必要がある。
-    pub fn init(&mut self) -> Result<()> {
+    ///
+    /// # Safety
+    /// 呼び出し中は同じ ADM 実体への他の直接操作、native 呼び出し、callback からの再入を排除すること。
+    /// clone した別ハンドルも同じ実体を指し、getter も可変 handler を呼ぶ。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(adm: &mut AudioDeviceModule) {
+    ///     let _ = adm.init();
+    /// }
+    /// ```
+    pub unsafe fn init(&mut self) -> Result<()> {
         let ret = unsafe { ffi::webrtc_AudioDeviceModule_Init(self.as_ptr()) };
         if ret != 0 {
             return Err(Error::Message(format!(
@@ -156,12 +167,34 @@ impl AudioDeviceModule {
     }
 
     /// 録音デバイスの数を返す。
-    pub fn recording_devices(&self) -> i16 {
+    ///
+    /// # Safety
+    /// 呼び出し中は同じ ADM 実体への他の直接操作、native 呼び出し、callback からの再入を排除すること。
+    /// clone した別ハンドルも同じ実体を指し、getter も可変 handler を呼ぶ。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(adm: &mut AudioDeviceModule) {
+    ///     let _ = adm.recording_devices();
+    /// }
+    /// ```
+    pub unsafe fn recording_devices(&self) -> i16 {
         unsafe { ffi::webrtc_AudioDeviceModule_RecordingDevices(self.as_ptr()) }
     }
 
     /// 録音デバイスの名前と GUID を取得する。
-    pub fn recording_device_name(&self, index: u16) -> Result<(String, String)> {
+    ///
+    /// # Safety
+    /// 呼び出し中は同じ ADM 実体への他の直接操作、native 呼び出し、callback からの再入を排除すること。
+    /// clone した別ハンドルも同じ実体を指し、getter も可変 handler を呼ぶ。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(adm: &mut AudioDeviceModule) {
+    ///     let _ = adm.recording_device_name(0);
+    /// }
+    /// ```
+    pub unsafe fn recording_device_name(&self, index: u16) -> Result<(String, String)> {
         let mut name = [0 as c_char; 128];
         let mut guid = [0 as c_char; 128];
         let ret = unsafe {
@@ -190,7 +223,18 @@ impl AudioDeviceModule {
     }
 
     /// 録音デバイスを選択する。
-    pub fn set_recording_device(&mut self, index: u16) -> Result<()> {
+    ///
+    /// # Safety
+    /// 呼び出し中は同じ ADM 実体への他の直接操作、native 呼び出し、callback からの再入を排除すること。
+    /// clone した別ハンドルも同じ実体を指し、getter も可変 handler を呼ぶ。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(adm: &mut AudioDeviceModule) {
+    ///     let _ = adm.set_recording_device(0);
+    /// }
+    /// ```
+    pub unsafe fn set_recording_device(&mut self, index: u16) -> Result<()> {
         let ret = unsafe { ffi::webrtc_AudioDeviceModule_SetRecordingDevice(self.as_ptr(), index) };
         if ret != 0 {
             return Err(Error::Message(format!(

@@ -92,6 +92,16 @@ webrtc_AudioTrackSinkInterface_new(
     void* user_data);
 WEBRTC_EXPORT void webrtc_AudioTrackSinkInterface_delete(
     struct webrtc_AudioTrackSinkInterface* self);
+// bits_per_sample は正の 8 の倍数とし、number_of_frames * number_of_channels *
+// bits_per_sample の積が size_t に収まること。
+// audio_data は呼び出し中、上記の積 / 8 byte の読み取り可能な領域を指すこと。
+WEBRTC_EXPORT void webrtc_AudioTrackSinkInterface_OnData(
+    struct webrtc_AudioTrackSinkInterface* self,
+    const void* audio_data,
+    int bits_per_sample,
+    int sample_rate,
+    size_t number_of_channels,
+    size_t number_of_frames);
 
 // -------------------------
 // webrtc::AudioTrackInterface

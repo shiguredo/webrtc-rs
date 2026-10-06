@@ -44,7 +44,8 @@ impl FactoryHolder {
         let event_log = RtcEventLogFactory::new();
         deps.set_event_log_factory(event_log);
         let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy).ok()?;
-        deps.set_audio_device_module(&adm);
+        // Safety: この ADM を渡す factory は 1 個だけで、引き渡した後はハンドルから直接操作しない。
+        unsafe { deps.set_audio_device_module(&adm) };
         let audio_enc = AudioEncoderFactory::builtin();
         let audio_dec = AudioDecoderFactory::builtin();
         deps.set_audio_encoder_factory(&audio_enc);
@@ -82,7 +83,7 @@ struct AnsiVideoSinkHandler {
 }
 
 impl VideoSinkHandler for AnsiVideoSinkHandler {
-    fn on_frame(&mut self, frame: VideoFrameRef<'_>) {
+    fn on_frame(&self, frame: VideoFrameRef<'_>) {
         render_frame(frame, self.width, self.height);
     }
 }
@@ -114,7 +115,8 @@ fn render_frame(frame: VideoFrameRef, width: i32, height: i32) {
         None => return,
     };
     let mut scaled = I420Buffer::new(width, height);
-    scaled.scale_from(&src);
+    // Safety: 書き込み先はローカルに確保した画素であり、共有先へ渡す前に書き込みを終える。
+    unsafe { scaled.scale_from(&src) };
 
     let mut image = vec![
         0u8;
@@ -286,14 +288,14 @@ struct CreateOfferObserverHandler {
 }
 
 impl CreateSessionDescriptionObserverHandler for CreateOfferObserverHandler {
-    fn on_success(&mut self, desc: SessionDescription) {
+    fn on_success(&self, desc: SessionDescription) {
         let sdp = desc
             .to_string()
             .map_err(|e| format!("offer to_string failed: {e}"));
         let _ = self.tx.send(sdp);
     }
 
-    fn on_failure(&mut self, err: RtcError) {
+    fn on_failure(&self, err: RtcError) {
         let msg = err.message().unwrap_or_else(|_| "unknown".to_string());
         let _ = self.tx.send(Err(msg));
     }
@@ -304,7 +306,7 @@ struct SetLocalObserverHandler {
 }
 
 impl SetLocalDescriptionObserverHandler for SetLocalObserverHandler {
-    fn on_set_local_description_complete(&mut self, err: RtcError) {
+    fn on_set_local_description_complete(&self, err: RtcError) {
         let msg = if err.ok() {
             None
         } else {
@@ -319,7 +321,7 @@ struct SetRemoteObserverHandler {
 }
 
 impl SetRemoteDescriptionObserverHandler for SetRemoteObserverHandler {
-    fn on_set_remote_description_complete(&mut self, err: RtcError) {
+    fn on_set_remote_description_complete(&self, err: RtcError) {
         let msg = if err.ok() {
             None
         } else {
@@ -380,6 +382,9 @@ impl SignalingWhep {
     }
 
     pub fn connect(&mut self) -> Result<(), String> {
+        if self.pc.is_some() {
+            return Err("peer connection already exists".to_string());
+        }
         self.set_state(WhepState::Connecting);
         let pc_factory = self.config.pc_factory.factory();
         let observer_state = self.state.clone();
@@ -391,9 +396,8 @@ impl SignalingWhep {
                 video_state_track,
                 video_state_remove,
             }));
-        // Keep observer alive for the lifetime of the PeerConnection.
-        let deps = PeerConnectionDependencies::new(&observer);
-        // Store observer so it lives as long as SignalingWhep.
+        // Safety: observer はこの PeerConnection 専用で、PeerConnection の破棄まで保持し、callback から再入しない。
+        let deps = unsafe { PeerConnectionDependencies::new(&observer) };
         self.pc_observer = Some(observer);
         let config = PeerConnectionRtcConfiguration::new();
         let pc = PeerConnection::create(pc_factory, &config, deps)
@@ -496,9 +500,13 @@ impl SignalingWhep {
     }
 
     pub fn disconnect(&mut self) {
-        self.detach_video_sink();
         if let Some(pc) = self.pc.take() {
+            // close の復帰で observer の通知を止め、sink 解除後の track 再保持を排除する。
+            pc.close();
+            self.detach_video_sink();
             drop(pc);
+        } else {
+            self.detach_video_sink();
         }
         self.pc_observer = None;
         self.set_state(WhepState::Closed);
@@ -507,6 +515,13 @@ impl SignalingWhep {
     fn detach_video_sink(&self) {
         let mut state = self.video_state.lock().unwrap();
         state.detach_sink();
+    }
+}
+
+impl Drop for SignalingWhep {
+    fn drop(&mut self) {
+        // factory と native thread を保持した状態で、track・PeerConnection・observer を片付ける。
+        self.disconnect();
     }
 }
 
@@ -747,10 +762,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    //log::initialize_logging(log::Severity::Info);
-    //log::enable_timestamps();
-    //log::enable_threads();
-
     let factory = FactoryHolder::new().ok_or("factory create failed")?;
 
     let mut whep_cfg = SignalingWhepConfig::new(factory.clone());
@@ -765,4 +776,205 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     whep.disconnect();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    #[test]
+    fn disconnect_closes_before_detaching_remote_video_track() {
+        struct EmptyObserver;
+        impl PeerConnectionObserverHandler for EmptyObserver {}
+
+        struct Observer {
+            inner: WhepPeerConnectionObserverHandler,
+            closed_with_track: Arc<AtomicBool>,
+        }
+        impl PeerConnectionObserverHandler for Observer {
+            fn on_track(&mut self, transceiver: RtpTransceiver) {
+                self.inner.on_track(transceiver);
+            }
+
+            fn on_remove_track(&mut self, receiver: RtpReceiver) {
+                self.inner.on_remove_track(receiver);
+            }
+
+            fn on_connection_change(&mut self, state: PeerConnectionState) {
+                if matches!(state, PeerConnectionState::Closed) {
+                    let retained = self
+                        .inner
+                        .video_state_track
+                        .lock()
+                        .expect("Closed 通知時の track 状態をロックできません")
+                        .video_track
+                        .is_some();
+                    self.closed_with_track.store(retained, Ordering::SeqCst);
+                }
+                self.inner.on_connection_change(state);
+            }
+        }
+
+        // 実 remote track の解除まで、テスト側でも factory と native thread を保持する。
+        let factory = FactoryHolder::new().expect("factory を生成できません");
+        let mut client = SignalingWhep::new(SignalingWhepConfig::new(factory.clone()));
+        let video_state = client.video_state.clone();
+        let closed_with_track = Arc::new(AtomicBool::new(false));
+        let observer = PeerConnectionObserver::new_with_handler(Box::new(Observer {
+            inner: WhepPeerConnectionObserverHandler {
+                observer_state: client.state.clone(),
+                video_state_track: video_state.clone(),
+                video_state_remove: video_state.clone(),
+            },
+            closed_with_track: closed_with_track.clone(),
+        }));
+        // observer はこの PC 専用で、client が close と PC の破棄まで保持し、再入しない。
+        let deps = unsafe { PeerConnectionDependencies::new(&observer) };
+        client.pc = Some(
+            PeerConnection::create(
+                factory.factory(),
+                &PeerConnectionRtcConfiguration::new(),
+                deps,
+            )
+            .expect("受信 PC を生成できません"),
+        );
+        client.pc_observer = Some(observer);
+
+        let offer_observer = PeerConnectionObserver::new_with_handler(Box::new(EmptyObserver));
+        // observer は送信 PC 専用で、全 PC ハンドルの破棄まで保持し、再入しない。
+        let offer_deps = unsafe { PeerConnectionDependencies::new(&offer_observer) };
+        let offer_pc = PeerConnection::create(
+            factory.factory(),
+            &PeerConnectionRtcConfiguration::new(),
+            offer_deps,
+        )
+        .expect("送信 PC を生成できません");
+        let mut init = RtpTransceiverInit::new();
+        init.set_direction(RtpTransceiverDirection::SendOnly);
+        offer_pc
+            .add_transceiver(MediaType::Video, &init)
+            .expect("映像 transceiver を追加できません");
+        let (offer_tx, offer_rx) = std::sync::mpsc::channel();
+        let mut offer_result = CreateSessionDescriptionObserver::new_with_handler(Box::new(
+            CreateOfferObserverHandler { tx: offer_tx },
+        ));
+        offer_pc.create_offer(&mut offer_result, &PeerConnectionOfferAnswerOptions::new());
+        let sdp = offer_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("offer の通知がありません")
+            .expect("offer の生成に失敗しました");
+
+        // native の remote SDP 処理から OnTrack を発火させ、実 renderer sink を登録する。
+        let (remote_tx, remote_rx) = std::sync::mpsc::channel();
+        let remote_result =
+            SetRemoteDescriptionObserver::new_with_handler(Box::new(SetRemoteObserverHandler {
+                tx: remote_tx,
+            }));
+        let desc =
+            SessionDescription::new(SdpType::Offer, &sdp).expect("remote offer を生成できません");
+        client
+            .pc
+            .as_ref()
+            .expect("受信 PC がありません")
+            .set_remote_description(desc, &remote_result);
+        assert!(
+            remote_rx
+                .recv_timeout(Duration::from_secs(10))
+                .expect("remote SDP の通知がありません")
+                .is_none(),
+            "remote SDP の設定に失敗しました"
+        );
+        assert!(
+            video_state
+                .lock()
+                .expect("remote SDP 適用後の track 状態をロックできません")
+                .video_track
+                .is_some(),
+            "OnTrack で remote track が保持されていません"
+        );
+
+        // Closed 通知時には track が生存し、callback 停止後の解除で保持がなくなる。
+        drop(client);
+        assert!(
+            closed_with_track.load(Ordering::SeqCst),
+            "track の解除前に Closed が通知されていません"
+        );
+        assert!(
+            video_state
+                .lock()
+                .expect("切断後の track 状態をロックできません")
+                .video_track
+                .is_none(),
+            "切断後も remote track が保持されています"
+        );
+        drop(video_state);
+        drop(offer_pc);
+        drop(offer_observer);
+    }
+
+    #[test]
+    fn connect_keeps_existing_observer_and_drop_disconnects() {
+        struct Observer {
+            destroyed: Arc<AtomicBool>,
+        }
+        impl PeerConnectionObserverHandler for Observer {}
+        impl Drop for Observer {
+            fn drop(&mut self) {
+                self.destroyed.store(true, Ordering::SeqCst);
+            }
+        }
+        let factory = FactoryHolder::new().expect("factory を生成できません");
+        let mut client = SignalingWhep::new(SignalingWhepConfig::new(factory));
+        assert_eq!(
+            Arc::strong_count(&client.config.pc_factory),
+            1,
+            "factory の余分な所有者があります"
+        );
+        let destroyed = Arc::new(AtomicBool::new(false));
+        let observer = PeerConnectionObserver::new_with_handler(Box::new(Observer {
+            destroyed: destroyed.clone(),
+        }));
+        // observer はこの PC 専用で、handler から再入せず、client が PC より後で破棄する。
+        let deps = unsafe { PeerConnectionDependencies::new(&observer) };
+        let pc = PeerConnection::create(
+            client.config.pc_factory.factory(),
+            &PeerConnectionRtcConfiguration::new(),
+            deps,
+        )
+        .expect("PeerConnection を生成できません");
+        let pc_address = pc.as_ptr();
+        let observer_address = observer.as_ptr();
+        client.pc_observer = Some(observer);
+        client.pc = Some(pc);
+        // 接続済みなら HTTP 処理を開始せず、既存 PC と observer を保持する。
+        assert_eq!(
+            client
+                .connect()
+                .expect_err("接続中の connect が成功しました"),
+            "peer connection already exists"
+        );
+        assert_eq!(
+            client.pc.as_ref().expect("PC が失われました").as_ptr(),
+            pc_address
+        );
+        assert_eq!(
+            client
+                .pc_observer
+                .as_ref()
+                .expect("observer が失われました")
+                .as_ptr(),
+            observer_address
+        );
+        assert!(
+            !destroyed.load(Ordering::SeqCst),
+            "接続中の observer が破棄されました"
+        );
+        // factory の最後の所有者である client を明示 disconnect なしで破棄する。
+        drop(client);
+        assert!(
+            destroyed.load(Ordering::SeqCst),
+            "observer が破棄されていません"
+        );
+    }
 }

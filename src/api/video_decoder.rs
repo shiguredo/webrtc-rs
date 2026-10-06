@@ -162,6 +162,8 @@ impl VideoDecoderDecodedImageCallbackPtr {
     }
 }
 
+/// 一意所有の codec に対する通常の直列呼び出しを扱うハンドラ。
+/// 可変借用による呼び出しを受け、完了 callback への通知とは別に状態を保持する。
 pub trait VideoDecoderHandler: Send {
     #[expect(unused_variables)]
     fn configure(&mut self, settings: VideoDecoderSettingsRef<'_>) -> bool {
@@ -194,11 +196,15 @@ pub trait VideoDecoderHandler: Send {
     }
 }
 
-pub trait VideoDecoderFactoryHandler: Send {
-    fn get_supported_formats(&mut self) -> Vec<SdpVideoFormat>;
+/// 複数の native stream から同時に呼ばれる映像 factory のハンドラ。
+/// 可変状態は実装側で同期し、callback 間で共有参照を利用する。
+pub trait VideoDecoderFactoryHandler: Send + Sync {
+    /// 対応する映像形式の一覧を返す。
+    fn get_supported_formats(&self) -> Vec<SdpVideoFormat>;
 
+    /// 指定した形式の codec を生成する。
     fn create(
-        &mut self,
+        &self,
         env: EnvironmentRef<'_>,
         format: SdpVideoFormatRef<'_>,
     ) -> Option<VideoDecoder>;
@@ -296,7 +302,7 @@ unsafe extern "C" fn video_decoder_factory_get_supported_formats(
         !user_data.is_null(),
         "video_decoder_factory_get_supported_formats: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoDecoderFactoryHandlerState) };
+    let state = unsafe { &*(user_data as *const VideoDecoderFactoryHandlerState) };
     let formats = state.handler.get_supported_formats();
     let vec = expect_non_null(
         unsafe { ffi::webrtc_SdpVideoFormat_vector_new() },
@@ -318,7 +324,7 @@ unsafe extern "C" fn video_decoder_factory_create(
         !user_data.is_null(),
         "video_decoder_factory_create: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoDecoderFactoryHandlerState) };
+    let state = unsafe { &*(user_data as *const VideoDecoderFactoryHandlerState) };
     let env = expect_non_null_const(env, "video_decoder_factory_create (env)");
     let format = expect_non_null_const(format, "video_decoder_factory_create (format)");
     let env = EnvironmentRef::from_raw(env);

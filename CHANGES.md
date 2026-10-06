@@ -11,6 +11,11 @@
 
 ## develop
 
+- [CHANGE] 共有画素の書き込み、ADM の利用、ログ初期化、observer 登録に排他契約を要求する
+  - `I420Buffer` / `NV12Buffer` の画素書き込み、`AudioDeviceModule` の直接操作と factory への引き渡し、`log::initialize_logging` を `unsafe fn` にする
+  - `PeerConnectionDependencies::new` と DataChannel の observer 登録、DtlsTransport の observer 登録・解除を `unsafe fn` にし、生存期間と同時・再入 callback の排除を要求する
+  - ログ、映像バッファ、音声・映像 factory、sink、エンコード完了 callback、SDP 完了 observer のハンドラを `Send + Sync` と `&self` にし、`RawBufferWriter` の `Send` を `T: Send` に限定する
+  - @voluntas
 - [CHANGE] `RawBufferWriter::write` を `unsafe fn` にする
   - 書き込み先の容量を超えないことの保証を、呼び出し側の責任として `unsafe` で明示する
   - `AudioDecoderHandler` のシグネチャは変わらない
@@ -55,9 +60,12 @@
   - 未設定は `Ok(None)`、UTF-8 への変換失敗は `Err` で表す
   - @melpon
 - [CHANGE] `AudioDeviceModuleHandler` の要求を `Send + Sync` から `Send` に変更し、各メソッドを `&mut self` にする
-  - libwebrtc は ADM の公開メソッドを同時に呼び出さないため、`Sync` と `&self` は要求しない
+  - 単一 factory の通常の native 呼び出しは直列で、共有・直接操作・再入の排他は呼び出し側の責務とする
   - `Mutex` などの内部可変性を用意しなくても、ハンドラが `&mut self` を通して状態を保持できる
   - @melpon
+- [ADD] 音声 sink に PCM を通知する C API を追加する
+  - `webrtc_AudioTrackSinkInterface_OnData` を追加し、native の音声通知入口を呼べるようにする
+  - @voluntas
 - [ADD] `RtpReceiver::stream_ids` を追加する
   - C API の `webrtc_RtpReceiverInterface_stream_ids` を追加し、受信器に関連付けられた Stream ID 群を複製して返す
   - `RtpReceiver::stream_ids` を追加し、所有権付きの `StringVector` で Stream ID 群を取得できるようにする
@@ -104,6 +112,11 @@
   - Android の `ConnectionContext` 破棄順が原因で PeerConnectionFactory 破棄時にクラッシュする不具合が修正された
   - `android` ターゲットにも `android_audio_pause_resume.patch` と `android_audio_track_sink.patch` が適用されるようになり、成果物の `webrtc.jar` に `JavaAudioDeviceModule` の `pauseRecording` / `resumeRecording` と `AudioTrackSink` が含まれるようになった
   - @melpon, @voluntas
+- [FIX] 共有ハンドラへの並行 callback で排他参照が重複する不具合を修正する
+  - LogSink、カスタム映像バッファ、音声・映像 factory、映像・音声 sink、エンコード完了 callback、SDP 完了 observer の入口を共有参照にする
+  - カスタム映像バッファのスレッド固定チェックを削除し、直列のスレッド移動と並行呼び出しを扱う
+  - WHIP / WHEP の再接続で既存 observer を保持し、切断・破棄時に factory と thread が生存する間に PC と observer を片付ける
+  - @voluntas
 - [FIX] C の関数名が間違っていたのを修正する
   - `webrtc_AudioDecoderFactory_MakeAudioDecoder` → `webrtc_AudioDecoderFactory_Create`
   - `webrtc_AudioEncoderFactory_MakeAudioEncoder` → `webrtc_AudioEncoderFactory_Create`

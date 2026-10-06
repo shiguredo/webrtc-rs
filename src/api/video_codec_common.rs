@@ -1,5 +1,5 @@
 use crate::const_non_null::ConstNonNull;
-use crate::helper::handler::{create_with_handler, destroy_handler};
+use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
 use crate::helper::non_null::{expect_non_null, expect_non_null_const};
 use crate::helper::optional::{
     get_optional_ptr, get_optional_scalar, set_optional_object, set_optional_scalar,
@@ -458,7 +458,21 @@ impl I420Buffer {
     }
 
     /// 別の I420Buffer からスケールして埋める。
-    pub fn scale_from(&mut self, src: &I420Buffer) {
+    ///
+    /// # Safety
+    /// 呼び出し中、書き込み先の画素領域と重なる Rust 参照が生存していないこと。
+    /// 別ハンドルや native 利用者が書き込み先の画素を読み書きしないこと。
+    /// cast したハンドル、frame、codec、source で共有した実体も含む。
+    /// `&mut self` はこのハンドルだけを借用し、共有画素の排他を保証しない。
+    /// 入力画素は書き込み先と重ならず、呼び出し中に変更されないこと。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(buffer: &mut I420Buffer, src: &I420Buffer) {
+    ///     buffer.scale_from(src);
+    /// }
+    /// ```
+    pub unsafe fn scale_from(&mut self, src: &I420Buffer) {
         let raw = self.raw();
         let src_raw = src.raw();
         unsafe { ffi::webrtc_I420Buffer_ScaleFrom(raw.as_ptr(), src_raw.as_ptr()) };
@@ -474,7 +488,21 @@ impl I420Buffer {
     }
 
     /// Y 平面を可変参照する。
-    pub fn y_data_mut(&mut self) -> &mut [u8] {
+    ///
+    /// # Safety
+    /// 返した可変 slice の有効期間全体で、stride の余白を含むその領域に重なる他の Rust 参照が生存しないこと。
+    /// 返した slice からの再借用や、それに由来するポインタの同期利用は、有効な借用期間内で許可する。
+    /// 別ハンドルや、返した slice に由来しない native のポインタから、その領域へアクセスしないこと。
+    /// cast したハンドル、frame、codec、source で共有した実体も含む。
+    /// `&mut self` はこのハンドルだけを借用し、共有画素の排他を保証しない。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(buffer: &mut I420Buffer) {
+    ///     buffer.y_data_mut();
+    /// }
+    /// ```
+    pub unsafe fn y_data_mut(&mut self) -> &mut [u8] {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataY(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_I420Buffer_StrideY(raw.as_ptr()) } as usize;
@@ -508,7 +536,21 @@ impl I420Buffer {
     }
 
     /// 連続したメモリとして Y/U/V 全体を可変参照する。
-    pub fn data_mut(&mut self) -> &mut [u8] {
+    ///
+    /// # Safety
+    /// 返した可変 slice の有効期間全体で、stride の余白を含むその領域に重なる他の Rust 参照が生存しないこと。
+    /// 返した slice からの再借用や、それに由来するポインタの同期利用は、有効な借用期間内で許可する。
+    /// 別ハンドルや、返した slice に由来しない native のポインタから、その領域へアクセスしないこと。
+    /// cast したハンドル、frame、codec、source で共有した実体も含む。
+    /// `&mut self` はこのハンドルだけを借用し、共有画素の排他を保証しない。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(buffer: &mut I420Buffer) {
+    ///     buffer.data_mut();
+    /// }
+    /// ```
+    pub unsafe fn data_mut(&mut self) -> &mut [u8] {
         let raw = self.raw();
         let height = self.height() as usize;
         let chroma_height = self.chroma_height() as usize;
@@ -533,7 +575,21 @@ impl I420Buffer {
     }
 
     /// Y/U/V 平面を同時に可変参照する。
-    pub fn planes_mut(&mut self) -> (&mut [u8], &mut [u8], &mut [u8]) {
+    ///
+    /// # Safety
+    /// 返した可変 slice の有効期間全体で、stride の余白を含むその領域に重なる他の Rust 参照が生存しないこと。
+    /// 返した slice からの再借用や、それに由来するポインタの同期利用は、有効な借用期間内で許可する。
+    /// 別ハンドルや、返した slice に由来しない native のポインタから、その領域へアクセスしないこと。
+    /// cast したハンドル、frame、codec、source で共有した実体も含む。
+    /// `&mut self` はこのハンドルだけを借用し、共有画素の排他を保証しない。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(buffer: &mut I420Buffer) {
+    ///     buffer.planes_mut();
+    /// }
+    /// ```
+    pub unsafe fn planes_mut(&mut self) -> (&mut [u8], &mut [u8], &mut [u8]) {
         let raw = self.raw();
         let height = self.height() as usize;
         let chroma_height = self.chroma_height() as usize;
@@ -563,7 +619,21 @@ impl I420Buffer {
     }
 
     /// U 平面を可変参照する。
-    pub fn u_data_mut(&mut self) -> &mut [u8] {
+    ///
+    /// # Safety
+    /// 返した可変 slice の有効期間全体で、stride の余白を含むその領域に重なる他の Rust 参照が生存しないこと。
+    /// 返した slice からの再借用や、それに由来するポインタの同期利用は、有効な借用期間内で許可する。
+    /// 別ハンドルや、返した slice に由来しない native のポインタから、その領域へアクセスしないこと。
+    /// cast したハンドル、frame、codec、source で共有した実体も含む。
+    /// `&mut self` はこのハンドルだけを借用し、共有画素の排他を保証しない。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(buffer: &mut I420Buffer) {
+    ///     buffer.u_data_mut();
+    /// }
+    /// ```
+    pub unsafe fn u_data_mut(&mut self) -> &mut [u8] {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataU(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_I420Buffer_StrideU(raw.as_ptr()) } as usize;
@@ -581,7 +651,21 @@ impl I420Buffer {
     }
 
     /// V 平面を可変参照する。
-    pub fn v_data_mut(&mut self) -> &mut [u8] {
+    ///
+    /// # Safety
+    /// 返した可変 slice の有効期間全体で、stride の余白を含むその領域に重なる他の Rust 参照が生存しないこと。
+    /// 返した slice からの再借用や、それに由来するポインタの同期利用は、有効な借用期間内で許可する。
+    /// 別ハンドルや、返した slice に由来しない native のポインタから、その領域へアクセスしないこと。
+    /// cast したハンドル、frame、codec、source で共有した実体も含む。
+    /// `&mut self` はこのハンドルだけを借用し、共有画素の排他を保証しない。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(buffer: &mut I420Buffer) {
+    ///     buffer.v_data_mut();
+    /// }
+    /// ```
+    pub unsafe fn v_data_mut(&mut self) -> &mut [u8] {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_I420Buffer_MutableDataV(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_I420Buffer_StrideV(raw.as_ptr()) } as usize;
@@ -673,7 +757,22 @@ impl NV12Buffer {
         unsafe { ffi::webrtc_NV12Buffer_StrideUV(raw.as_ptr()) }
     }
 
-    pub fn crop_and_scale_from(
+    /// 入力バッファから画素をスケールして書き込む。
+    ///
+    /// # Safety
+    /// 呼び出し中、書き込み先の画素領域と重なる Rust 参照が生存していないこと。
+    /// 別ハンドルや native 利用者が書き込み先の画素を読み書きしないこと。
+    /// cast したハンドル、frame、codec、source で共有した実体も含む。
+    /// `&mut self` はこのハンドルだけを借用し、共有画素の排他を保証しない。
+    /// 入力画素は書き込み先と重ならず、呼び出し中に変更されないこと。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(buffer: &mut NV12Buffer, src: &NV12Buffer) {
+    ///     buffer.crop_and_scale_from(src, 0, 0, 2, 2);
+    /// }
+    /// ```
+    pub unsafe fn crop_and_scale_from(
         &mut self,
         src: &NV12Buffer,
         offset_x: i32,
@@ -705,7 +804,21 @@ impl NV12Buffer {
     }
 
     /// Y 平面を可変参照する。
-    pub fn y_data_mut(&mut self) -> &mut [u8] {
+    ///
+    /// # Safety
+    /// 返した可変 slice の有効期間全体で、stride の余白を含むその領域に重なる他の Rust 参照が生存しないこと。
+    /// 返した slice からの再借用や、それに由来するポインタの同期利用は、有効な借用期間内で許可する。
+    /// 別ハンドルや、返した slice に由来しない native のポインタから、その領域へアクセスしないこと。
+    /// cast したハンドル、frame、codec、source で共有した実体も含む。
+    /// `&mut self` はこのハンドルだけを借用し、共有画素の排他を保証しない。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(buffer: &mut NV12Buffer) {
+    ///     buffer.y_data_mut();
+    /// }
+    /// ```
+    pub unsafe fn y_data_mut(&mut self) -> &mut [u8] {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_NV12Buffer_MutableDataY(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_NV12Buffer_StrideY(raw.as_ptr()) } as usize;
@@ -734,7 +847,21 @@ impl NV12Buffer {
     }
 
     /// 連続したメモリとして Y/UV 全体を可変参照する。
-    pub fn data_mut(&mut self) -> &mut [u8] {
+    ///
+    /// # Safety
+    /// 返した可変 slice の有効期間全体で、stride の余白を含むその領域に重なる他の Rust 参照が生存しないこと。
+    /// 返した slice からの再借用や、それに由来するポインタの同期利用は、有効な借用期間内で許可する。
+    /// 別ハンドルや、返した slice に由来しない native のポインタから、その領域へアクセスしないこと。
+    /// cast したハンドル、frame、codec、source で共有した実体も含む。
+    /// `&mut self` はこのハンドルだけを借用し、共有画素の排他を保証しない。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(buffer: &mut NV12Buffer) {
+    ///     buffer.data_mut();
+    /// }
+    /// ```
+    pub unsafe fn data_mut(&mut self) -> &mut [u8] {
         let raw = self.raw();
         let height = self.height() as usize;
         let chroma_height = self.chroma_height() as usize;
@@ -763,7 +890,21 @@ impl NV12Buffer {
     }
 
     /// UV 平面を可変参照する。
-    pub fn uv_data_mut(&mut self) -> &mut [u8] {
+    ///
+    /// # Safety
+    /// 返した可変 slice の有効期間全体で、stride の余白を含むその領域に重なる他の Rust 参照が生存しないこと。
+    /// 返した slice からの再借用や、それに由来するポインタの同期利用は、有効な借用期間内で許可する。
+    /// 別ハンドルや、返した slice に由来しない native のポインタから、その領域へアクセスしないこと。
+    /// cast したハンドル、frame、codec、source で共有した実体も含む。
+    /// `&mut self` はこのハンドルだけを借用し、共有画素の排他を保証しない。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(buffer: &mut NV12Buffer) {
+    ///     buffer.uv_data_mut();
+    /// }
+    /// ```
+    pub unsafe fn uv_data_mut(&mut self) -> &mut [u8] {
         let raw = self.raw();
         let ptr = unsafe { ffi::webrtc_NV12Buffer_MutableDataUV(raw.as_ptr()) };
         let stride = unsafe { ffi::webrtc_NV12Buffer_StrideUV(raw.as_ptr()) } as usize;
@@ -772,7 +913,21 @@ impl NV12Buffer {
     }
 
     /// Y/UV 平面を同時に可変参照する。
-    pub fn planes_mut(&mut self) -> (&mut [u8], &mut [u8]) {
+    ///
+    /// # Safety
+    /// 返した可変 slice の有効期間全体で、stride の余白を含むその領域に重なる他の Rust 参照が生存しないこと。
+    /// 返した slice からの再借用や、それに由来するポインタの同期利用は、有効な借用期間内で許可する。
+    /// 別ハンドルや、返した slice に由来しない native のポインタから、その領域へアクセスしないこと。
+    /// cast したハンドル、frame、codec、source で共有した実体も含む。
+    /// `&mut self` はこのハンドルだけを借用し、共有画素の排他を保証しない。
+    ///
+    /// ```compile_fail,E0133
+    /// use shiguredo_webrtc::*;
+    /// fn check(buffer: &mut NV12Buffer) {
+    ///     buffer.planes_mut();
+    /// }
+    /// ```
+    pub unsafe fn planes_mut(&mut self) -> (&mut [u8], &mut [u8]) {
         let raw = self.raw();
         let height = self.height() as usize;
         let chroma_height = self.chroma_height() as usize;
@@ -891,17 +1046,19 @@ impl<T: Any> VideoFrameBufferHandlerAny for T {
     }
 }
 
-pub trait VideoFrameBufferHandler: Send + VideoFrameBufferHandlerAny {
+/// 複数の native 利用者から同時に呼ばれるコールバックハンドラ。
+/// 可変状態は実装側で同期し、callback 間で共有参照を利用する。
+pub trait VideoFrameBufferHandler: Send + Sync + VideoFrameBufferHandlerAny {
     fn kind(&self) -> VideoFrameBufferKind {
         VideoFrameBufferKind::Native
     }
     fn width(&self) -> i32;
     fn height(&self) -> i32;
-    fn to_i420(&mut self) -> Option<I420Buffer>;
+    fn to_i420(&self) -> Option<I420Buffer>;
     // None を返すとデフォルトの実装が呼ばれる。
     // デフォルトの実装は to_i420() で I420Buffer を作成してからそれをクロップ＆スケールする。
     fn crop_and_scale(
-        &mut self,
+        &self,
         _offset_x: i32,
         _offset_y: i32,
         _crop_width: i32,
@@ -913,35 +1070,14 @@ pub trait VideoFrameBufferHandler: Send + VideoFrameBufferHandlerAny {
     }
 }
 
-struct VideoFrameBufferHandlerState {
-    handler: Box<dyn VideoFrameBufferHandler>,
-    #[cfg(debug_assertions)]
-    callback_thread: Option<std::thread::ThreadId>,
-}
-
-unsafe impl Send for VideoFrameBufferHandlerState {}
-
-#[cfg(debug_assertions)]
-fn assert_video_frame_buffer_handler_thread(state: &mut VideoFrameBufferHandlerState) {
-    let current = std::thread::current().id();
-    if let Some(thread) = state.callback_thread {
-        assert_eq!(
-            thread, current,
-            "video_frame_buffer callback called from multiple threads",
-        );
-    } else {
-        state.callback_thread = Some(current);
-    }
-}
+type VideoFrameBufferHandlerState = HandlerState<dyn VideoFrameBufferHandler>;
 
 unsafe extern "C" fn video_frame_buffer_type(user_data: *mut c_void) -> i32 {
     assert!(
         !user_data.is_null(),
         "video_frame_buffer_type: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
-    #[cfg(debug_assertions)]
-    assert_video_frame_buffer_handler_thread(state);
+    let state = unsafe { &*(user_data as *const VideoFrameBufferHandlerState) };
     state.handler.kind().to_raw()
 }
 
@@ -950,9 +1086,7 @@ unsafe extern "C" fn video_frame_buffer_width(user_data: *mut c_void) -> i32 {
         !user_data.is_null(),
         "video_frame_buffer_width: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
-    #[cfg(debug_assertions)]
-    assert_video_frame_buffer_handler_thread(state);
+    let state = unsafe { &*(user_data as *const VideoFrameBufferHandlerState) };
     state.handler.width()
 }
 
@@ -961,9 +1095,7 @@ unsafe extern "C" fn video_frame_buffer_height(user_data: *mut c_void) -> i32 {
         !user_data.is_null(),
         "video_frame_buffer_height: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
-    #[cfg(debug_assertions)]
-    assert_video_frame_buffer_handler_thread(state);
+    let state = unsafe { &*(user_data as *const VideoFrameBufferHandlerState) };
     state.handler.height()
 }
 
@@ -974,9 +1106,7 @@ unsafe extern "C" fn video_frame_buffer_to_i420(
         !user_data.is_null(),
         "video_frame_buffer_to_i420: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
-    #[cfg(debug_assertions)]
-    assert_video_frame_buffer_handler_thread(state);
+    let state = unsafe { &*(user_data as *const VideoFrameBufferHandlerState) };
     match state.handler.to_i420() {
         Some(buffer) => buffer.into_raw_refcounted(),
         None => std::ptr::null_mut(),
@@ -1001,9 +1131,7 @@ unsafe extern "C" fn video_frame_buffer_crop_and_scale(
         !user_data.is_null(),
         "video_frame_buffer_crop_and_scale: user_data is null"
     );
-    let state = unsafe { &mut *(user_data as *mut VideoFrameBufferHandlerState) };
-    #[cfg(debug_assertions)]
-    assert_video_frame_buffer_handler_thread(state);
+    let state = unsafe { &*(user_data as *const VideoFrameBufferHandlerState) };
     if let Some(buffer) = state.handler.crop_and_scale(
         offset_x,
         offset_y,
@@ -1032,11 +1160,8 @@ unsafe impl Send for VideoFrameBuffer {}
 
 impl VideoFrameBuffer {
     pub fn new_with_handler(handler: Box<dyn VideoFrameBufferHandler>) -> Self {
-        let user_data = Box::into_raw(Box::new(VideoFrameBufferHandlerState {
-            handler,
-            #[cfg(debug_assertions)]
-            callback_thread: None,
-        })) as *mut c_void;
+        let user_data =
+            Box::into_raw(Box::new(VideoFrameBufferHandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_VideoFrameBuffer_cbs {
             type_: Some(video_frame_buffer_type),
             width: Some(video_frame_buffer_width),
@@ -1083,7 +1208,7 @@ impl VideoFrameBuffer {
 
     /// # Safety
     /// 同一実体の `VideoFrameBuffer` への参照が存在しないこと。
-    /// 特に callback 側や別 clone から同時に参照されないことを呼び出し側が保証する必要があります。
+    /// 返した可変参照の有効期間全体で、callback、別 clone、借用参照を含む他のアクセスを排除すること。
     pub unsafe fn as_native_mut<T: VideoFrameBufferHandler + 'static>(&mut self) -> Option<&mut T> {
         let user_data = unsafe { ffi::webrtc_VideoFrameBuffer_get_user_data(self.raw().as_ptr()) };
         if user_data.is_null() {
