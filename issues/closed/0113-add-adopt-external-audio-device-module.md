@@ -62,20 +62,22 @@ Sora Kotlin SDK 側の呼び分けと実機での接続確認は、本 issue の
 
 ## 解決方法
 
-所有権の意味が異なる 2 つの取り込みコンストラクタを `AudioDeviceModule` に追加した。どちらも `unsafe fn` で、引数は `*mut c_void`、null の場合は `None` を返す。
+外部で作成された ADM を所有権付きで取り込む `AudioDeviceModule::from_refcounted_ptr` を追加した。`unsafe fn` で、引数は `NonNull<ffi::webrtc_AudioDeviceModule_refcounted>`、戻り値は `Self` である。null は型で排除するため呼び出し側で `NonNull::new` する。
 
-- `AudioDeviceModule::from_borrowed_refcounted_ptr` (`src/api/audio_device_module.rs`): 借用中の refcounted ポインタを取り込む。`ScopedRef::from_borrowed_raw` で参照カウントを 1 増やしてから保持するため、呼び出し側の参照は消費しない
-- `AudioDeviceModule::from_refcounted_ptr` (同): 所有権を持つ refcounted ポインタを取り込む。参照カウントを増やさずに `ScopedRef::from_raw` で保持する
-- `# Safety` に、参照カウントと所有権の契約 (借用側は参照カウントが 1 以上で呼び出し中に最後の参照が解放されないこと、所有側は参照 1 つ分の所有権が呼び出し側にあること)、誤用した場合の帰結 (借用側に所有権付きのポインタを渡すとリークすること、所有側に同じポインタを 2 回渡すと二重解放になること、呼び出し後に渡した参照を解放してはならないこと、借用中のポインタを所有側に渡すと過剰に解放されること)、借用側に渡すポインタの出所 (Java 側が参照を保持している `JavaAudioDeviceModule.getNative(long)` の戻り値など) を書いた
-- 型 `AudioDeviceModule` の Rustdoc に、利用者がメソッドを直接呼ぶ場合は同じスレッドから呼び、`PeerConnectionFactory` に渡した後は libwebrtc が worker thread から呼ぶため別スレッドから直接呼ばない契約を明記した。あわせて `as_ptr` / `as_refcounted_ptr` の Rustdoc に、参照カウントを変えず所有権も引き受けないこと、返したポインタが有効なのは `self` の生存中だけであること、共有する場合は `*mut c_void` にキャストして `from_borrowed_refcounted_ptr` に渡すことを書いた
+- `AudioDeviceModule::from_refcounted_ptr` (`src/api/audio_device_module.rs`): 所有権を持つ refcounted ポインタを取り込む。参照カウントを増やさずに `ScopedRef::from_raw` で保持する
+- `# Safety` に、参照 1 つ分の所有権が呼び出し側にあること、同じポインタを 2 回渡すと二重解放になること、呼び出し後に渡した参照を解放してはならないこと、借用中のポインタをそのまま渡すと呼び出し側の解放と返り値の解放で過剰に解放されることを書いた
+- 借用中のポインタを取り込む場合は、呼び出し側で `webrtc_AudioDeviceModule_AddRef` を呼んで参照 1 つ分の所有権を用意してから渡す。`webrtc_CreateJavaAudioDeviceModule` の戻り値はそのまま渡せる
+- 型 `AudioDeviceModule` の Rustdoc に、生成したスレッドと同じスレッドで利用し同じスレッドで破棄すること、`PeerConnectionFactory` に渡した後は libwebrtc が内部の worker thread から呼ぶため別スレッドから直接呼ばないことを書いた
+- `as_ptr` / `as_refcounted_ptr` の Rustdoc に、参照カウントを変えず所有権も引き受けないこと、返したポインタが有効なのは `self` の生存中だけであることを書いた。あわせて `as_refcounted_ptr` には、参照を共有する場合は `AddRef` してから `from_refcounted_ptr` に渡すことを書いた
 - `ScopedRef::from_borrowed_raw` (`src/helper/ref_count.rs`) を追加し、`ScopedRef::clone` をこれに委譲して参照カウント増加の実装を 1 箇所にまとめた
 
-`src/tests.rs` に 3 つのテストを追加した。破棄の観測点には `AudioDeviceModule::new_with_handler` に渡したハンドラの `Drop` (ADM の `OnDestroy` から `destroy_handler` を経て呼ばれる) を使った。
+`src/tests.rs` に 2 つのテストを追加した。破棄の観測点には `AudioDeviceModule::new_with_handler` に渡したハンドラの `Drop` (ADM の `OnDestroy` から `destroy_handler` を経て呼ばれる) を使った。
 
-- 借用取り込みでは、1 つ目のハンドルを drop した後も 2 つ目のハンドルが使え、2 つ目のハンドルを drop したときに 1 回だけ破棄されること
-- 所有権取り込みでは、呼び出し側が唯一の参照を持つ状態で取り込み、drop したときに 1 回だけ破棄されること
-- null ポインタはどちらのコンストラクタでも `None` になること
+- 借用中のポインタを `AddRef` してから取り込むと、1 つ目のハンドルを drop した後も 2 つ目のハンドルが使え、2 つ目のハンドルを drop したときに 1 回だけ破棄されること
+- 呼び出し側が唯一の参照を持つ状態で取り込むと参照カウントが増えず、drop したときに 1 回だけ破棄されること
 
-`from_borrowed_refcounted_ptr` の Rustdoc には、外部クレートとしてコンパイルされる doctest で ADM を共有して取り込む例を載せ、公開 API であることを固定した。あわせて `src/lib.rs` の `compile_fail_doctests` と `skills/shiguredo-webrtc/SKILL.md` の同趣旨の記述を、用途を限定した `unsafe fn` を公開する例外とその条件を反映した内容に更新し、`CHANGES.md` の `## develop` に `[ADD]` エントリと `### misc` の `[UPDATE]` エントリ (`src/lib.rs` の compile_fail doctest の説明の更新と `ScopedRef::clone` の委譲) を追加した。
+`from_refcounted_ptr` の Rustdoc には、外部クレートとしてコンパイルされる doctest で借用中のポインタを `AddRef` してから取り込む例を載せ、公開 API であることを固定した。あわせて `src/lib.rs` の `compile_fail_doctests` と `skills/shiguredo-webrtc/SKILL.md` の同趣旨の記述を、用途を限定した `unsafe fn` を公開する例外とその条件を反映した内容に更新し、`CHANGES.md` の `## develop` に `[ADD]` エントリと `### misc` の `[UPDATE]` エントリ (`src/lib.rs` の compile_fail doctest の説明の更新と `ScopedRef::clone` の委譲) を追加した。
+
+設計方針では所有権の意味が異なる 2 つのコンストラクタに分けるとしていたが、引数を `NonNull` にして null を型で排除し、取り込みは所有側の 1 つに絞った。借用中のポインタの扱いは呼び出し側の `AddRef` に寄せている。
 
 `cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build --all-targets -- -D warnings` / `cargo test --workspace --features source-build` が通ることを確認した。

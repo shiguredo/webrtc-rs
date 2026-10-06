@@ -1993,19 +1993,23 @@ impl AudioDeviceModuleHandler for TestDestroyCountingHandler {
 }
 
 #[test]
-fn audio_device_module_from_borrowed_refcounted_ptr_keeps_adm_alive() {
+fn audio_device_module_from_refcounted_ptr_shares_adm_after_add_ref() {
     let destroyed = Arc::new(AtomicUsize::new(0));
     let adm = AudioDeviceModule::new_with_handler(Box::new(TestDestroyCountingHandler {
         destroyed: Arc::clone(&destroyed),
         count: 0,
     }));
 
-    // 借用中のポインタから取り込むと参照カウントが 1 増える。
-    let borrowed =
-        unsafe { AudioDeviceModule::from_borrowed_refcounted_ptr(adm.as_refcounted_ptr().cast()) }
-            .expect("AudioDeviceModule の取り込みに失敗しました");
+    // 借用中のポインタを共有するため、呼び出し側で参照カウントを 1 増やしてから渡す。
+    let raw_ref = NonNull::new(adm.as_refcounted_ptr())
+        .expect("AudioDeviceModule のポインタが null になりました");
+    unsafe {
+        let raw = ffi::webrtc_AudioDeviceModule_refcounted_get(raw_ref.as_ptr());
+        ffi::webrtc_AudioDeviceModule_AddRef(raw);
+    }
+    let shared = unsafe { AudioDeviceModule::from_refcounted_ptr(raw_ref) };
     assert_eq!(
-        borrowed.recording_devices(),
+        shared.recording_devices(),
         1,
         "取り込んだハンドルからハンドラに到達できませんでした"
     );
@@ -2019,13 +2023,13 @@ fn audio_device_module_from_borrowed_refcounted_ptr_keeps_adm_alive() {
     );
     // 同じハンドラが生きているため、呼び出し回数はそのまま増える。
     assert_eq!(
-        borrowed.recording_devices(),
+        shared.recording_devices(),
         2,
         "取り込んだハンドルから同じハンドラに到達できませんでした"
     );
 
     // 2 つ目のハンドルを drop すると参照が無くなり、1 回だけ破棄される。
-    drop(borrowed);
+    drop(shared);
     assert_eq!(
         destroyed.load(Ordering::SeqCst),
         1,
@@ -2040,13 +2044,13 @@ fn audio_device_module_from_refcounted_ptr_takes_ownership() {
         destroyed: Arc::clone(&destroyed),
         count: 0,
     }));
-    let raw_ref = adm.as_refcounted_ptr();
+    let raw_ref = NonNull::new(adm.as_refcounted_ptr())
+        .expect("AudioDeviceModule のポインタが null になりました");
     // 所有権付きの取り込みへ参照 1 つ分を渡すため、adm は drop せずに参照を手放す。
     std::mem::forget(adm);
 
     // 参照カウントを増やさずに取り込み、取り込んだハンドルが唯一の参照になる。
-    let owned = unsafe { AudioDeviceModule::from_refcounted_ptr(raw_ref.cast()) }
-        .expect("AudioDeviceModule の取り込みに失敗しました");
+    let owned = unsafe { AudioDeviceModule::from_refcounted_ptr(raw_ref) };
     assert_eq!(
         destroyed.load(Ordering::SeqCst),
         0,
@@ -2064,19 +2068,6 @@ fn audio_device_module_from_refcounted_ptr_takes_ownership() {
         destroyed.load(Ordering::SeqCst),
         1,
         "唯一の参照を drop したのに ADM が破棄されませんでした"
-    );
-}
-
-#[test]
-fn audio_device_module_refcounted_ptr_constructors_return_none_for_null() {
-    // JNI の jlong は null ポインタを 0 で表すため、null は None として扱う。
-    assert!(
-        unsafe { AudioDeviceModule::from_borrowed_refcounted_ptr(std::ptr::null_mut()) }.is_none(),
-        "借用取り込みで null が None になりませんでした"
-    );
-    assert!(
-        unsafe { AudioDeviceModule::from_refcounted_ptr(std::ptr::null_mut()) }.is_none(),
-        "所有権取り込みで null が None になりませんでした"
     );
 }
 
