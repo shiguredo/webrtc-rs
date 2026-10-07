@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "../../common.h"
-#include "../environment.h"
+#include "../environment/environment.h"
 #include "audio_codec_pair_id.h"
 #include "audio_encoder.h"
 #include "audio_format.h"
@@ -69,11 +69,11 @@ webrtc_AudioEncoderFactory_QueryAudioEncoder(
     struct webrtc_AudioEncoderFactory* self,
     const struct webrtc_SdpAudioFormat* format);
 WEBRTC_EXPORT struct webrtc_AudioEncoder_unique*
-webrtc_AudioEncoderFactory_MakeAudioEncoder(
+webrtc_AudioEncoderFactory_Create(
     struct webrtc_AudioEncoderFactory* self,
     const struct webrtc_Environment* env,
     const struct webrtc_SdpAudioFormat* format,
-    struct webrtc_AudioEncoderFactory_Options* options);
+    const struct webrtc_AudioEncoderFactory_Options* options);
 
 WEBRTC_EXPORT struct webrtc_AudioEncoderFactory_refcounted*
 webrtc_CreateBuiltinAudioEncoderFactory();

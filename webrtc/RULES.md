@@ -7,7 +7,7 @@
 - **C ラッパーのファイルパスは、元になった C++ ファイルのパスと一致させること**
   - 例えば `webrtc::VideoFrame` は `<api/video/video_frame.h>` で宣言されているので、この C 版を `"webrtc_c/api/video/video_frame.h"` ファイルを作って記述する
   - ただし厳密にやる必要は無く、ある程度分割をサボっても良いものとする
-    - 例えば `webrtc_c/api/environment.h` は本来 `api/environment/environment.h` と `api/environment/environment_factory.h` に分かれているが、分ける意味があまり無いので纏めている。
+    - 例えば `webrtc_c/api/rtc_event_log.h` は `api/rtc_event_log/rtc_event_log_factory.h` の型を、ディレクトリを切らずにフラットなファイルへまとめている。
 - C++ 側の `webrtc::Xxx` というクラスは `struct webrtc_Xxx` に対応させる。
 - C++ 側の `webrtc::Xxx` の `Yyy` 関数は `webrtc_Xxx_Yyy` 関数に対応させる。
 - `webrtc::scoped_refptr<CppType>` は `struct CType_refcounted*` として扱い、手動で `CType_AddRef` 及び `CType_Release` を呼ぶことで寿命を管理する
@@ -22,6 +22,8 @@
 - C++ の構造体 `CppType` の `field` 変数へ読み書きする場合には `CppType_get_field` や `CppType_set_field` 関数を定義する
 - `*_refcounted` の型を直接 C++ の型にキャストしてはならない
   - 必ず `*_refcounted_get()` 関数を経由すること
+  - const な `*_refcounted` からは `*_refcounted_get_const()` を経由して `const struct CType*` を取得する
+  - `*_AddRef()` / `*_Release()` は C++ 側の `AddRef()` / `Release()` が const メソッドであるため、`const struct CType*` を受け取る
 - C++ オブジェクトを `*_refcounted` に渡すときは、必ず `webrtc::scoped_refptr<CppType>` で構築し、 `p.release()` したもののみをキャストする。
 - `*_unique` の型を直接 C++ の型にキャストしてはならない
   - 必ず `*_unique_get()` 関数を経由すること
@@ -44,12 +46,42 @@
   - Cbs 構築時に `assert(cbs->OnXxx != nullptr)` で契約違反を検出する
   - ディスパッチ時の null チェックは行わず、無条件呼び出しとする
   - この方針は `AudioDeviceModule_cbs` には適用しない（デフォルト実装 + 部分上書き方式のため）
+- **C++ 側の const 性を C API でもそのまま反映する**
+  - C++ 側が const メソッド、または読み取り専用のフィールド参照で済む操作は `const struct webrtc_Xxx* self` にする
+    - 値返しの getter（`webrtc_VideoFrameMetadata_GetFrameType` 等）や `int` を返す `_vector_size` / `_index` が該当する
+  - C++ 側が `const T&` / `const T*` で受ける引数は `const struct webrtc_Xxx*` にする
+    - Cbs 構造体の関数ポインタも同じ規則に従う
+  - `const_cast` は使わない
+  - フィールドへの可変参照を返す getter（`webrtc_SdpVideoFormat_get_parameters` / `webrtc_SdpVideoFormat_get_name` 等）は非 const のままとする
+    - 呼び出し側が借用先を書き換えられるため、const 化すると const 契約が壊れる
+  - 借用を返す getter は、C++ 側の形に合わせて必要な分だけ用意する
+    - C++ 側に const 参照（`const T&` / `const T*`）を返す getter しか無い場合は `_get_xxx` を 1 つだけ用意する（`_const` は付けない）
+      - 例: `webrtc_SSLCertChain_Get`（`const SSLCertificate& Get(size_t pos) const`）
+    - C++ 側に可変参照（`T&` / `T*`）を返す getter と const 参照を返す getter の両方がある場合は、`_get_xxx`（可変参照を返す）と `_get_xxx_const`（読み取り専用を返す）の 2 つを用意する
+      - 例: `webrtc_SdpVideoFormat_get_name`（可変参照を返す）と `webrtc_SdpVideoFormat_get_name_const`（`const struct std_string*` を返す）
+      - 例: `webrtc_Buffer_data`（`U* data()`）と `webrtc_Buffer_data_const`（`const U* data() const`）
+    - C++ 側のフィールドへの借用を返す getter は、フィールドにオーバーロードが無いため可変参照を返す `_get_xxx` を用意する
+      - 例: `webrtc_RtpCapabilities_get_codecs` / `webrtc_RTPVideoHeaderH264_get_nalus`
+      - Rust 側の `XxxRef` から読む場合は `_get_xxx_const` も用意する（`XxxRef` は `*const` しか持たないため可変版を呼べない）
+        - 例: `webrtc_SdpVideoFormat_get_name_const`（`std::string name` フィールドへの読み取り専用の借用）
+    - 要素への借用を返す `_vector_get` / `_inlined_vector_get` は C++ 側に可変参照と const 参照の両方があるため、読み取り経路では必ず `_get_const` 版を使う
+    - 読み取り専用の借用に対する cast は `WEBRTC_DECLARE_CAST_CONST` を用意する
+      - 例: `webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec`（可変参照を返す）と `webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec_const`（読み取り専用を返す）
+      - 例: `webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface`（ダウンキャスト）と `webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface_const`
+    - 借用ではなくコピーする引数（`_vector_set` / `_vector_push_back` / `_inlined_vector_set` / `_inlined_vector_push_back` の値）は `const struct webrtc_Xxx*` にする
+  - ObjC のオブジェクトハンドル（`objc_*` / `webrtc_objc_*`）を扱う C API は非 const のままとする
+    - ObjC の `id` は const を表現できず、対応する ObjC メソッドにも const が無いため、非 const が元の API と一致する
+    - const 化すると `__bridge` で const を外すことになり、`release` や setter のような書き換える関数まで const になってしまう
+  - 迷ったときは「C++ 側のシグネチャと同じ const 性になっているか」で判断する
 
 ## セルフチェック手順
 
-- 作業開始前に RULES.md を読み直し、今回の作業で関係するルール（薄いラッパー、元の C++ パスと名前、命名規則、`*_unique` / `*_refcounted` の扱い）を箇条書きにする
+- 作業開始前に RULES.md を読み直し、今回の作業で関係するルール（薄いラッパー、元の C++ パスと名前、命名規則、`*_unique` / `*_refcounted` の扱い、const 性）を箇条書きにする
 - 対応する C++ パスと型名を必ず開いて照合し、C 側のファイル・シンボル名が元の C++ に一致しているか確認する
 - `*_unique` / `*_refcounted` へのキャストが必ず `*_unique_get` / `*_refcounted_get` / `release` 経由になっているか `rg` でチェックする
+- `const_cast` が残っていないか、`self` と引数の const 性が元の C++ シグネチャと一致しているかを `rg` でチェックする
+- 読み取り専用の借用を返す getter が `_get_const` / `_vector_get_const` / `_inlined_vector_get_const` を使っているか（`_const` 版があるのに可変版を呼んでいないか）を `rg` でチェックする
+- C++ 側に可変参照と const 参照の両方がある getter に `_get_xxx` と `_get_xxx_const` の 2 つが揃っているか確認する
 - 便利関数やパラメータ展開を追加していないか、各変更ブロックごとに「薄いラッパーか」を自問する
 - 変更後に再度 RULES.md を読み直し、全ルール順守をチェックリスト形式で確認してから回答する
 
@@ -60,6 +92,17 @@
 - `std::string` を返す関数を移植する場合は `struct std_string_unique*` にして、利用後は C アプリケーション側で `std_string_unique_delete` を呼んで解放する
 - `webrtc::Timestamp` / `webrtc::TimeDelta` は `int64_t` マイクロ秒として渡す
   - 引数・戻り値ともに値はマイクロ秒単位とし、C++ 側で `Timestamp::Micros(...)` / `TimeDelta::Micros(...)` や `.us()` を使って変換する
+- `std::optional<T>` の C 側の表現は値の種類で決める
+  - スカラーは `int has` + `const T*`、getter は `int* out_has` + `T*` とする
+  - `CppType` は `int has` + `const struct CType*`、getter は `int* out_has` + `struct CType**` とする
+    - getter が返す値が C++ 側に実体として存在する場合は借用ポインタ、値として生成される場合はコピーした `struct CType_unique**` を返す
+  - `std::string` は setter を `int has` + `const char* value, size_t value_len` とし、getter は借用した `struct std_string**` かコピーした `struct std_string_unique**` を返す
+  - `std::span<const T>` は setter を `int has` + `const T* data, size_t len` とし、getter は `int* out_has` + `const T** data, size_t* len` とする
+  - `webrtc::Timestamp` / `webrtc::TimeDelta` も値の型は `int64_t` とし、他のスカラーと同じくポインタで渡す
+- optional の `has` は 0 か 1 とし、getter は `out_has`、setter は `has` という引数名に統一する
+- optional の getter は `has == 0` のとき値の出力先を書き換えない
+- optional の setter は `has == 0` のとき C++ 側で `std::nullopt` を設定し、値の引数は読まない
+- optional の実装には `webrtc_c::OptionalGet` / `OptionalGetAs` / `OptionalSet` / `OptionalSetAs` を使う
 - `std::variant<T0, T1, ..., Tn>` はヒープ確保したコピーを `struct CType_unique*` として返す
   - `WEBRTC_DECLARE_VARIANT(type)` / `WEBRTC_DEFINE_VARIANT(type, cpptype)` マクロを利用する
   - 生成関数は `std::make_unique<CppType>(value)` を `_unique` にキャストして返し、破棄は `CType_unique_delete` で行う
@@ -76,7 +119,7 @@
 
 - ビルドコマンド: `python3 run.py build ubuntu-24.04_x86_64`
 - 実行コマンド: `./_build/ubuntu-24.04_x86_64/release/webrtc_c/whip_c`
-- デバッグビルドコマンド: `python3 run.py build ubuntu-24.04_x86_64 --local-webrtc-build-dir ../../webrtc-build/_worktree/m154.8037.1.1 --debug`
+- デバッグビルドコマンド: `python3 run.py build ubuntu-24.04_x86_64 --local-webrtc-build-dir ../../webrtc-build/_worktree/m154.8037.4.1 --debug`
 - デバッグ実行コマンド: `./_build/ubuntu-24.04_x86_64/debug/webrtc_c/whip_c`
 - lldb-dap プラグインのインストールと lldb-dap バイナリのインストール、`../.vscode/launch.json` の各種パスの設定さえ適切にやれば、VSCode 上でデバッグ実行も可能です
 - 参照用の libwebrtc のヘッダーファイルの場所: `./_install/ubuntu-24.04_x86_64/release/webrtc/include`

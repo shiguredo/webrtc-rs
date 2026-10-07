@@ -26,7 +26,7 @@ webrtc_RtpTransceiverInit_get_stream_ids(
     struct webrtc_RtpTransceiverInit* self);
 WEBRTC_EXPORT void webrtc_RtpTransceiverInit_set_send_encodings(
     struct webrtc_RtpTransceiverInit* self,
-    struct webrtc_RtpEncodingParameters_vector* encodings);
+    const struct webrtc_RtpEncodingParameters_vector* encodings);
 
 // -------------------------
 // webrtc::RtpTransceiverInterface
@@ -40,7 +40,7 @@ WEBRTC_EXPORT void webrtc_RtpTransceiverInterface_SetCodecPreferences(
     struct webrtc_RTCError_unique** out_rtc_error);
 WEBRTC_EXPORT struct webrtc_RtpReceiverInterface_refcounted*
 webrtc_RtpTransceiverInterface_receiver(
-    struct webrtc_RtpTransceiverInterface* self);
+    const struct webrtc_RtpTransceiverInterface* self);
 #if defined(__cplusplus)
 }
 #endif

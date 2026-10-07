@@ -7,9 +7,10 @@ extern "C" {
 
 WEBRTC_EXPORT struct webrtc_AudioDeviceModule_refcounted*
 webrtc_CreateJavaAudioDeviceModule(JNIEnv* env,
-                                   struct webrtc_Environment* webrtc_env,
+                                   const struct webrtc_Environment* webrtc_env,
                                    jobject application_context) {
-  auto cpp_webrtc_env = reinterpret_cast<webrtc::Environment*>(webrtc_env);
+  auto cpp_webrtc_env =
+      reinterpret_cast<const webrtc::Environment*>(webrtc_env);
   auto adm = webrtc::CreateJavaAudioDeviceModule(env, *cpp_webrtc_env,
                                                  application_context);
   return reinterpret_cast<struct webrtc_AudioDeviceModule_refcounted*>(

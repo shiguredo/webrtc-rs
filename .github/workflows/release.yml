@@ -73,7 +73,8 @@ jobs:
           sudo apt-get install -y build-essential \
             libclang-dev \
             libx11-dev
-      - run: rustup update stable
+      # ツールチェーンは rust-toolchain.toml で MSRV に固定しており、
+      # cargo 実行時に rustup がそのツールチェーンを導入する
       - name: Build (native)
         run: cargo build --release --features source-build --target ${{ matrix.rust_target }}
       - name: Package prebuilt artifacts (non-Windows)
@@ -229,7 +230,8 @@ jobs:
           # Debian の keyring を trusted.gpg.d に配置しないと trixie の署名検証に失敗する。
           sudo install -Dm644 /usr/share/keyrings/debian-archive-keyring.gpg \
             /etc/apt/trusted.gpg.d/debian-archive-keyring.gpg
-      - run: rustup update stable
+      # ツールチェーンは rust-toolchain.toml で MSRV に固定しており、
+      # rustup target add 実行時に rustup がそのツールチェーンを導入する
       - name: Add cross-compile target and build sysroot with shiguredo-sysroot
         run: |
           rustup target add aarch64-unknown-linux-gnu
@@ -297,7 +299,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libclang-dev clang
-      - run: rustup update stable
+      # ツールチェーンは rust-toolchain.toml で MSRV に固定しており、
+      # rustup target add 実行時に rustup がそのツールチェーンを導入する
       - run: rustup target add aarch64-linux-android
       - name: Build (android arm64)
         run: cargo build --release --features source-build --target aarch64-linux-android
@@ -361,7 +364,8 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - run: rustup update stable
+      # ツールチェーンは rust-toolchain.toml で MSRV に固定しており、
+      # rustup target add 実行時に rustup がそのツールチェーンを導入する
       - run: rustup target add aarch64-apple-ios
       - name: Build (ios arm64)
         run: cargo build --release --features source-build --target aarch64-apple-ios

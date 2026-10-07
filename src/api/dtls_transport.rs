@@ -72,6 +72,14 @@ impl DtlsTransport {
     }
 }
 
+impl Clone for DtlsTransport {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
+    }
+}
+
 // -------------------------
 // DtlsTransportObserver
 // -------------------------

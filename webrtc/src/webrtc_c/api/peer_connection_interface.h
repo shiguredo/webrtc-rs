@@ -10,6 +10,7 @@
 #include "../std.h"
 #include "data_channel_interface.h"
 #include "dtls_transport_interface.h"
+#include "environment/environment.h"
 #include "jsep.h"
 #include "media_stream_interface.h"
 #include "rtc_error.h"
@@ -53,6 +54,9 @@ WEBRTC_DECLARE_VECTOR(webrtc_PeerConnectionInterface_IceServer);
 WEBRTC_EXPORT struct std_string_vector*
 webrtc_PeerConnectionInterface_IceServer_get_urls(
     struct webrtc_PeerConnectionInterface_IceServer* self);
+WEBRTC_EXPORT const struct std_string_vector*
+webrtc_PeerConnectionInterface_IceServer_get_urls_const(
+    const struct webrtc_PeerConnectionInterface_IceServer* self);
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_IceServer_set_username(
     struct webrtc_PeerConnectionInterface_IceServer* self,
     const char* username,
@@ -97,6 +101,13 @@ WEBRTC_EXPORT void
 webrtc_PeerConnectionInterface_RTCConfiguration_set_always_negotiate_data_channels(
     struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
     int always_negotiate_data_channels);
+WEBRTC_EXPORT int
+webrtc_PeerConnectionInterface_RTCConfiguration_cpu_adaptation(
+    const struct webrtc_PeerConnectionInterface_RTCConfiguration* self);
+WEBRTC_EXPORT void
+webrtc_PeerConnectionInterface_RTCConfiguration_set_cpu_adaptation(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    int cpu_adaptation);
 struct webrtc_PeerConnectionDependencies;
 WEBRTC_EXPORT struct webrtc_PeerConnectionDependencies*
 webrtc_PeerConnectionDependencies_new(
@@ -123,25 +134,25 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_CreateDataChannelOrError(
     struct webrtc_PeerConnectionInterface* self,
     const char* label,
     size_t label_len,
-    struct webrtc_DataChannelInit* init,
+    const struct webrtc_DataChannelInit* init,
     struct webrtc_DataChannelInterface_refcounted** out_data_channel,
     struct webrtc_RTCError_unique** out_rtc_error);
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTransceiver(
     struct webrtc_PeerConnectionInterface* self,
     int media_type,
-    struct webrtc_RtpTransceiverInit* init,
+    const struct webrtc_RtpTransceiverInit* init,
     struct webrtc_RtpTransceiverInterface_refcounted** out_transceiver,
     struct webrtc_RTCError_unique** out_rtc_error);
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTransceiverWithTrack(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_VideoTrackInterface_refcounted* track,
-    struct webrtc_RtpTransceiverInit* init,
+    const struct webrtc_RtpTransceiverInit* init,
     struct webrtc_RtpTransceiverInterface_refcounted** out_transceiver,
     struct webrtc_RTCError_unique** out_rtc_error);
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_AddTrack(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_MediaStreamTrackInterface_refcounted* track,
-    struct std_string_vector* stream_ids,
+    const struct std_string_vector* stream_ids,
     struct webrtc_RtpSenderInterface_refcounted** out_sender,
     struct webrtc_RTCError_unique** out_rtc_error);
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_RemoveTrackOrError(
@@ -151,11 +162,11 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_RemoveTrackOrError(
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_CreateOffer(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_CreateSessionDescriptionObserver* observer,
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* options);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* options);
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_CreateAnswer(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_CreateSessionDescriptionObserver* observer,
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* options);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* options);
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_SetLocalDescription(
     struct webrtc_PeerConnectionInterface* self,
     struct webrtc_SessionDescriptionInterface_unique* desc,
@@ -169,7 +180,7 @@ WEBRTC_EXPORT int webrtc_PeerConnectionInterface_AddIceCandidate(
     const struct webrtc_IceCandidate* candidate);
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_SetConfiguration(
     struct webrtc_PeerConnectionInterface* self,
-    struct webrtc_PeerConnectionInterface_RTCConfiguration* config,
+    const struct webrtc_PeerConnectionInterface_RTCConfiguration* config,
     struct webrtc_RTCError_unique** out_rtc_error);
 WEBRTC_EXPORT struct webrtc_DtlsTransportInterface_refcounted*
 webrtc_PeerConnectionInterface_LookupDtlsTransportByMid(
@@ -185,6 +196,19 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_GetStats(
 WEBRTC_EXPORT void webrtc_PeerConnectionInterface_Close(
     struct webrtc_PeerConnectionInterface* self);
 
+typedef int webrtc_PeerConnectionInterface_SignalingState;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kStable;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kHaveLocalOffer;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kHaveRemoteOffer;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kHaveLocalPranswer;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kHaveRemotePranswer;
+WEBRTC_EXPORT extern const int
+    webrtc_PeerConnectionInterface_SignalingState_kClosed;
 typedef int webrtc_PeerConnectionInterface_PeerConnectionState;
 WEBRTC_EXPORT extern const int
     webrtc_PeerConnectionInterface_PeerConnectionState_kNew;
@@ -229,56 +253,56 @@ WEBRTC_EXPORT void webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_delete(
     struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_offer_to_receive_video(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
 WEBRTC_EXPORT void
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_offer_to_receive_video(
     struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self,
     int offer_to_receive_video);
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_offer_to_receive_audio(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
 WEBRTC_EXPORT void
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_offer_to_receive_audio(
     struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self,
     int offer_to_receive_audio);
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_voice_activity_detection(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
 WEBRTC_EXPORT void
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_voice_activity_detection(
     struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self,
     int voice_activity_detection);
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_ice_restart(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
 WEBRTC_EXPORT void
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_ice_restart(
     struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self,
     int ice_restart);
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_use_rtp_mux(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
 WEBRTC_EXPORT void
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_use_rtp_mux(
     struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self,
     int use_rtp_mux);
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_raw_packetization_for_video(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
 WEBRTC_EXPORT void
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_raw_packetization_for_video(
     struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self,
     int raw_packetization_for_video);
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_num_simulcast_layers(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
 WEBRTC_EXPORT void
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_num_simulcast_layers(
     struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self,
     int num_simulcast_layers);
 WEBRTC_EXPORT int
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_get_use_obsolete_sctp_sdp(
-    struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
+    const struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self);
 WEBRTC_EXPORT void
 webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_use_obsolete_sctp_sdp(
     struct webrtc_PeerConnectionInterface_RTCOfferAnswerOptions* self,
@@ -291,6 +315,9 @@ webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_set_use_obsolete_sctp_sdp(
 // 全コールバックは必須（null 非許容）。
 // 呼び出し側は全関数ポインタを非 null で設定しなければならない。
 struct webrtc_PeerConnectionObserver_cbs {
+  void (*OnSignalingChange)(
+      webrtc_PeerConnectionInterface_SignalingState new_state,
+      void* user_data);
   void (*OnStandardizedIceConnectionChange)(
       webrtc_PeerConnectionInterface_IceConnectionState new_state,
       void* user_data);
@@ -346,6 +373,10 @@ WEBRTC_EXPORT void
 webrtc_PeerConnectionFactoryDependencies_set_signaling_thread(
     struct webrtc_PeerConnectionFactoryDependencies* self,
     struct webrtc_Thread* signaling_thread);
+WEBRTC_EXPORT void webrtc_PeerConnectionFactoryDependencies_set_env(
+    struct webrtc_PeerConnectionFactoryDependencies* self,
+    int has,
+    const struct webrtc_Environment* env);
 WEBRTC_EXPORT void webrtc_PeerConnectionFactoryDependencies_set_adm(
     struct webrtc_PeerConnectionFactoryDependencies* self,
     struct webrtc_AudioDeviceModule_refcounted* adm);
@@ -400,7 +431,7 @@ webrtc_CreateModularPeerConnectionFactoryWithContext(
 WEBRTC_EXPORT void
 webrtc_PeerConnectionFactoryInterface_CreatePeerConnectionOrError(
     struct webrtc_PeerConnectionFactoryInterface* self,
-    struct webrtc_PeerConnectionInterface_RTCConfiguration* rtc_config,
+    const struct webrtc_PeerConnectionInterface_RTCConfiguration* rtc_config,
     struct webrtc_PeerConnectionDependencies* dependencies,
     struct webrtc_PeerConnectionInterface_refcounted** out_pc,
     struct webrtc_RTCError_unique** out_rtc_error);
@@ -418,7 +449,7 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateLocalMediaStream(
 
 WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateAudioSource(
     struct webrtc_PeerConnectionFactoryInterface* self,
-    struct webrtc_AudioOptions* options,
+    const struct webrtc_AudioOptions* options,
     struct webrtc_AudioSourceInterface_refcounted** out_source);
 
 WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateAudioTrack(
@@ -429,11 +460,11 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_CreateAudioTrack(
     struct webrtc_AudioTrackInterface_refcounted** out_track);
 WEBRTC_EXPORT struct webrtc_RtpCapabilities*
 webrtc_PeerConnectionFactoryInterface_GetRtpSenderCapabilities(
-    struct webrtc_PeerConnectionFactoryInterface* self,
+    const struct webrtc_PeerConnectionFactoryInterface* self,
     int media_type);
 WEBRTC_EXPORT struct webrtc_RtpCapabilities*
 webrtc_PeerConnectionFactoryInterface_GetRtpReceiverCapabilities(
-    struct webrtc_PeerConnectionFactoryInterface* self,
+    const struct webrtc_PeerConnectionFactoryInterface* self,
     int media_type);
 
 struct webrtc_PeerConnectionFactoryInterface_Options;
@@ -451,7 +482,7 @@ webrtc_PeerConnectionFactoryInterface_Options_set_ssl_max_version(
     int ssl_max_version);
 WEBRTC_EXPORT void webrtc_PeerConnectionFactoryInterface_SetOptions(
     struct webrtc_PeerConnectionFactoryInterface* self,
-    struct webrtc_PeerConnectionFactoryInterface_Options* options);
+    const struct webrtc_PeerConnectionFactoryInterface_Options* options);
 WEBRTC_EXPORT extern const int webrtc_SSL_PROTOCOL_DTLS_12;
 
 #if defined(__cplusplus)

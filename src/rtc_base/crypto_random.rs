@@ -7,7 +7,7 @@ pub fn random_string(len: usize) -> String {
     let raw = unsafe { ffi::webrtc_CreateRandomString(len) };
     CxxString::from_unique(expect_non_null(raw, "webrtc_CreateRandomString"))
         .to_string()
-        .expect("BUG: webrtc_CreateRandomString が不正な UTF-8 文字列を返しました")
+        .expect("BUG: webrtc_CreateRandomString returned an invalid UTF-8 string")
 }
 
 /// webrtc::CreateRandomString を byte array として扱うヘルパー。

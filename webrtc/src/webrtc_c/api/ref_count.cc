@@ -27,11 +27,11 @@ struct webrtc_RefCountInterface_ref : webrtc::RefCountInterface {
 extern "C" {
 
 WEBRTC_EXPORT void webrtc_RefCountInterface_AddRef(
-    struct webrtc_RefCountInterface_ref* ref) {
+    const struct webrtc_RefCountInterface_ref* ref) {
   ref->AddRef();
 }
 WEBRTC_EXPORT void webrtc_RefCountInterface_Release(
-    struct webrtc_RefCountInterface_ref* ref) {
+    const struct webrtc_RefCountInterface_ref* ref) {
   ref->Release();
 }
 WEBRTC_EXPORT struct webrtc_RefCountInterface_ref*

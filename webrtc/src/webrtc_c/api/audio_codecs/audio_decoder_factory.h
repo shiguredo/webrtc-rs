@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../common.h"
-#include "../environment.h"
+#include "../environment/environment.h"
 #include "audio_decoder.h"
 #include "audio_format.h"
 
@@ -38,10 +38,9 @@ WEBRTC_EXPORT int webrtc_AudioDecoderFactory_IsSupportedDecoder(
     struct webrtc_AudioDecoderFactory* self,
     const struct webrtc_SdpAudioFormat* format);
 WEBRTC_EXPORT struct webrtc_AudioDecoder_unique*
-webrtc_AudioDecoderFactory_MakeAudioDecoder(
-    struct webrtc_AudioDecoderFactory* self,
-    const struct webrtc_Environment* env,
-    const struct webrtc_SdpAudioFormat* format);
+webrtc_AudioDecoderFactory_Create(struct webrtc_AudioDecoderFactory* self,
+                                  const struct webrtc_Environment* env,
+                                  const struct webrtc_SdpAudioFormat* format);
 
 WEBRTC_EXPORT struct webrtc_AudioDecoderFactory_refcounted*
 webrtc_CreateBuiltinAudioDecoderFactory();

@@ -1,13 +1,19 @@
+use crate::const_non_null::ConstNonNull;
 use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
 use crate::helper::non_null::expect_non_null;
 use crate::helper::ref_count::AudioDeviceModuleHandle;
 use crate::{Environment, Error, Result, ScopedRef, ffi};
 use std::ffi::c_char;
+use std::marker::PhantomData;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 use std::slice;
 
 /// webrtc::AudioDeviceModule のラッパー。
+///
+/// この ADM を生成したスレッドと同じスレッドで利用し、同じスレッドで破棄すること。
+/// `PeerConnectionFactory` に渡した後は libwebrtc が内部の worker thread からこの ADM を呼ぶため、
+/// 別スレッドから直接呼ばないこと ([AudioDeviceModuleHandler] と同じ契約)。
 pub struct AudioDeviceModule {
     raw_ref: ScopedRef<AudioDeviceModuleHandle>,
 }
@@ -18,6 +24,7 @@ pub struct AudioDeviceModule {
 // unsafe impl Sync for AudioDeviceModule {}
 
 impl AudioDeviceModule {
+    /// 指定した音声レイヤーの ADM を生成する。
     pub fn new(env: &Environment, audio_type: AudioDeviceModuleAudioLayer) -> Result<Self> {
         let raw = NonNull::new(unsafe {
             ffi::webrtc_CreateAudioDeviceModule(env.as_ptr(), audio_type.to_int())
@@ -110,10 +117,28 @@ impl AudioDeviceModule {
         Self { raw_ref }
     }
 
+    /// Rust の外で作成された ADM を、所有権を持つ refcounted ポインタから取り込む。
+    ///
+    /// 参照カウントを増やさずに保持するため、呼び出し側が参照の所有権を持つポインタを渡すこと。
+    ///
+    /// # Safety
+    ///
+    /// `raw_ref` は有効な `webrtc::AudioDeviceModule` の refcounted ポインタを指し、その参照
+    /// 1 つ分の所有権が呼び出し側にあること。
+    pub unsafe fn from_refcounted_ptr(
+        raw_ref: NonNull<ffi::webrtc_AudioDeviceModule_refcounted>,
+    ) -> Self {
+        Self {
+            raw_ref: ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw_ref),
+        }
+    }
+
+    /// この ADM の生ポインタを返す。
     pub fn as_ptr(&self) -> *mut ffi::webrtc_AudioDeviceModule {
         self.raw_ref.as_ptr()
     }
 
+    /// この ADM が保持している参照の refcounted ポインタを返す。
     pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_AudioDeviceModule_refcounted {
         self.raw_ref.as_refcounted_ptr()
     }
@@ -123,7 +148,7 @@ impl AudioDeviceModule {
         let ret = unsafe { ffi::webrtc_AudioDeviceModule_Init(self.as_ptr()) };
         if ret != 0 {
             return Err(Error::Message(format!(
-                "AudioDeviceModule::Init が失敗しました: {}",
+                "AudioDeviceModule::Init failed: {}",
                 ret
             )));
         }
@@ -149,7 +174,7 @@ impl AudioDeviceModule {
         };
         if ret != 0 {
             return Err(Error::Message(format!(
-                "AudioDeviceModule::RecordingDeviceName が失敗しました: {}",
+                "AudioDeviceModule::RecordingDeviceName failed: {}",
                 ret
             )));
         }
@@ -169,7 +194,7 @@ impl AudioDeviceModule {
         let ret = unsafe { ffi::webrtc_AudioDeviceModule_SetRecordingDevice(self.as_ptr(), index) };
         if ret != 0 {
             return Err(Error::Message(format!(
-                "AudioDeviceModule::SetRecordingDevice が失敗しました: {}",
+                "AudioDeviceModule::SetRecordingDevice failed: {}",
                 ret
             )));
         }
@@ -243,20 +268,25 @@ impl AudioDeviceModuleAudioLayer {
     }
 }
 
-/// webrtc::AudioTransport の参照ラッパー。
+/// webrtc::AudioTransport へのライフタイムを持たないポインタ。
+///
+/// C++ 側の ADM が所有する transport を [AudioDeviceModuleHandler::register_audio_callback] で受け取り、
+/// ハンドラが自身の状態として保持するために使う。C 側の transport がいつまで生存するかはハンドラの
+/// 状態からは辿れないため、ライフタイムを持つ借用型 ([AudioTransportRef] / [AudioTransportRefMut])
+/// では保持できない。
 #[derive(Debug, Clone, Copy)]
-pub struct AudioTransportRef {
+pub struct AudioTransportPtr {
     raw: NonNull<ffi::webrtc_AudioTransport>,
 }
 
-unsafe impl Send for AudioTransportRef {}
+unsafe impl Send for AudioTransportPtr {}
 
-impl AudioTransportRef {
-    fn from_raw(raw: *mut ffi::webrtc_AudioTransport) -> Option<Self> {
-        NonNull::new(raw).map(|raw| Self { raw })
+impl AudioTransportPtr {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_AudioTransport>) -> Self {
+        Self { raw }
     }
 
-    pub fn as_ptr(&self) -> *mut ffi::webrtc_AudioTransport {
+    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_AudioTransport {
         self.raw.as_ptr()
     }
 
@@ -367,6 +397,144 @@ impl AudioTransportRef {
     }
 }
 
+/// webrtc::AudioTransport の借用ラッパー。
+#[derive(Debug, Clone, Copy)]
+pub struct AudioTransportRef<'a> {
+    raw: ConstNonNull<ffi::webrtc_AudioTransport>,
+    _marker: PhantomData<&'a ffi::webrtc_AudioTransport>,
+}
+
+unsafe impl<'a> Send for AudioTransportRef<'a> {}
+
+impl<'a> AudioTransportRef<'a> {
+    pub(crate) fn from_raw(raw: ConstNonNull<ffi::webrtc_AudioTransport>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn as_ptr(&self) -> *const ffi::webrtc_AudioTransport {
+        self.raw.as_ptr()
+    }
+}
+
+/// webrtc::AudioTransport の可変借用ラッパー。
+#[derive(Debug)]
+pub struct AudioTransportRefMut<'a> {
+    raw: NonNull<ffi::webrtc_AudioTransport>,
+    _marker: PhantomData<&'a mut ffi::webrtc_AudioTransport>,
+    cref: AudioTransportRef<'a>,
+}
+
+unsafe impl<'a> Send for AudioTransportRefMut<'a> {}
+
+impl<'a> AudioTransportRefMut<'a> {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_AudioTransport>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+            cref: AudioTransportRef::from_raw(ConstNonNull::from(raw)),
+        }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_AudioTransport {
+        self.raw.as_ptr()
+    }
+
+    /// # Safety
+    /// [AudioTransportPtr::recorded_data_is_available] と同じ前提条件を満たす必要がある。
+    #[expect(clippy::too_many_arguments)]
+    pub unsafe fn recorded_data_is_available(
+        &mut self,
+        audio_samples: *const u8,
+        n_samples: usize,
+        n_bytes_per_sample: usize,
+        n_channels: usize,
+        samples_per_sec: u32,
+        total_delay_ms: u32,
+        clock_drift: i32,
+        current_mic_level: u32,
+        key_pressed: bool,
+        new_mic_level: &mut u32,
+        estimated_capture_time_ns: Option<i64>,
+    ) -> i32 {
+        unsafe {
+            AudioTransportPtr::from_raw(self.raw).recorded_data_is_available(
+                audio_samples,
+                n_samples,
+                n_bytes_per_sample,
+                n_channels,
+                samples_per_sec,
+                total_delay_ms,
+                clock_drift,
+                current_mic_level,
+                key_pressed,
+                new_mic_level,
+                estimated_capture_time_ns,
+            )
+        }
+    }
+
+    /// # Safety
+    /// [AudioTransportPtr::need_more_play_data] と同じ前提条件を満たす必要がある。
+    #[expect(clippy::too_many_arguments)]
+    pub unsafe fn need_more_play_data(
+        &mut self,
+        n_samples: usize,
+        n_bytes_per_sample: usize,
+        n_channels: usize,
+        samples_per_sec: u32,
+        audio_samples: *mut u8,
+        n_samples_out: &mut usize,
+        elapsed_time_ms: *mut i64,
+        ntp_time_ms: *mut i64,
+    ) -> i32 {
+        unsafe {
+            AudioTransportPtr::from_raw(self.raw).need_more_play_data(
+                n_samples,
+                n_bytes_per_sample,
+                n_channels,
+                samples_per_sec,
+                audio_samples,
+                n_samples_out,
+                elapsed_time_ms,
+                ntp_time_ms,
+            )
+        }
+    }
+
+    /// # Safety
+    /// [AudioTransportPtr::pull_render_data] と同じ前提条件を満たす必要がある。
+    #[expect(clippy::too_many_arguments)]
+    pub unsafe fn pull_render_data(
+        &mut self,
+        bits_per_sample: i32,
+        sample_rate: i32,
+        number_of_channels: usize,
+        number_of_frames: usize,
+        audio_data: *mut u8,
+        elapsed_time_ms: *mut i64,
+        ntp_time_ms: *mut i64,
+    ) {
+        unsafe {
+            AudioTransportPtr::from_raw(self.raw).pull_render_data(
+                bits_per_sample,
+                sample_rate,
+                number_of_channels,
+                number_of_frames,
+                audio_data,
+                elapsed_time_ms,
+                ntp_time_ms,
+            )
+        }
+    }
+
+    pub fn as_ref(&self) -> AudioTransportRef<'_> {
+        self.cref
+    }
+}
+
 /// Rust 側でカスタム実装を持てる webrtc::AudioTransport の所有型。
 pub struct AudioTransport {
     raw: NonNull<ffi::webrtc_AudioTransport>,
@@ -393,15 +561,21 @@ impl AudioTransport {
         Self { raw }
     }
 
-    pub fn as_ref(&self) -> AudioTransportRef {
-        AudioTransportRef { raw: self.raw }
+    pub fn as_ref(&self) -> AudioTransportRef<'_> {
+        // Safety: self.raw は AudioTransport の生存中は常に有効です。
+        AudioTransportRef::from_raw(ConstNonNull::from(self.raw))
+    }
+
+    pub fn as_mut(&mut self) -> AudioTransportRefMut<'_> {
+        // Safety: self.raw は AudioTransport の生存中は常に有効です。
+        AudioTransportRefMut::from_raw(self.raw)
     }
 
     /// # Safety
     /// `AudioTransportRef::recorded_data_is_available` と同じ前提条件を満たす必要がある。
     #[expect(clippy::too_many_arguments)]
     pub unsafe fn recorded_data_is_available(
-        &self,
+        &mut self,
         audio_samples: *const u8,
         n_samples: usize,
         n_bytes_per_sample: usize,
@@ -415,7 +589,7 @@ impl AudioTransport {
         estimated_capture_time_ns: Option<i64>,
     ) -> i32 {
         unsafe {
-            self.as_ref().recorded_data_is_available(
+            self.as_mut().recorded_data_is_available(
                 audio_samples,
                 n_samples,
                 n_bytes_per_sample,
@@ -435,7 +609,7 @@ impl AudioTransport {
     /// `AudioTransportRef::need_more_play_data` と同じ前提条件を満たす必要がある。
     #[expect(clippy::too_many_arguments)]
     pub unsafe fn need_more_play_data(
-        &self,
+        &mut self,
         n_samples: usize,
         n_bytes_per_sample: usize,
         n_channels: usize,
@@ -446,7 +620,7 @@ impl AudioTransport {
         ntp_time_ms: *mut i64,
     ) -> i32 {
         unsafe {
-            self.as_ref().need_more_play_data(
+            self.as_mut().need_more_play_data(
                 n_samples,
                 n_bytes_per_sample,
                 n_channels,
@@ -463,7 +637,7 @@ impl AudioTransport {
     /// `AudioTransportRef::pull_render_data` と同じ前提条件を満たす必要がある。
     #[expect(clippy::too_many_arguments)]
     pub unsafe fn pull_render_data(
-        &self,
+        &mut self,
         bits_per_sample: i32,
         sample_rate: i32,
         number_of_channels: usize,
@@ -473,7 +647,7 @@ impl AudioTransport {
         ntp_time_ms: *mut i64,
     ) {
         unsafe {
-            self.as_ref().pull_render_data(
+            self.as_mut().pull_render_data(
                 bits_per_sample,
                 sample_rate,
                 number_of_channels,
@@ -762,229 +936,233 @@ impl Drop for AudioDeviceModuleStats {
     }
 }
 
-pub trait AudioDeviceModuleHandler: Send + Sync {
-    fn active_audio_layer(&self, audio_layer: &mut i32) -> i32 {
+/// Rust 側で実装を差し替えられる webrtc::AudioDeviceModule。
+///
+/// このトレイトを実装したオブジェクトを [AudioDeviceModule::new_with_handler] に渡して利用する。
+/// ADM を `PeerConnectionFactory` に渡した後は、同じ ADM のメソッドを別スレッドから呼ばないこと。
+pub trait AudioDeviceModuleHandler: Send {
+    fn active_audio_layer(&mut self, audio_layer: &mut i32) -> i32 {
         *audio_layer = 0;
         0
     }
     #[expect(unused_variables)]
-    fn register_audio_callback(&self, audio_transport: Option<AudioTransportRef>) -> i32 {
+    fn register_audio_callback(&mut self, audio_transport: Option<AudioTransportPtr>) -> i32 {
         0
     }
-    fn init(&self) -> i32 {
+    fn init(&mut self) -> i32 {
         0
     }
-    fn terminate(&self) -> i32 {
+    fn terminate(&mut self) -> i32 {
         0
     }
-    fn initialized(&self) -> bool {
+    fn initialized(&mut self) -> bool {
         false
     }
-    fn playout_devices(&self) -> i16 {
+    fn playout_devices(&mut self) -> i16 {
         0
     }
-    fn recording_devices(&self) -> i16 {
+    fn recording_devices(&mut self) -> i16 {
         0
     }
     #[expect(unused_variables)]
-    fn playout_device_name(&self, index: u16) -> Option<(String, String)> {
+    fn playout_device_name(&mut self, index: u16) -> Option<(String, String)> {
         Some((String::new(), String::new()))
     }
     #[expect(unused_variables)]
-    fn recording_device_name(&self, index: u16) -> Option<(String, String)> {
+    fn recording_device_name(&mut self, index: u16) -> Option<(String, String)> {
         Some((String::new(), String::new()))
     }
     #[expect(unused_variables)]
-    fn set_playout_device(&self, index: u16) -> i32 {
+    fn set_playout_device(&mut self, index: u16) -> i32 {
         0
     }
     #[expect(unused_variables)]
-    fn set_playout_device_with_windows_device_type(&self, device: i32) -> i32 {
+    fn set_playout_device_with_windows_device_type(&mut self, device: i32) -> i32 {
         0
     }
     #[expect(unused_variables)]
-    fn set_recording_device(&self, index: u16) -> i32 {
+    fn set_recording_device(&mut self, index: u16) -> i32 {
         0
     }
     #[expect(unused_variables)]
-    fn set_recording_device_with_windows_device_type(&self, device: i32) -> i32 {
+    fn set_recording_device_with_windows_device_type(&mut self, device: i32) -> i32 {
         0
     }
-    fn playout_is_available(&self, available: &mut bool) -> i32 {
+    fn playout_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
-    fn init_playout(&self) -> i32 {
+    fn init_playout(&mut self) -> i32 {
         0
     }
-    fn playout_is_initialized(&self) -> bool {
+    fn playout_is_initialized(&mut self) -> bool {
         true
     }
-    fn recording_is_available(&self, available: &mut bool) -> i32 {
+    fn recording_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
-    fn init_recording(&self) -> i32 {
+    fn init_recording(&mut self) -> i32 {
         0
     }
-    fn recording_is_initialized(&self) -> bool {
+    fn recording_is_initialized(&mut self) -> bool {
         true
     }
-    fn start_playout(&self) -> i32 {
+    fn start_playout(&mut self) -> i32 {
         0
     }
-    fn stop_playout(&self) -> i32 {
+    fn stop_playout(&mut self) -> i32 {
         0
     }
-    fn playing(&self) -> bool {
+    fn playing(&mut self) -> bool {
         false
     }
-    fn start_recording(&self) -> i32 {
+    fn start_recording(&mut self) -> i32 {
         0
     }
-    fn stop_recording(&self) -> i32 {
+    fn stop_recording(&mut self) -> i32 {
         0
     }
-    fn recording(&self) -> bool {
+    fn recording(&mut self) -> bool {
         false
     }
-    fn init_speaker(&self) -> i32 {
+    fn init_speaker(&mut self) -> i32 {
         0
     }
-    fn speaker_is_initialized(&self) -> bool {
+    fn speaker_is_initialized(&mut self) -> bool {
         true
     }
-    fn init_microphone(&self) -> i32 {
+    fn init_microphone(&mut self) -> i32 {
         0
     }
-    fn microphone_is_initialized(&self) -> bool {
+    fn microphone_is_initialized(&mut self) -> bool {
         true
     }
-    fn speaker_volume_is_available(&self, available: &mut bool) -> i32 {
+    fn speaker_volume_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
     #[expect(unused_variables)]
-    fn set_speaker_volume(&self, volume: u32) -> i32 {
+    fn set_speaker_volume(&mut self, volume: u32) -> i32 {
         0
     }
-    fn speaker_volume(&self, volume: &mut u32) -> i32 {
+    fn speaker_volume(&mut self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn max_speaker_volume(&self, volume: &mut u32) -> i32 {
+    fn max_speaker_volume(&mut self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn min_speaker_volume(&self, volume: &mut u32) -> i32 {
+    fn min_speaker_volume(&mut self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn microphone_volume_is_available(&self, available: &mut bool) -> i32 {
+    fn microphone_volume_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
     #[expect(unused_variables)]
-    fn set_microphone_volume(&self, volume: u32) -> i32 {
+    fn set_microphone_volume(&mut self, volume: u32) -> i32 {
         0
     }
-    fn microphone_volume(&self, volume: &mut u32) -> i32 {
+    fn microphone_volume(&mut self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn max_microphone_volume(&self, volume: &mut u32) -> i32 {
+    fn max_microphone_volume(&mut self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn min_microphone_volume(&self, volume: &mut u32) -> i32 {
+    fn min_microphone_volume(&mut self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn speaker_mute_is_available(&self, available: &mut bool) -> i32 {
+    fn speaker_mute_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
     #[expect(unused_variables)]
-    fn set_speaker_mute(&self, enable: bool) -> i32 {
+    fn set_speaker_mute(&mut self, enable: bool) -> i32 {
         0
     }
-    fn speaker_mute(&self, enabled: &mut bool) -> i32 {
+    fn speaker_mute(&mut self, enabled: &mut bool) -> i32 {
         *enabled = false;
         0
     }
-    fn microphone_mute_is_available(&self, available: &mut bool) -> i32 {
+    fn microphone_mute_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
     #[expect(unused_variables)]
-    fn set_microphone_mute(&self, enable: bool) -> i32 {
+    fn set_microphone_mute(&mut self, enable: bool) -> i32 {
         0
     }
-    fn microphone_mute(&self, enabled: &mut bool) -> i32 {
+    fn microphone_mute(&mut self, enabled: &mut bool) -> i32 {
         *enabled = false;
         0
     }
-    fn stereo_playout_is_available(&self, available: &mut bool) -> i32 {
+    fn stereo_playout_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
     #[expect(unused_variables)]
-    fn set_stereo_playout(&self, enable: bool) -> i32 {
+    fn set_stereo_playout(&mut self, enable: bool) -> i32 {
         0
     }
-    fn stereo_playout(&self, enabled: &mut bool) -> i32 {
+    fn stereo_playout(&mut self, enabled: &mut bool) -> i32 {
         *enabled = false;
         0
     }
-    fn stereo_recording_is_available(&self, available: &mut bool) -> i32 {
+    fn stereo_recording_is_available(&mut self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
     #[expect(unused_variables)]
-    fn set_stereo_recording(&self, enable: bool) -> i32 {
+    fn set_stereo_recording(&mut self, enable: bool) -> i32 {
         0
     }
-    fn stereo_recording(&self, enabled: &mut bool) -> i32 {
+    fn stereo_recording(&mut self, enabled: &mut bool) -> i32 {
         *enabled = false;
         0
     }
-    fn playout_delay(&self, delay_ms: &mut u16) -> i32 {
+    fn playout_delay(&mut self, delay_ms: &mut u16) -> i32 {
         *delay_ms = 0;
         0
     }
-    fn built_in_aec_is_available(&self) -> bool {
+    fn built_in_aec_is_available(&mut self) -> bool {
         false
     }
-    fn built_in_agc_is_available(&self) -> bool {
+    fn built_in_agc_is_available(&mut self) -> bool {
         false
     }
-    fn built_in_ns_is_available(&self) -> bool {
+    fn built_in_ns_is_available(&mut self) -> bool {
         false
     }
     #[expect(unused_variables)]
-    fn enable_built_in_aec(&self, enable: bool) -> i32 {
+    fn enable_built_in_aec(&mut self, enable: bool) -> i32 {
         -1
     }
     #[expect(unused_variables)]
-    fn enable_built_in_agc(&self, enable: bool) -> i32 {
+    fn enable_built_in_agc(&mut self, enable: bool) -> i32 {
         -1
     }
     #[expect(unused_variables)]
-    fn enable_built_in_ns(&self, enable: bool) -> i32 {
+    fn enable_built_in_ns(&mut self, enable: bool) -> i32 {
         -1
     }
-    fn get_playout_underrun_count(&self) -> i32 {
+    fn get_playout_underrun_count(&mut self) -> i32 {
         -1
     }
-    fn get_playout_audio_parameters(&self, params: &mut Option<AudioParameters>) -> i32 {
+    fn get_playout_audio_parameters(&mut self, params: &mut Option<AudioParameters>) -> i32 {
         *params = None;
         -1
     }
-    fn get_record_audio_parameters(&self, params: &mut Option<AudioParameters>) -> i32 {
+    fn get_record_audio_parameters(&mut self, params: &mut Option<AudioParameters>) -> i32 {
         *params = None;
         -1
     }
-    fn get_stats(&self) -> Option<AudioDeviceModuleStats> {
+    fn get_stats(&mut self) -> Option<AudioDeviceModuleStats> {
         None
     }
 }
@@ -1011,8 +1189,17 @@ fn write_c_string(dest: &mut [c_char], value: &str) {
     }
 }
 
-unsafe fn adm_state(user_data: *mut c_void) -> &'static AudioDeviceModuleHandlerState {
-    unsafe { &*(user_data as *const AudioDeviceModuleHandlerState) }
+/// `user_data` が指す ADM ハンドラの状態を返す。
+///
+/// ADM の各 trampoline が先頭で呼び出し、ハンドラのメソッドを実行するために使う。
+///
+/// # Safety
+///
+/// `user_data` は `Box::into_raw` で変換した `Box<AudioDeviceModuleHandlerState>` の
+/// 生ポインタであり有効なメモリを指していること。同じ状態を同時に借用する
+/// 別の trampoline が動いていないこと。
+unsafe fn adm_state(user_data: *mut c_void) -> &'static mut AudioDeviceModuleHandlerState {
+    unsafe { &mut *(user_data as *mut AudioDeviceModuleHandlerState) }
 }
 
 fn write_i32(out: *mut i32, value: i32) {
@@ -1059,7 +1246,7 @@ unsafe extern "C" fn adm_register_audio_callback(
     user_data: *mut c_void,
 ) -> i32 {
     let state = unsafe { adm_state(user_data) };
-    let transport = AudioTransportRef::from_raw(audio_transport);
+    let transport = NonNull::new(audio_transport).map(AudioTransportPtr::from_raw);
     state.handler.register_audio_callback(transport)
 }
 

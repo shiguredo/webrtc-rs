@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../../../api/audio/audio_device.h"
-#include "../../../../api/environment.h"
+#include "../../../../api/environment/environment.h"
 #include "../../../../common.h"
 #include "../../../../jni_export.h"
 
@@ -11,7 +11,7 @@ extern "C" {
 
 WEBRTC_EXPORT struct webrtc_AudioDeviceModule_refcounted*
 webrtc_CreateJavaAudioDeviceModule(JNIEnv* env,
-                                   struct webrtc_Environment* webrtc_env,
+                                   const struct webrtc_Environment* webrtc_env,
                                    jobject application_context);
 
 #if defined(__cplusplus)

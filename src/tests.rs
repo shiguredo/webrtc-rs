@@ -1,8 +1,10 @@
 use super::*;
+use crate::const_non_null::ConstNonNull;
+use std::cell::Cell;
 use std::ptr::NonNull;
 use std::sync::{
     Arc, Mutex,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicUsize, Ordering},
     mpsc,
 };
 use std::time::Duration;
@@ -17,10 +19,315 @@ impl SetLocalDescriptionObserverHandler for NoopHandler {}
 impl SetRemoteDescriptionObserverHandler for NoopHandler {}
 impl VideoEncoderHandler for NoopHandler {}
 impl VideoDecoderHandler for NoopHandler {}
+impl AudioTransportHandler for NoopHandler {}
 
 #[test]
 fn create_and_drop_environment() {
     let _env = Environment::new();
+}
+
+#[test]
+fn field_trials_create_and_environment_field_trials() {
+    // 正しいフィールドトライアル文字列はパースに成功する
+    let field_trials = FieldTrials::new("WebRTC-Video-PerSsrcKeyframes/Enabled/")
+        .expect("FieldTrials の生成に失敗しました");
+
+    // 末尾の / がない文字列は不正なのでエラーになる
+    assert!(
+        matches!(
+            FieldTrials::new("WebRTC-Video-PerSsrcKeyframes/Enabled"),
+            Err(Error::InvalidFieldTrials(_))
+        ),
+        "不正なフィールドトライアル文字列がエラーになりません"
+    );
+
+    // EnvironmentFactory で生成した Environment ではフィールドトライアルが有効になる
+    let mut factory = EnvironmentFactory::new();
+    factory.set_field_trials(field_trials);
+    let env = factory.create();
+    assert!(
+        env.field_trials()
+            .is_enabled("WebRTC-Video-PerSsrcKeyframes"),
+        "EnvironmentFactory で生成した Environment でフィールドトライアルが有効になっていません"
+    );
+
+    // EnvironmentFactory を drop しても、フィールドトライアルは Environment 側で保持される
+    drop(factory);
+    assert!(
+        env.field_trials()
+            .is_enabled("WebRTC-Video-PerSsrcKeyframes"),
+        "EnvironmentFactory の drop 後にフィールドトライアルが無効になっています"
+    );
+
+    // コピーした Environment でもフィールドトライアルは有効で、元を drop しても使える
+    let copied_env = env.clone();
+    drop(env);
+    assert!(
+        copied_env
+            .field_trials()
+            .is_enabled("WebRTC-Video-PerSsrcKeyframes"),
+        "コピーした Environment でフィールドトライアルが無効になっています"
+    );
+
+    // フィールドトライアルを指定していない Environment では無効になる
+    let default_env = Environment::new();
+    assert!(
+        !default_env
+            .field_trials()
+            .is_enabled("WebRTC-Video-PerSsrcKeyframes"),
+        "既定の Environment でフィールドトライアルが有効になっています"
+    );
+}
+
+#[test]
+fn field_trials_is_enabled_and_is_disabled_are_independent() {
+    // 値が Enabled のキーは有効、値が Disabled のキーは無効になる
+    let mut factory = EnvironmentFactory::new();
+    factory.set_field_trials(
+        FieldTrials::new(
+            "Enabled-Trial/Enabled/Disabled-Trial/Disabled/Param-Trial/Enabled,offer:true/Other-Trial/42/",
+        )
+        .expect("FieldTrials の生成に失敗しました"),
+    );
+    let env = factory.create();
+    let trials = env.field_trials();
+
+    assert!(
+        trials.is_enabled("Enabled-Trial"),
+        "値が Enabled のキーが有効になっていません"
+    );
+    assert!(
+        !trials.is_disabled("Enabled-Trial"),
+        "値が Enabled のキーが無効になっています"
+    );
+
+    assert!(
+        !trials.is_enabled("Disabled-Trial"),
+        "値が Disabled のキーが有効になっています"
+    );
+    assert!(
+        trials.is_disabled("Disabled-Trial"),
+        "値が Disabled のキーが無効になっていません"
+    );
+
+    // 値が Enabled で始まる場合はパラメータが付いていても有効になる
+    assert!(
+        trials.is_enabled("Param-Trial"),
+        "パラメータ付きの Enabled のキーが有効になっていません"
+    );
+    assert!(
+        !trials.is_disabled("Param-Trial"),
+        "パラメータ付きの Enabled のキーが無効になっています"
+    );
+
+    // 値が Enabled でも Disabled でもないキーは is_enabled と is_disabled の両方が false になる。
+    // is_enabled の否定で is_disabled を代用できないことを確認する。
+    assert!(
+        !trials.is_enabled("Other-Trial"),
+        "値が Enabled でも Disabled でもないキーが有効になっています"
+    );
+    assert!(
+        !trials.is_disabled("Other-Trial"),
+        "値が Enabled でも Disabled でもないキーが無効になっています"
+    );
+
+    // 設定されていないキーも両方が false になる
+    assert!(
+        !trials.is_enabled("Unknown-Trial"),
+        "設定されていないキーが有効になっています"
+    );
+    assert!(
+        !trials.is_disabled("Unknown-Trial"),
+        "設定されていないキーが無効になっています"
+    );
+}
+
+#[test]
+fn field_trials_lookup_returns_value() {
+    // 設定された値はパラメータも含めてそのまま取得できる
+    let mut factory = EnvironmentFactory::new();
+    factory.set_field_trials(
+        FieldTrials::new("Param-Trial/Enabled,offer:true/Disabled-Trial/Disabled/")
+            .expect("FieldTrials の生成に失敗しました"),
+    );
+    let env = factory.create();
+    let trials = env.field_trials();
+
+    // パラメータ付きの値もそのまま返る
+    assert_eq!(
+        trials.lookup("Param-Trial").expect("lookup に失敗しました"),
+        "Enabled,offer:true",
+        "パラメータ付きの値が取得できていません"
+    );
+    assert_eq!(
+        trials
+            .lookup("Disabled-Trial")
+            .expect("lookup に失敗しました"),
+        "Disabled",
+        "値が取得できていません"
+    );
+
+    // 設定されていないキーは空文字列になる
+    assert_eq!(
+        trials
+            .lookup("Unknown-Trial")
+            .expect("lookup に失敗しました"),
+        "",
+        "設定されていないキーが空文字列になっていません"
+    );
+
+    // フィールドトライアルを指定していない Environment でも空文字列になる
+    let default_env = Environment::new();
+    assert_eq!(
+        default_env
+            .field_trials()
+            .lookup("Param-Trial")
+            .expect("lookup に失敗しました"),
+        "",
+        "既定の Environment のキーが空文字列になっていません"
+    );
+}
+
+#[test]
+fn environment_ref_to_owned_extends_lifetime() {
+    // EnvironmentRef から所有権を持つ Environment を作り、借用元を drop した後も使えることを確認する
+    let mut factory = EnvironmentFactory::new();
+    factory.set_field_trials(
+        FieldTrials::new("WebRTC-Video-PerSsrcKeyframes/Enabled/")
+            .expect("FieldTrials の生成に失敗しました"),
+    );
+    let env = factory.create();
+    let owned = env.as_ref().to_owned();
+    drop(factory);
+    drop(env);
+
+    assert!(
+        owned
+            .field_trials()
+            .is_enabled("WebRTC-Video-PerSsrcKeyframes"),
+        "EnvironmentRef から作った Environment でフィールドトライアルが無効になっています"
+    );
+}
+
+#[test]
+fn audio_transport_ref_and_ptr_are_available() {
+    // 借用ハンドルと、C++ 側が所有する transport を保持するための AudioTransportPtr が
+    // 取得できることを確認する。借用ハンドルが所有型の借用に縛られること (所有者を drop した
+    // あとに使えないこと) は型で保証されるため、ここでは検証しない。
+    let mut transport = AudioTransport::new_with_handler(Box::new(NoopHandler));
+    {
+        let r = transport.as_ref();
+        assert!(!r.as_ptr().is_null());
+    }
+    {
+        let m = transport.as_mut();
+        assert!(!m.as_mut_ptr().is_null());
+        assert!(!m.as_ref().as_ptr().is_null());
+    }
+    // C++ 側の ADM が所有する transport はライフタイムを持たない Ptr で扱う。
+    let m = transport.as_mut();
+    let ptr = AudioTransportPtr::from_raw(
+        NonNull::new(m.as_mut_ptr()).expect("BUG: AudioTransport が null です"),
+    );
+    assert!(!ptr.as_mut_ptr().is_null());
+}
+
+#[test]
+fn const_non_null_null_is_none() {
+    assert!(ConstNonNull::<u8>::new(std::ptr::null()).is_none());
+}
+
+#[test]
+fn const_non_null_keeps_pointer() {
+    let value = 42u8;
+    let ptr = ConstNonNull::new(&value as *const u8).expect("BUG: 非 null のはずです");
+    assert_eq!(unsafe { *ptr.as_ptr() }, 42);
+
+    // NonNull からの変換でも同じポインタを指す。
+    let mut value2 = 7u8;
+    let non_null = NonNull::new(&mut value2 as *mut u8).expect("BUG: 非 null のはずです");
+    let const_non_null = ConstNonNull::from(non_null);
+    assert_eq!(const_non_null.as_ptr(), non_null.as_ptr() as *const u8);
+    assert_eq!(unsafe { *const_non_null.as_ptr() }, 7);
+
+    // Safety: value3 はこのスコープの間ずっと有効です。
+    let value3 = 1u8;
+    let unchecked = unsafe { ConstNonNull::new_unchecked(&value3 as *const u8) };
+    assert_eq!(unsafe { *unchecked.as_ptr() }, 1);
+}
+
+#[test]
+fn ref_mut_scalar_write_is_visible_from_owner() {
+    // XxxRefMut の書き換えが所有型に反映されることを確認する。
+    let mut parameters = RtpEncodingParameters::new();
+    parameters.as_mut().set_rid("r0");
+    assert_eq!(
+        parameters.as_ref().rid().expect("rid の取得に失敗しました"),
+        "r0"
+    );
+    parameters.as_mut().set_max_bitrate_bps(Some(1_000_000));
+    assert_eq!(parameters.max_bitrate_bps(), Some(1_000_000));
+}
+
+#[test]
+fn ref_mut_map_write_is_visible_from_owner() {
+    // map を返す可変アクセサでも、書き換えが所有型に反映されることを確認する。
+    let mut format = SdpVideoFormat::new("VP8");
+    format.as_mut().parameters_mut().set("profile-id", "0");
+    let parameters = format.as_ref().parameters();
+    assert_eq!(parameters.len(), 1);
+    assert!(
+        parameters
+            .iter()
+            .any(|(k, v)| k == "profile-id" && v == "0")
+    );
+}
+
+#[test]
+fn ref_mut_vector_write_is_visible_from_owner() {
+    // vector を返す可変アクセサでも、書き換えが所有型に反映されることを確認する。
+    let mut vector = RtpCodecCapabilityVector::new(0);
+    let capability = RtpCodecCapability::new();
+    vector.as_mut().push(&capability.as_ref());
+    assert_eq!(vector.len(), 1);
+}
+
+#[test]
+fn ref_mut_forwarded_read_matches_ref() {
+    // XxxRefMut の転送アクセサが as_ref() で得た XxxRef と同じ値を返すことを確認する。
+    let mut capability = RtpCodecCapability::new();
+    capability.set_name("opus");
+    capability.set_clock_rate(Some(48_000));
+    let m = capability.as_mut();
+    let r = m.as_ref();
+    assert_eq!(
+        m.name().expect("name の取得に失敗しました"),
+        r.name().expect("name の取得に失敗しました")
+    );
+    assert_eq!(m.clock_rate(), r.clock_rate());
+    assert!(!r.as_ptr().is_null());
+    assert!(!m.as_mut_ptr().is_null());
+}
+
+#[test]
+fn buffer_data_mut_round_trip() {
+    // append_data で用意した内容を data_mut 経由で書き換え、data で読み戻せることを確認する。
+    let mut buffer = Buffer::new();
+    buffer.append_data(&[1, 2, 3, 4]);
+    {
+        let mut r = buffer.as_mut();
+        assert_eq!(r.data(), &[1, 2, 3, 4]);
+        let data = r.data_mut();
+        data[0] = 9;
+        data[3] = 8;
+        assert_eq!(r.data(), &[9, 2, 3, 8]);
+    }
+    assert_eq!(buffer.data(), &[9, 2, 3, 8]);
+
+    // 空のバッファでは空スライスを返す。
+    let mut empty = Buffer::new();
+    assert!(empty.as_mut().data_mut().is_empty());
+    assert!(empty.data().is_empty());
 }
 
 #[test]
@@ -38,7 +345,9 @@ fn cxx_string_round_trip() {
         "hello world"
     );
 
-    let r = CxxStringRef::from_ptr(NonNull::new(s.as_ptr()).unwrap());
+    let r = CxxStringRef::from_ptr(
+        ConstNonNull::new(s.as_ptr()).expect("ConstNonNull の生成に失敗しました"),
+    );
     assert_eq!(r.len(), 11);
     assert_eq!(
         r.to_string().expect("CxxStringRef の変換に失敗しました"),
@@ -112,6 +421,42 @@ fn string_vector_push_and_get() {
 }
 
 #[test]
+fn string_vector_get_mut() {
+    let mut vec = StringVector::new(0);
+    vec.push(&CxxString::from_str("hello"));
+
+    // 所有型の get_mut で取得したハンドル越しに要素を書き換えられることを確認する。
+    {
+        let mut element = vec.get_mut(0).expect("要素が存在する想定");
+        element.append("-world");
+        assert_eq!(
+            element.to_string().expect("文字列の取得に失敗しました"),
+            "hello-world"
+        );
+    }
+    // 書き換えがベクタ本体に反映されていることを確認する。
+    assert_eq!(
+        vec.get(0).expect("0 番目の取得に失敗しました"),
+        "hello-world"
+    );
+
+    // StringVectorRefMut 経由でも同じ要素を書き換えられることを確認する。
+    {
+        let mut borrowed = vec.as_mut();
+        let mut element = borrowed.get_mut(0).expect("要素が存在する想定");
+        element.append("!");
+    }
+    assert_eq!(
+        vec.get(0).expect("0 番目の取得に失敗しました"),
+        "hello-world!"
+    );
+
+    // 範囲外の index では Error::OutOfIndex を返すことを確認する。
+    assert!(matches!(vec.get_mut(1), Err(Error::OutOfIndex(1))));
+    assert!(matches!(vec.as_mut().get_mut(1), Err(Error::OutOfIndex(1))));
+}
+
+#[test]
 fn sdp_type_round_trip() {
     let offer = SdpType::Offer;
     let val = offer.to_int();
@@ -164,7 +509,7 @@ fn session_description_to_string() {
 
 #[test]
 fn sdp_video_format_with_parameters() {
-    let mut fmt = SdpVideoFormat::new_with_parameters(
+    let fmt = SdpVideoFormat::new_with_parameters(
         "VP8",
         &std::collections::HashMap::from([
             (String::from("profile-id"), String::from("0")),
@@ -172,7 +517,7 @@ fn sdp_video_format_with_parameters() {
         ]),
         &[ScalabilityMode::L1T1, ScalabilityMode::L1T2],
     );
-    let params = fmt.parameters_mut();
+    let params = fmt.as_ref().parameters();
     assert_eq!(params.len(), 2);
 
     let mut found = std::collections::HashMap::new();
@@ -204,7 +549,7 @@ fn sdp_video_format_with_parameters() {
         params.set("packetization-mode", "1");
     }
     let mut has_packetization_mode = false;
-    for (k, _) in fmt.parameters_mut().iter() {
+    for (k, _) in fmt.as_ref().parameters().iter() {
         if k == "packetization-mode" {
             has_packetization_mode = true;
             break;
@@ -252,10 +597,11 @@ fn fuzzy_match_sdp_video_format_prefers_more_parameter_matches() {
         &[],
     );
 
-    let mut matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
+    let matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
         .expect("fuzzy_match_sdp_video_format が一致するフォーマットを見つけられませんでした");
     let params = matched
-        .parameters_mut()
+        .as_ref()
+        .parameters()
         .iter()
         .collect::<std::collections::HashMap<String, String>>();
 
@@ -287,10 +633,11 @@ fn fuzzy_match_sdp_video_format_keeps_first_candidate_on_tie() {
     ];
     let requested = SdpVideoFormat::new("H264");
 
-    let mut matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
+    let matched = fuzzy_match_sdp_video_format(&supported_formats, requested.as_ref())
         .expect("fuzzy_match_sdp_video_format が一致するフォーマットを見つけられませんでした");
     let params = matched
-        .parameters_mut()
+        .as_ref()
+        .parameters()
         .iter()
         .collect::<std::collections::HashMap<String, String>>();
 
@@ -430,7 +777,7 @@ fn video_codec_ref_getter_setter_and_simulcast_stream_ref_roundtrip() {
 
     {
         let mut stream0 = codec
-            .simulcast_stream(0)
+            .simulcast_stream_mut(0)
             .expect("simulcast stream 0 の取得に失敗");
         stream0.set_width(640);
         stream0.set_height(360);
@@ -445,7 +792,7 @@ fn video_codec_ref_getter_setter_and_simulcast_stream_ref_roundtrip() {
     }
     {
         let mut stream1 = codec
-            .simulcast_stream(1)
+            .simulcast_stream_mut(1)
             .expect("simulcast stream 1 の取得に失敗");
         stream1.set_width(320);
         stream1.set_height(180);
@@ -741,7 +1088,7 @@ fn nv12_buffer_planes_kind_and_to_i420() {
     for (i, v) in buf.y_data_mut().iter_mut().enumerate() {
         *v = (i as u8).wrapping_add(0x10);
     }
-    for uv in buf.uv_data_mut().chunks_exact_mut(2) {
+    for uv in buf.uv_data_mut().as_chunks_mut::<2>().0 {
         uv[0] = 0x44;
         uv[1] = 0x88;
     }
@@ -823,7 +1170,7 @@ fn nv12_buffer_data_and_data_mut_use_contiguous_memory_with_padding() {
 fn nv12_buffer_crop_and_scale_from() {
     let mut src = NV12Buffer::new(4, 4);
     src.y_data_mut().fill(0x11);
-    for uv in src.uv_data_mut().chunks_exact_mut(2) {
+    for uv in src.uv_data_mut().as_chunks_mut::<2>().0 {
         uv[0] = 0x22;
         uv[1] = 0x66;
     }
@@ -832,7 +1179,7 @@ fn nv12_buffer_crop_and_scale_from() {
     dst.crop_and_scale_from(&src, 0, 0, 4, 4);
 
     assert!(dst.y_data().iter().all(|&v| v == 0x11));
-    for uv in dst.uv_data().chunks_exact(2) {
+    for uv in dst.uv_data().as_chunks::<2>().0 {
         assert_eq!(uv[0], 0x22);
         assert_eq!(uv[1], 0x66);
     }
@@ -1524,13 +1871,11 @@ fn builtin_audio_factories_create() {
     // PeerConnectionFactoryDependencies を組み立てて EnableMedia まで呼ぶ。
     let mut deps = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps.set_network_thread(&network);
-    deps.set_worker_thread(&worker);
+    deps.set_worker_thread(&network);
     deps.set_signaling_thread(&signaling);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
@@ -1544,7 +1889,6 @@ fn builtin_audio_factories_create() {
     assert!(!deps.as_ptr().is_null());
     drop(deps);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -1556,15 +1900,15 @@ fn audio_device_module_recording_device_name_roundtrip() {
     }
 
     impl AudioDeviceModuleHandler for TestAudioDeviceModuleHandler {
-        fn init(&self) -> i32 {
+        fn init(&mut self) -> i32 {
             0
         }
 
-        fn recording_devices(&self) -> i16 {
+        fn recording_devices(&mut self) -> i16 {
             1
         }
 
-        fn recording_device_name(&self, index: u16) -> Option<(String, String)> {
+        fn recording_device_name(&mut self, index: u16) -> Option<(String, String)> {
             if index == 0 {
                 Some((self.name.clone(), self.guid.clone()))
             } else {
@@ -1595,6 +1939,133 @@ fn audio_device_module_recording_device_name_roundtrip() {
         assert_eq!(got_name, expected_name);
         assert_eq!(got_guid, expected_guid);
     }
+}
+
+#[test]
+fn audio_device_module_handler_requires_only_send() {
+    // AudioDeviceModuleHandler は Send だけを要求し、各メソッドは &mut self を取る。
+    // Cell<i32> は Send だが Sync ではないため、Sync を要求していたらこの実装は
+    // コンパイルできない。これにより bound が Send だけであることを型で確認する。
+    struct NotSyncHandler {
+        count: Cell<i32>,
+    }
+
+    impl AudioDeviceModuleHandler for NotSyncHandler {
+        // &mut self で呼ばれるため、ハンドラは状態を直接更新できる。
+        fn recording_devices(&mut self) -> i16 {
+            self.count.set(self.count.get() + 1);
+            self.count.get() as i16
+        }
+    }
+
+    let adm = AudioDeviceModule::new_with_handler(Box::new(NotSyncHandler {
+        count: Cell::new(0),
+    }));
+    // 呼び出しごとに trampoline が &mut self でハンドラを呼ぶため、状態が保持される。
+    assert_eq!(adm.recording_devices(), 1);
+    assert_eq!(adm.recording_devices(), 2);
+}
+
+/// ADM が破棄されたことをハンドラの破棄で観測するためのハンドラ。
+///
+/// `AudioDeviceModule::new_with_handler` が設定する `OnDestroy` は `destroy_handler` を
+/// 通してハンドラの `Box` を破棄するため、ハンドラの `Drop` は ADM の破棄と同じ回数だけ
+/// 呼ばれる。参照カウントを読む C API は無いので、これを ADM の破棄の観測点にする。
+///
+/// `count` は `recording_devices` の呼び出し回数であり、取り込んだハンドルが生きた
+/// ハンドラへ到達できていることの確認に使う。
+struct TestDestroyCountingHandler {
+    destroyed: Arc<AtomicUsize>,
+    count: i32,
+}
+
+impl Drop for TestDestroyCountingHandler {
+    fn drop(&mut self) {
+        self.destroyed.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+impl AudioDeviceModuleHandler for TestDestroyCountingHandler {
+    fn recording_devices(&mut self) -> i16 {
+        self.count += 1;
+        self.count as i16
+    }
+}
+
+#[test]
+fn audio_device_module_from_refcounted_ptr_shares_adm_after_add_ref() {
+    let destroyed = Arc::new(AtomicUsize::new(0));
+    let adm = AudioDeviceModule::new_with_handler(Box::new(TestDestroyCountingHandler {
+        destroyed: Arc::clone(&destroyed),
+        count: 0,
+    }));
+
+    // 借用中のポインタを共有するため、呼び出し側で参照カウントを 1 増やしてから渡す。
+    let raw_ref = NonNull::new(adm.as_refcounted_ptr())
+        .expect("AudioDeviceModule のポインタが null になりました");
+    unsafe { ffi::webrtc_AudioDeviceModule_AddRef(adm.as_ptr()) };
+    let shared = unsafe { AudioDeviceModule::from_refcounted_ptr(raw_ref) };
+    assert_eq!(
+        shared.recording_devices(),
+        1,
+        "取り込んだハンドルからハンドラに到達できませんでした"
+    );
+
+    // 1 つ目のハンドルを drop しても参照が残るため、ADM は破棄されない。
+    drop(adm);
+    assert_eq!(
+        destroyed.load(Ordering::SeqCst),
+        0,
+        "参照が残っているはずの段階で ADM が破棄されました"
+    );
+    // 同じハンドラが生きているため、呼び出し回数はそのまま増える。
+    assert_eq!(
+        shared.recording_devices(),
+        2,
+        "取り込んだハンドルから同じハンドラに到達できませんでした"
+    );
+
+    // 2 つ目のハンドルを drop すると参照が無くなり、1 回だけ破棄される。
+    drop(shared);
+    assert_eq!(
+        destroyed.load(Ordering::SeqCst),
+        1,
+        "最後の参照を drop したのに ADM が破棄されませんでした"
+    );
+}
+
+#[test]
+fn audio_device_module_from_refcounted_ptr_takes_ownership() {
+    let destroyed = Arc::new(AtomicUsize::new(0));
+    let adm = AudioDeviceModule::new_with_handler(Box::new(TestDestroyCountingHandler {
+        destroyed: Arc::clone(&destroyed),
+        count: 0,
+    }));
+    let raw_ref = NonNull::new(adm.as_refcounted_ptr())
+        .expect("AudioDeviceModule のポインタが null になりました");
+    // 所有権付きの取り込みへ参照 1 つ分を渡すため、adm は drop せずに参照を手放す。
+    std::mem::forget(adm);
+
+    // 参照カウントを増やさずに取り込み、取り込んだハンドルが唯一の参照になる。
+    let owned = unsafe { AudioDeviceModule::from_refcounted_ptr(raw_ref) };
+    assert_eq!(
+        destroyed.load(Ordering::SeqCst),
+        0,
+        "取り込み直後に ADM が破棄されました"
+    );
+    assert_eq!(
+        owned.recording_devices(),
+        1,
+        "取り込んだハンドルからハンドラに到達できませんでした"
+    );
+
+    // 唯一の参照を drop したので 1 回だけ破棄される。参照が余分に残っていれば破棄されない。
+    drop(owned);
+    assert_eq!(
+        destroyed.load(Ordering::SeqCst),
+        1,
+        "唯一の参照を drop したのに ADM が破棄されませんでした"
+    );
 }
 
 #[test]
@@ -1652,7 +2123,7 @@ fn audio_device_module_get_stats_returns_unique() {
     struct TestAudioDeviceModuleGetStatsHandler;
 
     impl AudioDeviceModuleHandler for TestAudioDeviceModuleGetStatsHandler {
-        fn get_stats(&self) -> Option<AudioDeviceModuleStats> {
+        fn get_stats(&mut self) -> Option<AudioDeviceModuleStats> {
             Some(AudioDeviceModuleStats::new(1.0, 2, 3.0, 4.0, 5))
         }
     }
@@ -1722,13 +2193,11 @@ fn peer_connection_factory_and_capabilities() {
     // PeerConnectionFactoryDependencies を組み立てる。スレッドのライフサイクルはここで管理する。
     let mut deps = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps.set_network_thread(&network);
-    deps.set_worker_thread(&worker);
+    deps.set_worker_thread(&network);
     deps.set_signaling_thread(&signaling);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
@@ -1755,7 +2224,7 @@ fn peer_connection_factory_and_capabilities() {
     assert!(!network_manager.as_ptr().is_null());
     assert!(!socket_factory.as_ptr().is_null());
 
-    let caps = factory.get_rtp_sender_capabilities(MediaType::Audio);
+    let mut caps = factory.get_rtp_sender_capabilities(MediaType::Audio);
     assert!(caps.codec_len() >= 0);
     let codecs = caps.codecs();
     assert_eq!(codecs.len() as i32, caps.codec_len());
@@ -1764,11 +2233,20 @@ fn peer_connection_factory_and_capabilities() {
         assert!(first.name().is_ok());
     }
 
+    // codecs_mut() から取得した可変ハンドルで書き換えられることを確認する。
+    let codecs_len_before = caps.codecs().len();
+    {
+        let mut codecs = caps.codecs_mut();
+        codecs.resize(codecs_len_before + 1);
+        assert_eq!(codecs.len(), codecs_len_before + 1);
+    }
+    // 書き換えが所有型に反映されていることを確認する。
+    assert_eq!(caps.codecs().len(), codecs_len_before + 1);
+
     drop(caps);
     drop(context);
     drop(factory);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -1786,18 +2264,87 @@ fn rtc_configuration_and_ice_server() {
     server.add_url("turn:192.0.2.2:3478?transport=udp");
     assert_eq!(server.urls_len(), 2);
 
+    let servers_len_before = config.servers().len();
     {
-        let mut servers = config.servers();
-        let len_before = servers.len();
+        let mut servers = config.servers_mut();
         servers.push(&server);
-        assert_eq!(servers.len(), len_before + 1);
+        assert_eq!(servers.len(), servers_len_before + 1);
     }
+    // 書き換えが所有型に反映されていることを確認する。
+    assert_eq!(config.servers().len(), servers_len_before + 1);
 
     // 所有ベクタでも同じ挙動になることを確認しておく。
     let mut owned = IceServerVector::new(0);
     let len_before = owned.len();
     owned.push(&server);
     assert_eq!(owned.len(), len_before + 1);
+}
+
+#[test]
+fn ice_server_vector_get_mut_and_set() {
+    let mut vec = IceServerVector::new(0);
+    let mut server = IceServer::new();
+    server.add_url("stun:192.0.2.1:3478");
+    vec.push(&server);
+
+    // 所有型の get_mut で取得したハンドル越しに要素を書き換えられることを確認する。
+    {
+        let mut element = vec.get_mut(0).expect("要素が存在する想定");
+        element.add_url("turn:192.0.2.2:3478?transport=udp");
+        assert_eq!(element.urls_len(), 2);
+    }
+    // 書き換えがベクタ本体に反映されていることを確認する。
+    assert_eq!(vec.get(0).expect("要素が存在する想定").urls_len(), 2);
+
+    // 所有型の set で要素を丸ごと差し替えられることを確認する。
+    let mut replacement = IceServer::new();
+    replacement.add_url("stun:192.0.2.3:3478");
+    assert!(vec.set(0, &replacement));
+    assert_eq!(vec.get(0).expect("要素が存在する想定").urls_len(), 1);
+
+    // IceServerVectorRefMut 経由でも同じ要素を書き換えられることを確認する。
+    {
+        let mut borrowed = vec.as_mut();
+        let mut element = borrowed.get_mut(0).expect("要素が存在する想定");
+        element.add_url("stun:192.0.2.4:3478");
+        assert_eq!(element.urls_len(), 2);
+    }
+    assert_eq!(vec.get(0).expect("要素が存在する想定").urls_len(), 2);
+
+    // IceServerVectorRefMut 経由でも要素を丸ごと差し替えられることを確認する。
+    assert!(vec.as_mut().set(0, &replacement));
+    assert_eq!(vec.get(0).expect("要素が存在する想定").urls_len(), 1);
+
+    // 範囲外の index では None / false を返すことを確認する。
+    assert!(vec.get_mut(1).is_none());
+    assert!(!vec.set(1, &replacement));
+    assert!(vec.as_mut().get_mut(1).is_none());
+    assert!(!vec.as_mut().set(1, &replacement));
+}
+
+#[test]
+fn rtc_configuration_cpu_adaptation_round_trip() {
+    let mut config = PeerConnectionRtcConfiguration::new();
+
+    // 既定値は libwebrtc の既定値 (有効) がそのまま見えることを確認する。
+    assert!(
+        config.cpu_adaptation(),
+        "生成直後の cpu_adaptation が true ではありません"
+    );
+
+    // 無効にすると false が見えることを確認する。
+    config.set_cpu_adaptation(false);
+    assert!(
+        !config.cpu_adaptation(),
+        "set_cpu_adaptation(false) 後の cpu_adaptation が false ではありません"
+    );
+
+    // 有効に戻すと true に戻ることを確認する。
+    config.set_cpu_adaptation(true);
+    assert!(
+        config.cpu_adaptation(),
+        "set_cpu_adaptation(true) 後の cpu_adaptation が true ではありません"
+    );
 }
 
 #[test]
@@ -1824,13 +2371,11 @@ fn create_modular_with_context_returns_default_network_objects() {
 
     let mut deps = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps.set_network_thread(&network);
-    deps.set_worker_thread(&worker);
+    deps.set_worker_thread(&network);
     deps.set_signaling_thread(&signaling);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
@@ -1852,7 +2397,6 @@ fn create_modular_with_context_returns_default_network_objects() {
     drop(context);
     drop(factory);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -1863,7 +2407,7 @@ fn rtp_codec_capability_vector() {
     cap.set_name("opus");
     cap.set_clock_rate(Some(48_000));
     {
-        let mut params = cap.parameters();
+        let mut params = cap.parameters_mut();
         params.set("stereo", "1");
         assert!(params.iter().any(|(k, v)| k == "stereo" && v == "1"));
     }
@@ -1889,6 +2433,77 @@ fn rtp_codec_capability_vector() {
         second.name().expect("2 番目 codec 名の取得に失敗しました"),
         "PCMU"
     );
+
+    // 借用ハンドル経由の読み取りアクセサを検証する。
+    let codec_ref = cap.cast_to_codec();
+    assert_eq!(
+        codec_ref
+            .name()
+            .expect("cast_to_codec 経由の codec 名の取得に失敗しました"),
+        "opus"
+    );
+    let codec_parameters = codec_ref.parameters();
+    assert!(
+        codec_parameters
+            .iter()
+            .any(|(k, v)| k == "stereo" && v == "1")
+    );
+
+    // 所有型の codec でも同じパラメータを読めることを検証する。
+    let mut owned_codec = RtpCodec::new();
+    owned_codec.parameters_mut().set("stereo", "1");
+    let owned_parameters = owned_codec.parameters();
+    assert_eq!(owned_parameters.len(), 1);
+    assert!(
+        owned_parameters
+            .iter()
+            .any(|(k, v)| k == "stereo" && v == "1")
+    );
+}
+
+#[test]
+fn rtp_codec_capability_vector_get_mut() {
+    let mut vec = RtpCodecCapabilityVector::new(0);
+    let mut cap = RtpCodecCapability::new();
+    cap.set_kind(MediaType::Audio);
+    cap.set_name("opus");
+    vec.push(&cap.as_ref());
+
+    // 所有型の get_mut で取得したハンドル越しに要素を書き換えられることを確認する。
+    {
+        let mut element = vec.get_mut(0).expect("要素が存在する想定");
+        element.set_name("PCMU");
+        element.set_clock_rate(Some(8_000));
+        assert_eq!(
+            element.name().expect("codec 名の取得に失敗しました"),
+            "PCMU"
+        );
+    }
+    // 書き換えがベクタ本体に反映されていることを確認する。
+    {
+        let element = vec.get(0).expect("要素が存在する想定");
+        assert_eq!(
+            element.name().expect("codec 名の取得に失敗しました"),
+            "PCMU"
+        );
+        assert_eq!(element.clock_rate(), Some(8_000));
+    }
+
+    // RtpCodecCapabilityVectorRefMut 経由でも同じ要素を書き換えられることを確認する。
+    {
+        let mut borrowed = vec.as_mut();
+        let mut element = borrowed.get_mut(0).expect("要素が存在する想定");
+        element.set_num_channels(Some(2));
+        assert_eq!(element.num_channels(), Some(2));
+    }
+    assert_eq!(
+        vec.get(0).expect("要素が存在する想定").num_channels(),
+        Some(2)
+    );
+
+    // 範囲外の index では None を返すことを確認する。
+    assert!(vec.get_mut(1).is_none());
+    assert!(vec.as_mut().get_mut(1).is_none());
 }
 
 #[test]
@@ -1949,8 +2564,8 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     assert!(enc.adaptive_ptime());
     assert_eq!(
         enc.scalability_mode()
-            .expect("scalability_mode が未設定でした")
-            .expect("scalability_mode の取得に失敗しました"),
+            .expect("scalability_mode の取得に失敗しました")
+            .expect("scalability_mode が未設定でした"),
         "L1T3".to_string()
     );
     let enc_codec = enc.codec().expect("codec の取得に失敗しました");
@@ -1960,13 +2575,42 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     );
     assert_eq!(enc_codec.clock_rate(), Some(48_000));
     assert_eq!(enc_codec.num_channels(), Some(2));
+
+    // codec_mut() で encoding parameters が保持する codec を直接書き換えられることを検証する。
+    {
+        let mut enc_mut = enc.as_mut();
+        let mut enc_codec_mut = enc_mut.codec_mut().expect("codec_mut の取得に失敗しました");
+        enc_codec_mut.set_num_channels(Some(1));
+        enc_codec_mut.parameters_mut().set("profile-id", "0");
+        // 可変ハンドルは読み取りアクセサも転送メソッドとして持つ。
+        assert_eq!(enc_codec_mut.parameters().len(), 1);
+        assert!(
+            enc_codec_mut
+                .as_ref()
+                .parameters()
+                .iter()
+                .any(|(k, v)| k == "profile-id" && v == "0")
+        );
+    }
+    assert_eq!(
+        enc.codec()
+            .expect("codec の取得に失敗しました")
+            .num_channels(),
+        Some(1)
+    );
+    // 書き換えたのは enc が保持するコピーだけなので、元の codec は変わらない。
+    assert_eq!(codec.num_channels(), Some(2));
     // clock_rate / num_channels を None に戻せば getter が None に戻ることを検証する
     codec.set_clock_rate(None);
     codec.set_num_channels(None);
     assert_eq!(codec.clock_rate(), None);
     assert_eq!(codec.num_channels(), None);
     enc.set_scalability_mode(None);
-    assert!(enc.scalability_mode().is_none());
+    assert!(
+        enc.scalability_mode()
+            .expect("scalability_mode の取得に失敗しました")
+            .is_none()
+    );
     enc.set_codec(None);
     assert!(enc.codec().is_none());
 
@@ -1984,9 +2628,8 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     let mut init = RtpTransceiverInit::new();
     init.set_direction(RtpTransceiverDirection::SendOnly);
     init.set_send_encodings(&vec);
-    let mut stream_ids = init.stream_ids();
-    stream_ids.push(&CxxString::from_str("stream-1"));
-    assert_eq!(stream_ids.len(), 1);
+    init.stream_ids_mut().push(&CxxString::from_str("stream-1"));
+    assert_eq!(init.stream_ids().len(), 1);
 
     let mut offer = PeerConnectionOfferAnswerOptions::new();
     offer.set_offer_to_receive_audio(1);
@@ -2001,6 +2644,32 @@ fn rtp_encoding_parameters_and_transceiver_init() {
     assert_eq!(offer.offer_to_receive_video(), 1);
     assert!(offer.voice_activity_detection());
     assert!(offer.use_rtp_mux());
+}
+
+#[test]
+fn rtp_encoding_parameters_vector_get_mut() {
+    let mut vec = RtpEncodingParametersVector::new(0);
+    let mut enc = RtpEncodingParameters::new();
+    enc.set_rid("r0");
+    vec.push(&enc);
+
+    // 所有型の get_mut で取得したハンドル越しに要素を書き換えられることを確認する。
+    // RtpEncodingParameters はフィールドが多いため、set の往復を挟まずに直接書き換える。
+    {
+        let mut element = vec.get_mut(0).expect("要素が存在する想定");
+        element.set_rid("r1");
+        element.set_max_bitrate_bps(Some(500_000));
+        assert_eq!(element.rid().expect("rid の取得に失敗しました"), "r1");
+    }
+    // 書き換えがベクタ本体に反映されていることを確認する。
+    {
+        let element = vec.get(0).expect("要素が存在する想定");
+        assert_eq!(element.rid().expect("rid の取得に失敗しました"), "r1");
+        assert_eq!(element.max_bitrate_bps(), Some(500_000));
+    }
+
+    // 範囲外の index では None を返すことを確認する。
+    assert!(vec.get_mut(1).is_none());
 }
 
 #[test]
@@ -2052,13 +2721,11 @@ fn rtp_sender_get_set_parameters() {
 
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -2107,7 +2774,288 @@ fn rtp_sender_get_set_parameters() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
+    signaling.stop();
+}
+
+#[test]
+fn rtp_and_peer_connection_refcounted_wrappers_clone() {
+    // Offer の生成完了を待つための処理。
+    struct OfferHandler {
+        tx: mpsc::Sender<Result<String>>,
+    }
+
+    impl CreateSessionDescriptionObserverHandler for OfferHandler {
+        fn on_success(&mut self, desc: SessionDescription) {
+            let _ = self.tx.send(desc.to_string());
+        }
+
+        fn on_failure(&mut self, err: RtcError) {
+            let _ = self.tx.send(Err(err.into()));
+        }
+    }
+
+    // local description の設定完了を待つための処理。
+    struct SetLocalDescriptionHandler {
+        tx: mpsc::Sender<bool>,
+    }
+
+    impl SetLocalDescriptionObserverHandler for SetLocalDescriptionHandler {
+        fn on_set_local_description_complete(&mut self, error: RtcError) {
+            let _ = self.tx.send(error.ok());
+        }
+    }
+
+    // Factory と ConnectionContext を組み立てる。
+    let dec_audio = AudioDecoderFactory::builtin();
+    let enc_audio = AudioEncoderFactory::builtin();
+    let enc_video = VideoEncoderFactory::builtin();
+    let dec_video = VideoDecoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&network);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc_audio);
+    deps_factory.set_audio_decoder_factory(&dec_audio);
+    deps_factory.set_video_encoder_factory(enc_video);
+    deps_factory.set_video_decoder_factory(dec_video);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    // PeerConnectionFactory の clone。
+    let factory_clone = factory.clone();
+    assert_eq!(
+        factory.as_ptr(),
+        factory_clone.as_ptr(),
+        "PeerConnectionFactory の clone が別の実体を指しています"
+    );
+
+    // ConnectionContext の clone。
+    let context_clone = context.clone();
+    assert_eq!(
+        context.as_ptr(),
+        context_clone.as_ptr(),
+        "ConnectionContext の clone が別の実体を指しています"
+    );
+    drop(context);
+    assert!(
+        !context_clone.default_network_manager().as_ptr().is_null(),
+        "元の ConnectionContext の drop 後に clone が使えません"
+    );
+    assert!(
+        !context_clone.default_socket_factory().as_ptr().is_null(),
+        "元の ConnectionContext の drop 後に clone が使えません"
+    );
+
+    // PeerConnection の clone。
+    let pc_config = PeerConnectionRtcConfiguration::new();
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
+    let pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
+        .expect("PeerConnection の生成に失敗しました");
+    let pc_clone = pc.clone();
+    assert_eq!(
+        pc.as_ptr(),
+        pc_clone.as_ptr(),
+        "PeerConnection の clone が別の実体を指しています"
+    );
+    drop(pc);
+
+    // MediaStreamTrack の clone。
+    let source = AdaptedVideoTrackSource::new();
+    let vts = source.cast_to_video_track_source();
+    let send_track = factory
+        .create_video_track(&vts, "video-track-clone-send")
+        .expect("VideoTrack の生成に失敗しました");
+    let recv_track = factory
+        .create_video_track(&vts, "video-track-clone-recv")
+        .expect("VideoTrack の生成に失敗しました");
+    let stream_track = send_track.cast_to_media_stream_track();
+    let stream_track_clone = stream_track.clone();
+    assert_eq!(
+        stream_track.as_refcounted_ptr(),
+        stream_track_clone.as_refcounted_ptr(),
+        "MediaStreamTrack の clone が別の実体を指しています"
+    );
+    // clone 経由の操作が元のハンドルから見えることを確認する。
+    assert!(
+        stream_track_clone.set_enabled(false),
+        "clone した MediaStreamTrack の set_enabled が失敗しました"
+    );
+    assert!(
+        !stream_track.enabled(),
+        "clone 経由の set_enabled が元の MediaStreamTrack に反映されていません"
+    );
+    drop(stream_track);
+    assert!(
+        !stream_track_clone.enabled(),
+        "元の MediaStreamTrack の drop 後に clone が使えません"
+    );
+
+    // 元の PeerConnectionFactory を drop しても、clone で media stream を生成できることを確認する。
+    drop(factory);
+    let stream = factory_clone
+        .create_local_media_stream("stream-clone")
+        .expect("CreateLocalMediaStream が失敗しました");
+    assert_eq!(
+        stream.id().expect("MediaStream の id 取得に失敗しました"),
+        "stream-clone",
+        "元の PeerConnectionFactory の drop 後に clone が使えません"
+    );
+
+    // RtpSender の clone。
+    let mut stream_ids = StringVector::new(0);
+    stream_ids.push(&CxxString::from_str("stream-clone"));
+    let sender = pc_clone
+        .add_track(&stream_track_clone, &stream_ids)
+        .expect("AddTrack が失敗しました");
+    let sender_clone = sender.clone();
+    assert_eq!(
+        sender.as_refcounted_ptr(),
+        sender_clone.as_refcounted_ptr(),
+        "RtpSender の clone が別の実体を指しています"
+    );
+    drop(sender);
+    let _ = sender_clone.get_parameters();
+
+    // RtpTransceiver と RtpReceiver の clone。
+    let mut transceiver_init = RtpTransceiverInit::new();
+    transceiver_init.set_direction(RtpTransceiverDirection::SendRecv);
+    let transceiver = pc_clone
+        .add_transceiver_with_track(&recv_track, &transceiver_init)
+        .expect("AddTransceiverWithTrack が失敗しました");
+    let transceiver_clone = transceiver.clone();
+    assert_eq!(
+        transceiver.as_ptr(),
+        transceiver_clone.as_ptr(),
+        "RtpTransceiver の clone が別の実体を指しています"
+    );
+    let receiver = transceiver.receiver();
+    let receiver_clone = receiver.clone();
+    // RtpReceiver は実体のポインタを取り出す公開 API を持たないため、
+    // 同じ実体を指していることを受信トラックの id の一致で確認する。
+    let track_id = receiver
+        .track()
+        .id()
+        .expect("受信トラックの id 取得に失敗しました");
+    assert_eq!(
+        receiver_clone
+            .track()
+            .id()
+            .expect("受信トラックの id 取得に失敗しました"),
+        track_id,
+        "RtpReceiver の clone が別の実体を指しています"
+    );
+    drop(receiver);
+    assert_eq!(
+        receiver_clone
+            .track()
+            .id()
+            .expect("受信トラックの id 取得に失敗しました"),
+        track_id,
+        "元の RtpReceiver の drop 後に clone が使えません"
+    );
+    drop(transceiver);
+    let _ = transceiver_clone.receiver();
+
+    // DataChannel の clone。
+    let data_channel_init = DataChannelInit::new();
+    let data_channel = pc_clone
+        .create_data_channel("dc-clone", &data_channel_init)
+        .expect("DataChannel の生成に失敗しました");
+    let data_channel_clone = data_channel.clone();
+    assert_eq!(
+        data_channel.as_ptr(),
+        data_channel_clone.as_ptr(),
+        "DataChannel の clone が別の実体を指しています"
+    );
+    drop(data_channel);
+    assert_eq!(
+        data_channel_clone
+            .label()
+            .expect("DataChannel のラベル取得に失敗しました"),
+        "dc-clone",
+        "元の DataChannel の drop 後に clone が使えません"
+    );
+
+    // DtlsTransport の clone。offer を設定して transport を生成してから mid で取得する。
+    let opts = PeerConnectionOfferAnswerOptions::new();
+    let (offer_tx, offer_rx) = mpsc::channel::<Result<String>>();
+    let mut offer_observer =
+        CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferHandler { tx: offer_tx }));
+    pc_clone.create_offer(&mut offer_observer, &opts);
+    let sdp = offer_rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("createOffer がタイムアウトしました")
+        .expect("createOffer が失敗しました");
+    let (local_tx, local_rx) = mpsc::channel::<bool>();
+    let local_observer =
+        SetLocalDescriptionObserver::new_with_handler(Box::new(SetLocalDescriptionHandler {
+            tx: local_tx,
+        }));
+    let local_description =
+        SessionDescription::new(SdpType::Offer, &sdp).expect("Offer の組み立てに失敗しました");
+    pc_clone.set_local_description(local_description, &local_observer);
+    assert!(
+        local_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("setLocalDescription がタイムアウトしました"),
+        "setLocalDescription が失敗しました"
+    );
+    let dtls_transport = pc_clone
+        .lookup_dtls_transport_by_mid("0")
+        .expect("DtlsTransport の取得に失敗しました");
+    let dtls_state = dtls_transport.state();
+    let dtls_transport_clone = dtls_transport.clone();
+    assert_eq!(
+        dtls_transport_clone.state(),
+        dtls_state,
+        "DtlsTransport の clone が別の実体を指しています"
+    );
+    drop(dtls_transport);
+    assert_eq!(
+        dtls_transport_clone.state(),
+        dtls_state,
+        "元の DtlsTransport の drop 後に clone が使えません"
+    );
+    let dtls_observer = DtlsTransportObserver::new_with_handler(Box::new(NoopHandler));
+    dtls_transport_clone.register_observer(&dtls_observer);
+    dtls_transport_clone.unregister_observer();
+
+    // webrtc オブジェクトを先に解放してからスレッドを停止する。
+    drop(dtls_observer);
+    drop(dtls_transport_clone);
+    drop(data_channel_clone);
+    drop(data_channel_init);
+    drop(receiver_clone);
+    drop(transceiver_clone);
+    drop(sender_clone);
+    drop(stream_ids);
+    drop(stream);
+    drop(stream_track_clone);
+    drop(recv_track);
+    drop(send_track);
+    drop(vts);
+    drop(source);
+    drop(local_observer);
+    drop(offer_observer);
+    drop(context_clone);
+    drop(pc_clone);
+    drop(observer);
+    drop(factory_clone);
+    drop(adm);
+    drop(env);
+    network.stop();
     signaling.stop();
 }
 
@@ -2119,13 +3067,11 @@ fn peer_connection_create_and_transceiver() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -2151,7 +3097,500 @@ fn peer_connection_create_and_transceiver() {
     drop(pc);
     drop(factory);
     network.stop();
-    worker.stop();
+    signaling.stop();
+}
+
+#[test]
+fn rtp_receiver_stream_ids() {
+    // 受信側の on_track で渡される送受信器から、送信側が付けた Stream ID 群が返ることを確認する。
+    struct TrackHandler {
+        tx: mpsc::Sender<Vec<String>>,
+    }
+
+    impl PeerConnectionObserverHandler for TrackHandler {
+        fn on_track(&mut self, transceiver: RtpTransceiver) {
+            let ids = transceiver.receiver().stream_ids();
+            let mut out = Vec::new();
+            for i in 0..ids.len() {
+                out.push(ids.get(i).expect("Stream ID の取得に失敗しました"));
+            }
+            let _ = self.tx.send(out);
+        }
+    }
+
+    // Offer 生成の完了を待つための処理。
+    struct OfferHandler {
+        tx: mpsc::Sender<Result<String>>,
+    }
+
+    impl CreateSessionDescriptionObserverHandler for OfferHandler {
+        fn on_success(&mut self, desc: SessionDescription) {
+            let _ = self.tx.send(desc.to_string());
+        }
+
+        fn on_failure(&mut self, err: RtcError) {
+            let _ = self.tx.send(Err(err.into()));
+        }
+    }
+
+    // Offer / Answer の設定完了を待つための処理。
+    struct SetDescriptionHandler {
+        tx: mpsc::Sender<bool>,
+    }
+
+    impl SetLocalDescriptionObserverHandler for SetDescriptionHandler {
+        fn on_set_local_description_complete(&mut self, error: RtcError) {
+            let _ = self.tx.send(error.ok());
+        }
+    }
+
+    impl SetRemoteDescriptionObserverHandler for SetDescriptionHandler {
+        fn on_set_remote_description_complete(&mut self, error: RtcError) {
+            let _ = self.tx.send(error.ok());
+        }
+    }
+
+    // Factory を組み立てる。
+    let dec_audio = AudioDecoderFactory::builtin();
+    let enc_audio = AudioEncoderFactory::builtin();
+    let enc_video = VideoEncoderFactory::builtin();
+    let dec_video = VideoDecoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&network);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc_audio);
+    deps_factory.set_audio_decoder_factory(&dec_audio);
+    deps_factory.set_video_encoder_factory(enc_video);
+    deps_factory.set_video_decoder_factory(dec_video);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    // 送信側の PeerConnection を生成し、映像トラックを 2 件追加する。
+    // 1 件目には Stream ID を 1 件付け、2 件目には付けず、空の場合の振る舞いも確認する。
+    let pc_config = PeerConnectionRtcConfiguration::new();
+    let offer_observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
+    let offer_deps = PeerConnectionDependencies::new(&offer_observer);
+    let offer_pc = PeerConnection::create(&factory, &pc_config, offer_deps)
+        .expect("PeerConnection の生成に失敗しました");
+    let source = AdaptedVideoTrackSource::new();
+    let vts = source.cast_to_video_track_source();
+    let track = factory
+        .create_video_track(&vts, "video-track-1")
+        .expect("VideoTrack の生成に失敗しました");
+    let stream_track = track.cast_to_media_stream_track();
+    let mut offer_stream_ids = StringVector::new(0);
+    offer_stream_ids.push(&CxxString::from_str("loopback-stream"));
+    offer_pc
+        .add_track(&stream_track, &offer_stream_ids)
+        .expect("AddTrack が失敗しました");
+    let empty_track = factory
+        .create_video_track(&vts, "video-track-2")
+        .expect("VideoTrack の生成に失敗しました");
+    let empty_stream_track = empty_track.cast_to_media_stream_track();
+    let empty_stream_ids = StringVector::new(0);
+    offer_pc
+        .add_track(&empty_stream_track, &empty_stream_ids)
+        .expect("AddTrack が失敗しました");
+
+    // 受信側の PeerConnection を生成する。on_track 到達時の Stream ID 群を受け取る。
+    let (track_tx, track_rx) = mpsc::channel::<Vec<String>>();
+    let answer_observer =
+        PeerConnectionObserver::new_with_handler(Box::new(TrackHandler { tx: track_tx }));
+    let answer_deps = PeerConnectionDependencies::new(&answer_observer);
+    let answer_pc = PeerConnection::create(&factory, &pc_config, answer_deps)
+        .expect("PeerConnection の生成に失敗しました");
+
+    // 送信側で Offer を生成する。
+    let opts = PeerConnectionOfferAnswerOptions::new();
+    let (offer_tx, offer_rx) = mpsc::channel::<Result<String>>();
+    let mut offer_obs =
+        CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferHandler { tx: offer_tx }));
+    offer_pc.create_offer(&mut offer_obs, &opts);
+    let sdp = offer_rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("createOffer がタイムアウトしました")
+        .expect("createOffer が失敗しました");
+
+    // 送信側に Offer を設定する。
+    let (local_tx, local_rx) = mpsc::channel::<bool>();
+    let local_obs =
+        SetLocalDescriptionObserver::new_with_handler(Box::new(SetDescriptionHandler {
+            tx: local_tx,
+        }));
+    let local_desc =
+        SessionDescription::new(SdpType::Offer, &sdp).expect("Offer の組み立てに失敗しました");
+    offer_pc.set_local_description(local_desc, &local_obs);
+    assert!(
+        local_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("setLocalDescription がタイムアウトしました"),
+        "setLocalDescription が失敗しました"
+    );
+
+    // 受信側に Offer を設定し、on_track で届く 2 件の Stream ID 群を確認する。
+    // 到達順は問わないため、両方受け取ってから並べ替えて比較する。
+    let (remote_tx, remote_rx) = mpsc::channel::<bool>();
+    let remote_obs =
+        SetRemoteDescriptionObserver::new_with_handler(Box::new(SetDescriptionHandler {
+            tx: remote_tx,
+        }));
+    let remote_desc =
+        SessionDescription::new(SdpType::Offer, &sdp).expect("Offer の組み立てに失敗しました");
+    answer_pc.set_remote_description(remote_desc, &remote_obs);
+    assert!(
+        remote_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("setRemoteDescription がタイムアウトしました"),
+        "setRemoteDescription が失敗しました"
+    );
+    let mut received = Vec::new();
+    for _ in 0..2 {
+        received.push(
+            track_rx
+                .recv_timeout(Duration::from_secs(10))
+                .expect("on_track がタイムアウトしました"),
+        );
+    }
+    received.sort();
+    assert_eq!(
+        received,
+        vec![Vec::<String>::new(), vec!["loopback-stream".to_string()]]
+    );
+
+    drop(offer_obs);
+    drop(local_obs);
+    drop(remote_obs);
+    drop(offer_pc);
+    drop(answer_pc);
+    drop(empty_stream_track);
+    drop(empty_track);
+    drop(stream_track);
+    drop(track);
+    drop(vts);
+    drop(source);
+    drop(factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    signaling.stop();
+}
+
+#[test]
+fn signaling_state_from_int_and_to_int() {
+    // C 側の定数と Rust 側の値が双方向に対応していることを確認する。
+    let cases = [
+        (
+            unsafe { ffi::webrtc_PeerConnectionInterface_SignalingState_kStable },
+            SignalingState::Stable,
+        ),
+        (
+            unsafe { ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveLocalOffer },
+            SignalingState::HaveLocalOffer,
+        ),
+        (
+            unsafe { ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveRemoteOffer },
+            SignalingState::HaveRemoteOffer,
+        ),
+        (
+            unsafe { ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveLocalPranswer },
+            SignalingState::HaveLocalPranswer,
+        ),
+        (
+            unsafe { ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveRemotePranswer },
+            SignalingState::HaveRemotePranswer,
+        ),
+        (
+            unsafe { ffi::webrtc_PeerConnectionInterface_SignalingState_kClosed },
+            SignalingState::Closed,
+        ),
+    ];
+    for (value, expected) in cases {
+        assert_eq!(
+            SignalingState::from_int(value),
+            expected,
+            "SignalingState の from_int が定数に対応していません"
+        );
+        assert_eq!(
+            expected.to_int(),
+            value,
+            "SignalingState の to_int が定数に対応していません"
+        );
+    }
+
+    // 未知の値は Unknown として保持され、そのまま戻る。
+    assert_eq!(SignalingState::from_int(999), SignalingState::Unknown(999));
+    assert_eq!(SignalingState::Unknown(999).to_int(), 999);
+}
+
+#[test]
+fn signaling_state_change_is_observed() {
+    // SignalingState の変化が observer へ届くことを確認する。
+    struct SignalingHandler {
+        tx: mpsc::Sender<SignalingState>,
+    }
+
+    impl PeerConnectionObserverHandler for SignalingHandler {
+        fn on_signaling_change(&mut self, new_state: SignalingState) {
+            let _ = self.tx.send(new_state);
+        }
+    }
+
+    // Offer / Answer 生成の完了を待つための処理。
+    struct OfferAnswerHandler {
+        tx: mpsc::Sender<Result<String>>,
+    }
+
+    impl CreateSessionDescriptionObserverHandler for OfferAnswerHandler {
+        fn on_success(&mut self, desc: SessionDescription) {
+            let _ = self.tx.send(desc.to_string());
+        }
+
+        fn on_failure(&mut self, err: RtcError) {
+            let _ = self.tx.send(Err(err.into()));
+        }
+    }
+
+    // Offer / Answer の設定完了を待つための処理。
+    struct SetDescriptionHandler {
+        tx: mpsc::Sender<bool>,
+    }
+
+    impl SetLocalDescriptionObserverHandler for SetDescriptionHandler {
+        fn on_set_local_description_complete(&mut self, error: RtcError) {
+            let _ = self.tx.send(error.ok());
+        }
+    }
+
+    impl SetRemoteDescriptionObserverHandler for SetDescriptionHandler {
+        fn on_set_remote_description_complete(&mut self, error: RtcError) {
+            let _ = self.tx.send(error.ok());
+        }
+    }
+
+    // Factory を組み立てる。
+    let dec_audio = AudioDecoderFactory::builtin();
+    let enc_audio = AudioEncoderFactory::builtin();
+    let enc_video = VideoEncoderFactory::builtin();
+    let dec_video = VideoDecoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&network);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc_audio);
+    deps_factory.set_audio_decoder_factory(&dec_audio);
+    deps_factory.set_video_encoder_factory(enc_video);
+    deps_factory.set_video_decoder_factory(dec_video);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    // 送信側と受信側の PeerConnection を生成する。
+    let pc_config = PeerConnectionRtcConfiguration::new();
+    let (offer_tx, offer_rx) = mpsc::channel::<SignalingState>();
+    let offer_observer =
+        PeerConnectionObserver::new_with_handler(Box::new(SignalingHandler { tx: offer_tx }));
+    let offer_deps = PeerConnectionDependencies::new(&offer_observer);
+    let offer_pc = PeerConnection::create(&factory, &pc_config, offer_deps)
+        .expect("PeerConnection の生成に失敗しました");
+    let (answer_tx, answer_rx) = mpsc::channel::<SignalingState>();
+    let answer_observer =
+        PeerConnectionObserver::new_with_handler(Box::new(SignalingHandler { tx: answer_tx }));
+    let answer_deps = PeerConnectionDependencies::new(&answer_observer);
+    let answer_pc = PeerConnection::create(&factory, &pc_config, answer_deps)
+        .expect("PeerConnection の生成に失敗しました");
+
+    // 送信側で Offer を生成して設定し、HaveLocalOffer になることを確認する。
+    let opts = PeerConnectionOfferAnswerOptions::new();
+    let (offer_desc_tx, offer_desc_rx) = mpsc::channel::<Result<String>>();
+    let mut offer_desc_obs =
+        CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferAnswerHandler {
+            tx: offer_desc_tx,
+        }));
+    offer_pc.create_offer(&mut offer_desc_obs, &opts);
+    let sdp = offer_desc_rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("createOffer がタイムアウトしました")
+        .expect("createOffer が失敗しました");
+
+    let (local_tx, local_rx) = mpsc::channel::<bool>();
+    let local_obs =
+        SetLocalDescriptionObserver::new_with_handler(Box::new(SetDescriptionHandler {
+            tx: local_tx,
+        }));
+    let local_desc =
+        SessionDescription::new(SdpType::Offer, &sdp).expect("Offer の組み立てに失敗しました");
+    offer_pc.set_local_description(local_desc, &local_obs);
+    assert!(
+        local_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("setLocalDescription がタイムアウトしました"),
+        "setLocalDescription が失敗しました"
+    );
+    assert_eq!(
+        offer_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("on_signaling_change (HaveLocalOffer) がタイムアウトしました"),
+        SignalingState::HaveLocalOffer,
+        "setLocalDescription(offer) 後の SignalingState が HaveLocalOffer ではありません"
+    );
+
+    // 受信側に Offer を設定し、HaveRemoteOffer になることを確認する。
+    let (remote_tx, remote_rx) = mpsc::channel::<bool>();
+    let remote_obs =
+        SetRemoteDescriptionObserver::new_with_handler(Box::new(SetDescriptionHandler {
+            tx: remote_tx,
+        }));
+    let remote_desc =
+        SessionDescription::new(SdpType::Offer, &sdp).expect("Offer の組み立てに失敗しました");
+    answer_pc.set_remote_description(remote_desc, &remote_obs);
+    assert!(
+        remote_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("setRemoteDescription がタイムアウトしました"),
+        "setRemoteDescription が失敗しました"
+    );
+    assert_eq!(
+        answer_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("on_signaling_change (HaveRemoteOffer) がタイムアウトしました"),
+        SignalingState::HaveRemoteOffer,
+        "setRemoteDescription(offer) 後の SignalingState が HaveRemoteOffer ではありません"
+    );
+
+    // 受信側で Answer を生成して設定し、Stable に戻ることを確認する。
+    let (answer_desc_tx, answer_desc_rx) = mpsc::channel::<Result<String>>();
+    let mut answer_desc_obs =
+        CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferAnswerHandler {
+            tx: answer_desc_tx,
+        }));
+    answer_pc.create_answer(&mut answer_desc_obs, &opts);
+    let answer_sdp = answer_desc_rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("createAnswer がタイムアウトしました")
+        .expect("createAnswer が失敗しました");
+
+    let (answer_local_tx, answer_local_rx) = mpsc::channel::<bool>();
+    let answer_local_obs =
+        SetLocalDescriptionObserver::new_with_handler(Box::new(SetDescriptionHandler {
+            tx: answer_local_tx,
+        }));
+    let answer_local_desc = SessionDescription::new(SdpType::Answer, &answer_sdp)
+        .expect("Answer の組み立てに失敗しました");
+    answer_pc.set_local_description(answer_local_desc, &answer_local_obs);
+    assert!(
+        answer_local_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("setLocalDescription がタイムアウトしました"),
+        "setLocalDescription が失敗しました"
+    );
+    assert_eq!(
+        answer_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("on_signaling_change (Stable) がタイムアウトしました"),
+        SignalingState::Stable,
+        "setLocalDescription(answer) 後の SignalingState が Stable ではありません"
+    );
+
+    drop(answer_local_obs);
+    drop(answer_desc_obs);
+    drop(remote_obs);
+    drop(local_obs);
+    drop(offer_desc_obs);
+    drop(answer_pc);
+    drop(offer_pc);
+    drop(factory);
+    drop(adm);
+    drop(env);
+    network.stop();
+    signaling.stop();
+}
+
+#[test]
+fn media_stream_track_state() {
+    // 整数と列挙の対応を確認する。C 側の定数との対応が崩れていないことも見る。
+    assert_eq!(
+        MediaStreamTrackState::from_int(unsafe {
+            ffi::webrtc_MediaStreamTrackInterface_TrackState_kLive
+        }),
+        MediaStreamTrackState::Live
+    );
+    assert_eq!(
+        MediaStreamTrackState::from_int(unsafe {
+            ffi::webrtc_MediaStreamTrackInterface_TrackState_kEnded
+        }),
+        MediaStreamTrackState::Ended
+    );
+    assert_eq!(
+        MediaStreamTrackState::from_int(999),
+        MediaStreamTrackState::Unknown(999)
+    );
+
+    // Factory を組み立てる。
+    let dec_audio = AudioDecoderFactory::builtin();
+    let enc_audio = AudioEncoderFactory::builtin();
+    let enc_video = VideoEncoderFactory::builtin();
+    let dec_video = VideoDecoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&network);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc_audio);
+    deps_factory.set_audio_decoder_factory(&dec_audio);
+    deps_factory.set_video_encoder_factory(enc_video);
+    deps_factory.set_video_decoder_factory(dec_video);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    // 生成直後の映像トラックが生きた状態であることを確認する。
+    let source = AdaptedVideoTrackSource::new();
+    let vts = source.cast_to_video_track_source();
+    let track = factory
+        .create_video_track(&vts, "video-track-state")
+        .expect("VideoTrack の生成に失敗しました");
+    let stream_track = track.cast_to_media_stream_track();
+    assert_eq!(stream_track.state(), MediaStreamTrackState::Live);
+
+    drop(stream_track);
+    drop(track);
+    drop(vts);
+    drop(source);
+    drop(factory);
+    drop(adm);
+    drop(env);
+    network.stop();
     signaling.stop();
 }
 
@@ -2162,13 +3601,11 @@ fn peer_connection_lookup_dtls_transport() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -2203,7 +3640,6 @@ fn peer_connection_lookup_dtls_transport() {
     drop(pc);
     drop(factory);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -2214,13 +3650,11 @@ fn get_stats_delivers_report() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -2251,7 +3685,6 @@ fn get_stats_delivers_report() {
     drop(pc);
     drop(factory);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -2262,13 +3695,11 @@ fn peer_connection_create_with_proxy_allocator() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -2306,7 +3737,6 @@ fn peer_connection_create_with_proxy_allocator() {
     drop(context);
     drop(factory);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -2320,13 +3750,11 @@ fn video_track_and_transceiver_with_track() {
 
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -2377,7 +3805,6 @@ fn video_track_and_transceiver_with_track() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -2475,13 +3902,11 @@ fn always_negotiate_data_channels_adds_data_section() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -2515,8 +3940,94 @@ fn always_negotiate_data_channels_adds_data_section() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
     signaling.stop();
+}
+
+// フィールドトライアルを設定した Environment が PeerConnectionFactory を経由して
+// PeerConnection の offer SDP 生成まで届くことを確認する。
+#[test]
+fn field_trials_reach_offer_sdp() {
+    struct OfferHandler {
+        tx: mpsc::Sender<Result<String>>,
+    }
+
+    impl CreateSessionDescriptionObserverHandler for OfferHandler {
+        fn on_success(&mut self, desc: SessionDescription) {
+            let sdp = desc.to_string();
+            let _ = self.tx.send(sdp);
+        }
+
+        fn on_failure(&mut self, err: RtcError) {
+            let _ = self.tx.send(Err(err.into()));
+        }
+    }
+
+    // 音声の m= セクションが含まれる offer SDP を生成する。
+    // コーデックが並ばないと a=rtcp-fb が出力されないため、音声のエンコーダー /
+    // デコーダーファクトリを設定しておく。
+    fn create_offer_sdp(env: &Environment) -> String {
+        let enc = AudioEncoderFactory::builtin();
+        let dec = AudioDecoderFactory::builtin();
+        let apb = AudioProcessingBuilder::new_builtin();
+        let mut deps_factory = PeerConnectionFactoryDependencies::new();
+        let mut network = Thread::new();
+        let mut signaling = Thread::new();
+        network.start();
+        signaling.start();
+        deps_factory.set_network_thread(&network);
+        deps_factory.set_worker_thread(&network);
+        deps_factory.set_signaling_thread(&signaling);
+        deps_factory.set_audio_encoder_factory(&enc);
+        deps_factory.set_audio_decoder_factory(&dec);
+        deps_factory.set_audio_processing_builder(apb);
+        let adm = AudioDeviceModule::new(env, AudioDeviceModuleAudioLayer::Dummy)
+            .expect("AudioDeviceModule の生成に失敗しました");
+        deps_factory.set_audio_device_module(&adm);
+        // フィールドトライアルを持つ Environment をファクトリに設定する
+        deps_factory.set_env(Some(env.clone()));
+        deps_factory.enable_media();
+        let factory = PeerConnectionFactory::create_modular(deps_factory)
+            .expect("PeerConnectionFactory の生成に失敗しました");
+
+        let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
+        let pc_deps = PeerConnectionDependencies::new(&observer);
+        let pc_config = PeerConnectionRtcConfiguration::new();
+        let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
+            .expect("PeerConnection の生成に失敗しました");
+        let init = RtpTransceiverInit::new();
+        pc.add_transceiver(MediaType::Audio, &init)
+            .expect("AddTransceiver に失敗しました");
+
+        let opts = PeerConnectionOfferAnswerOptions::new();
+        let (tx, rx) = mpsc::channel::<Result<String>>();
+        let mut obs =
+            CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferHandler { tx }));
+        pc.create_offer(&mut obs, &opts);
+        rx.recv_timeout(Duration::from_secs(5))
+            .expect("createOffer がタイムアウトしました")
+            .expect("createOffer が失敗しました")
+    }
+
+    // RFC 8888 の輻輳制御フィードバックを offer するフィールドトライアルを有効にする
+    let mut env_factory = EnvironmentFactory::new();
+    env_factory.set_field_trials(
+        FieldTrials::new("WebRTC-RFC8888CongestionControlFeedback/Enabled,offer:true/")
+            .expect("FieldTrials の生成に失敗しました"),
+    );
+    let env = env_factory.create();
+    let sdp_on = create_offer_sdp(&env);
+    assert!(
+        sdp_on.contains("ack ccfb"),
+        "フィールドトライアルが offer SDP に反映されていません: {sdp_on}"
+    );
+
+    // 対照実験: フィールドトライアルを指定していない Environment では ack ccfb は入らない
+    let default_env = Environment::new();
+    let sdp_off = create_offer_sdp(&default_env);
+    assert!(
+        !sdp_off.contains("ack ccfb"),
+        "既定の Environment で ack ccfb が入っています: {sdp_off}"
+    );
 }
 
 // VideoEncoderFactory でカスタムエンコーダーを登録して encode を呼び、
@@ -2625,18 +4136,18 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
             info.set_has_trusted_rate_controller(true);
             info.set_is_hardware_accelerated(true);
 
-            if let Some(mut fps0) = info.fps_allocation(0) {
+            if let Some(mut fps0) = info.fps_allocation_mut(0) {
                 fps0.clear();
                 fps0.push(128);
                 fps0.push(255);
             } else {
-                panic!("fps_allocation(0) が取得できません");
+                panic!("fps_allocation_mut(0) が取得できません");
             }
-            if let Some(mut fps1) = info.fps_allocation(1) {
+            if let Some(mut fps1) = info.fps_allocation_mut(1) {
                 fps1.clear();
                 fps1.push(64);
             } else {
-                panic!("fps_allocation(1) が取得できません");
+                panic!("fps_allocation_mut(1) が取得できません");
             }
 
             let limits0 =
@@ -2644,7 +4155,7 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
             let limits1 =
                 VideoEncoderResolutionBitrateLimits::new(1280 * 720, 300000, 200000, 1500000);
             {
-                let mut limits = info.resolution_bitrate_limits();
+                let mut limits = info.resolution_bitrate_limits_mut();
                 limits.clear();
                 limits.push(&limits0);
                 limits.push(&limits1);
@@ -2652,7 +4163,7 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
 
             info.set_supports_simulcast(true);
             {
-                let mut preferred = info.preferred_pixel_formats();
+                let mut preferred = info.preferred_pixel_formats_mut();
                 preferred.clear();
                 preferred.push(VideoFrameBufferKind::I420);
                 preferred.push(VideoFrameBufferKind::Nv12);
@@ -2688,8 +4199,8 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
     assert_eq!(scaling.min_pixels_per_frame(), 12345);
 
     let mut fps0 = info
-        .fps_allocation(0)
-        .expect("fps_allocation(0) が None です");
+        .fps_allocation_mut(0)
+        .expect("fps_allocation_mut(0) が None です");
     assert_eq!(fps0.len(), 2);
     assert_eq!(fps0.get(0), Some(128));
     assert_eq!(fps0.get(1), Some(255));
@@ -2703,7 +4214,7 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
     assert_eq!(fps1.get(0), Some(64));
 
     {
-        let mut limits = info.resolution_bitrate_limits();
+        let mut limits = info.resolution_bitrate_limits_mut();
         assert_eq!(limits.len(), 2);
         let limits0 = limits
             .get(0)
@@ -2728,7 +4239,7 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
         assert_eq!(limits1.max_bitrate_bps(), 2500000);
     }
 
-    let mut preferred = info.preferred_pixel_formats();
+    let mut preferred = info.preferred_pixel_formats_mut();
     assert_eq!(preferred.len(), 2);
     assert_eq!(preferred.get(0), Some(VideoFrameBufferKind::I420));
     assert_eq!(preferred.get(1), Some(VideoFrameBufferKind::Nv12));
@@ -2773,6 +4284,42 @@ fn custom_video_encoder_get_encoder_info_roundtrip_all_fields() {
 }
 
 #[test]
+fn video_encoder_resolution_bitrate_limits_vector_get_mut() {
+    let mut info = VideoEncoderEncoderInfo::new();
+    {
+        let mut limits = info.resolution_bitrate_limits_mut();
+        limits.clear();
+        limits.push(&VideoEncoderResolutionBitrateLimits::new(
+            640 * 360,
+            100_000,
+            80_000,
+            500_000,
+        ));
+    }
+
+    // VideoEncoderResolutionBitrateLimitsVectorRefMut の get_mut で取得したハンドル越しに
+    // 要素を書き換えられることを確認する。
+    {
+        let mut limits = info.resolution_bitrate_limits_mut();
+        let mut element = limits.get_mut(0).expect("要素が存在する想定");
+        element.set_max_bitrate_bps(600_000);
+        element.set_min_bitrate_bps(90_000);
+        assert_eq!(element.max_bitrate_bps(), 600_000);
+        assert_eq!(element.min_bitrate_bps(), 90_000);
+
+        // 範囲外の index では None を返すことを確認する。
+        assert!(limits.get_mut(1).is_none());
+    }
+    // 書き換えが所有型に反映されていることを確認する。
+    {
+        let limits = info.resolution_bitrate_limits();
+        let element = limits.get(0).expect("要素が存在する想定");
+        assert_eq!(element.max_bitrate_bps(), 600_000);
+        assert_eq!(element.min_bitrate_bps(), 90_000);
+    }
+}
+
+#[test]
 fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
     struct TestVideoEncoderFactoryHandler;
     impl VideoEncoderFactoryHandler for TestVideoEncoderFactoryHandler {
@@ -2794,7 +4341,7 @@ fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
     }
 
     let factory = VideoEncoderFactory::new_with_handler(Box::new(TestVideoEncoderFactoryHandler));
-    let mut formats = factory.get_supported_formats();
+    let formats = factory.get_supported_formats();
     assert_eq!(formats.len(), 2);
     assert_eq!(
         formats[0].name().expect("name の取得に失敗しました"),
@@ -2803,9 +4350,10 @@ fn video_encoder_factory_get_supported_formats_returns_owned_formats() {
     assert_eq!(formats[1].name().expect("name の取得に失敗しました"), "VP8");
 
     let params: std::collections::HashMap<String, String> = formats
-        .get_mut(0)
+        .first()
         .expect("先頭フォーマットが存在しません")
-        .parameters_mut()
+        .as_ref()
+        .parameters()
         .iter()
         .collect();
     assert_eq!(
@@ -3006,16 +4554,17 @@ fn video_decoder_factory_get_supported_formats_returns_owned_formats() {
     }
 
     let factory = VideoDecoderFactory::new_with_handler(Box::new(TestVideoDecoderFactoryHandler));
-    let mut formats = factory.get_supported_formats();
+    let formats = factory.get_supported_formats();
     assert_eq!(formats.len(), 1);
     assert_eq!(
         formats[0].name().expect("name の取得に失敗しました"),
         "H264"
     );
     let params: std::collections::HashMap<String, String> = formats
-        .get_mut(0)
+        .first()
         .expect("先頭フォーマットが存在しません")
-        .parameters_mut()
+        .as_ref()
+        .parameters()
         .iter()
         .collect();
     assert_eq!(
@@ -3131,14 +4680,14 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     impl VideoEncoderHandler for TestVideoEncoderHandler {
         fn register_encode_complete_callback(
             &mut self,
-            callback: Option<VideoEncoderEncodedImageCallbackRef<'_>>,
+            callback: Option<VideoEncoderEncodedImageCallbackRefMut<'_>>,
         ) -> VideoCodecStatus {
             let callback = callback.expect("register 側 callback が None です");
             let state = unsafe { self.state_ptr.get_mut() };
             state.register_called = true;
             state.order.push("register");
             state.callback_ptr =
-                Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_ref(callback) });
+                Some(unsafe { VideoEncoderEncodedImageCallbackPtr::from_mut(&callback) });
             VideoCodecStatus::Ok
         }
 
@@ -3234,12 +4783,12 @@ fn custom_video_encoder_register_and_encode_calls_encoded_image_and_codec_specif
     let state_ptr = StatePtr((&mut *state) as *mut State);
     let mut encoder =
         VideoEncoder::new_with_handler(Box::new(TestVideoEncoderHandler { state_ptr }));
-    let encoded_image_callback = VideoEncoderEncodedImageCallback::new_with_handler(Box::new(
+    let mut encoded_image_callback = VideoEncoderEncodedImageCallback::new_with_handler(Box::new(
         TestEncodedImageCallbackHandler { state_ptr },
     ));
 
     assert_eq!(
-        encoder.register_encode_complete_callback(Some(encoded_image_callback.as_ref())),
+        encoder.register_encode_complete_callback(Some(encoded_image_callback.as_mut())),
         VideoCodecStatus::Ok
     );
 
@@ -3386,10 +4935,8 @@ fn video_decoder_handler_register_decode_complete_callback_accepts_none_and_some
         handler.register_decode_complete_callback(None),
         VideoCodecStatus::Ok
     );
-    let dummy_callback = unsafe {
-        // このテストでは callback を呼び出さず Option::Some 経路だけを確認する。
-        VideoDecoderDecodedImageCallbackPtr::from_raw(NonNull::dangling())
-    };
+    // このテストでは callback を呼び出さず Option::Some 経路だけを確認する。
+    let dummy_callback = VideoDecoderDecodedImageCallbackPtr::from_raw(NonNull::dangling());
     assert_eq!(
         handler.register_decode_complete_callback(Some(dummy_callback)),
         VideoCodecStatus::Ok
@@ -3437,13 +4984,11 @@ fn create_local_media_stream_returns_requested_id() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -3469,7 +5014,6 @@ fn create_local_media_stream_returns_requested_id() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -3482,13 +5026,11 @@ fn media_stream_track_round_trip() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -3572,7 +5114,6 @@ fn media_stream_track_round_trip() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -3625,13 +5166,11 @@ fn create_audio_source_with_audio_options() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -3659,7 +5198,6 @@ fn create_audio_source_with_audio_options() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
     signaling.stop();
 }
 
@@ -3671,13 +5209,11 @@ fn create_audio_source_with_default_audio_options() {
     let apb = AudioProcessingBuilder::new_builtin();
     let mut deps_factory = PeerConnectionFactoryDependencies::new();
     let mut network = Thread::new();
-    let mut worker = Thread::new();
     let mut signaling = Thread::new();
     network.start();
-    worker.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&worker);
+    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -3701,7 +5237,103 @@ fn create_audio_source_with_default_audio_options() {
     drop(adm);
     drop(env);
     network.stop();
-    worker.stop();
+    signaling.stop();
+}
+
+#[test]
+fn audio_refcounted_wrappers_clone() {
+    // 参照カウントで実体を共有する音声関連の型を複製しても、元のハンドルを drop した後に使えることを確認する。
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let dec_clone = dec.clone();
+    let enc_clone = enc.clone();
+    // 同じ実体を指していることを、実体を取り出すポインタの一致で確認する。
+    assert_eq!(
+        dec.as_ptr(),
+        dec_clone.as_ptr(),
+        "AudioDecoderFactory の clone が別の実体を指しています"
+    );
+    assert_eq!(
+        enc.as_ptr(),
+        enc_clone.as_ptr(),
+        "AudioEncoderFactory の clone が別の実体を指しています"
+    );
+
+    // 元のファクトリを drop しても、clone を使って PeerConnectionFactory を組み立てられることを確認する。
+    drop(dec);
+    drop(enc);
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut deps_factory = PeerConnectionFactoryDependencies::new();
+    let mut network = Thread::new();
+    let mut signaling = Thread::new();
+    network.start();
+    signaling.start();
+    deps_factory.set_network_thread(&network);
+    deps_factory.set_worker_thread(&network);
+    deps_factory.set_signaling_thread(&signaling);
+    deps_factory.set_audio_encoder_factory(&enc_clone);
+    deps_factory.set_audio_decoder_factory(&dec_clone);
+    deps_factory.set_audio_processing_builder(apb);
+    let env = Environment::new();
+    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
+        .expect("AudioDeviceModule の生成に失敗しました");
+    deps_factory.set_audio_device_module(&adm);
+    deps_factory.enable_media();
+    let factory = PeerConnectionFactory::create_modular(deps_factory)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    // AudioTrackSource の clone。
+    let options = AudioOptions::new();
+    let source = factory
+        .create_audio_source(&options)
+        .expect("AudioSource の生成に失敗しました");
+    let source_clone = source.clone();
+    assert_eq!(
+        source.as_ptr(),
+        source_clone.as_ptr(),
+        "AudioTrackSource の clone が別の実体を指しています"
+    );
+
+    // AudioTrack の clone。
+    let track = factory
+        .create_audio_track(&source, "audio-track-clone")
+        .expect("AudioTrack の生成に失敗しました");
+    let track_clone = track.clone();
+    assert_eq!(
+        track.as_refcounted_ptr(),
+        track_clone.as_refcounted_ptr(),
+        "AudioTrack の clone が別の実体を指しています"
+    );
+
+    // clone 経由の操作が元のハンドルから見えることを確認する。
+    assert!(
+        track_clone.cast_to_media_stream_track().set_enabled(false),
+        "clone した AudioTrack の set_enabled が失敗しました"
+    );
+    assert!(
+        !track.cast_to_media_stream_track().enabled(),
+        "clone 経由の set_enabled が元の AudioTrack に反映されていません"
+    );
+
+    // 元のハンドルを drop しても clone が使えることを確認する。
+    drop(track);
+    drop(source);
+    assert!(
+        !track_clone.cast_to_media_stream_track().enabled(),
+        "元の AudioTrack の drop 後に clone が使えません"
+    );
+    let source_after_drop = factory
+        .create_audio_track(&source_clone, "audio-track-clone-after-drop")
+        .expect("元の AudioTrackSource の drop 後に clone が使えません");
+
+    drop(source_after_drop);
+    drop(source_clone);
+    drop(track_clone);
+    drop(options);
+    drop(factory);
+    drop(adm);
+    drop(env);
+    network.stop();
     signaling.stop();
 }
 
@@ -4057,6 +5689,75 @@ fn nalu_info_vector_roundtrip() {
 }
 
 #[test]
+fn nalu_info_vector_get_mut_and_set() {
+    let mut nalu = NaluInfo::new();
+    nalu.set_type(7);
+    nalu.set_sps_id(3);
+    nalu.set_pps_id(4);
+    let mut vec = NaluInfoVector::new(0);
+    vec.push(&nalu);
+
+    // get_mut で取得したハンドル越しに要素を書き換えられることを確認する。
+    {
+        let mut element = vec.get_mut(0).expect("要素が存在する想定");
+        element.set_type(5);
+        element.set_sps_id(1);
+        element.set_pps_id(2);
+        assert_eq!(element.type_(), 5);
+        assert_eq!(element.sps_id(), 1);
+        assert_eq!(element.pps_id(), 2);
+    }
+    // 書き換えがベクタ本体に反映されていることを確認する。
+    {
+        let element = vec.get(0).expect("要素が存在する想定");
+        assert_eq!(element.type_(), 5);
+        assert_eq!(element.sps_id(), 1);
+        assert_eq!(element.pps_id(), 2);
+    }
+
+    // set で要素を丸ごと差し替えられることを確認する。
+    let mut other = NaluInfo::new();
+    other.set_type(1);
+    other.set_sps_id(-1);
+    other.set_pps_id(-1);
+    assert!(vec.set(0, &other));
+    {
+        let element = vec.get(0).expect("要素が存在する想定");
+        assert_eq!(element.type_(), 1);
+        assert_eq!(element.sps_id(), -1);
+        assert_eq!(element.pps_id(), -1);
+    }
+
+    // 範囲外の index では None / false を返すことを確認する。
+    assert!(vec.get_mut(1).is_none());
+    assert!(!vec.set(1, &other));
+}
+
+#[test]
+fn video_frame_type_vector_set() {
+    let mut vec = VideoFrameTypeVector::new(0);
+    vec.push(VideoFrameType::Key);
+    vec.push(VideoFrameType::Delta);
+
+    // 所有型の set で要素を置き換えられることを確認する。
+    assert!(vec.set(0, VideoFrameType::Empty));
+    assert_eq!(vec.get(0), Some(VideoFrameType::Empty));
+    assert_eq!(vec.get(1), Some(VideoFrameType::Delta));
+
+    // VideoFrameTypeVectorRefMut 経由でも同じ要素を置き換えられることを確認する。
+    {
+        let mut borrowed = vec.as_mut();
+        assert!(borrowed.set(1, VideoFrameType::Key));
+    }
+    assert_eq!(vec.get(0), Some(VideoFrameType::Empty));
+    assert_eq!(vec.get(1), Some(VideoFrameType::Key));
+
+    // 範囲外の index では false を返すことを確認する。
+    assert!(!vec.set(2, VideoFrameType::Key));
+    assert!(!vec.as_mut().set(2, VideoFrameType::Key));
+}
+
+#[test]
 fn rtp_video_header_h264_full_roundtrip() {
     let mut header = RTPVideoHeaderH264::new();
     header.set_nalu_type(5);
@@ -4204,7 +5905,7 @@ impl AudioEncoderHandler for TestAudioEncoderHandler {
         &mut self,
         _rtp_timestamp: u32,
         _audio: &[i16],
-        encoded: &mut BufferRef<'_>,
+        encoded: &mut BufferRefMut<'_>,
     ) -> AudioEncoderEncodedInfo {
         self.encoded = true;
         encoded.append_data(&[0x01, 0x02, 0x03]);
@@ -4241,6 +5942,8 @@ impl AudioEncoderFactoryHandler for TestAudioEncoderFactoryHandler {
     ) -> Option<AudioEncoder> {
         assert!(!env.as_ptr().is_null());
         assert_eq!(format.name().expect("名前の取得に失敗しました"), "opus");
+        // パラメータを設定していないので空になる。
+        assert!(format.parameters().is_empty());
         if self.created {
             return None;
         }
@@ -4316,7 +6019,7 @@ impl AudioEncoderHandler for TestAudioEncoderNoOutputHandler {
         &mut self,
         _rtp_timestamp: u32,
         _audio: &[i16],
-        _encoded: &mut BufferRef<'_>,
+        _encoded: &mut BufferRefMut<'_>,
     ) -> AudioEncoderEncodedInfo {
         AudioEncoderEncodedInfo::new()
     }
@@ -4341,7 +6044,8 @@ impl AudioDecoderHandler for TestAudioDecoderHandler {
         _sample_rate_hz: i32,
         decoded: &mut RawBufferWriter<'_, i16>,
     ) -> (i32, AudioSpeechType) {
-        decoded.write(&[0x1111i16; 160]);
+        // Safety: 呼び出し元が 320 サンプルを確保しており、ここでは 160 サンプルだけを書きます。
+        unsafe { decoded.write(&[0x1111i16; 160]) };
         (160, AudioSpeechType::Speech)
     }
     fn reset(&mut self) {}
@@ -4368,6 +6072,8 @@ impl AudioDecoderFactoryHandler for TestAudioDecoderFactoryHandler {
     ) -> Option<AudioDecoder> {
         assert!(!env.as_ptr().is_null());
         assert_eq!(format.name().expect("名前の取得に失敗しました"), "opus");
+        // パラメータを設定していないので空になる。
+        assert!(format.parameters().is_empty());
         if self.created {
             return None;
         }
@@ -4425,7 +6131,8 @@ impl AudioDecoderHandler for TestComfortNoiseDecoderHandler {
         _sample_rate_hz: i32,
         decoded: &mut RawBufferWriter<'_, i16>,
     ) -> (i32, AudioSpeechType) {
-        decoded.write(&[0x2222i16; 80]);
+        // Safety: 呼び出し元が 160 サンプルを確保しており、ここでは 80 サンプルだけを書きます。
+        unsafe { decoded.write(&[0x2222i16; 80]) };
         (80, AudioSpeechType::ComfortNoise)
     }
     fn reset(&mut self) {}
@@ -4477,4 +6184,25 @@ fn audio_encoder_owned_wrapper_methods() {
     encoder.on_received_rtt(10);
     encoder.on_received_target_audio_bitrate(64000);
     encoder.on_received_overhead(12);
+}
+
+#[test]
+fn encoded_image_buffer_clone() {
+    // 参照カウントで実体を共有する EncodedImageBuffer を複製しても、元のハンドルを drop した後に使えることを確認する。
+    let buffer = EncodedImageBuffer::from_bytes(&[1, 2, 3, 4]);
+    let buffer_clone = buffer.clone();
+    // 同じ実体を指していることを、中身の一致で確認する。
+    assert_eq!(
+        buffer_clone.data(),
+        buffer.data(),
+        "EncodedImageBuffer の clone が別の実体を指しています"
+    );
+
+    // 元のハンドルを drop しても clone が使えることを確認する。
+    drop(buffer);
+    assert_eq!(
+        buffer_clone.data(),
+        &[1, 2, 3, 4],
+        "元の EncodedImageBuffer の drop 後に clone が使えません"
+    );
 }

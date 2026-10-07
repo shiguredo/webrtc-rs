@@ -1,5 +1,7 @@
+use crate::const_non_null::ConstNonNull;
 use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
-use crate::helper::non_null::expect_non_null;
+use crate::helper::non_null::{expect_non_null, expect_non_null_const};
+use crate::helper::optional::set_optional_object;
 use crate::helper::out_param::{call_with_out, call_with_out_and_error, call_with_void_and_error};
 use crate::helper::ref_count::{
     AudioTrackHandle, AudioTrackSourceHandle, ConnectionContextHandle, DataChannelHandle,
@@ -10,11 +12,11 @@ use crate::helper::ref_count::{
 use crate::{
     AudioDecoderFactory, AudioDeviceModule, AudioEncoderFactory, AudioOptions,
     AudioProcessingBuilder, AudioTrack, AudioTrackSource, CxxString, DataChannel, DataChannelInit,
-    DtlsTransport, Error, IceCandidate, IceCandidateRef, MediaStream, MediaStreamTrack, MediaType,
-    RTCStatsReport, Result, RtcError, RtcEventLogFactory, RtpCapabilities, RtpReceiver, RtpSender,
-    RtpTransceiver, RtpTransceiverInit, SSLCertificateVerifier, SSLIdentity, ScopedRef,
-    SessionDescription, StringVector, Thread, VideoDecoderFactory, VideoEncoderFactory, VideoTrack,
-    VideoTrackSource, ffi,
+    DtlsTransport, Environment, Error, IceCandidate, IceCandidateRef, MediaStream,
+    MediaStreamTrack, MediaType, RTCStatsReport, Result, RtcError, RtcEventLogFactory,
+    RtpCapabilities, RtpReceiver, RtpSender, RtpTransceiver, RtpTransceiverInit,
+    SSLCertificateVerifier, SSLIdentity, ScopedRef, SessionDescription, StringVector, Thread,
+    VideoDecoderFactory, VideoEncoderFactory, VideoTrack, VideoTrackSource, ffi,
 };
 use std::marker::PhantomData;
 use std::os::raw::{c_char, c_void};
@@ -68,6 +70,19 @@ impl PeerConnectionFactoryDependencies {
                 raw.as_ptr(),
             );
         }
+    }
+
+    /// PeerConnectionFactory が使う Environment を設定する。
+    ///
+    /// 設定しない場合は既定の Environment が使われる。
+    pub fn set_env(&mut self, env: Option<Environment>) {
+        set_optional_object(
+            env,
+            |env| env.as_ptr(),
+            |has, env| unsafe {
+                ffi::webrtc_PeerConnectionFactoryDependencies_set_env(self.raw.as_ptr(), has, env)
+            },
+        );
     }
 
     pub fn set_audio_encoder_factory(&mut self, factory: &AudioEncoderFactory) {
@@ -370,6 +385,14 @@ impl PeerConnectionFactory {
     }
 }
 
+impl Clone for PeerConnectionFactory {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
+    }
+}
+
 /// webrtc::ConnectionContext のラッパー。
 pub struct ConnectionContext {
     raw_ref: ScopedRef<ConnectionContextHandle>,
@@ -390,6 +413,7 @@ impl ConnectionContext {
         self.raw_ref.as_ptr()
     }
 
+    /// default の NetworkManager を借用する。
     pub fn default_network_manager(&self) -> NetworkManagerRef<'_> {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_ConnectionContext_default_network_manager(self.as_ptr()) },
@@ -398,6 +422,7 @@ impl ConnectionContext {
         NetworkManagerRef::from_raw(raw)
     }
 
+    /// default の PacketSocketFactory を借用する。
     pub fn default_socket_factory(&self) -> PacketSocketFactoryRef<'_> {
         let raw = expect_non_null(
             unsafe { ffi::webrtc_ConnectionContext_default_socket_factory(self.as_ptr()) },
@@ -407,7 +432,29 @@ impl ConnectionContext {
     }
 }
 
+impl Clone for ConnectionContext {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
+    }
+}
+
 /// rtc::NetworkManager への借用ラッパー。
+///
+/// このライブラリでは、借用ラッパー Ref では `ConstNonNull` で保持して `#[derive(Clone, Copy)]` し、
+/// 可変借用ラッパー RefMut では [NonNull] で保持して derive しないというルールになっている。
+///
+/// しかしこの借用ラッパーは他の Ref と違い、内部ポインタを `ConstNonNull` ではなく [NonNull] で保持する。
+/// つまり書き換え可能な NetworkManager* であるにも関わらず、複数の借用を可能としている。
+/// これで問題ない理由は以下の通りである。
+///
+/// - Rust 側に可変参照を持つメソッドが存在せず、ポインタを取り出す手段しか公開していない
+/// - C++ 側のメソッドには同一スレッドからアクセスしなければならない実行時の仕様がある
+///
+/// これによって、Rust 側は複数の借用を行っても何もできず、C++ 側は常にシーケンシャルにアクセス
+/// されることが保証されている。
+/// そのため内部ポインタは NonNull だが、Rust 側としては Ref として扱うことにする。
 #[derive(Clone, Copy)]
 pub struct NetworkManagerRef<'a> {
     raw: NonNull<ffi::webrtc_NetworkManager>,
@@ -417,19 +464,26 @@ pub struct NetworkManagerRef<'a> {
 unsafe impl<'a> Send for NetworkManagerRef<'a> {}
 
 impl<'a> NetworkManagerRef<'a> {
-    pub fn from_raw(raw: NonNull<ffi::webrtc_NetworkManager>) -> Self {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_NetworkManager>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
         }
     }
 
-    pub fn as_ptr(&self) -> *mut ffi::webrtc_NetworkManager {
+    pub fn as_ptr(&self) -> *const ffi::webrtc_NetworkManager {
+        self.raw.as_ptr()
+    }
+
+    /// C API に渡すための可変ポインタ。
+    pub(crate) fn as_mut_ptr(&self) -> *mut ffi::webrtc_NetworkManager {
         self.raw.as_ptr()
     }
 }
 
 /// rtc::PacketSocketFactory への借用ラッパー。
+///
+/// 借用先の扱いは [NetworkManagerRef] と同じ。
 #[derive(Clone, Copy)]
 pub struct PacketSocketFactoryRef<'a> {
     raw: NonNull<ffi::webrtc_PacketSocketFactory>,
@@ -439,14 +493,19 @@ pub struct PacketSocketFactoryRef<'a> {
 unsafe impl<'a> Send for PacketSocketFactoryRef<'a> {}
 
 impl<'a> PacketSocketFactoryRef<'a> {
-    pub fn from_raw(raw: NonNull<ffi::webrtc_PacketSocketFactory>) -> Self {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_PacketSocketFactory>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
         }
     }
 
-    pub fn as_ptr(&self) -> *mut ffi::webrtc_PacketSocketFactory {
+    pub fn as_ptr(&self) -> *const ffi::webrtc_PacketSocketFactory {
+        self.raw.as_ptr()
+    }
+
+    /// C API に渡すための可変ポインタ。
+    pub(crate) fn as_mut_ptr(&self) -> *mut ffi::webrtc_PacketSocketFactory {
         self.raw.as_ptr()
     }
 }
@@ -486,15 +545,45 @@ impl PeerConnectionRtcConfiguration {
         }
     }
 
-    /// servers への可変参照を取得する。寿命は self に束縛される。
-    pub fn servers(&mut self) -> IceServerVectorRef<'_> {
+    /// CPU アダプテーション（負荷に応じて映像のフレームレートや解像度を自動調整する機能）が
+    /// 有効かどうかを返す。
+    pub fn cpu_adaptation(&self) -> bool {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_RTCConfiguration_cpu_adaptation(self.raw.as_ptr())
+                != 0
+        }
+    }
+
+    /// CPU アダプテーションの有効 / 無効を設定する。
+    pub fn set_cpu_adaptation(&mut self, enable: bool) {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_RTCConfiguration_set_cpu_adaptation(
+                self.raw.as_ptr(),
+                enable as i32,
+            );
+        }
+    }
+
+    /// servers の読み取り専用の借用を返す。寿命は self に束縛される。
+    pub fn servers(&self) -> IceServerVectorRef<'_> {
         let raw = expect_non_null(
             unsafe {
                 ffi::webrtc_PeerConnectionInterface_RTCConfiguration_get_servers(self.raw.as_ptr())
             },
             "webrtc_PeerConnectionInterface_RTCConfiguration_get_servers",
         );
-        IceServerVectorRef::from_raw(raw)
+        IceServerVectorRef::from_raw(ConstNonNull::from(raw))
+    }
+
+    /// servers の書き換え用の借用を返す。寿命は self に束縛される。
+    pub fn servers_mut(&mut self) -> IceServerVectorRefMut<'_> {
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_PeerConnectionInterface_RTCConfiguration_get_servers(self.raw.as_ptr())
+            },
+            "webrtc_PeerConnectionInterface_RTCConfiguration_get_servers",
+        );
+        IceServerVectorRefMut::from_raw(raw)
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_RTCConfiguration {
@@ -585,7 +674,7 @@ impl IceServer {
     }
 
     pub fn add_url(&mut self, url: &str) {
-        self.as_ref().add_url(url);
+        self.as_mut().add_url(url);
     }
 
     pub fn urls_len(&self) -> usize {
@@ -593,24 +682,28 @@ impl IceServer {
     }
 
     pub fn set_username(&mut self, username: &str) {
-        self.as_ref().set_username(username);
+        self.as_mut().set_username(username);
     }
 
     pub fn set_password(&mut self, password: &str) {
-        self.as_ref().set_password(password);
+        self.as_mut().set_password(password);
     }
 
     pub fn set_tls_cert_policy(&mut self, tls_cert_policy: TlsCertPolicy) {
-        self.as_ref().set_tls_cert_policy(tls_cert_policy);
+        self.as_mut().set_tls_cert_policy(tls_cert_policy);
     }
 
     /// TURN-TLS 接続でクライアント認証 (mTLS) に使用する SSLIdentity を設定する。
     pub fn set_tls_client_identity(&mut self, identity: SSLIdentity) {
-        self.as_ref().set_tls_client_identity(identity);
+        self.as_mut().set_tls_client_identity(identity);
     }
 
     pub fn as_ref(&self) -> IceServerRef<'_> {
-        IceServerRef::from_raw(self.raw)
+        IceServerRef::from_raw(ConstNonNull::from(self.raw))
+    }
+
+    pub fn as_mut(&mut self) -> IceServerRefMut<'_> {
+        IceServerRefMut::from_raw(self.raw)
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_IceServer {
@@ -631,22 +724,56 @@ impl Drop for IceServer {
 }
 
 /// IceServer への借用ラッパー。
+#[derive(Clone, Copy)]
 pub struct IceServerRef<'a> {
-    raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>,
-    _marker: PhantomData<&'a mut ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
+    raw: ConstNonNull<ffi::webrtc_PeerConnectionInterface_IceServer>,
+    _marker: PhantomData<&'a ffi::webrtc_PeerConnectionInterface_IceServer>,
 }
 
 unsafe impl<'a> Send for IceServerRef<'a> {}
 
 impl<'a> IceServerRef<'a> {
-    pub fn from_raw(raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>) -> Self {
+    pub(crate) fn from_raw(
+        raw: ConstNonNull<ffi::webrtc_PeerConnectionInterface_IceServer>,
+    ) -> Self {
         Self {
             raw,
             _marker: PhantomData,
         }
     }
 
-    pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_IceServer {
+    pub fn as_ptr(&self) -> *const ffi::webrtc_PeerConnectionInterface_IceServer {
+        self.raw.as_ptr()
+    }
+
+    pub fn urls_len(&self) -> usize {
+        let urls = unsafe {
+            ffi::webrtc_PeerConnectionInterface_IceServer_get_urls_const(self.raw.as_ptr())
+        };
+        let len = unsafe { ffi::std_string_vector_size(urls) };
+        len.max(0) as usize
+    }
+}
+
+/// IceServer への可変借用ラッパー。
+pub struct IceServerRefMut<'a> {
+    raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>,
+    _marker: PhantomData<&'a mut ffi::webrtc_PeerConnectionInterface_IceServer>,
+    cref: IceServerRef<'a>,
+}
+
+unsafe impl<'a> Send for IceServerRefMut<'a> {}
+
+impl<'a> IceServerRefMut<'a> {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer>) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+            cref: IceServerRef::from_raw(ConstNonNull::from(raw)),
+        }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_IceServer {
         self.raw.as_ptr()
     }
 
@@ -655,13 +782,6 @@ impl<'a> IceServerRef<'a> {
             unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_get_urls(self.raw.as_ptr()) };
         let cxx = CxxString::from_str(url);
         unsafe { ffi::std_string_vector_push_back(urls, cxx.as_ptr()) };
-    }
-
-    pub fn urls_len(&self) -> usize {
-        let urls =
-            unsafe { ffi::webrtc_PeerConnectionInterface_IceServer_get_urls(self.raw.as_ptr()) };
-        let len = unsafe { ffi::std_string_vector_size(urls) };
-        len.max(0) as usize
     }
 
     pub fn set_username(&mut self, username: &str) {
@@ -702,6 +822,13 @@ impl<'a> IceServerRef<'a> {
             );
         }
     }
+    pub fn as_ref(&self) -> IceServerRef<'_> {
+        self.cref
+    }
+
+    pub fn urls_len(&self) -> usize {
+        self.cref.urls_len()
+    }
 }
 
 /// PeerConnectionInterface::IceServer_vector の所有ラッパー。
@@ -732,8 +859,34 @@ impl IceServerVector {
         self.as_ref().get(index)
     }
 
+    /// index の要素を書き換えるための可変ハンドルを返す。
+    /// 範囲外の index では `None` を返す。
+    pub fn get_mut(&mut self, index: usize) -> Option<IceServerRefMut<'_>> {
+        if index >= self.len() {
+            return None;
+        }
+        // 返すハンドルのライフタイムを self の可変借用に縛るため、
+        // as_mut() の戻り値 (一時値) には委譲せず、ここでハンドルを組み立てる。
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceServer_vector_get(
+                    self.raw.as_ptr(),
+                    index as i32,
+                )
+            },
+            "webrtc_PeerConnectionInterface_IceServer_vector_get",
+        );
+        Some(IceServerRefMut::from_raw(raw))
+    }
+
+    /// index の要素を server で置き換える。
+    /// 範囲外の index では `false` を返す。
+    pub fn set(&mut self, index: usize, server: &IceServer) -> bool {
+        self.as_mut().set(index, server)
+    }
+
     pub fn push(&mut self, server: &IceServer) {
-        self.as_ref().push(server);
+        self.as_mut().push(server);
     }
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_IceServer_vector {
@@ -741,7 +894,11 @@ impl IceServerVector {
     }
 
     pub fn as_ref(&self) -> IceServerVectorRef<'_> {
-        IceServerVectorRef::from_raw(self.raw)
+        IceServerVectorRef::from_raw(ConstNonNull::from(self.raw))
+    }
+
+    pub fn as_mut(&mut self) -> IceServerVectorRefMut<'_> {
+        IceServerVectorRefMut::from_raw(self.raw)
     }
 }
 
@@ -752,15 +909,18 @@ impl Drop for IceServerVector {
 }
 
 /// RTCConfiguration 内部の servers を借用するためのラッパー。
+#[derive(Clone, Copy)]
 pub struct IceServerVectorRef<'a> {
-    raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
-    _marker: PhantomData<&'a mut ffi::webrtc_PeerConnectionInterface_RTCConfiguration>,
+    raw: ConstNonNull<ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
+    _marker: PhantomData<&'a ffi::webrtc_PeerConnectionInterface_RTCConfiguration>,
 }
 
 unsafe impl<'a> Send for IceServerVectorRef<'a> {}
 
 impl<'a> IceServerVectorRef<'a> {
-    pub fn from_raw(raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer_vector>) -> Self {
+    pub(crate) fn from_raw(
+        raw: ConstNonNull<ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
+    ) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -782,16 +942,41 @@ impl<'a> IceServerVectorRef<'a> {
         if index >= len {
             return None;
         }
-        let raw = expect_non_null(
+        let raw = expect_non_null_const(
             unsafe {
-                ffi::webrtc_PeerConnectionInterface_IceServer_vector_get(
+                ffi::webrtc_PeerConnectionInterface_IceServer_vector_get_const(
                     self.raw.as_ptr(),
                     index as i32,
                 )
             },
-            "webrtc_PeerConnectionInterface_IceServer_vector_get",
+            "webrtc_PeerConnectionInterface_IceServer_vector_get_const",
         );
         Some(IceServerRef::from_raw(raw))
+    }
+}
+
+/// RTCConfiguration 内部の servers を書き換えるための可変借用ラッパー。
+pub struct IceServerVectorRefMut<'a> {
+    raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
+    _marker: PhantomData<&'a mut ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
+    cref: IceServerVectorRef<'a>,
+}
+
+unsafe impl<'a> Send for IceServerVectorRefMut<'a> {}
+
+impl<'a> IceServerVectorRefMut<'a> {
+    pub(crate) fn from_raw(
+        raw: NonNull<ffi::webrtc_PeerConnectionInterface_IceServer_vector>,
+    ) -> Self {
+        Self {
+            raw,
+            _marker: PhantomData,
+            cref: IceServerVectorRef::from_raw(ConstNonNull::from(raw)),
+        }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface_IceServer_vector {
+        self.raw.as_ptr()
     }
 
     pub fn push(&mut self, server: &IceServer) {
@@ -801,6 +986,57 @@ impl<'a> IceServerVectorRef<'a> {
                 server.as_ptr(),
             );
         }
+    }
+
+    /// index の要素を server で置き換える。
+    /// 範囲外の index では `false` を返す。
+    pub fn set(&mut self, index: usize, server: &IceServer) -> bool {
+        if index >= self.len() {
+            return false;
+        }
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_IceServer_vector_set(
+                self.raw.as_ptr(),
+                index as i32,
+                server.as_ptr(),
+            );
+        }
+        true
+    }
+
+    pub fn as_ref(&self) -> IceServerVectorRef<'_> {
+        self.cref
+    }
+
+    pub fn len(&self) -> usize {
+        self.cref.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.cref.is_empty()
+    }
+
+    pub fn get(&self, index: usize) -> Option<IceServerRef<'_>> {
+        self.cref.get(index)
+    }
+
+    /// index の要素を書き換えるための可変ハンドルを返す。
+    /// 範囲外の index では `None` を返す。
+    pub fn get_mut(&mut self, index: usize) -> Option<IceServerRefMut<'_>> {
+        if index >= self.len() {
+            return None;
+        }
+        // 書き換え用のハンドルを返すため、可変参照を返す非 const 版の get を使う。
+        let raw = expect_non_null(
+            unsafe {
+                ffi::webrtc_PeerConnectionInterface_IceServer_vector_get(
+                    self.raw.as_ptr(),
+                    index as i32,
+                )
+            },
+            "webrtc_PeerConnectionInterface_IceServer_vector_get",
+        );
+        Some(IceServerRefMut::from_raw(raw))
     }
 }
 
@@ -972,6 +1208,64 @@ impl Drop for PeerConnectionOfferAnswerOptions {
         unsafe {
             ffi::webrtc_PeerConnectionInterface_RTCOfferAnswerOptions_delete(self.raw.as_ptr())
         };
+    }
+}
+
+/// SignalingState のラッパー。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SignalingState {
+    Stable,
+    HaveLocalOffer,
+    HaveRemoteOffer,
+    HaveLocalPranswer,
+    HaveRemotePranswer,
+    Closed,
+    Unknown(i32),
+}
+
+impl SignalingState {
+    pub fn from_int(v: i32) -> Self {
+        unsafe {
+            if v == ffi::webrtc_PeerConnectionInterface_SignalingState_kStable {
+                SignalingState::Stable
+            } else if v == ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveLocalOffer {
+                SignalingState::HaveLocalOffer
+            } else if v == ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveRemoteOffer {
+                SignalingState::HaveRemoteOffer
+            } else if v == ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveLocalPranswer {
+                SignalingState::HaveLocalPranswer
+            } else if v == ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveRemotePranswer {
+                SignalingState::HaveRemotePranswer
+            } else if v == ffi::webrtc_PeerConnectionInterface_SignalingState_kClosed {
+                SignalingState::Closed
+            } else {
+                SignalingState::Unknown(v)
+            }
+        }
+    }
+
+    pub fn to_int(self) -> i32 {
+        match self {
+            SignalingState::Stable => unsafe {
+                ffi::webrtc_PeerConnectionInterface_SignalingState_kStable
+            },
+            SignalingState::HaveLocalOffer => unsafe {
+                ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveLocalOffer
+            },
+            SignalingState::HaveRemoteOffer => unsafe {
+                ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveRemoteOffer
+            },
+            SignalingState::HaveLocalPranswer => unsafe {
+                ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveLocalPranswer
+            },
+            SignalingState::HaveRemotePranswer => unsafe {
+                ffi::webrtc_PeerConnectionInterface_SignalingState_kHaveRemotePranswer
+            },
+            SignalingState::Closed => unsafe {
+                ffi::webrtc_PeerConnectionInterface_SignalingState_kClosed
+            },
+            SignalingState::Unknown(v) => v,
+        }
     }
 }
 
@@ -1174,6 +1468,8 @@ unsafe impl Send for IceCandidateError {}
 
 pub trait PeerConnectionObserverHandler: Send {
     #[expect(unused_variables)]
+    fn on_signaling_change(&mut self, new_state: SignalingState) {}
+    #[expect(unused_variables)]
     fn on_connection_change(&mut self, new_state: PeerConnectionState) {}
     #[expect(unused_variables)]
     fn on_standardized_ice_connection_change(&mut self, new_state: IceConnectionState) {}
@@ -1192,6 +1488,14 @@ pub trait PeerConnectionObserverHandler: Send {
 }
 
 type PeerConnectionObserverHandlerState = HandlerState<dyn PeerConnectionObserverHandler>;
+
+unsafe extern "C" fn observer_on_signaling_change(new_state: i32, user_data: *mut c_void) {
+    assert!(!user_data.is_null());
+    let state = unsafe { &mut *(user_data as *mut PeerConnectionObserverHandlerState) };
+    state
+        .handler
+        .on_signaling_change(SignalingState::from_int(new_state));
+}
 
 unsafe extern "C" fn observer_on_connection_change(new_state: i32, user_data: *mut c_void) {
     assert!(!user_data.is_null());
@@ -1278,7 +1582,7 @@ unsafe extern "C" fn observer_on_ice_candidate(
 ) {
     assert!(!user_data.is_null());
     let state = unsafe { &mut *(user_data as *mut PeerConnectionObserverHandlerState) };
-    let candidate = expect_non_null(candidate as *mut ffi::webrtc_IceCandidate, "candidate");
+    let candidate = expect_non_null_const(candidate, "candidate");
     let candidate = IceCandidateRef::from_raw(candidate);
     state.handler.on_ice_candidate(candidate);
 }
@@ -1326,6 +1630,7 @@ impl PeerConnectionObserver {
     pub fn new_with_handler(handler: Box<dyn PeerConnectionObserverHandler>) -> Self {
         let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
         let cbs = ffi::webrtc_PeerConnectionObserver_cbs {
+            OnSignalingChange: Some(observer_on_signaling_change),
             OnStandardizedIceConnectionChange: Some(observer_on_standardized_ice_connection_change),
             OnConnectionChange: Some(observer_on_connection_change),
             OnIceCandidate: Some(observer_on_ice_candidate),
@@ -1377,6 +1682,13 @@ impl PeerConnectionDependencies {
         self.raw.as_ptr()
     }
 
+    /// TURN 用の HTTP Proxy を設定する。
+    ///
+    /// `network_manager` と `socket_factory` が指すオブジェクトは C++ 側の port allocator が
+    /// 保持し続け、この port allocator は、生成した [PeerConnection] の network thread から使われる。
+    /// そのため、これらを所有する [crate::ConnectionContext]
+    /// (およびそれを保持する[crate::PeerConnectionFactory]) を、
+    /// この依存関係で作る [PeerConnection] より長生きさせる必要がある。
     #[expect(clippy::too_many_arguments)]
     pub fn set_proxy(
         &mut self,
@@ -1391,8 +1703,8 @@ impl PeerConnectionDependencies {
         unsafe {
             ffi::webrtc_PeerConnectionDependencies_set_proxy(
                 self.raw.as_ptr(),
-                network_manager.as_ptr(),
-                socket_factory.as_ptr(),
+                network_manager.as_mut_ptr(),
+                socket_factory.as_mut_ptr(),
                 proxy_host.as_ptr() as *const c_char,
                 proxy_host.len(),
                 proxy_port as i32,
@@ -1435,11 +1747,14 @@ unsafe extern "C" fn peer_connection_on_stats(
         "peer_connection_on_stats: user_data is null"
     );
     let state = unsafe { &mut *(user_data as *mut PeerConnectionStatsCallbackState) };
-    let report = RTCStatsReport::from_refcounted_ptr(expect_non_null(
-        report as *mut ffi::webrtc_RTCStatsReport_refcounted,
-        "report",
+    let report = RTCStatsReport::from_refcounted_ptr(expect_non_null_const(
+        report,
+        "peer_connection_on_stats (report)",
     ));
-    let on_stats = state.on_stats.take().expect("BUG: on_stats が消費済みです");
+    let on_stats = state
+        .on_stats
+        .take()
+        .expect("BUG: on_stats is already taken");
     on_stats(report);
 }
 
@@ -1908,5 +2223,13 @@ impl PeerConnection {
 
     pub fn as_ptr(&self) -> *mut ffi::webrtc_PeerConnectionInterface {
         self.raw_ref.as_ptr()
+    }
+}
+
+impl Clone for PeerConnection {
+    fn clone(&self) -> Self {
+        Self {
+            raw_ref: ScopedRef::clone(&self.raw_ref),
+        }
     }
 }

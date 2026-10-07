@@ -33,16 +33,18 @@ webrtc_EncodedImageBuffer_Create_from_data(const uint8_t* data, size_t size) {
 }
 
 WEBRTC_EXPORT size_t
-webrtc_EncodedImageBuffer_size(struct webrtc_EncodedImageBuffer* self) {
+webrtc_EncodedImageBuffer_size(const struct webrtc_EncodedImageBuffer* self) {
   assert(self != nullptr);
-  auto buffer = reinterpret_cast<webrtc::EncodedImageBufferInterface*>(self);
+  auto buffer =
+      reinterpret_cast<const webrtc::EncodedImageBufferInterface*>(self);
   return buffer->size();
 }
 
 WEBRTC_EXPORT const uint8_t* webrtc_EncodedImageBuffer_data(
-    struct webrtc_EncodedImageBuffer* self) {
+    const struct webrtc_EncodedImageBuffer* self) {
   assert(self != nullptr);
-  auto buffer = reinterpret_cast<webrtc::EncodedImageBufferInterface*>(self);
+  auto buffer =
+      reinterpret_cast<const webrtc::EncodedImageBufferInterface*>(self);
   return buffer->data();
 }
 
@@ -100,8 +102,8 @@ WEBRTC_EXPORT void webrtc_EncodedImage_set_qp(struct webrtc_EncodedImage* self,
 }
 
 WEBRTC_EXPORT struct webrtc_EncodedImageBuffer_refcounted*
-webrtc_EncodedImage_encoded_data(struct webrtc_EncodedImage* self) {
-  auto image = reinterpret_cast<webrtc::EncodedImage*>(self);
+webrtc_EncodedImage_encoded_data(const struct webrtc_EncodedImage* self) {
+  auto image = reinterpret_cast<const webrtc::EncodedImage*>(self);
   auto encoded_data = image->GetEncodedData();
   if (encoded_data == nullptr) {
     return nullptr;
@@ -111,31 +113,32 @@ webrtc_EncodedImage_encoded_data(struct webrtc_EncodedImage* self) {
 }
 
 WEBRTC_EXPORT uint32_t
-webrtc_EncodedImage_rtp_timestamp(struct webrtc_EncodedImage* self) {
-  auto image = reinterpret_cast<webrtc::EncodedImage*>(self);
+webrtc_EncodedImage_rtp_timestamp(const struct webrtc_EncodedImage* self) {
+  auto image = reinterpret_cast<const webrtc::EncodedImage*>(self);
   return image->RtpTimestamp();
 }
 
 WEBRTC_EXPORT uint32_t
-webrtc_EncodedImage_encoded_width(struct webrtc_EncodedImage* self) {
-  auto image = reinterpret_cast<webrtc::EncodedImage*>(self);
+webrtc_EncodedImage_encoded_width(const struct webrtc_EncodedImage* self) {
+  auto image = reinterpret_cast<const webrtc::EncodedImage*>(self);
   return image->_encodedWidth;
 }
 
 WEBRTC_EXPORT uint32_t
-webrtc_EncodedImage_encoded_height(struct webrtc_EncodedImage* self) {
-  auto image = reinterpret_cast<webrtc::EncodedImage*>(self);
+webrtc_EncodedImage_encoded_height(const struct webrtc_EncodedImage* self) {
+  auto image = reinterpret_cast<const webrtc::EncodedImage*>(self);
   return image->_encodedHeight;
 }
 
 WEBRTC_EXPORT int webrtc_EncodedImage_frame_type(
-    struct webrtc_EncodedImage* self) {
-  auto image = reinterpret_cast<webrtc::EncodedImage*>(self);
+    const struct webrtc_EncodedImage* self) {
+  auto image = reinterpret_cast<const webrtc::EncodedImage*>(self);
   return static_cast<int>(image->FrameType());
 }
 
-WEBRTC_EXPORT int webrtc_EncodedImage_qp(struct webrtc_EncodedImage* self) {
-  auto image = reinterpret_cast<webrtc::EncodedImage*>(self);
+WEBRTC_EXPORT int webrtc_EncodedImage_qp(
+    const struct webrtc_EncodedImage* self) {
+  auto image = reinterpret_cast<const webrtc::EncodedImage*>(self);
   return image->qp_;
 }
 }

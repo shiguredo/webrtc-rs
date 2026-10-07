@@ -5,8 +5,8 @@
 
 extern "C" {
 WEBRTC_EXPORT int webrtc_SimulcastStream_width(
-    struct webrtc_SimulcastStream* self) {
-  auto stream = reinterpret_cast<webrtc::SimulcastStream*>(self);
+    const struct webrtc_SimulcastStream* self) {
+  auto stream = reinterpret_cast<const webrtc::SimulcastStream*>(self);
   return static_cast<int>(stream->width);
 }
 
@@ -18,8 +18,8 @@ WEBRTC_EXPORT void webrtc_SimulcastStream_set_width(
 }
 
 WEBRTC_EXPORT int webrtc_SimulcastStream_height(
-    struct webrtc_SimulcastStream* self) {
-  auto stream = reinterpret_cast<webrtc::SimulcastStream*>(self);
+    const struct webrtc_SimulcastStream* self) {
+  auto stream = reinterpret_cast<const webrtc::SimulcastStream*>(self);
   return static_cast<int>(stream->height);
 }
 
@@ -31,8 +31,8 @@ WEBRTC_EXPORT void webrtc_SimulcastStream_set_height(
 }
 
 WEBRTC_EXPORT unsigned int webrtc_SimulcastStream_min_bitrate_kbps(
-    struct webrtc_SimulcastStream* self) {
-  auto stream = reinterpret_cast<webrtc::SimulcastStream*>(self);
+    const struct webrtc_SimulcastStream* self) {
+  auto stream = reinterpret_cast<const webrtc::SimulcastStream*>(self);
   return stream->minBitrate;
 }
 
@@ -45,8 +45,8 @@ WEBRTC_EXPORT void webrtc_SimulcastStream_set_min_bitrate_kbps(
 }
 
 WEBRTC_EXPORT unsigned int webrtc_SimulcastStream_target_bitrate_kbps(
-    struct webrtc_SimulcastStream* self) {
-  auto stream = reinterpret_cast<webrtc::SimulcastStream*>(self);
+    const struct webrtc_SimulcastStream* self) {
+  auto stream = reinterpret_cast<const webrtc::SimulcastStream*>(self);
   return stream->targetBitrate;
 }
 
@@ -59,8 +59,8 @@ WEBRTC_EXPORT void webrtc_SimulcastStream_set_target_bitrate_kbps(
 }
 
 WEBRTC_EXPORT unsigned int webrtc_SimulcastStream_max_bitrate_kbps(
-    struct webrtc_SimulcastStream* self) {
-  auto stream = reinterpret_cast<webrtc::SimulcastStream*>(self);
+    const struct webrtc_SimulcastStream* self) {
+  auto stream = reinterpret_cast<const webrtc::SimulcastStream*>(self);
   return stream->maxBitrate;
 }
 

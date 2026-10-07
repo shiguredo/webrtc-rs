@@ -19,7 +19,7 @@
 #include "../../common.h"
 #include "../../common.impl.h"
 #include "../../std.impl.h"
-#include "../environment.h"
+#include "../environment/environment.h"
 #include "audio_encoder.h"
 #include "audio_format.h"
 
@@ -185,11 +185,11 @@ webrtc_AudioEncoderFactory_QueryAudioEncoder(
 }
 
 WEBRTC_EXPORT struct webrtc_AudioEncoder_unique*
-webrtc_AudioEncoderFactory_MakeAudioEncoder(
+webrtc_AudioEncoderFactory_Create(
     struct webrtc_AudioEncoderFactory* self,
     const struct webrtc_Environment* env,
     const struct webrtc_SdpAudioFormat* format,
-    struct webrtc_AudioEncoderFactory_Options* options) {
+    const struct webrtc_AudioEncoderFactory_Options* options) {
   assert(self != nullptr);
   assert(env != nullptr);
   assert(format != nullptr);
@@ -197,7 +197,7 @@ webrtc_AudioEncoderFactory_MakeAudioEncoder(
   auto cpp_env = reinterpret_cast<const webrtc::Environment*>(env);
   auto cpp_format = reinterpret_cast<const webrtc::SdpAudioFormat*>(format);
   auto cpp_options =
-      reinterpret_cast<webrtc::AudioEncoderFactory::Options*>(options);
+      reinterpret_cast<const webrtc::AudioEncoderFactory::Options*>(options);
   auto encoder = factory->Create(*cpp_env, *cpp_format, *cpp_options);
   return reinterpret_cast<struct webrtc_AudioEncoder_unique*>(
       encoder.release());

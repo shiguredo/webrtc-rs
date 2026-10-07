@@ -31,7 +31,11 @@ WEBRTC_EXPORT size_t webrtc_Buffer_size(const struct webrtc_Buffer* self) {
   auto buffer = reinterpret_cast<const webrtc::Buffer*>(self);
   return buffer->size();
 }
-WEBRTC_EXPORT const uint8_t* webrtc_Buffer_data(
+WEBRTC_EXPORT uint8_t* webrtc_Buffer_data(struct webrtc_Buffer* self) {
+  auto buffer = reinterpret_cast<webrtc::Buffer*>(self);
+  return buffer->data();
+}
+WEBRTC_EXPORT const uint8_t* webrtc_Buffer_data_const(
     const struct webrtc_Buffer* self) {
   auto buffer = reinterpret_cast<const webrtc::Buffer*>(self);
   return buffer->data();
@@ -56,7 +60,11 @@ webrtc_BufferS16_size(const struct webrtc_BufferS16* self) {
   auto buffer = reinterpret_cast<const webrtc::BufferT<int16_t>*>(self);
   return buffer->size();
 }
-WEBRTC_EXPORT const int16_t* webrtc_BufferS16_data(
+WEBRTC_EXPORT int16_t* webrtc_BufferS16_data(struct webrtc_BufferS16* self) {
+  auto buffer = reinterpret_cast<webrtc::BufferT<int16_t>*>(self);
+  return buffer->data();
+}
+WEBRTC_EXPORT const int16_t* webrtc_BufferS16_data_const(
     const struct webrtc_BufferS16* self) {
   auto buffer = reinterpret_cast<const webrtc::BufferT<int16_t>*>(self);
   return buffer->data();

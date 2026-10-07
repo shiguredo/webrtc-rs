@@ -96,7 +96,6 @@ static void whip_OnSendRequestResponse(char* resp, void* user_data);
 struct PeerConnectionFactory {
   struct webrtc_RefCountInterface_ref* ref;
   struct webrtc_Thread_unique* network_thread;
-  struct webrtc_Thread_unique* worker_thread;
   struct webrtc_Thread_unique* signaling_thread;
   struct webrtc_PeerConnectionFactoryInterface_refcounted* factory;
 };
@@ -110,10 +109,6 @@ void PeerConnectionFactory_delete(void* user_data) {
   if (p->network_thread != NULL) {
     webrtc_Thread_Stop(webrtc_Thread_unique_get(p->network_thread));
     webrtc_Thread_unique_delete(p->network_thread);
-  }
-  if (p->worker_thread != NULL) {
-    webrtc_Thread_Stop(webrtc_Thread_unique_get(p->worker_thread));
-    webrtc_Thread_unique_delete(p->worker_thread);
   }
   if (p->signaling_thread != NULL) {
     webrtc_Thread_Stop(webrtc_Thread_unique_get(p->signaling_thread));
@@ -476,8 +471,6 @@ struct PeerConnectionFactory* PeerConnectionFactory_Create() {
 
   p->network_thread = webrtc_Thread_CreateWithSocketServer();
   webrtc_Thread_Start(webrtc_Thread_unique_get(p->network_thread));
-  p->worker_thread = webrtc_Thread_Create();
-  webrtc_Thread_Start(webrtc_Thread_unique_get(p->worker_thread));
   p->signaling_thread = webrtc_Thread_Create();
   webrtc_Thread_Start(webrtc_Thread_unique_get(p->signaling_thread));
 
@@ -487,14 +480,14 @@ struct PeerConnectionFactory* PeerConnectionFactory_Create() {
   webrtc_PeerConnectionFactoryDependencies_set_network_thread(
       dependencies, webrtc_Thread_unique_get(p->network_thread));
   webrtc_PeerConnectionFactoryDependencies_set_worker_thread(
-      dependencies, webrtc_Thread_unique_get(p->worker_thread));
+      dependencies, webrtc_Thread_unique_get(p->network_thread));
   webrtc_PeerConnectionFactoryDependencies_set_signaling_thread(
       dependencies, webrtc_Thread_unique_get(p->signaling_thread));
   webrtc_PeerConnectionFactoryDependencies_set_event_log_factory(
       dependencies, webrtc_RtcEventLogFactory_Create());
   struct webrtc_AudioDeviceModule_refcounted* adm =
       (struct webrtc_AudioDeviceModule_refcounted*)webrtc_Thread_BlockingCall_r(
-          webrtc_Thread_unique_get(p->worker_thread), _BlockingCall_create_adm,
+          webrtc_Thread_unique_get(p->network_thread), _BlockingCall_create_adm,
           env);
   webrtc_PeerConnectionFactoryDependencies_set_adm(dependencies, adm);
   webrtc_AudioDeviceModule_Release(
@@ -721,6 +714,12 @@ void SignalingWhip_OnConnectionChange(
   }
   pthread_cond_broadcast(&self->cond);
   pthread_mutex_unlock(&self->mutex);
+}
+
+void SignalingWhip_OnSignalingChange(
+    webrtc_PeerConnectionInterface_SignalingState new_state,
+    void* user_data) {
+  RTC_LOG_INFO("SignalingWhip_OnSignalingChange: new_state=%d", new_state);
 }
 
 static void SignalingWhip_SetState(struct SignalingWhip* self, int state) {
@@ -1243,6 +1242,7 @@ struct SignalingWhip* SignalingWhip_Create(struct SignalingWhipConfig* config) {
   struct SignalingWhip* p =
       (struct SignalingWhip*)calloc(1, sizeof(struct SignalingWhip));
   p->ref = webrtc_RefCountInterface_Create(SignalingWhip_delete, p);
+  p->observer_cbs.OnSignalingChange = SignalingWhip_OnSignalingChange;
   p->observer_cbs.OnConnectionChange = SignalingWhip_OnConnectionChange;
   p->loc_cbs.OnSetLocalDescriptionComplete = whip_OnSetLocalDescriptionComplete;
   p->rem_cbs.OnSetRemoteDescriptionComplete =

@@ -86,6 +86,14 @@ WEBRTC_DEFINE_REFCOUNTED(webrtc_FrameTransformerInterface,
                          webrtc::FrameTransformerInterface);
 WEBRTC_DEFINE_UNIQUE(webrtc_TransformableFrameInterface,
                      webrtc::TransformableFrameInterface);
+WEBRTC_DEFINE_CAST(webrtc_TransformableFrameInterface,
+                   webrtc_TransformableVideoFrameInterface,
+                   webrtc::TransformableFrameInterface,
+                   webrtc::TransformableVideoFrameInterface);
+WEBRTC_DEFINE_CAST_CONST(webrtc_TransformableFrameInterface,
+                         webrtc_TransformableVideoFrameInterface,
+                         webrtc::TransformableFrameInterface,
+                         webrtc::TransformableVideoFrameInterface);
 WEBRTC_DEFINE_REFCOUNTED(webrtc_TransformedFrameCallback,
                          webrtc::TransformedFrameCallback);
 WEBRTC_DEFINE_VARIANT(webrtc_RtpTimestampInfo, webrtc::RtpTimestampInfo);
@@ -116,14 +124,14 @@ webrtc_RtpTimestampInfo_get_RtpTimestampWithoutOffset(
 }
 
 WEBRTC_EXPORT uint32_t webrtc_RtpTimestampWithOffset_get_value(
-    struct webrtc_RtpTimestampWithOffset* self) {
-  auto value = reinterpret_cast<webrtc::RtpTimestampWithOffset*>(self);
+    const struct webrtc_RtpTimestampWithOffset* self) {
+  auto value = reinterpret_cast<const webrtc::RtpTimestampWithOffset*>(self);
   return value->value;
 }
 
 WEBRTC_EXPORT uint32_t webrtc_RtpTimestampWithoutOffset_get_value(
-    struct webrtc_RtpTimestampWithoutOffset* self) {
-  auto value = reinterpret_cast<webrtc::RtpTimestampWithoutOffset*>(self);
+    const struct webrtc_RtpTimestampWithoutOffset* self) {
+  auto value = reinterpret_cast<const webrtc::RtpTimestampWithoutOffset*>(self);
   return value->value;
 }
 
@@ -148,10 +156,11 @@ WEBRTC_EXPORT void webrtc_TransformedFrameCallback_OnTransformedFrame(
 }
 
 WEBRTC_EXPORT void webrtc_TransformableFrameInterface_GetData(
-    struct webrtc_TransformableFrameInterface* self,
+    const struct webrtc_TransformableFrameInterface* self,
     const uint8_t** out_data,
     size_t* out_len) {
-  auto frame = reinterpret_cast<webrtc::TransformableFrameInterface*>(self);
+  auto frame =
+      reinterpret_cast<const webrtc::TransformableFrameInterface*>(self);
   assert(out_data != nullptr);
   assert(out_len != nullptr);
   auto data = frame->GetData();
@@ -168,14 +177,16 @@ WEBRTC_EXPORT void webrtc_TransformableFrameInterface_SetData(
 }
 
 WEBRTC_EXPORT uint8_t webrtc_TransformableFrameInterface_GetPayloadType(
-    struct webrtc_TransformableFrameInterface* self) {
-  auto frame = reinterpret_cast<webrtc::TransformableFrameInterface*>(self);
+    const struct webrtc_TransformableFrameInterface* self) {
+  auto frame =
+      reinterpret_cast<const webrtc::TransformableFrameInterface*>(self);
   return frame->GetPayloadType();
 }
 
 WEBRTC_EXPORT int webrtc_TransformableFrameInterface_CanSetPayloadType(
-    struct webrtc_TransformableFrameInterface* self) {
-  auto frame = reinterpret_cast<webrtc::TransformableFrameInterface*>(self);
+    const struct webrtc_TransformableFrameInterface* self) {
+  auto frame =
+      reinterpret_cast<const webrtc::TransformableFrameInterface*>(self);
   return frame->CanSetPayloadType() ? 1 : 0;
 }
 
@@ -187,15 +198,17 @@ WEBRTC_EXPORT void webrtc_TransformableFrameInterface_SetPayloadType(
 }
 
 WEBRTC_EXPORT uint32_t webrtc_TransformableFrameInterface_GetSsrc(
-    struct webrtc_TransformableFrameInterface* self) {
-  auto frame = reinterpret_cast<webrtc::TransformableFrameInterface*>(self);
+    const struct webrtc_TransformableFrameInterface* self) {
+  auto frame =
+      reinterpret_cast<const webrtc::TransformableFrameInterface*>(self);
   return frame->GetSsrc();
 }
 
 WEBRTC_EXPORT struct webrtc_RtpTimestampInfo_unique*
 webrtc_TransformableFrameInterface_GetRtpTimestampInfo(
-    struct webrtc_TransformableFrameInterface* self) {
-  auto frame = reinterpret_cast<webrtc::TransformableFrameInterface*>(self);
+    const struct webrtc_TransformableFrameInterface* self) {
+  auto frame =
+      reinterpret_cast<const webrtc::TransformableFrameInterface*>(self);
   auto variant =
       std::make_unique<webrtc::RtpTimestampInfo>(frame->GetRtpTimestampInfo());
   return reinterpret_cast<struct webrtc_RtpTimestampInfo_unique*>(
@@ -210,8 +223,9 @@ WEBRTC_EXPORT void webrtc_TransformableFrameInterface_SetRTPTimestamp(
 }
 
 WEBRTC_EXPORT int webrtc_TransformableFrameInterface_GetDirection(
-    struct webrtc_TransformableFrameInterface* self) {
-  auto frame = reinterpret_cast<webrtc::TransformableFrameInterface*>(self);
+    const struct webrtc_TransformableFrameInterface* self) {
+  auto frame =
+      reinterpret_cast<const webrtc::TransformableFrameInterface*>(self);
   switch (frame->GetDirection()) {
     case webrtc::TransformableFrameInterface::Direction::kReceiver:
       return 1;
@@ -224,84 +238,91 @@ WEBRTC_EXPORT int webrtc_TransformableFrameInterface_GetDirection(
 
 WEBRTC_EXPORT struct std_string_unique*
 webrtc_TransformableFrameInterface_GetMimeType(
-    struct webrtc_TransformableFrameInterface* self) {
-  auto frame = reinterpret_cast<webrtc::TransformableFrameInterface*>(self);
+    const struct webrtc_TransformableFrameInterface* self) {
+  auto frame =
+      reinterpret_cast<const webrtc::TransformableFrameInterface*>(self);
   auto mime = std::make_unique<std::string>(frame->GetMimeType());
   return reinterpret_cast<struct std_string_unique*>(mime.release());
 }
 
 WEBRTC_EXPORT void webrtc_TransformableFrameInterface_ReceiveTime(
-    struct webrtc_TransformableFrameInterface* self,
-    int* has,
+    const struct webrtc_TransformableFrameInterface* self,
+    int* out_has,
     int64_t* timestamp_us) {
-  auto frame = reinterpret_cast<webrtc::TransformableFrameInterface*>(self);
+  auto frame =
+      reinterpret_cast<const webrtc::TransformableFrameInterface*>(self);
   auto value = frame->ReceiveTime();
-  webrtc_c::OptionalGetAs(value, has, timestamp_us,
+  webrtc_c::OptionalGetAs(value, out_has, timestamp_us,
                           [&]() { return value->us(); });
 }
 
 WEBRTC_EXPORT void webrtc_TransformableFrameInterface_GetPresentationTimestamp(
-    struct webrtc_TransformableFrameInterface* self,
-    int* has,
+    const struct webrtc_TransformableFrameInterface* self,
+    int* out_has,
     int64_t* timestamp_us) {
-  auto frame = reinterpret_cast<webrtc::TransformableFrameInterface*>(self);
+  auto frame =
+      reinterpret_cast<const webrtc::TransformableFrameInterface*>(self);
   auto value = frame->GetPresentationTimestamp();
-  webrtc_c::OptionalGetAs(value, has, timestamp_us,
+  webrtc_c::OptionalGetAs(value, out_has, timestamp_us,
                           [&]() { return value->us(); });
 }
 
 WEBRTC_EXPORT void webrtc_TransformableFrameInterface_CaptureTime(
-    struct webrtc_TransformableFrameInterface* self,
-    int* has,
+    const struct webrtc_TransformableFrameInterface* self,
+    int* out_has,
     int64_t* timestamp_us) {
-  auto frame = reinterpret_cast<webrtc::TransformableFrameInterface*>(self);
+  auto frame =
+      reinterpret_cast<const webrtc::TransformableFrameInterface*>(self);
   auto value = frame->CaptureTime();
-  webrtc_c::OptionalGetAs(value, has, timestamp_us,
+  webrtc_c::OptionalGetAs(value, out_has, timestamp_us,
                           [&]() { return value->us(); });
 }
 
 WEBRTC_EXPORT int webrtc_TransformableFrameInterface_CanSetCaptureTime(
-    struct webrtc_TransformableFrameInterface* self) {
-  auto frame = reinterpret_cast<webrtc::TransformableFrameInterface*>(self);
+    const struct webrtc_TransformableFrameInterface* self) {
+  auto frame =
+      reinterpret_cast<const webrtc::TransformableFrameInterface*>(self);
   return frame->CanSetCaptureTime() ? 1 : 0;
 }
 
 WEBRTC_EXPORT void webrtc_TransformableFrameInterface_SetCaptureTime(
     struct webrtc_TransformableFrameInterface* self,
     int has,
-    int64_t timestamp_us) {
+    const int64_t* timestamp_us) {
   auto frame = reinterpret_cast<webrtc::TransformableFrameInterface*>(self);
   std::optional<webrtc::Timestamp> capture_time;
-  webrtc_c::OptionalSetAs(capture_time, has, &timestamp_us, [&]() {
-    return webrtc::Timestamp::Micros(timestamp_us);
+  webrtc_c::OptionalSetAs(capture_time, has, timestamp_us, [&]() {
+    return webrtc::Timestamp::Micros(*timestamp_us);
   });
   frame->SetCaptureTime(capture_time);
 }
 
 WEBRTC_EXPORT void webrtc_TransformableFrameInterface_SenderCaptureTimeOffset(
-    struct webrtc_TransformableFrameInterface* self,
-    int* has,
+    const struct webrtc_TransformableFrameInterface* self,
+    int* out_has,
     int64_t* delta_us) {
-  auto frame = reinterpret_cast<webrtc::TransformableFrameInterface*>(self);
+  auto frame =
+      reinterpret_cast<const webrtc::TransformableFrameInterface*>(self);
   auto value = frame->SenderCaptureTimeOffset();
-  webrtc_c::OptionalGetAs(value, has, delta_us, [&]() { return value->us(); });
+  webrtc_c::OptionalGetAs(value, out_has, delta_us,
+                          [&]() { return value->us(); });
 }
 
 WEBRTC_EXPORT int webrtc_TransformableVideoFrameInterface_IsKeyFrame(
-    struct webrtc_TransformableVideoFrameInterface* self) {
+    const struct webrtc_TransformableVideoFrameInterface* self) {
   auto frame =
-      reinterpret_cast<webrtc::TransformableVideoFrameInterface*>(self);
+      reinterpret_cast<const webrtc::TransformableVideoFrameInterface*>(self);
   return frame->IsKeyFrame() ? 1 : 0;
 }
 
 WEBRTC_EXPORT void webrtc_TransformableVideoFrameInterface_Rid(
-    struct webrtc_TransformableVideoFrameInterface* self,
+    const struct webrtc_TransformableVideoFrameInterface* self,
     int* out_has,
     struct std_string_unique** out_value) {
   assert(out_has != nullptr);
   assert(out_value != nullptr);
   auto frame =
-      reinterpret_cast<webrtc::TransformableVideoFrameInterface*>(self);
+      reinterpret_cast<const webrtc::TransformableVideoFrameInterface*>(self);
   auto rid = frame->Rid();
   webrtc_c::OptionalGetAs(rid, out_has, out_value, [&]() {
     auto s = std::make_unique<std::string>(std::move(*rid));
@@ -311,9 +332,9 @@ WEBRTC_EXPORT void webrtc_TransformableVideoFrameInterface_Rid(
 
 WEBRTC_EXPORT struct webrtc_VideoFrameMetadata*
 webrtc_TransformableVideoFrameInterface_Metadata(
-    struct webrtc_TransformableVideoFrameInterface* self) {
+    const struct webrtc_TransformableVideoFrameInterface* self) {
   auto frame =
-      reinterpret_cast<webrtc::TransformableVideoFrameInterface*>(self);
+      reinterpret_cast<const webrtc::TransformableVideoFrameInterface*>(self);
   auto metadata =
       std::make_unique<webrtc::VideoFrameMetadata>(frame->Metadata());
   return reinterpret_cast<struct webrtc_VideoFrameMetadata*>(

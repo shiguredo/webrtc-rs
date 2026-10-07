@@ -16,7 +16,8 @@ extern "C" {
 WEBRTC_DECLARE_REFCOUNTED(webrtc_RtpSenderInterface);
 
 WEBRTC_EXPORT struct webrtc_RtpParameters*
-webrtc_RtpSenderInterface_GetParameters(struct webrtc_RtpSenderInterface* self);
+webrtc_RtpSenderInterface_GetParameters(
+    const struct webrtc_RtpSenderInterface* self);
 WEBRTC_EXPORT void webrtc_RtpSenderInterface_SetParameters(
     struct webrtc_RtpSenderInterface* self,
     const struct webrtc_RtpParameters* parameters,

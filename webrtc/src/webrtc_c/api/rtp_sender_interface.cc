@@ -21,8 +21,8 @@ WEBRTC_DEFINE_REFCOUNTED(webrtc_RtpSenderInterface, webrtc::RtpSenderInterface);
 
 WEBRTC_EXPORT struct webrtc_RtpParameters*
 webrtc_RtpSenderInterface_GetParameters(
-    struct webrtc_RtpSenderInterface* self) {
-  auto sender = reinterpret_cast<webrtc::RtpSenderInterface*>(self);
+    const struct webrtc_RtpSenderInterface* self) {
+  auto sender = reinterpret_cast<const webrtc::RtpSenderInterface*>(self);
   auto parameters = new webrtc::RtpParameters(sender->GetParameters());
   return reinterpret_cast<struct webrtc_RtpParameters*>(parameters);
 }

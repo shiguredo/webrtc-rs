@@ -1,9 +1,9 @@
 ---
-name: libwebrtc_c
+name: libwebrtc-c
 description: webrtc-rs リポジトリ配下の webrtc/ サブプロジェクト (libwebrtc C++ API の薄い C ラッパー) の機能・設計ルールリファレンス。命名規則、*_refcounted / *_unique / *_vector / *_inlined_vector のメモリ管理、null チェック方針、Cbs ルール、RULES.md の移植ルール、webrtc_c.h の公開 API、CMake ビルドターゲット、WHIP/WHEP サンプル、セルフチェック手順に関する質問時に使用。
 ---
 
-# libwebrtc_c
+# libwebrtc-c
 
 `webrtc-rs` リポジトリの `webrtc/` サブプロジェクトに存在する、libwebrtc C++ API の薄い C ラッパー層。Rust 側の `shiguredo_webrtc` crate はこの C API を通じて libwebrtc を利用する。
 
@@ -12,7 +12,7 @@ description: webrtc-rs リポジトリ配下の webrtc/ サブプロジェクト
 - C ラッパーは **libwebrtc との薄い対応のみ** を実装する
 - 便利関数や独自機能の追加は禁止
 - 元の C++ API のシグネチャ・名前に忠実に移植する
-- C ラッパーのファイルパスは元の C++ ファイルのパスと一致させる (分割をある程度サボることは許容、例: `api/environment.h` は `api/environment/environment.h` と `api/environment/environment_factory.h` を統合)
+- C ラッパーのファイルパスは元の C++ ファイルのパスと一致させる (分割をある程度サボることは許容、例: `api/rtc_event_log.h` は `api/rtc_event_log/rtc_event_log_factory.h` の型をフラットなファイルにまとめている)
 
 ## ディレクトリ構成
 
@@ -28,7 +28,7 @@ webrtc/
     ├── whip.c, whep.c      WHIP/WHEP サンプル (C)
     ├── whip.cpp, whep.cpp  WHIP/WHEP サンプル (C++)
     └── webrtc_c/
-        ├── api/            PeerConnection, JSEP, RTP, 統計, video/audio codec, environment, observer 等 (audio/, audio_codecs/, video/, video_codecs/, stats/ サブディレクトリを含む)
+        ├── api/            PeerConnection, JSEP, RTP, 統計, video/audio codec, environment, observer 等 (audio/, audio_codecs/, environment/, video/, video_codecs/, stats/ サブディレクトリを含む)
         ├── pc/             connection_context (接続管理)
         ├── rtc_base/       暗号、SSL、ロギング、スレッド、タイムスタンプ
         ├── media/          base/adapted_video_track_source, engine/simulcast_encoder_adapter
@@ -103,11 +103,11 @@ C++ でスタック配置するクラスは C 側ではヒープに置いて明�
 
 ### 4. `std::vector<T>` → `T_vector*`
 
-`WEBRTC_DECLARE_VECTOR(T)` で宣言。`_new(size)` / `_delete` / `_get(i)` / `_size` / `_resize(size)` / `_set(i, val)` / `_push_back(val)` を提供する。デフォルトコンストラクタを持たない型向けには `WEBRTC_DECLARE_VECTOR_NO_DEFAULT_CTOR(T)` を使い、`_new()` が引数なしになる代わりに `_clear` が追加される。`scoped_refptr` の vector 用には `WEBRTC_DECLARE_REFCOUNTED_VECTOR(T)` を使い、要素は `T_refcounted*` として扱う。
+`WEBRTC_DECLARE_VECTOR(T)` で宣言。`_new(size)` / `_delete` / `_get(i)` / `_get_const(i)` / `_size` / `_resize(size)` / `_set(i, val)` / `_push_back(val)` を提供する。`_get` は要素への可変参照を、`_get_const` は読み取り専用の参照を返す。デフォルトコンストラクタを持たない型向けには `WEBRTC_DECLARE_VECTOR_NO_DEFAULT_CTOR(T)` を使い、`_new()` が引数なしになる代わりに `_clear` が追加される。`scoped_refptr` の vector 用には `WEBRTC_DECLARE_REFCOUNTED_VECTOR(T)` を使い、要素は `T_refcounted*` として扱う。
 
 ### 5. `absl::InlinedVector<T, N>` → `T_inlined_vector*`
 
-`WEBRTC_DECLARE_INLINED_VECTOR(T)` で宣言。`_new(size)` / `_delete` / `_get(i)` / `_size` / `_resize(size)` / `_set(i, val)` / `_push_back(val)` / `_clear` を提供する。
+`WEBRTC_DECLARE_INLINED_VECTOR(T)` で宣言。`_new(size)` / `_delete` / `_get(i)` / `_get_const(i)` / `_size` / `_resize(size)` / `_set(i, val)` / `_push_back(val)` / `_clear` を提供する。`_get` は要素への可変参照を、`_get_const` は読み取り専用の参照を返す。
 
 ### `std::optional<CppType>` の扱い
 
@@ -133,6 +133,36 @@ C++ でスタック配置するクラスは C 側ではヒープに置いて明�
   - `AudioDeviceModule_cbs` (デフォルト実装 + 部分上書き方式のため適用外)
   - `RTCStatsCollectorCallback_cbs` は `OnDestroy` を持たないが、それ以外は他と同様に扱う
 
+## const 性
+
+- **C++ 側の const 性を C API でもそのまま反映する**
+- C++ 側が const メソッド、または読み取り専用のフィールド参照で済む操作の `self` は `const struct webrtc_Xxx* self` にする
+  - 値返しの getter (`webrtc_VideoFrameMetadata_GetFrameType` 等)、`int` を返す `_vector_size` / `_index` が該当する
+- C++ 側が `const T&` / `const T*` で受ける引数は `const struct webrtc_Xxx*` にする
+  - Cbs 構造体の関数ポインタも同じ規則に従う (`webrtc_VideoDecoder_cbs.Configure` 等)
+- `const_cast` は使わない
+- フィールドへの可変参照を返す getter (`webrtc_SdpVideoFormat_get_parameters` / `webrtc_SdpVideoFormat_get_name` 等) は非 const のままとする
+  - 呼び出し側が借用先を書き換えられるため、const 化すると const 契約が壊れる
+- 借用を返す getter は、C++ 側の形に合わせて必要な分だけ用意する
+  - C++ 側に const 参照 (`const T&` / `const T*`) を返す getter しか無い場合は `_get_xxx` を 1 つだけ用意する (`_const` は付けない)
+    - 例: `webrtc_SSLCertChain_Get` (`const SSLCertificate& Get(size_t pos) const`)
+  - C++ 側に可変参照 (`T&` / `T*`) を返す getter と const 参照を返す getter の両方がある場合は、`_get_xxx` (可変参照を返す) と `_get_xxx_const` (読み取り専用を返す) の 2 つを用意する
+    - 例: `webrtc_SdpVideoFormat_get_name` (可変参照を返す) と `webrtc_SdpVideoFormat_get_name_const` (`const struct std_string*` を返す)
+    - 例: `webrtc_Buffer_data` (`U* data()`) と `webrtc_Buffer_data_const` (`const U* data() const`)
+  - C++ 側のフィールドへの借用を返す getter は、フィールドにオーバーロードが無いため可変参照を返す `_get_xxx` を用意する
+    - 例: `webrtc_RtpCapabilities_get_codecs` / `webrtc_RTPVideoHeaderH264_get_nalus`
+    - Rust 側の `XxxRef` から読む場合は `_get_xxx_const` も用意する (`XxxRef` は `*const` しか持たないため可変版を呼べない)
+  - 要素への借用を返す `_vector_get` / `_inlined_vector_get` は C++ 側に可変参照と const 参照の両方があるため、読み取り経路では必ず `_get_const` 版を使う
+  - 読み取り専用の借用に対する cast は `WEBRTC_DECLARE_CAST_CONST` を用意する
+    - 例: `webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec` (可変参照を返す) と `webrtc_RtpCodecCapability_cast_to_webrtc_RtpCodec_const` (読み取り専用を返す)
+    - 例: `webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface` (ダウンキャスト) と `webrtc_TransformableFrameInterface_cast_to_webrtc_TransformableVideoFrameInterface_const`
+  - 借用ではなくコピーする引数 (`_vector_set` / `_vector_push_back` / `_inlined_vector_set` / `_inlined_vector_push_back` の値) は `const struct webrtc_Xxx*` にする
+- `std::vector` / `absl::InlinedVector` の `_get` は要素への可変参照を返すため非 const、`_get_const` / `_size` / `_index` は const になる (`common.h` / `common.impl.h` のマクロ)
+- `WEBRTC_DECLARE_REFCOUNTED_VECTOR` の `_refcounted_vector_get` は非 const で `_get_const` は持たない (`_refcounted_vector_size` は const)
+- `std::variant` のアクセサは alternative ごとの `_get_<alternative>` のみで、`_get_const` は持たない (`_index` は const)
+- `*_refcounted` は `WEBRTC_DECLARE_REFCOUNTED` / `WEBRTC_DEFINE_REFCOUNTED` マクロで `_refcounted_get` (非 const) と `_refcounted_get_const` (const) の両方を宣言する
+  - `*_AddRef` / `*_Release` は C++ 側の `AddRef()` / `Release()` が const メソッドであるため `const struct webrtc_Xxx*` を受け取る
+
 ## 戻り値の扱い
 
 ### `RTCErrorOr<T>`
@@ -153,11 +183,12 @@ C++ でスタック配置するクラスは C 側ではヒープに置いて明�
 
 新規 API 追加時・変更時は **必ず** 以下を実施する。
 
-1. 作業開始前に RULES.md を読み直し、関係するルール (薄いラッパー、元の C++ パスと名前、命名規則、`*_unique` / `*_refcounted` の扱い、null チェック方針、Cbs の null 非許容) を箇条書きにする
+1. 作業開始前に RULES.md を読み直し、関係するルール (薄いラッパー、元の C++ パスと名前、命名規則、`*_unique` / `*_refcounted` の扱い、null チェック方針、Cbs の null 非許容、const 性) を箇条書きにする
 2. 対応する C++ パスと型名を必ず開いて照合し、C 側のファイル・シンボル名が元の C++ に一致しているか確認する
 3. `*_unique` / `*_refcounted` へのキャストが必ず `*_unique_get` / `*_refcounted_get` / `release` 経由になっているか `rg` でチェックする
-4. 便利関数やパラメータ展開を追加していないか、各変更ブロックごとに「薄いラッパーか」を自問する
-5. 変更後に再度 RULES.md を読み直し、全ルール順守をチェックリスト形式で確認してから回答する
+4. `const_cast` が残っていないか、`self` と引数の const 性が元の C++ シグネチャと一致しているかを `rg` でチェックする
+5. 便利関数やパラメータ展開を追加していないか、各変更ブロックごとに「薄いラッパーか」を自問する
+6. 変更後に再度 RULES.md を読み直し、全ルール順守をチェックリスト形式で確認してから回答する
 
 ## 統合ヘッダ `src/webrtc_c.h`
 
@@ -165,7 +196,7 @@ C++ でスタック配置するクラスは C 側ではヒープに置いて明�
 
 | カテゴリ | ヘッダ |
 |----------|--------|
-| 環境・基盤 | `api/environment.h`, `api/ref_count.h`, `api/rtc_error.h`, `api/rtc_event_log.h`, `api/priority.h`, `api/media_types.h` |
+| 環境・基盤 | `api/environment/environment.h`, `api/environment/environment_factory.h`, `api/field_trials.h`, `api/field_trials_view.h`, `api/ref_count.h`, `api/rtc_error.h`, `api/rtc_event_log.h`, `api/priority.h`, `api/media_types.h` |
 | PeerConnection / JSEP | `api/peer_connection_interface.h`, `api/jsep.h`, `api/set_local_description_observer_interface.h`, `api/set_remote_description_observer_interface.h` |
 | Media | `api/media_stream_interface.h`, `api/data_channel_interface.h`, `api/dtls_transport_interface.h` |
 | 音声 | `api/audio/audio_device.h`, `api/audio/audio_processing.h`, `api/audio_codecs/audio_decoder_factory.h`, `api/audio_codecs/audio_encoder_factory.h` |
@@ -195,7 +226,7 @@ C アプリ側で `webrtc::scoped_refptr` に相互変換できるクラスを�
 | 変数 | 用途 |
 |------|------|
 | `WEBRTC_C_TARGET` | ターゲット OS/アーキ (例: `ubuntu-24.04_x86_64`, `macos_arm64`, `windows_x86_64`, `android_arm64`, `ios_arm64`, `raspberry-pi-os_armv8`) |
-| `WEBRTC_BUILD_VERSION` | libwebrtc バージョン (例: `m154.8037.1.1`) |
+| `WEBRTC_BUILD_VERSION` | libwebrtc バージョン (例: `m154.8037.4.1`) |
 | `WEBRTC_BASE_URL` | webrtc-build リリースのベース URL |
 | `WEBRTC_C_SYSROOT` | ARMv8 クロスコンパイル時のみ必須 |
 
@@ -263,5 +294,5 @@ C アプリ側で `webrtc::scoped_refptr` に相互変換できるクラスを�
 
 ## 関連
 
-- Rust 側 API (`shiguredo_webrtc` crate): `shiguredo_webrtc` skill を参照
+- Rust 側 API (`shiguredo_webrtc` crate): `shiguredo-webrtc` skill を参照
 - 移植ルールの一次情報: `webrtc/RULES.md`

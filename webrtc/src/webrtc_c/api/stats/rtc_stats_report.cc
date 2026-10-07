@@ -20,11 +20,11 @@ extern "C" {
 WEBRTC_DEFINE_REFCOUNTED(webrtc_RTCStatsReport, webrtc::RTCStatsReport);
 
 WEBRTC_EXPORT struct std_string_unique* webrtc_RTCStatsReport_ToJson(
-    struct webrtc_RTCStatsReport* report) {
+    const struct webrtc_RTCStatsReport* report) {
   if (report == nullptr) {
     return nullptr;
   }
-  auto rtc_report = reinterpret_cast<webrtc::RTCStatsReport*>(report);
+  auto rtc_report = reinterpret_cast<const webrtc::RTCStatsReport*>(report);
   std::string json = rtc_report->ToJson();
   auto str = std::make_unique<std::string>(std::move(json));
   return reinterpret_cast<struct std_string_unique*>(str.release());

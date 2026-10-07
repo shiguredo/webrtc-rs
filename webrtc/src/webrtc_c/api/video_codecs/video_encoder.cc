@@ -43,10 +43,9 @@ class EncodedImageCallbackImpl : public webrtc::EncodedImageCallback {
       const webrtc::EncodedImage& encoded_image,
       const webrtc::CodecSpecificInfo* codec_specific_info) override {
     auto raw_result = cbs_.OnEncodedImage(
-        reinterpret_cast<struct webrtc_EncodedImage*>(
-            const_cast<webrtc::EncodedImage*>(&encoded_image)),
-        reinterpret_cast<struct webrtc_CodecSpecificInfo*>(
-            const_cast<webrtc::CodecSpecificInfo*>(codec_specific_info)),
+        reinterpret_cast<const struct webrtc_EncodedImage*>(&encoded_image),
+        reinterpret_cast<const struct webrtc_CodecSpecificInfo*>(
+            codec_specific_info),
         user_data_);
     assert(raw_result != nullptr);
     auto result_unique = reinterpret_cast<
@@ -100,10 +99,8 @@ class VideoEncoderImpl : public webrtc::VideoEncoder {
   int InitEncode(const webrtc::VideoCodec* codec_settings,
                  const webrtc::VideoEncoder::Settings& settings) override {
     return cbs_.InitEncode(
-        reinterpret_cast<struct webrtc_VideoCodec*>(
-            const_cast<webrtc::VideoCodec*>(codec_settings)),
-        reinterpret_cast<struct webrtc_VideoEncoder_Settings*>(
-            const_cast<webrtc::VideoEncoder::Settings*>(&settings)),
+        reinterpret_cast<const struct webrtc_VideoCodec*>(codec_settings),
+        reinterpret_cast<const struct webrtc_VideoEncoder_Settings*>(&settings),
         user_data_);
   }
 
@@ -111,10 +108,9 @@ class VideoEncoderImpl : public webrtc::VideoEncoder {
       const webrtc::VideoFrame& frame,
       const std::vector<webrtc::VideoFrameType>* frame_types) override {
     return cbs_.Encode(
-        reinterpret_cast<struct webrtc_VideoFrame*>(
-            const_cast<webrtc::VideoFrame*>(&frame)),
-        reinterpret_cast<struct webrtc_VideoFrameType_vector*>(
-            const_cast<std::vector<webrtc::VideoFrameType>*>(frame_types)),
+        reinterpret_cast<const struct webrtc_VideoFrame*>(&frame),
+        reinterpret_cast<const struct webrtc_VideoFrameType_vector*>(
+            frame_types),
         user_data_);
   }
 
@@ -130,11 +126,10 @@ class VideoEncoderImpl : public webrtc::VideoEncoder {
 
   void SetRates(
       const webrtc::VideoEncoder::RateControlParameters& parameters) override {
-    cbs_.SetRates(
-        reinterpret_cast<struct webrtc_VideoEncoder_RateControlParameters*>(
-            const_cast<webrtc::VideoEncoder::RateControlParameters*>(
-                &parameters)),
-        user_data_);
+    cbs_.SetRates(reinterpret_cast<
+                      const struct webrtc_VideoEncoder_RateControlParameters*>(
+                      &parameters),
+                  user_data_);
   }
 
   webrtc::VideoEncoder::EncoderInfo GetEncoderInfo() const override {
@@ -200,8 +195,8 @@ WEBRTC_EXPORT const int webrtc_VideoFrameBuffer_Type_kNV12 =
     static_cast<int>(webrtc::VideoFrameBuffer::Type::kNV12);
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_FramerateFraction_value(
-    struct webrtc_VideoEncoder_FramerateFraction* self) {
-  auto value = reinterpret_cast<uint8_t*>(self);
+    const struct webrtc_VideoEncoder_FramerateFraction* self) {
+  auto value = reinterpret_cast<const uint8_t*>(self);
   return static_cast<int>(*value);
 }
 
@@ -225,8 +220,8 @@ webrtc_VideoEncoder_FramerateFraction_inlined_vector_set_value(
 }
 
 WEBRTC_EXPORT int webrtc_VideoFrameBuffer_Type_value(
-    struct webrtc_VideoFrameBuffer_Type* self) {
-  auto value = reinterpret_cast<webrtc::VideoFrameBuffer::Type*>(self);
+    const struct webrtc_VideoFrameBuffer_Type* self) {
+  auto value = reinterpret_cast<const webrtc::VideoFrameBuffer::Type*>(self);
   return static_cast<int>(*value);
 }
 
@@ -264,8 +259,9 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_QpThresholds_delete(
 }
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_QpThresholds_get_low(
-    struct webrtc_VideoEncoder_QpThresholds* self) {
-  auto thresholds = reinterpret_cast<webrtc::VideoEncoder::QpThresholds*>(self);
+    const struct webrtc_VideoEncoder_QpThresholds* self) {
+  auto thresholds =
+      reinterpret_cast<const webrtc::VideoEncoder::QpThresholds*>(self);
   return thresholds->low;
 }
 
@@ -277,8 +273,9 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_QpThresholds_set_low(
 }
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_QpThresholds_get_high(
-    struct webrtc_VideoEncoder_QpThresholds* self) {
-  auto thresholds = reinterpret_cast<webrtc::VideoEncoder::QpThresholds*>(self);
+    const struct webrtc_VideoEncoder_QpThresholds* self) {
+  auto thresholds =
+      reinterpret_cast<const webrtc::VideoEncoder::QpThresholds*>(self);
   return thresholds->high;
 }
 
@@ -305,11 +302,11 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_ScalingSettings_delete(
 }
 
 WEBRTC_EXPORT void webrtc_VideoEncoder_ScalingSettings_get_thresholds(
-    struct webrtc_VideoEncoder_ScalingSettings* self,
+    const struct webrtc_VideoEncoder_ScalingSettings* self,
     int* out_has,
     struct webrtc_VideoEncoder_QpThresholds* out_value) {
   auto settings =
-      reinterpret_cast<webrtc::VideoEncoder::ScalingSettings*>(self);
+      reinterpret_cast<const webrtc::VideoEncoder::ScalingSettings*>(self);
   auto value = reinterpret_cast<webrtc::VideoEncoder::QpThresholds*>(out_value);
   webrtc_c::OptionalGet(settings->thresholds, out_has, value);
 }
@@ -325,9 +322,9 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_ScalingSettings_set_thresholds(
 }
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_ScalingSettings_get_min_pixels_per_frame(
-    struct webrtc_VideoEncoder_ScalingSettings* self) {
+    const struct webrtc_VideoEncoder_ScalingSettings* self) {
   auto settings =
-      reinterpret_cast<webrtc::VideoEncoder::ScalingSettings*>(self);
+      reinterpret_cast<const webrtc::VideoEncoder::ScalingSettings*>(self);
   return settings->min_pixels_per_frame;
 }
 
@@ -360,9 +357,10 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_ResolutionBitrateLimits_delete(
 
 WEBRTC_EXPORT int
 webrtc_VideoEncoder_ResolutionBitrateLimits_get_frame_size_pixels(
-    struct webrtc_VideoEncoder_ResolutionBitrateLimits* self) {
+    const struct webrtc_VideoEncoder_ResolutionBitrateLimits* self) {
   auto limits =
-      reinterpret_cast<webrtc::VideoEncoder::ResolutionBitrateLimits*>(self);
+      reinterpret_cast<const webrtc::VideoEncoder::ResolutionBitrateLimits*>(
+          self);
   return limits->frame_size_pixels;
 }
 
@@ -377,9 +375,10 @@ webrtc_VideoEncoder_ResolutionBitrateLimits_set_frame_size_pixels(
 
 WEBRTC_EXPORT int
 webrtc_VideoEncoder_ResolutionBitrateLimits_get_min_start_bitrate_bps(
-    struct webrtc_VideoEncoder_ResolutionBitrateLimits* self) {
+    const struct webrtc_VideoEncoder_ResolutionBitrateLimits* self) {
   auto limits =
-      reinterpret_cast<webrtc::VideoEncoder::ResolutionBitrateLimits*>(self);
+      reinterpret_cast<const webrtc::VideoEncoder::ResolutionBitrateLimits*>(
+          self);
   return limits->min_start_bitrate_bps;
 }
 
@@ -394,9 +393,10 @@ webrtc_VideoEncoder_ResolutionBitrateLimits_set_min_start_bitrate_bps(
 
 WEBRTC_EXPORT int
 webrtc_VideoEncoder_ResolutionBitrateLimits_get_min_bitrate_bps(
-    struct webrtc_VideoEncoder_ResolutionBitrateLimits* self) {
+    const struct webrtc_VideoEncoder_ResolutionBitrateLimits* self) {
   auto limits =
-      reinterpret_cast<webrtc::VideoEncoder::ResolutionBitrateLimits*>(self);
+      reinterpret_cast<const webrtc::VideoEncoder::ResolutionBitrateLimits*>(
+          self);
   return limits->min_bitrate_bps;
 }
 
@@ -411,9 +411,10 @@ webrtc_VideoEncoder_ResolutionBitrateLimits_set_min_bitrate_bps(
 
 WEBRTC_EXPORT int
 webrtc_VideoEncoder_ResolutionBitrateLimits_get_max_bitrate_bps(
-    struct webrtc_VideoEncoder_ResolutionBitrateLimits* self) {
+    const struct webrtc_VideoEncoder_ResolutionBitrateLimits* self) {
   auto limits =
-      reinterpret_cast<webrtc::VideoEncoder::ResolutionBitrateLimits*>(self);
+      reinterpret_cast<const webrtc::VideoEncoder::ResolutionBitrateLimits*>(
+          self);
   return limits->max_bitrate_bps;
 }
 
@@ -439,8 +440,9 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_Resolution_delete(
 }
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_Resolution_get_width(
-    struct webrtc_VideoEncoder_Resolution* self) {
-  auto resolution = reinterpret_cast<webrtc::VideoEncoder::Resolution*>(self);
+    const struct webrtc_VideoEncoder_Resolution* self) {
+  auto resolution =
+      reinterpret_cast<const webrtc::VideoEncoder::Resolution*>(self);
   return resolution->width;
 }
 
@@ -452,8 +454,9 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_Resolution_set_width(
 }
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_Resolution_get_height(
-    struct webrtc_VideoEncoder_Resolution* self) {
-  auto resolution = reinterpret_cast<webrtc::VideoEncoder::Resolution*>(self);
+    const struct webrtc_VideoEncoder_Resolution* self) {
+  auto resolution =
+      reinterpret_cast<const webrtc::VideoEncoder::Resolution*>(self);
   return resolution->height;
 }
 
@@ -473,8 +476,8 @@ webrtc_VideoEncoder_EncoderInfo_new() {
 
 WEBRTC_EXPORT struct std_string_unique*
 webrtc_VideoEncoder_EncoderInfo_get_implementation_name(
-    struct webrtc_VideoEncoder_EncoderInfo* self) {
-  auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
+    const struct webrtc_VideoEncoder_EncoderInfo* self) {
+  auto info = reinterpret_cast<const webrtc::VideoEncoder::EncoderInfo*>(self);
   auto out = std::make_unique<std::string>(info->implementation_name);
   return reinterpret_cast<struct std_string_unique*>(out.release());
 }
@@ -490,8 +493,8 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_set_implementation_name(
 }
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_EncoderInfo_get_is_hardware_accelerated(
-    struct webrtc_VideoEncoder_EncoderInfo* self) {
-  auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
+    const struct webrtc_VideoEncoder_EncoderInfo* self) {
+  auto info = reinterpret_cast<const webrtc::VideoEncoder::EncoderInfo*>(self);
   return info->is_hardware_accelerated ? 1 : 0;
 }
 
@@ -522,8 +525,8 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_set_scaling_settings(
 
 WEBRTC_EXPORT uint32_t
 webrtc_VideoEncoder_EncoderInfo_get_requested_resolution_alignment(
-    struct webrtc_VideoEncoder_EncoderInfo* self) {
-  auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
+    const struct webrtc_VideoEncoder_EncoderInfo* self) {
+  auto info = reinterpret_cast<const webrtc::VideoEncoder::EncoderInfo*>(self);
   return info->requested_resolution_alignment;
 }
 
@@ -537,8 +540,8 @@ webrtc_VideoEncoder_EncoderInfo_set_requested_resolution_alignment(
 
 WEBRTC_EXPORT int
 webrtc_VideoEncoder_EncoderInfo_get_apply_alignment_to_all_simulcast_layers(
-    struct webrtc_VideoEncoder_EncoderInfo* self) {
-  auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
+    const struct webrtc_VideoEncoder_EncoderInfo* self) {
+  auto info = reinterpret_cast<const webrtc::VideoEncoder::EncoderInfo*>(self);
   return info->apply_alignment_to_all_simulcast_layers ? 1 : 0;
 }
 
@@ -551,8 +554,8 @@ webrtc_VideoEncoder_EncoderInfo_set_apply_alignment_to_all_simulcast_layers(
 }
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_EncoderInfo_get_supports_native_handle(
-    struct webrtc_VideoEncoder_EncoderInfo* self) {
-  auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
+    const struct webrtc_VideoEncoder_EncoderInfo* self) {
+  auto info = reinterpret_cast<const webrtc::VideoEncoder::EncoderInfo*>(self);
   return info->supports_native_handle ? 1 : 0;
 }
 
@@ -565,8 +568,8 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_set_supports_native_handle(
 
 WEBRTC_EXPORT int
 webrtc_VideoEncoder_EncoderInfo_get_has_trusted_rate_controller(
-    struct webrtc_VideoEncoder_EncoderInfo* self) {
-  auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
+    const struct webrtc_VideoEncoder_EncoderInfo* self) {
+  auto info = reinterpret_cast<const webrtc::VideoEncoder::EncoderInfo*>(self);
   return info->has_trusted_rate_controller ? 1 : 0;
 }
 
@@ -598,8 +601,8 @@ webrtc_VideoEncoder_EncoderInfo_get_resolution_bitrate_limits(
 }
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_EncoderInfo_get_supports_simulcast(
-    struct webrtc_VideoEncoder_EncoderInfo* self) {
-  auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
+    const struct webrtc_VideoEncoder_EncoderInfo* self) {
+  auto info = reinterpret_cast<const webrtc::VideoEncoder::EncoderInfo*>(self);
   return info->supports_simulcast ? 1 : 0;
 }
 
@@ -619,10 +622,10 @@ webrtc_VideoEncoder_EncoderInfo_get_preferred_pixel_formats(
 }
 
 WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_get_is_qp_trusted(
-    struct webrtc_VideoEncoder_EncoderInfo* self,
+    const struct webrtc_VideoEncoder_EncoderInfo* self,
     int* out_has,
     int* out_value) {
-  auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
+  auto info = reinterpret_cast<const webrtc::VideoEncoder::EncoderInfo*>(self);
   webrtc_c::OptionalGetAs(info->is_qp_trusted, out_has, out_value, [&]() {
     return info->is_qp_trusted.value() ? 1 : 0;
   });
@@ -638,10 +641,10 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_set_is_qp_trusted(
 }
 
 WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_get_min_qp(
-    struct webrtc_VideoEncoder_EncoderInfo* self,
+    const struct webrtc_VideoEncoder_EncoderInfo* self,
     int* out_has,
     int* out_value) {
-  auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
+  auto info = reinterpret_cast<const webrtc::VideoEncoder::EncoderInfo*>(self);
   webrtc_c::OptionalGet(info->min_qp, out_has, out_value);
 }
 
@@ -654,10 +657,10 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_set_min_qp(
 }
 
 WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_get_mapped_resolution(
-    struct webrtc_VideoEncoder_EncoderInfo* self,
+    const struct webrtc_VideoEncoder_EncoderInfo* self,
     int* out_has,
     struct webrtc_VideoEncoder_Resolution* out_value) {
-  auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
+  auto info = reinterpret_cast<const webrtc::VideoEncoder::EncoderInfo*>(self);
   auto value = reinterpret_cast<webrtc::VideoEncoder::Resolution*>(out_value);
   webrtc_c::OptionalGet(info->mapped_resolution, out_has, value);
 }
@@ -673,19 +676,19 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_EncoderInfo_set_mapped_resolution(
 
 WEBRTC_EXPORT struct std_string_unique*
 webrtc_VideoEncoder_EncoderInfo_ToString(
-    struct webrtc_VideoEncoder_EncoderInfo* self) {
-  auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
+    const struct webrtc_VideoEncoder_EncoderInfo* self) {
+  auto info = reinterpret_cast<const webrtc::VideoEncoder::EncoderInfo*>(self);
   auto out = std::make_unique<std::string>(info->ToString());
   return reinterpret_cast<struct std_string_unique*>(out.release());
 }
 
 WEBRTC_EXPORT void
 webrtc_VideoEncoder_EncoderInfo_GetEncoderBitrateLimitsForResolution(
-    struct webrtc_VideoEncoder_EncoderInfo* self,
+    const struct webrtc_VideoEncoder_EncoderInfo* self,
     int frame_size_pixels,
     int* out_has,
     struct webrtc_VideoEncoder_ResolutionBitrateLimits* out_value) {
-  auto info = reinterpret_cast<webrtc::VideoEncoder::EncoderInfo*>(self);
+  auto info = reinterpret_cast<const webrtc::VideoEncoder::EncoderInfo*>(self);
   auto limits = info->GetEncoderBitrateLimitsForResolution(frame_size_pixels);
   auto value = reinterpret_cast<webrtc::VideoEncoder::ResolutionBitrateLimits*>(
       out_value);
@@ -714,8 +717,9 @@ webrtc_VideoEncoder_EncodedImageCallback_Result_new_with_frame_id(
 }
 
 WEBRTC_EXPORT int webrtc_VideoEncoder_EncodedImageCallback_Result_error(
-    struct webrtc_VideoEncoder_EncodedImageCallback_Result* self) {
-  auto result = reinterpret_cast<webrtc::EncodedImageCallback::Result*>(self);
+    const struct webrtc_VideoEncoder_EncodedImageCallback_Result* self) {
+  auto result =
+      reinterpret_cast<const webrtc::EncodedImageCallback::Result*>(self);
   return static_cast<int>(result->error);
 }
 
@@ -728,8 +732,9 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_EncodedImageCallback_Result_set_error(
 }
 
 WEBRTC_EXPORT uint32_t webrtc_VideoEncoder_EncodedImageCallback_Result_frame_id(
-    struct webrtc_VideoEncoder_EncodedImageCallback_Result* self) {
-  auto result = reinterpret_cast<webrtc::EncodedImageCallback::Result*>(self);
+    const struct webrtc_VideoEncoder_EncodedImageCallback_Result* self) {
+  auto result =
+      reinterpret_cast<const webrtc::EncodedImageCallback::Result*>(self);
   return result->frame_id;
 }
 
@@ -742,8 +747,9 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_EncodedImageCallback_Result_set_frame_id(
 
 WEBRTC_EXPORT int
 webrtc_VideoEncoder_EncodedImageCallback_Result_drop_next_frame(
-    struct webrtc_VideoEncoder_EncodedImageCallback_Result* self) {
-  auto result = reinterpret_cast<webrtc::EncodedImageCallback::Result*>(self);
+    const struct webrtc_VideoEncoder_EncodedImageCallback_Result* self) {
+  auto result =
+      reinterpret_cast<const webrtc::EncodedImageCallback::Result*>(self);
   return result->drop_next_frame ? 1 : 0;
 }
 
@@ -773,14 +779,14 @@ WEBRTC_EXPORT void webrtc_VideoEncoder_EncodedImageCallback_delete(
 WEBRTC_EXPORT struct webrtc_VideoEncoder_EncodedImageCallback_Result_unique*
 webrtc_VideoEncoder_EncodedImageCallback_OnEncodedImage(
     struct webrtc_VideoEncoder_EncodedImageCallback* self,
-    struct webrtc_EncodedImage* encoded_image,
-    struct webrtc_CodecSpecificInfo* codec_specific_info) {
+    const struct webrtc_EncodedImage* encoded_image,
+    const struct webrtc_CodecSpecificInfo* codec_specific_info) {
   assert(self != nullptr);
   assert(encoded_image != nullptr);
   auto callback = reinterpret_cast<webrtc::EncodedImageCallback*>(self);
-  auto image = reinterpret_cast<webrtc::EncodedImage*>(encoded_image);
+  auto image = reinterpret_cast<const webrtc::EncodedImage*>(encoded_image);
   auto codec_info =
-      reinterpret_cast<webrtc::CodecSpecificInfo*>(codec_specific_info);
+      reinterpret_cast<const webrtc::CodecSpecificInfo*>(codec_specific_info);
   auto result = callback->OnEncodedImage(*image, codec_info);
   auto out = std::make_unique<webrtc::EncodedImageCallback::Result>(result);
   return reinterpret_cast<
@@ -795,30 +801,30 @@ WEBRTC_EXPORT struct webrtc_VideoEncoder_unique* webrtc_VideoEncoder_new(
   return reinterpret_cast<struct webrtc_VideoEncoder_unique*>(encoder);
 }
 
-WEBRTC_EXPORT int32_t
-webrtc_VideoEncoder_InitEncode(struct webrtc_VideoEncoder* self,
-                               struct webrtc_VideoCodec* codec_settings,
-                               struct webrtc_VideoEncoder_Settings* settings) {
+WEBRTC_EXPORT int32_t webrtc_VideoEncoder_InitEncode(
+    struct webrtc_VideoEncoder* self,
+    const struct webrtc_VideoCodec* codec_settings,
+    const struct webrtc_VideoEncoder_Settings* settings) {
   assert(self != nullptr);
   assert(codec_settings != nullptr);
   assert(settings != nullptr);
   auto encoder = reinterpret_cast<webrtc::VideoEncoder*>(self);
-  auto codec = reinterpret_cast<webrtc::VideoCodec*>(codec_settings);
+  auto codec = reinterpret_cast<const webrtc::VideoCodec*>(codec_settings);
   auto encoder_settings =
-      reinterpret_cast<webrtc::VideoEncoder::Settings*>(settings);
+      reinterpret_cast<const webrtc::VideoEncoder::Settings*>(settings);
   return encoder->InitEncode(codec, *encoder_settings);
 }
 
-WEBRTC_EXPORT int32_t
-webrtc_VideoEncoder_Encode(struct webrtc_VideoEncoder* self,
-                           struct webrtc_VideoFrame* frame,
-                           struct webrtc_VideoFrameType_vector* frame_types) {
+WEBRTC_EXPORT int32_t webrtc_VideoEncoder_Encode(
+    struct webrtc_VideoEncoder* self,
+    const struct webrtc_VideoFrame* frame,
+    const struct webrtc_VideoFrameType_vector* frame_types) {
   assert(self != nullptr);
   assert(frame != nullptr);
   auto encoder = reinterpret_cast<webrtc::VideoEncoder*>(self);
-  auto input_frame = reinterpret_cast<webrtc::VideoFrame*>(frame);
+  auto input_frame = reinterpret_cast<const webrtc::VideoFrame*>(frame);
   auto types =
-      reinterpret_cast<std::vector<webrtc::VideoFrameType>*>(frame_types);
+      reinterpret_cast<const std::vector<webrtc::VideoFrameType>*>(frame_types);
   return encoder->Encode(*input_frame, types);
 }
 
@@ -841,19 +847,20 @@ webrtc_VideoEncoder_Release(struct webrtc_VideoEncoder* self) {
 
 WEBRTC_EXPORT void webrtc_VideoEncoder_SetRates(
     struct webrtc_VideoEncoder* self,
-    struct webrtc_VideoEncoder_RateControlParameters* parameters) {
+    const struct webrtc_VideoEncoder_RateControlParameters* parameters) {
   assert(self != nullptr);
   assert(parameters != nullptr);
   auto encoder = reinterpret_cast<webrtc::VideoEncoder*>(self);
-  auto rates = reinterpret_cast<webrtc::VideoEncoder::RateControlParameters*>(
-      parameters);
+  auto rates =
+      reinterpret_cast<const webrtc::VideoEncoder::RateControlParameters*>(
+          parameters);
   encoder->SetRates(*rates);
 }
 
 WEBRTC_EXPORT struct webrtc_VideoEncoder_EncoderInfo_unique*
-webrtc_VideoEncoder_GetEncoderInfo(struct webrtc_VideoEncoder* self) {
+webrtc_VideoEncoder_GetEncoderInfo(const struct webrtc_VideoEncoder* self) {
   assert(self != nullptr);
-  auto encoder = reinterpret_cast<webrtc::VideoEncoder*>(self);
+  auto encoder = reinterpret_cast<const webrtc::VideoEncoder*>(self);
   auto info = std::make_unique<webrtc::VideoEncoder::EncoderInfo>(
       encoder->GetEncoderInfo());
   return reinterpret_cast<struct webrtc_VideoEncoder_EncoderInfo_unique*>(

@@ -92,7 +92,6 @@ pub struct FactoryHolder {
     factory: PeerConnectionFactory,
     connection_context: ConnectionContext,
     _network: Thread,
-    _worker: Thread,
     _signaling: Thread,
 }
 
@@ -100,16 +99,15 @@ impl FactoryHolder {
     pub fn new() -> Option<Arc<Self>> {
         let env = Environment::new();
         let mut network = Thread::new_with_socket_server();
-        let mut worker = Thread::new();
         let mut signaling = Thread::new();
         network.start();
-        worker.start();
         signaling.start();
 
         let mut deps = PeerConnectionFactoryDependencies::new();
         deps.set_network_thread(&network);
-        deps.set_worker_thread(&worker);
+        deps.set_worker_thread(&network);
         deps.set_signaling_thread(&signaling);
+        deps.set_env(Some(env.clone()));
         let event_log = RtcEventLogFactory::new();
         deps.set_event_log_factory(event_log);
         let adm = AudioDeviceModule::new(
@@ -134,14 +132,73 @@ impl FactoryHolder {
             factory,
             connection_context,
             _network: network,
-            _worker: worker,
             _signaling: signaling,
         }))
     }
 }
 ```
 
+### フィールドトライアルの指定
+
+libwebrtc のフィールドトライアルを指定する場合は、`FieldTrials` を `EnvironmentFactory` に設定して生成した `Environment` を使う。フィールドトライアルを指定しない場合は `Environment::new()` を使う。
+
+```rust
+use shiguredo_webrtc::{EnvironmentFactory, FieldTrials};
+
+let mut env_factory = EnvironmentFactory::new();
+env_factory.set_field_trials(
+    FieldTrials::new("WebRTC-Video-PerSsrcKeyframes/Enabled/").ok()?,
+);
+let env = env_factory.create();
+deps.set_env(Some(env.clone()));
+
+// 指定したフィールドトライアルが有効かどうかは Environment から確認できる
+assert!(
+    env.field_trials()
+        .is_enabled("WebRTC-Video-PerSsrcKeyframes")
+);
+
+// 無効かどうかは is_disabled で確認できる。is_enabled の否定ではないため、値が
+// Enabled でも Disabled でもないフィールドトライアルと、指定していない
+// フィールドトライアルは両方 false になる
+assert!(
+    !env.field_trials()
+        .is_disabled("WebRTC-Video-PerSsrcKeyframes")
+);
+
+// 設定された値は lookup でそのまま取得できる。Enabled,offer:true のような
+// パラメータも含めて返り、設定されていないフィールドトライアルは空文字列になる
+assert_eq!(
+    env.field_trials()
+        .lookup("WebRTC-Video-PerSsrcKeyframes")
+        .ok()?,
+    "Enabled"
+);
+```
+
+フィールドトライアル文字列が不正な場合、`FieldTrials::new` は `Error::InvalidFieldTrials` を返す。
+
+`EnvironmentRef` は借用型なので、借用が切れた後も `Environment` を保持したい場合は `EnvironmentRef::to_owned` で所有権を持つ `Environment` を作る。
+
 ## 対応 API
+
+### 借用ハンドル
+
+借用ハンドルは読み取り専用の `XxxRef` と書き換え用の `XxxRefMut` に分かれている。
+
+- 所有型から取得する
+  - `as_ref()` は `XxxRef`、`as_mut()` は `XxxRefMut` を返す (`VideoFrame::as_ref()` / `VideoFrame::as_mut()`)
+  - 所有型が持つコンテナは、読み取り用と書き換え用のアクセサに分かれている (`PeerConnectionRtcConfiguration::servers()` / `servers_mut()`)
+- 読み取りは `as_ref()` か、`XxxRef` と同じ名前のアクセサで行う
+  - `XxxRefMut` は `Deref` を実装していない (`VideoFrameRefMut::as_ref()` / `VideoFrameRefMut::width()`)
+- 生ポインタを取り出す
+  - `XxxRef::as_ptr()` は `*const`、`XxxRefMut::as_mut_ptr()` は `*mut` を返す
+- コンテナの要素を書き換える
+  - `get_mut(index)` は要素の `XxxRefMut` を返す (`RtpCodecCapabilityVector::get_mut()`)
+  - 要素が値型のコンテナは `set(index, value)` で書き込む (`VideoFrameTypeVector::set()`)
+  - 範囲外の index は `get` と揃えて `None` / `Err` / `false` を返す
+- handler trait とコールバックの引数のうち、書き換えが必要なものは `XxxRefMut` を取る
+  - `AudioEncoderHandler::encode` は `&mut BufferRefMut<'_>` を受け取る
 
 ### PeerConnection
 
@@ -205,7 +262,7 @@ impl FactoryHolder {
   - カスタム ADM handler と統計
 - `AudioParameters`
   - 音声パラメータ (サンプルレート、チャネル数など)
-- `AudioTransport` / `AudioTransportRef` / `AudioTransportHandler`
+- `AudioTransport` / `AudioTransportRef` / `AudioTransportRefMut` / `AudioTransportHandler`
   - 音声トランスポート
 - `MediaStreamTrack`
   - メディアストリームトラック
@@ -217,7 +274,7 @@ impl FactoryHolder {
   - 映像フレームバッファ
 - `VideoFrameBufferHandler` / `VideoFrameBufferHandlerAny`
   - カスタム映像バッファ実装
-- `VideoFrame` / `VideoFrameRef`
+- `VideoFrame` / `VideoFrameRef` / `VideoFrameRefMut`
   - 映像フレーム
 - `VideoFrameBuilder`
   - 映像フレーム builder
@@ -256,9 +313,9 @@ impl FactoryHolder {
   - エンコーダー設定とメタ情報
 - `VideoEncoderQpThresholds` / `VideoEncoderScalingSettings` / `VideoEncoderResolution` / `VideoEncoderResolutionBitrateLimits`
   - `VideoEncoderEncoderInfo` の詳細設定型
-- `VideoEncoderQpThresholdsRef` / `VideoEncoderScalingSettingsRef` / `VideoEncoderResolutionRef` / `VideoEncoderResolutionBitrateLimitsRef` / `VideoEncoderResolutionBitrateLimitsVectorRef` / `VideoEncoderFramerateFractionInlinedVectorRef` / `VideoFrameBufferKindInlinedVectorRef`
+- `VideoEncoderQpThresholdsRef` / `VideoEncoderQpThresholdsRefMut` / `VideoEncoderScalingSettingsRef` / `VideoEncoderScalingSettingsRefMut` / `VideoEncoderResolutionRef` / `VideoEncoderResolutionBitrateLimitsRef` / `VideoEncoderResolutionBitrateLimitsVectorRef` / `VideoEncoderFramerateFractionInlinedVectorRef` / `VideoFrameBufferKindInlinedVectorRef`
   - `VideoEncoderEncoderInfo` の詳細設定参照型
-- `VideoEncoderEncodedImageCallback` / `VideoEncoderEncodedImageCallbackRef`
+- `VideoEncoderEncodedImageCallback` / `VideoEncoderEncodedImageCallbackRef` / `VideoEncoderEncodedImageCallbackRefMut`
   - エンコード完了 callback
 - `VideoEncoderEncodedImageCallbackHandler`
   - エンコード完了 callback の handler trait
@@ -274,7 +331,7 @@ impl FactoryHolder {
   - デコーダー / デコーダーファクトリーの handler trait
 - `VideoDecoderDecoderInfo` / `VideoDecoderSettingsRef`
   - デコーダー設定とメタ情報
-- `VideoDecoderDecodedImageCallbackRef` / `VideoDecoderDecodedImageCallbackPtr`
+- `VideoDecoderDecodedImageCallbackPtr`
   - デコード完了 callback
 
 ### RTP
@@ -283,15 +340,15 @@ impl FactoryHolder {
   - コーデック能力
 - `RtpCodecCapability`
   - 個別コーデック設定
-- `RtpCodecRef` / `RtpCodecCapabilityRef`
+- `RtpCodecRef` / `RtpCodecRefMut` / `RtpCodecCapabilityRef` / `RtpCodecCapabilityRefMut`
   - RTP コーデック参照型
 - `RtpCodecCapabilityVector`
   - コーデック能力ベクタ
-- `RtpCodecCapabilityVectorRef`
+- `RtpCodecCapabilityVectorRef` / `RtpCodecCapabilityVectorRefMut`
   - コーデック能力ベクタ参照型
 - `RtpEncodingParameters` / `RtpEncodingParametersVector`
   - エンコーディング設定
-- `RtpEncodingParametersRef`
+- `RtpEncodingParametersRef` / `RtpEncodingParametersRefMut`
   - エンコーディング設定参照型
 - `RtpParameters`
   - RTP 送信パラメータ
@@ -333,7 +390,7 @@ impl FactoryHolder {
   - ICE 候補参照型
 - `IceServer` / `IceServerVector`
   - ICE サーバー設定
-- `IceServerRef` / `IceServerVectorRef`
+- `IceServerRef` / `IceServerRefMut` / `IceServerVectorRef` / `IceServerVectorRefMut`
   - ICE サーバー参照型
 - `IceTransportsType`
   - ICE トランスポートモード
@@ -369,6 +426,12 @@ impl FactoryHolder {
   - WebRTC 環境の初期化
 - `EnvironmentRef`
   - WebRTC 環境参照型
+- `EnvironmentFactory`
+  - フィールドトライアルを設定した WebRTC 環境の生成
+- `FieldTrials`
+  - libwebrtc のフィールドトライアル
+- `FieldTrialsViewRef`
+  - フィールドトライアルの参照型
 - `Thread`
   - スレッド管理
 - `AudioEncoderFactory` / `AudioDecoderFactory`
@@ -385,10 +448,8 @@ impl FactoryHolder {
   - カラーフォーマット変換 (libyuv)
 - `LibyuvFourcc`
   - `convert_from_i420` 用の出力フォーマット指定
-- `CxxString` / `CxxStringRef` / `StringVector` / `StringVectorRef` / `MapStringString` / `MapStringStringIter`
+- `CxxString` / `CxxStringRef` / `CxxStringRefMut` / `StringVector` / `StringVectorRef` / `StringVectorRefMut` / `MapStringStringRef` / `MapStringStringRefMut` / `MapStringStringIter`
   - C++ 標準文字列 / コンテナの Rust ラッパー
-- `ScopedRef` / `RefCountedHandle`
-  - 参照カウント付きハンドル管理
 - `random_bytes` / `random_string`
   - ランダム生成
 - `time_millis` / `thread_sleep_ms`

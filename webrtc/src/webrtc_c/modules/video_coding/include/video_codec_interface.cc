@@ -27,8 +27,8 @@ webrtc_CodecSpecificInfo_new() {
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_codec_type(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return static_cast<int>(info->codecType);
 }
 
@@ -40,8 +40,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_codec_type(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_end_of_picture(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return info->end_of_picture ? 1 : 0;
 }
 
@@ -53,8 +53,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_end_of_picture(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp8_non_reference(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return info->codecSpecific.VP8.nonReference ? 1 : 0;
 }
 
@@ -66,8 +66,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp8_non_reference(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp8_temporal_idx(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return static_cast<int>(info->codecSpecific.VP8.temporalIdx);
 }
 
@@ -79,8 +79,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp8_temporal_idx(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp8_layer_sync(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return info->codecSpecific.VP8.layerSync ? 1 : 0;
 }
 
@@ -92,8 +92,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp8_layer_sync(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp8_key_idx(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return static_cast<int>(info->codecSpecific.VP8.keyIdx);
 }
 
@@ -105,8 +105,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp8_key_idx(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_temporal_idx(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return static_cast<int>(info->codecSpecific.VP9.temporal_idx);
 }
 
@@ -118,8 +118,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_temporal_idx(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_inter_pic_predicted(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return info->codecSpecific.VP9.inter_pic_predicted ? 1 : 0;
 }
 
@@ -131,8 +131,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_inter_pic_predicted(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_flexible_mode(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return info->codecSpecific.VP9.flexible_mode ? 1 : 0;
 }
 
@@ -144,8 +144,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_flexible_mode(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_inter_layer_predicted(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return info->codecSpecific.VP9.inter_layer_predicted ? 1 : 0;
 }
 
@@ -157,8 +157,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_inter_layer_predicted(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_ss_data_available(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return info->codecSpecific.VP9.ss_data_available ? 1 : 0;
 }
 
@@ -170,8 +170,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_ss_data_available(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_temporal_up_switch(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return info->codecSpecific.VP9.temporal_up_switch ? 1 : 0;
 }
 
@@ -183,8 +183,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_temporal_up_switch(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_num_spatial_layers(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return static_cast<int>(info->codecSpecific.VP9.num_spatial_layers);
 }
 
@@ -197,8 +197,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_num_spatial_layers(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_first_frame_in_picture(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return info->codecSpecific.VP9.first_frame_in_picture ? 1 : 0;
 }
 
@@ -210,8 +210,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_vp9_first_frame_in_picture(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_vp9_spatial_layer_resolution_present(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return info->codecSpecific.VP9.spatial_layer_resolution_present ? 1 : 0;
 }
 
@@ -225,8 +225,8 @@ webrtc_CodecSpecificInfo_set_vp9_spatial_layer_resolution_present(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_h264_packetization_mode(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return static_cast<int>(info->codecSpecific.H264.packetization_mode);
 }
 
@@ -239,8 +239,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_h264_packetization_mode(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_h264_temporal_idx(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return static_cast<int>(info->codecSpecific.H264.temporal_idx);
 }
 
@@ -252,8 +252,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_h264_temporal_idx(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_h264_base_layer_sync(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return info->codecSpecific.H264.base_layer_sync ? 1 : 0;
 }
 
@@ -265,8 +265,8 @@ WEBRTC_EXPORT void webrtc_CodecSpecificInfo_set_h264_base_layer_sync(
 }
 
 WEBRTC_EXPORT int webrtc_CodecSpecificInfo_h264_idr_frame(
-    struct webrtc_CodecSpecificInfo* self) {
-  auto info = reinterpret_cast<webrtc::CodecSpecificInfo*>(self);
+    const struct webrtc_CodecSpecificInfo* self) {
+  auto info = reinterpret_cast<const webrtc::CodecSpecificInfo*>(self);
   return info->codecSpecific.H264.idr_frame ? 1 : 0;
 }
 

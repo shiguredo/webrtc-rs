@@ -13,8 +13,8 @@ extern "C" {
 // -------------------------
 
 WEBRTC_DECLARE_UNIQUE(webrtc_RTCError);
-WEBRTC_EXPORT int webrtc_RTCError_ok(struct webrtc_RTCError* self);
-WEBRTC_EXPORT void webrtc_RTCError_message(struct webrtc_RTCError* self,
+WEBRTC_EXPORT int webrtc_RTCError_ok(const struct webrtc_RTCError* self);
+WEBRTC_EXPORT void webrtc_RTCError_message(const struct webrtc_RTCError* self,
                                            const char** out_message,
                                            size_t* out_len);
 

@@ -54,11 +54,11 @@ WEBRTC_EXPORT void webrtc_VideoFrameBuilder_set_timestamp_us(
 WEBRTC_EXPORT void webrtc_VideoFrameBuilder_set_presentation_timestamp_us(
     struct webrtc_VideoFrameBuilder* self,
     int has,
-    int64_t presentation_timestamp_us);
+    const int64_t* presentation_timestamp_us);
 WEBRTC_EXPORT void webrtc_VideoFrameBuilder_set_reference_time_us(
     struct webrtc_VideoFrameBuilder* self,
     int has,
-    int64_t reference_time_us);
+    const int64_t* reference_time_us);
 WEBRTC_EXPORT void webrtc_VideoFrameBuilder_set_rtp_timestamp(
     struct webrtc_VideoFrameBuilder* self,
     uint32_t rtp_timestamp);

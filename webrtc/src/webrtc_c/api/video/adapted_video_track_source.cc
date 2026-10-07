@@ -82,9 +82,9 @@ WEBRTC_EXPORT int webrtc_AdaptedVideoTrackSource_AdaptFrame(
 
 WEBRTC_EXPORT void webrtc_AdaptedVideoTrackSource_OnFrame(
     struct webrtc_AdaptedVideoTrackSource* self,
-    struct webrtc_VideoFrame* frame) {
+    const struct webrtc_VideoFrame* frame) {
   auto src = reinterpret_cast<AdaptedVideoTrackSourceWrapper*>(self);
-  auto f = reinterpret_cast<webrtc::VideoFrame*>(frame);
+  auto f = reinterpret_cast<const webrtc::VideoFrame*>(frame);
   src->OnFramePublic(*f);
 }
 WEBRTC_DEFINE_CAST_REFCOUNTED(webrtc_AdaptedVideoTrackSource,

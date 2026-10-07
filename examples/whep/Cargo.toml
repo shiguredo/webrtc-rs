@@ -5,16 +5,13 @@ edition = "2024"
 publish = false
 
 [dependencies]
+# コマンドライン引数のパース
 noargs = "0.4"
-rustls = {
-  version = "0.23",
-  default-features = false,
-  features = [
-    "aws-lc-rs",
-    "std",
-    "tls12",
-  ]
-}
+# TLS 実装 (暗号ライブラリバックエンドに aws-lc-rs を使う)
+rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", "std", "tls12"] }
+# プラットフォーム標準の証明書ストアの利用
 rustls-platform-verifier = "0.7"
+# HTTP/1.1 実装
 shiguredo_http11 = "2026.6"
+# 本ライブラリ
 shiguredo_webrtc = { path = "../.." }

@@ -1,5 +1,6 @@
+use crate::const_non_null::ConstNonNull;
 use crate::ffi;
-use crate::helper::non_null::expect_non_null;
+use crate::helper::non_null::{expect_non_null, expect_non_null_const};
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -17,8 +18,9 @@ pub(crate) trait RefCountedHandle {
     type Raw;
 
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw;
-    unsafe fn add_ref(raw: *mut Self::Raw);
-    unsafe fn release(raw: *mut Self::Raw);
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw;
+    unsafe fn add_ref(raw: *const Self::Raw);
+    unsafe fn release(raw: *const Self::Raw);
 }
 
 /// webrtc::scoped_refptr 相当の簡易ラッパー。
@@ -29,22 +31,22 @@ pub(crate) struct ScopedRef<H: RefCountedHandle> {
 }
 
 impl<H: RefCountedHandle> ScopedRef<H> {
-    /// 生の refcounted ポインタから生成する。
+    /// 生の refcounted ポインタから生成する crate 内部専用のコンストラクタ。
     ///
-    /// # Safety
-    /// - `raw_ref` は有効な refcounted ポインタで、呼び出し元が所有権を持っていること。
-    pub fn from_raw(raw_ref: NonNull<H::Refcounted>) -> Self {
+    /// `raw_ref` が持つ参照カウント 1 つ分の所有権をこの型が引き受けるため、
+    /// 同じ参照カウントを 2 回渡してはいけない。
+    pub(crate) fn from_raw(raw_ref: NonNull<H::Refcounted>) -> Self {
         Self {
             raw_ref,
             _marker: PhantomData,
         }
     }
 
-    pub fn as_refcounted_ptr(&self) -> *mut H::Refcounted {
+    pub(crate) fn as_refcounted_ptr(&self) -> *mut H::Refcounted {
         self.raw_ref.as_ptr()
     }
 
-    pub fn as_ptr(&self) -> *mut H::Raw {
+    pub(crate) fn as_ptr(&self) -> *mut H::Raw {
         self.raw().as_ptr()
     }
 
@@ -72,6 +74,41 @@ impl<H: RefCountedHandle> Drop for ScopedRef<H> {
     }
 }
 
+/// const な webrtc::scoped_refptr 相当の簡易ラッパー。
+///
+/// C++ 側が `scoped_refptr<const CppType>` として渡してくるハンドルを扱う。
+/// Rust の `NonNull` は可変ポインタしか扱えないため、`ConstNonNull` を保持する。
+#[derive(Debug)]
+pub(crate) struct ScopedRefConst<H: RefCountedHandle> {
+    raw_ref: ConstNonNull<H::Refcounted>,
+    _marker: PhantomData<H>,
+}
+
+impl<H: RefCountedHandle> ScopedRefConst<H> {
+    /// 生の refcounted ポインタから生成する crate 内部専用のコンストラクタ。
+    ///
+    /// `raw_ref` が持つ参照カウント 1 つ分の所有権をこの型が引き受けるため、
+    /// 同じ参照カウントを 2 回渡してはいけない。
+    pub(crate) fn from_raw(raw_ref: ConstNonNull<H::Refcounted>) -> Self {
+        Self {
+            raw_ref,
+            _marker: PhantomData,
+        }
+    }
+
+    pub(crate) fn raw(&self) -> ConstNonNull<H::Raw> {
+        let raw = unsafe { H::get_const(self.raw_ref.as_ptr()) };
+        expect_non_null_const(raw, "RefCountedHandle::get_const")
+    }
+}
+
+impl<H: RefCountedHandle> Drop for ScopedRefConst<H> {
+    fn drop(&mut self) {
+        let raw = self.raw();
+        unsafe { H::release(raw.as_ptr()) };
+    }
+}
+
 // RefCountedHandle を実装する各ハンドル。
 pub(crate) struct AudioDecoderFactoryHandle;
 impl RefCountedHandle for AudioDecoderFactoryHandle {
@@ -81,10 +118,13 @@ impl RefCountedHandle for AudioDecoderFactoryHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_AudioDecoderFactory_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_AudioDecoderFactory_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_AudioDecoderFactory_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_AudioDecoderFactory_Release(raw) };
     }
 }
@@ -97,10 +137,13 @@ impl RefCountedHandle for AudioEncoderFactoryHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_AudioEncoderFactory_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_AudioEncoderFactory_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_AudioEncoderFactory_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_AudioEncoderFactory_Release(raw) };
     }
 }
@@ -113,10 +156,13 @@ impl RefCountedHandle for AudioDeviceModuleHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_AudioDeviceModule_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_AudioDeviceModule_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_AudioDeviceModule_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_AudioDeviceModule_Release(raw) };
     }
 }
@@ -129,10 +175,13 @@ impl RefCountedHandle for AudioTrackSourceHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_AudioSourceInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_AudioSourceInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_AudioSourceInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_AudioSourceInterface_Release(raw) };
     }
 }
@@ -145,10 +194,13 @@ impl RefCountedHandle for AudioTrackHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_AudioTrackInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_AudioTrackInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_AudioTrackInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_AudioTrackInterface_Release(raw) };
     }
 }
@@ -161,10 +213,13 @@ impl RefCountedHandle for I420BufferHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_I420Buffer_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_I420Buffer_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_I420Buffer_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_I420Buffer_Release(raw) };
     }
 }
@@ -177,10 +232,13 @@ impl RefCountedHandle for NV12BufferHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_NV12Buffer_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_NV12Buffer_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_NV12Buffer_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_NV12Buffer_Release(raw) };
     }
 }
@@ -193,10 +251,13 @@ impl RefCountedHandle for VideoFrameBufferHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_VideoFrameBuffer_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_VideoFrameBuffer_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_VideoFrameBuffer_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_VideoFrameBuffer_Release(raw) };
     }
 }
@@ -209,10 +270,13 @@ impl RefCountedHandle for EncodedImageBufferHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_EncodedImageBuffer_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_EncodedImageBuffer_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_EncodedImageBuffer_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_EncodedImageBuffer_Release(raw) };
     }
 }
@@ -225,10 +289,13 @@ impl RefCountedHandle for AdaptedVideoTrackSourceHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_AdaptedVideoTrackSource_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_AdaptedVideoTrackSource_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_AdaptedVideoTrackSource_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_AdaptedVideoTrackSource_Release(raw) };
     }
 }
@@ -241,10 +308,13 @@ impl RefCountedHandle for VideoTrackSourceHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_VideoTrackSourceInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_VideoTrackSourceInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_VideoTrackSourceInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_VideoTrackSourceInterface_Release(raw) };
     }
 }
@@ -257,10 +327,13 @@ impl RefCountedHandle for VideoTrackHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_VideoTrackInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_VideoTrackInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_VideoTrackInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_VideoTrackInterface_Release(raw) };
     }
 }
@@ -273,10 +346,13 @@ impl RefCountedHandle for MediaStreamTrackHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_MediaStreamTrackInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_MediaStreamTrackInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_MediaStreamTrackInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_MediaStreamTrackInterface_Release(raw) };
     }
 }
@@ -289,10 +365,13 @@ impl RefCountedHandle for MediaStreamHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_MediaStreamInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_MediaStreamInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_MediaStreamInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_MediaStreamInterface_Release(raw) };
     }
 }
@@ -305,10 +384,13 @@ impl RefCountedHandle for RtpReceiverHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_RtpReceiverInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_RtpReceiverInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_RtpReceiverInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_RtpReceiverInterface_Release(raw) };
     }
 }
@@ -321,10 +403,13 @@ impl RefCountedHandle for RtpSenderHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_RtpSenderInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_RtpSenderInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_RtpSenderInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_RtpSenderInterface_Release(raw) };
     }
 }
@@ -337,10 +422,13 @@ impl RefCountedHandle for FrameTransformerHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_FrameTransformerInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_FrameTransformerInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_FrameTransformerInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_FrameTransformerInterface_Release(raw) };
     }
 }
@@ -353,10 +441,13 @@ impl RefCountedHandle for TransformedFrameCallbackHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_TransformedFrameCallback_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_TransformedFrameCallback_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_TransformedFrameCallback_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_TransformedFrameCallback_Release(raw) };
     }
 }
@@ -369,10 +460,13 @@ impl RefCountedHandle for PeerConnectionHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_PeerConnectionInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_PeerConnectionInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_PeerConnectionInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_PeerConnectionInterface_Release(raw) };
     }
 }
@@ -385,10 +479,13 @@ impl RefCountedHandle for DtlsTransportHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_DtlsTransportInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_DtlsTransportInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_DtlsTransportInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_DtlsTransportInterface_Release(raw) };
     }
 }
@@ -401,10 +498,13 @@ impl RefCountedHandle for RTCStatsReportHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_RTCStatsReport_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_RTCStatsReport_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_RTCStatsReport_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_RTCStatsReport_Release(raw) };
     }
 }
@@ -417,10 +517,13 @@ impl RefCountedHandle for RtpTransceiverHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_RtpTransceiverInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_RtpTransceiverInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_RtpTransceiverInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_RtpTransceiverInterface_Release(raw) };
     }
 }
@@ -433,10 +536,13 @@ impl RefCountedHandle for SetLocalDescriptionObserverHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_SetLocalDescriptionObserverInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_SetLocalDescriptionObserverInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_SetLocalDescriptionObserverInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_SetLocalDescriptionObserverInterface_Release(raw) };
     }
 }
@@ -449,10 +555,13 @@ impl RefCountedHandle for SetRemoteDescriptionObserverHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_SetRemoteDescriptionObserverInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_SetRemoteDescriptionObserverInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_SetRemoteDescriptionObserverInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_SetRemoteDescriptionObserverInterface_Release(raw) };
     }
 }
@@ -465,10 +574,13 @@ impl RefCountedHandle for PeerConnectionFactoryHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_PeerConnectionFactoryInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_PeerConnectionFactoryInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_PeerConnectionFactoryInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_PeerConnectionFactoryInterface_Release(raw) };
     }
 }
@@ -481,10 +593,13 @@ impl RefCountedHandle for ConnectionContextHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_ConnectionContext_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_ConnectionContext_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_ConnectionContext_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_ConnectionContext_Release(raw) };
     }
 }
@@ -497,10 +612,13 @@ impl RefCountedHandle for DataChannelHandle {
     unsafe fn get(raw_ref: *mut Self::Refcounted) -> *mut Self::Raw {
         unsafe { ffi::webrtc_DataChannelInterface_refcounted_get(raw_ref) }
     }
-    unsafe fn add_ref(raw: *mut Self::Raw) {
+    unsafe fn get_const(raw_ref: *const Self::Refcounted) -> *const Self::Raw {
+        unsafe { ffi::webrtc_DataChannelInterface_refcounted_get_const(raw_ref) }
+    }
+    unsafe fn add_ref(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_DataChannelInterface_AddRef(raw) };
     }
-    unsafe fn release(raw: *mut Self::Raw) {
+    unsafe fn release(raw: *const Self::Raw) {
         unsafe { ffi::webrtc_DataChannelInterface_Release(raw) };
     }
 }

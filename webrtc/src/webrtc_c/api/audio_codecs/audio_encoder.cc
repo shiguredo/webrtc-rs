@@ -234,10 +234,9 @@ WEBRTC_EXPORT void webrtc_AudioEncoder_unique_vector_delete(
 }
 
 WEBRTC_EXPORT size_t webrtc_AudioEncoder_unique_vector_size(
-    struct webrtc_AudioEncoder_unique_vector* self) {
-  auto vec =
-      reinterpret_cast<std::vector<std::unique_ptr<webrtc::AudioEncoder>>*>(
-          self);
+    const struct webrtc_AudioEncoder_unique_vector* self) {
+  auto vec = reinterpret_cast<
+      const std::vector<std::unique_ptr<webrtc::AudioEncoder>>*>(self);
   return vec->size();
 }
 
@@ -406,8 +405,8 @@ webrtc_AudioEncoder_EncodedInfo_new() {
 }
 
 WEBRTC_EXPORT size_t webrtc_AudioEncoder_EncodedInfo_get_encoded_bytes(
-    struct webrtc_AudioEncoder_EncodedInfo* self) {
-  auto info = reinterpret_cast<webrtc::AudioEncoder::EncodedInfo*>(self);
+    const struct webrtc_AudioEncoder_EncodedInfo* self) {
+  auto info = reinterpret_cast<const webrtc::AudioEncoder::EncodedInfo*>(self);
   return info->encoded_bytes;
 }
 
@@ -419,8 +418,8 @@ WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_encoded_bytes(
 }
 
 WEBRTC_EXPORT uint32_t webrtc_AudioEncoder_EncodedInfo_get_encoded_timestamp(
-    struct webrtc_AudioEncoder_EncodedInfo* self) {
-  auto info = reinterpret_cast<webrtc::AudioEncoder::EncodedInfo*>(self);
+    const struct webrtc_AudioEncoder_EncodedInfo* self) {
+  auto info = reinterpret_cast<const webrtc::AudioEncoder::EncodedInfo*>(self);
   return info->encoded_timestamp;
 }
 
@@ -432,8 +431,8 @@ WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_encoded_timestamp(
 }
 
 WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfo_get_payload_type(
-    struct webrtc_AudioEncoder_EncodedInfo* self) {
-  auto info = reinterpret_cast<webrtc::AudioEncoder::EncodedInfo*>(self);
+    const struct webrtc_AudioEncoder_EncodedInfo* self) {
+  auto info = reinterpret_cast<const webrtc::AudioEncoder::EncodedInfo*>(self);
   return info->payload_type;
 }
 
@@ -445,8 +444,8 @@ WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_payload_type(
 }
 
 WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfo_get_send_even_if_empty(
-    struct webrtc_AudioEncoder_EncodedInfo* self) {
-  auto info = reinterpret_cast<webrtc::AudioEncoder::EncodedInfo*>(self);
+    const struct webrtc_AudioEncoder_EncodedInfo* self) {
+  auto info = reinterpret_cast<const webrtc::AudioEncoder::EncodedInfo*>(self);
   return info->send_even_if_empty ? 1 : 0;
 }
 
@@ -458,8 +457,8 @@ WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_send_even_if_empty(
 }
 
 WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfo_get_speech(
-    struct webrtc_AudioEncoder_EncodedInfo* self) {
-  auto info = reinterpret_cast<webrtc::AudioEncoder::EncodedInfo*>(self);
+    const struct webrtc_AudioEncoder_EncodedInfo* self) {
+  auto info = reinterpret_cast<const webrtc::AudioEncoder::EncodedInfo*>(self);
   return info->speech ? 1 : 0;
 }
 
@@ -471,8 +470,8 @@ WEBRTC_EXPORT void webrtc_AudioEncoder_EncodedInfo_set_speech(
 }
 
 WEBRTC_EXPORT int webrtc_AudioEncoder_EncodedInfo_get_encoder_type(
-    struct webrtc_AudioEncoder_EncodedInfo* self) {
-  auto info = reinterpret_cast<webrtc::AudioEncoder::EncodedInfo*>(self);
+    const struct webrtc_AudioEncoder_EncodedInfo* self) {
+  auto info = reinterpret_cast<const webrtc::AudioEncoder::EncodedInfo*>(self);
   return static_cast<int>(info->encoder_type);
 }
 
