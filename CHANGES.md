@@ -11,6 +11,10 @@
 
 ## develop
 
+## 0.154.1
+
+**リリース日**: 2026-10-08
+
 - [CHANGE] `RawBufferWriter::write` を `unsafe fn` にする
   - 書き込み先の容量を超えないことの保証を、呼び出し側の責任として `unsafe` で明示する
   - `AudioDecoderHandler` のシグネチャは変わらない
