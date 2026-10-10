@@ -11,7 +11,7 @@
 
 `issues/0104-bug-safe-api-use-after-free.md` で use-after-free に到達する経路を洗い出した際に、ポインタの寿命とは別の原因で「同じ実体へ並行にアクセスできる」箇所が見つかった。use-after-free は解放済みメモリへのアクセスの問題であり、こちらは同じ実体への並行アクセスの問題なので別 issue として扱う。
 
-LogSink と LoggingConfig の初期化を先行して安全化し、その後に共有映像バッファと残りのハンドラを対応する。先行対応だけで本 issue 全体を完了とはしない。observer の登録経路については 0104 の対応と組み合わせて排他条件を満たす必要がある。
+`LogSinkHandler` の callback の共有参照化は `issues/0114-bug-log-sink-concurrent-callback.md` で扱う。本 issue は共有映像バッファ、残りのハンドラ、`LoggingConfig` の初期化を対応する。先行対応だけで本 issue 全体を完了とはしない。observer の登録経路については 0104 の対応と組み合わせて排他条件を満たす必要がある。
 
 以下は `shiguredo_webrtc 0.154.1-canary.5` と、依存する `webrtc-build m154.8037.4.1` の libwebrtc commit `7ee41bfd3f443545b06456f47f14a52bdf71180a` を確認した結果である。
 
@@ -64,11 +64,10 @@ observer を受け取る `PeerConnectionDependencies::new` / `DataChannel::regis
 
 ### (3) 同時呼び出しがあり得ることを確認したハンドラ
 
-- `LogSinkHandler` (`src/rtc_base/logging.rs`): `rtc_base/logging.cc` の `LogMessage::~LogMessage` は、`config.sinks()` のループではログロックを取らずに `sink->OnLogMessage(log_line_)` を呼ぶ (直後の legacy な `streams_` のループは `MutexLock lock(&GetLoggingLock())` を取る)。crate の `LogSink` は `LoggingConfig::AddSink` で `config.sinks_` に入り、`log::initialize_logging` でグローバルに設定される。ログはどのスレッドからでも出るため、同じ sink が同時に呼ばれ得る
 - `VideoFrameBufferHandler` (`src/api/video_codec_common.rs`): `VideoFrameBuffer` は `Clone + Send` であり、C ラッパーの `VideoFrameBufferImpl` は Rust callback を直接呼ぶ。`to_i420` / `crop_and_scale` だけでなく、safe な `kind` / `width` / `height` でも trampoline が `&mut VideoFrameBufferHandlerState` を作るため、読み取り同士でも競合する
 - `AudioEncoderFactoryHandler` / `AudioDecoderFactoryHandler` (`src/api/audio.rs`): factory は `Clone + Send` であり、`get_supported_encoders` / `get_supported_decoders` / `query_audio_encoder` / `create` などを別ハンドルから safe に呼べる。C ラッパーの `AudioEncoderFactoryImpl` / `AudioDecoderFactoryImpl` は callback を直接呼び、trampoline が同じ state に `&mut` を作る。1 stream の worker thread の直列性では共有 factory を保護できない
 
-LogSink の `handler_state` も `&mut LogSinkHandlerState` を返す。ハンドラ内部で Mutex を取るだけでは、ロックを取る前に trampoline が重複する排他参照を作る問題を防げない。
+これらのハンドラの trampoline は `&mut ...State` を返す。ハンドラ内部で Mutex を取るだけでは、ロックを取る前に trampoline が重複する排他参照を作る問題を防げない。
 
 カスタム映像バッファの debug 用 `callback_thread` は通常の `Option<ThreadId>` であり、trampoline が `&mut` を作った後に読み書きされる。release には存在せず、直列のスレッド移動まで拒否するため、排他の保証には使えない。
 
@@ -138,11 +137,10 @@ libwebrtc の独自パッチ、未取り込み変更の backport、`make_ref_cou
 - 0104 が登録を型で保証する設計を採る場合も、寿命だけでなく上記の重複 callback を排除することを確認する。safe な登録 API に使用上の注意を書くだけでは完了条件を満たさない
 - `VideoEncoderHandler` / `VideoDecoderHandler` は現在の `Send` と `&mut self` を維持し、確認した通常経路の直列性を Rustdoc に記載する
 
-登録 API の生存期間の変更は 0104 が担当し、本 issue は重複 callback の排除条件を担当する。LogSink の先行対応には 0104 の完了を要求しないが、observer の経路を含めた本 issue 全体の完了には登録 API の安全化が必要である。
+登録 API の生存期間の変更は 0104 が担当し、本 issue は重複 callback の排除条件を担当する。observer の経路を含めた本 issue 全体の完了には登録 API の安全化が必要である。
 
 ### (3) 同時呼び出しがあり得るハンドラ
 
-- `LogSinkHandler` は `Send + Sync` とし、`on_log_message` を `&self` にする。`handler_state` と `log_sink_on_log_line_ref` も共有参照を使い、callback の入口で可変 state を作らない
 - `VideoFrameBufferHandler` は `Send + Sync` とし、`to_i420` / `crop_and_scale` を含む全メソッドを `&self` にする。`kind` / `width` / `height` を含む全 trampoline を共有参照へ変更する。`callback_thread` と thread 固定チェックは撤去する
 - `AudioEncoderFactoryHandler` / `AudioDecoderFactoryHandler` は `Send + Sync` とし、全メソッドを `&self` にする。対応する全 trampoline を共有参照へ変更する
 - 各 handler の利用箇所を新しい trait に合わせる。並行して呼ばれる契約を Rustdoc に書き、可変状態の同期は handler 実装が担当する
@@ -179,7 +177,7 @@ libwebrtc の独自パッチ、未取り込み変更の backport、`make_ref_cou
 
 ### 対応順
 
-1. LogSink の trait・trampoline と LoggingConfig 初期化を安全化し、利用箇所とテストを更新する。この段階で SDK が安全な LoggingConfig 経路へ接続できる
+1. LoggingConfig 初期化を安全化し、利用箇所とテストを更新する
 2. I420 / NV12 の全画素書き込み操作と、カスタム VideoFrameBuffer の全 callback を安全化する
 3. 共有 audio factory と複数登録できる video / audio sink、エンコード完了 callback を安全化する
 4. ADM の共有・直接操作の排他契約と `Send` の根拠を反映し、0104 と組み合わせた observer 登録の排他条件を確認する
@@ -189,12 +187,12 @@ libwebrtc の独自パッチ、未取り込み変更の backport、`make_ref_cou
 ## 完了条件
 
 - I420 / NV12 の可変 slice と `scale_from` / `crop_and_scale_from` が safe API から呼べず、書き込み同士と読み取り・書き込みの排他契約が `# Safety` に記載されていること。cast と VideoFrame 経由の共有も含むこと
-- `LogSinkHandler` / `VideoFrameBufferHandler` / `AudioEncoderFactoryHandler` / `AudioDecoderFactoryHandler` / `VideoSinkHandler` / `AudioTrackSinkHandler` / `VideoEncoderEncodedImageCallbackHandler` が `Send + Sync` と `&self` を使い、通常 callback の trampoline も共有参照を使うこと
+- `VideoFrameBufferHandler` / `AudioEncoderFactoryHandler` / `AudioDecoderFactoryHandler` / `VideoSinkHandler` / `AudioTrackSinkHandler` / `VideoEncoderEncodedImageCallbackHandler` が `Send + Sync` と `&self` を使い、通常 callback の trampoline も共有参照を使うこと
 - カスタム VideoFrameBuffer の getter を含む callback に可変 state の生成が残らず、debug / release の両方で並行アクセスと直列のスレッド移動を扱えること
 - `initialize_logging` が unsafe となり、初期化順序と並行 native ログ出力の排除契約、初期化失敗時の `false` の意味が記載されていること
 - 上記の公開 API に合わせて既存の handler 実装、テスト、サンプルが更新され、unsafe 呼び出しの排他条件が確認できること
-- 実物の C ラッパーを通じ、複数スレッドの LogSink、clone した映像バッファと audio factory、複数登録先の sink / エンコード完了 callback を検証すること。モックやスタブ、未修正の UB を実行するテストは使わないこと
-- logging のグローバル初期化の検証は独立プロセスで行い、初期適用・再適用の結果と複数スレッドからのログ受信を検証すること
+- 実物の C ラッパーを通じ、clone した映像バッファと audio factory、複数登録先の sink / エンコード完了 callback を検証すること。モックやスタブ、未修正の UB を実行するテストは使わないこと
+- logging のグローバル初期化の検証は独立プロセスで行い、初期適用・再適用の結果を検証すること
 - 直列性を前提にする handler の Rustdoc が保証の範囲を示し、observer の登録 API で同時・再入 callback が排除されていること。0104 の登録 API の安全化が未完了なら、本 issue 全体を完了としないこと
 - `SdpAudioFormatRef` の readonly な `Send` の根拠がコメントに記載され、`RawBufferWriter` の `Send` が `T: Send` に限定されていること
 - ADM の factory 引き渡しと 4 個の直接操作が unsafe となり、native 利用者・他のハンドル・callback からの同時・再入を排除する契約が記載されていること。`AudioDeviceModuleHandler` は `Send` と `&mut self` を維持し、通常の直列呼び出しを実物の C ラッパーで検証すること
