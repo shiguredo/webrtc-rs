@@ -1,7 +1,7 @@
 # LogSinkHandler の callback が同時に呼ばれると未定義動作になる
 
 - Created: 2026-10-11
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-11
 - Branch: feature/fix-log-sink-concurrent-callback
 - Polished: {YYYY-MM-DD}
 
@@ -65,3 +65,16 @@ for thread in threads {
 - 既存のテストとサンプルが新しい trait に追随している
 - `cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build --all-targets -- -D warnings` / `cargo test --workspace --features source-build` が通る
 - 公開 API の変更を伴うため `CHANGES.md` の `## develop` に `[CHANGE]` が記載されている
+
+## 解決方法
+
+`src/rtc_base/logging.rs` の `LogSinkHandler` を `Send + Sync` の要求に変え、`on_log_message` のレシーバを `&self` にした。あわせて `handler_state` が共有参照 (`&LogSinkHandlerState`) を返すようにし、`log_sink_on_log_line_ref` が callback の入口で可変参照を作らないようにした。`HandlerState<dyn LogSinkHandler>` はハンドラが `Send + Sync` なら自動で `Send + Sync` になるため、状態の共有参照は複数のスレッドから同時に使える。
+
+- `LogSinkHandler` の Rustdoc に、ログは出力したスレッドでそのまま sink へ届くため同じ sink の `on_log_message` が同時に呼ばれ得ること、`&self` で受け取る理由、可変状態を持つ場合は実装側で `Mutex` や atomic により保護する契約を書いた
+- `handler_state` の Rustdoc には、返した参照が複数スレッドで同時に使えること、`user_data` の出所と有効期間、`null` の場合に panic することを書いた
+
+`src/tests.rs` に `logging_sink_receives_concurrent_log_lines` を追加した。8 スレッドから `log::print` を 64 回ずつ呼び、実物の C ラッパーを通して sink が 4096 件全件を受け取ることを `AtomicUsize` で検証する。グローバルな `LoggingConfig` の初期化が競合しないよう、既存の logging のテストと同じく `logging_sink_concurrent_helper` をサブプロセスとして実行する。モックやスタブは使っていない。既存の `TestSinkHandler` も `&self` に追随させた。
+
+libwebrtc を m156.8078.3.4 に上げた。`CHANGES.md` の `## develop` に `[CHANGE]` と `[UPDATE]` を追記した。
+
+`cargo fmt --all -- --check` / `cargo clippy --workspace --features source-build --all-targets -- -D warnings` / `cargo test --workspace --features source-build` が通ることを確認した。

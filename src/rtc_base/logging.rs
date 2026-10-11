@@ -314,9 +314,16 @@ pub mod log {
     ///
     /// [LogSinkHandler::on_log_message] には、ログ 1 行分の全情報を持つ
     /// [LogLineRef] が渡される。
-    pub trait LogSinkHandler: Send {
+    ///
+    /// ログはそれを出力したスレッドでそのまま sink へ届けられるため、
+    /// 同じ sink の [LogSinkHandler::on_log_message] は複数のスレッドから
+    /// 同時に呼ばれ得る。同時に呼ばれても同じ実体への可変参照が重複しないよう、
+    /// ハンドラは `Send + Sync` を要求され、[LogSinkHandler::on_log_message] は
+    /// `&self` を受け取る。可変状態を持つ実装は、[std::sync::Mutex] や
+    /// [std::sync::atomic] などを用いて自身で保護すること。
+    pub trait LogSinkHandler: Send + Sync {
         #[expect(unused_variables)]
-        fn on_log_message(&mut self, line: LogLineRef<'_>) {}
+        fn on_log_message(&self, line: LogLineRef<'_>) {}
     }
 
     type LogSinkHandlerState = HandlerState<dyn LogSinkHandler>;
@@ -369,12 +376,18 @@ pub mod log {
         std::str::from_utf8(bytes).unwrap_or("")
     }
 
-    fn handler_state<'a>(user_data: *mut c_void) -> &'a mut LogSinkHandlerState {
+    /// `user_data` が指すハンドラの状態への共有参照を返す。
+    ///
+    /// 返した参照は複数のスレッドで同時に使える。`user_data` は `Box::into_raw` で
+    /// 変換した `Box<LogSinkHandlerState>` の生ポインタであり、`destroy_handler` で
+    /// 回収されるまで有効でなければならない。`null` の場合は panic する。
+    fn handler_state<'a>(user_data: *mut c_void) -> &'a LogSinkHandlerState {
         assert!(
             !user_data.is_null(),
             "null user_data passed to the LogSink callback"
         );
-        unsafe { &mut *(user_data as *mut LogSinkHandlerState) }
+        // callback は複数のスレッドから同時に呼ばれ得るため、可変参照は作らない。
+        unsafe { &*(user_data as *const LogSinkHandlerState) }
     }
 
     unsafe extern "C" fn log_sink_on_destroy(user_data: *mut c_void) {

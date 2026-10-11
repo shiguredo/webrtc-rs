@@ -11,6 +11,14 @@
 
 ## develop
 
+- [CHANGE] `log::LogSinkHandler` で同じ sink の callback が同時に呼ばれても安全に使えるようにする
+  - `log::LogSinkHandler` は `Send + Sync` を要求し、`on_log_message` は `&self` を受け取る
+  - ログは出力したスレッドでそのまま sink へ届くため、同じ sink の `on_log_message` は複数のスレッドから同時に呼ばれ得る。callback の入口で可変参照を作らず、共有参照として扱う
+  - 可変状態を持つ実装は `Mutex` や atomic などで自身で保護する
+  - @melpon
+- [UPDATE] libwebrtc m156 (m156.8078.3.4) に上げる
+  - @melpon
+
 ## 0.156.0
 
 **リリース日**: 2026-10-11
