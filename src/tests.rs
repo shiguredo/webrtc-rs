@@ -1755,9 +1755,9 @@ fn logging_sink_helper() {
     }
 
     impl log::LogSinkHandler for TestSinkHandler {
-        fn on_log_message(&mut self, line: log::LogLineRef<'_>) {
+        fn on_log_message(&self, line: log::LogLineRef<'_>) {
             if line.message().contains(&self.expected) && line.severity() == log::Severity::Info {
-                *self.seen.lock().unwrap() = true;
+                *self.seen.lock().expect("seen のロックに失敗しました") = true;
             }
         }
     }
@@ -1783,8 +1783,93 @@ fn logging_sink_helper() {
     }
     log::print(log::Severity::Info, "webrtc-c", 0, &expected);
     assert!(
-        *seen.lock().unwrap(),
+        *seen.lock().expect("seen のロックに失敗しました"),
         "sink がメッセージを受け取っていません"
+    );
+}
+
+#[test]
+fn logging_sink_receives_concurrent_log_lines() {
+    let exe = std::env::current_exe().expect("テストバイナリのパスを取得できませんでした");
+    // log::print はグローバルの LoggingConfig へ sink を登録するため、
+    // initialize_logging の競合を避けるべくサブプロセスとして実行する。
+    let output = std::process::Command::new(&exe)
+        .arg("logging_sink_concurrent_helper")
+        .env("WEBRTC_LOG_SINK_CONCURRENT", "1")
+        .output()
+        .expect("サブプロセスの実行に失敗しました");
+    assert!(
+        output.status.success(),
+        "複数スレッドからの sink 呼び出しで全件を受け取れていません\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn logging_sink_concurrent_helper() {
+    // 検証用ヘルパー。logging_sink_receives_concurrent_log_lines から
+    // サブプロセスとして実行され、複数スレッドから同時に log::print を呼んでも
+    // 同じ sink が全件を受け取ることを検証する。sink の on_log_message は
+    // 同時に呼ばれ得るため &self で呼ばれ、件数は AtomicUsize で数える。
+    const THREADS: usize = 8;
+    const LINES_PER_THREAD: usize = 64;
+    const MARKER: &str = "concurrent sink test message";
+
+    struct TestSinkHandler {
+        received: Arc<AtomicUsize>,
+    }
+
+    impl log::LogSinkHandler for TestSinkHandler {
+        fn on_log_message(&self, line: log::LogLineRef<'_>) {
+            // 同じプロセスで出る他のログと区別するため、このテストが出力した
+            // メッセージだけを数える。
+            if line.message().contains(MARKER) {
+                self.received.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+    }
+
+    // このヘルパーは logging_sink_receives_concurrent_log_lines からのみ
+    // サブプロセスとして実行される。テスト本体として直接実行された場合
+    // （グローバルの LoggingConfig が別のテストで既に初期化済みで、検証が
+    // 意味を持たない場合）は何もせず成功とする。
+    if std::env::var("WEBRTC_LOG_SINK_CONCURRENT").is_err() {
+        return;
+    }
+    let received = Arc::new(AtomicUsize::new(0));
+    let mut config = log::LoggingConfig::new();
+    config.set_min_severity(log::Severity::Info);
+    config.set_debug_severity(log::Severity::Info);
+    config.add_sink(log::LogSink::new_with_handler(Box::new(TestSinkHandler {
+        received: received.clone(),
+    })));
+    if !log::initialize_logging(config) {
+        panic!("logging_sink_concurrent_helper: initialize_logging が失敗しました");
+    }
+
+    // 全スレッドで一斉に出力し、sink への同時呼び出しを発生させる。
+    let threads: Vec<_> = (0..THREADS)
+        .map(|i| {
+            std::thread::spawn(move || {
+                for j in 0..LINES_PER_THREAD {
+                    log::print(
+                        log::Severity::Info,
+                        "webrtc-c",
+                        0,
+                        &format!("{MARKER} thread={i} line={j}"),
+                    );
+                }
+            })
+        })
+        .collect();
+    for thread in threads {
+        thread.join().expect("スレッドの join に失敗しました");
+    }
+
+    assert_eq!(
+        received.load(Ordering::SeqCst),
+        THREADS * LINES_PER_THREAD,
+        "sink が受け取った件数が出力した件数と一致しません"
     );
 }
 
