@@ -519,7 +519,9 @@ cargo build --features source-build
 - Windows の場合:
   - Visual Studio 2022 (`Desktop development with C++`)
   - `C++ Clang tools for Windows` (`Microsoft.VisualStudio.Component.VC.Llvm.Clang`)
-    - `bindgen` 用の `libclang` として利用します (C++ コンパイルは MSVC を利用)
+    - `bindgen` 用の `libclang` と、静的ライブラリ作成用の `llvm-lib` として利用します
+  - C++ コンパイラには libwebrtc が利用する Clang (`clang-cl`) を利用するため、別途インストールする必要はありません
+  - ビルドには Ninja を利用します (自動的にダウンロードします)
 
 ```bash
 # Linux
@@ -533,10 +535,56 @@ sudo apt-get install build-essential libclang-dev libx11-dev
 # を有効化してください
 ```
 
+### デバッグビルド (Windows)
+
+libwebrtc のデバッグビルド (webrtc-build が `is_debug=true` でビルドしたもの) は、静的デバッグ CRT (`/MTd`) でコンパイルされています。
+一方 Rust は、デバッグビルドであっても既定でリリース CRT (`/DEFAULTLIB:msvcrt`) をリンクします。
+`msvcrt.lib` と `libcmtd.lib` はそれぞれ `/disallowlib` で相手を排除するため、この 2 つは同時にリンクできません。
+その結果、libwebrtc が参照する `_CrtDbgReportW` が未解決になってリンクに失敗します。
+`_CrtDbgReportW` を定義しているのは `libucrtd.lib` です。`libcmtd.lib` はこれを参照するだけで定義は持たず、`/DEFAULTLIB:libucrtd.lib` で推移的にリンクします。
+
+この組み合わせを解消するには、**利用者側でリンクする CRT を明示的に指定する必要があります**。
+ライブラリ側からは指定できません (Rust の build script が最終バイナリのリンクに影響を与えられるのは、その crate 自身のバイナリだけで、ライブラリからは届かないためです)。
+
+Windows で `debug-build` feature を利用する場合は、次の 3 つを指定してください。
+
+1. `WEBRTC_BUILD_ROOT` — デバッグビルドの prebuilt バイナリは提供されていないため、ローカルの webrtc-build が必須です
+2. Rust 側のリンク設定 — 既定のリリース CRT を外し、libwebrtc と同じ静的デバッグ CRT をリンクします
+3. C/C++ 側のコンパイル設定 — 静的デバッグ CRT でビルドし直します (rustls の `aws-lc-sys` などを使う場合に必要です)
+
+```powershell
+# ローカルの webrtc-build を指定する (デバッグビルドの prebuilt は提供されていない)
+$env:WEBRTC_BUILD_ROOT = "C:\path\to\webrtc-build"
+
+# Rust 側: 既定のリリース CRT を外し、libwebrtc と同じ静的デバッグ CRT をリンクする
+$env:RUSTFLAGS = "-C link-arg=/NODEFAULTLIB:msvcrt " +
+                 "-C link-arg=/DEFAULTLIB:libcmtd"
+
+# C/C++ 側: rustls など C/C++ を含む依存を静的デバッグ CRT でビルドし直す
+$env:CFLAGS = "/MTd"
+$env:CXXFLAGS = "/MTd"
+
+cargo build --features source-build,debug-build
+```
+
+指定の意味:
+
+- `/NODEFAULTLIB:msvcrt`
+  - Rust が既定でリンクするリリース CRT を外します
+- `/DEFAULTLIB:libcmtd`
+  - libwebrtc と同じ静的デバッグ CRT をリンクします。`libucrtd.lib` と `libvcruntimed.lib` はここから推移的にリンクされるため、個別の指定は不要です
+- `CFLAGS` / `CXXFLAGS` の `/MTd`
+  - C/C++ を含む依存 (rustls の `aws-lc-sys` など) は既定で静的リリース CRT (`/MT`) を使うため、揃えないとリンクに失敗します
+  - `shiguredo_webrtc` 単体には C/C++ の依存が無いため、これらが無くてもビルドは通ります
+
+`RUSTFLAGS` と `CFLAGS` / `CXXFLAGS` を変更した場合は、CRT が変わったオブジェクトを作り直す必要があるため、`cargo clean` してからビルドしてください。
+
 ## 環境変数
 
 - `WEBRTC_C_TARGET`
   - ビルドターゲットを変更する場合に指定 (デフォルトはホスト環境に応じて自動判定)
+- `WEBRTC_BUILD_ROOT`
+  - ローカルの webrtc-build を利用する場合に指定 (`source-build` feature と併用)
 
 ## ライセンス
 

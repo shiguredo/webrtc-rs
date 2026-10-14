@@ -16,7 +16,21 @@
   - ログは出力したスレッドでそのまま sink へ届くため、同じ sink の `on_log_message` は複数のスレッドから同時に呼ばれ得る。callback の入口で可変参照を作らず、共有参照として扱う
   - 可変状態を持つ実装は `Mutex` や atomic などで自身で保護する
   - @melpon
-- [UPDATE] libwebrtc m156 (m156.8078.3.4) に上げる
+- [UPDATE] libwebrtc m156 (m156.8078.3.5) に上げる
+  - @melpon
+- [UPDATE] Windows のビルドで libwebrtc が利用する Clang (clang-cl) と libc++ を利用するようにする
+  - MSVC (cl.exe) と MSVC STL ではなく libwebrtc と同じコンパイラと標準ライブラリを使い、C++ の型やシンボルの解釈を libwebrtc と一致させる
+  - C++ コンパイラに libwebrtc に含まれる `clang-cl.exe` を指定する。GCC 互換のオプションは `/clang:` を経由して渡す
+  - C++ のターゲットを CRT 静的リンクにし、例外処理を明示的に有効にする。C のターゲットも同じ CRT を選ぶようにする
+  - CMake のジェネレータを Ninja にする。Ninja は環境に依存しないよう自動でダウンロードする
+  - 静的ライブラリの作成には Visual Studio の `llvm-lib.exe` を使う。WebRTC の Clang には `llvm-lib.exe` が含まれないため
+  - @melpon
+- [UPDATE] Windows のデバッグビルドで `RUSTFLAGS` が不足している場合に、ビルド時に検出して対処方法を案内するようにする
+  - libwebrtc のデバッグビルドは静的デバッグ CRT (`/MTd`) でコンパイルされており、Rust が既定でリンクするリリース CRT と衝突する
+  - ライブラリの build script からは最終バイナリのリンクを変更できないため、利用者が `RUSTFLAGS` を指定する必要がある
+  - C/C++ を含む依存を併用する場合は `CFLAGS`/`CXXFLAGS` も必要だが、依存の有無は build script から知り得ないため検査せず、案内だけを行う
+  - @melpon
+- [FIX] C++20 モジュールスキャンの無効化が `whip_cpp` と `whep_cpp` に漏れていてビルドに失敗する問題を修正する
   - @melpon
 
 ## 0.156.0
