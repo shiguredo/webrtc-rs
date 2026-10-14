@@ -618,9 +618,8 @@ endfunction()
 if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
   # 文字コードを utf-8 として扱うのと、シンボルテーブル数を増やす。
   # clang-cl は C++ の例外が既定で無効なため、明示的に有効にする。
-  # CMAKE_CXX_FLAGS には -MD が入るため、CRT を静的リンクさせるために /MT も明示する
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_options(${target} PRIVATE /utf-8 /bigobj /EHsc /MT)
+    target_compile_options(${target} PRIVATE /utf-8 /bigobj /EHsc)
     set_target_properties(${target}
       PROPERTIES
         # CRTライブラリを静的リンクさせる
@@ -904,6 +903,12 @@ if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
         msdmo.lib
         Secur32.lib
         wmcodecdspuuid.lib
+    )
+    # C++ のターゲットと同じ CRT を選ぶ。ここで指定しないと CMake の既定 (/MD, Debug は /MDd) になり、
+    # 静的リンクされた webrtc_c と CRT が食い違う
+    set_target_properties(${target}
+      PROPERTIES
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
     )
     target_compile_definitions(${target}
       PRIVATE

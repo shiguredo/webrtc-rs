@@ -279,6 +279,10 @@ libwebrtc の `scoped_refptr` 相当を Rust 側で安全に扱うための型:
 - source-build (Linux): 上記 + `build-essential`, `libclang-dev`
 - source-build (macOS): 上記 + Xcode Command Line Tools
 - source-build (Windows): 上記 + Visual Studio 2022 (`Desktop development with C++` + `C++ Clang tools for Windows`)
+  - `C++ Clang tools for Windows` は bindgen 用の `libclang` と静的ライブラリ作成用の `llvm-lib` として使う
+  - C++ コンパイラには libwebrtc に含まれる `clang-cl` を使うため、別途インストールは不要
+  - Ninja はビルド時に自動でダウンロードされる
+  - `debug-build` feature を使う場合は追加の指定が必要 (README の「デバッグビルド (Windows)」を参照)
 
 ## ワークスペース構成
 
