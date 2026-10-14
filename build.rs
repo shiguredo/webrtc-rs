@@ -13,6 +13,8 @@ struct BuildMetadata {
     android_platform: String,
     android_commandlinetools_version: String,
     android_ndk_version: String,
+    ninja_version: String,
+    ninja_win_sha256: String,
 }
 
 /// Cargo.toml からビルド設定を取得する。
@@ -82,6 +84,16 @@ fn get_build_metadata(manifest_dir: &Path) -> BuildMetadata {
         .and_then(|v| v.as_str())
         .expect("build-config.android-ndk-version is missing")
         .to_string();
+    let ninja_version = build_config
+        .get("ninja-version")
+        .and_then(|v| v.as_str())
+        .expect("build-config.ninja-version is missing")
+        .to_string();
+    let ninja_win_sha256 = build_config
+        .get("ninja-win-sha256")
+        .and_then(|v| v.as_str())
+        .expect("build-config.ninja-win-sha256 is missing")
+        .to_string();
 
     BuildMetadata {
         webrtc_build_version,
@@ -90,6 +102,8 @@ fn get_build_metadata(manifest_dir: &Path) -> BuildMetadata {
         android_platform,
         android_commandlinetools_version,
         android_ndk_version,
+        ninja_version,
+        ninja_win_sha256,
     }
 }
 
@@ -662,6 +676,25 @@ fn verify_sha256(file_path: &Path, sha256_path: &Path) -> Result<(), String> {
         .ok_or("SHA256 チェックサムファイルが空です")?
         .to_lowercase();
 
+    verify_sha256_value(file_path, &expected)
+}
+
+/// ファイルの SHA256 チェックサムを期待値と比較する。
+///
+/// 引数:
+/// - `file_path`: 検証対象ファイル。
+/// - `expected`: 期待する小文字 16 進の SHA256 値。
+///
+/// 環境変数依存: なし。
+///
+/// 戻り値:
+/// - `Ok(())`: チェックサム一致。
+/// - `Err(String)`: 計算失敗、または不一致。
+///
+/// 副作用:
+/// - ファイルを読み込む。
+/// - 検証成功時に標準エラーへログを出力する。
+fn verify_sha256_value(file_path: &Path, expected: &str) -> Result<(), String> {
     let actual = compute_sha256(file_path)?;
     if actual != expected {
         return Err(format!(
@@ -916,13 +949,24 @@ fn build_webrtc_c(
             PathBuf::from(&manifest_dir).join(&root_path)
         };
         let abs_root =
-            fs::canonicalize(&abs_root).expect("WEBRTC_BUILD_ROOT の正規化に失敗しました");
+            std::path::absolute(&abs_root).expect("WEBRTC_BUILD_ROOT の絶対パス化に失敗しました");
+        if !abs_root.is_dir() {
+            panic!(
+                "WEBRTC_BUILD_ROOT のディレクトリが見つかりません: {}",
+                abs_root.display()
+            );
+        }
         config.define(
             "WEBRTC_BUILD_ROOT",
             abs_root
                 .to_str()
                 .expect("WEBRTC_BUILD_ROOT の絶対パスを文字列に変換できませんでした"),
         );
+    }
+
+    // Windows では WebRTC の Clang (clang-cl) を使うための設定を加える
+    if cfg!(windows) && is_windows_target(target_platform) {
+        setup_windows_clang_build(&mut config, out_dir, build_metadata);
     }
 
     // iOS クロスコンパイル設定
@@ -1023,6 +1067,70 @@ fn is_windows_target(target_platform: &str) -> bool {
     target_platform.starts_with("windows_")
 }
 
+/// Windows で WebRTC の Clang を使うための CMake 設定を適用する。
+///
+/// 引数:
+/// - `config`: 設定を適用する CMake の設定。
+/// - `out_dir`: Cargo の出力先ディレクトリ（`ninja.exe` と `vswhere.exe` の配置先に使用）。
+/// - `build_metadata`: `Cargo.toml` 由来のビルド設定。
+///
+/// 環境変数依存: なし。
+///
+/// 戻り値: なし。
+///
+/// 副作用:
+/// - 必要に応じて `ninja.exe` をダウンロードする。
+/// - 必要に応じて `vswhere.exe` をダウンロードする。
+/// - Visual Studio を検出する。
+/// - 前提が満たせない場合は panic する。
+fn setup_windows_clang_build(
+    config: &mut shiguredo_cmake::Config,
+    out_dir: &Path,
+    build_metadata: &BuildMetadata,
+) {
+    // Ninja ジェネレータは CMAKE_CXX_COMPILER で指定したコンパイラを利用する
+    config.generator("Ninja");
+
+    // リンクには Visual Studio の環境変数 (LIB) が必要なため、静的ライブラリの作成だけを行うトライコンパイルにする
+    config.define("CMAKE_TRY_COMPILE_TARGET_TYPE", "STATIC_LIBRARY");
+
+    // ビルドには Ninja を利用する。インストール状況に依存しないようにダウンロードする
+    config.define(
+        "CMAKE_MAKE_PROGRAM",
+        ninja_path(out_dir, build_metadata)
+            .to_str()
+            .expect("ninja.exe のパスを文字列に変換できませんでした"),
+    );
+
+    // WebRTC の Clang には llvm-lib が含まれないため、Visual Studio の LLVM の llvm-lib を静的ライブラリの作成に使う
+    let installation_path = find_visual_studio_installation(&vswhere_path(out_dir)).expect(
+        "Visual Studio 2022 または 2026 の検出に失敗しました。\
+         Visual Studio 2022 または 2026 に `Desktop development with C++` を\
+         インストールしてください。",
+    );
+    let llvm_lib_path = PathBuf::from(&installation_path)
+        .join("VC")
+        .join("Tools")
+        .join("Llvm")
+        .join("x64")
+        .join("bin")
+        .join("llvm-lib.exe");
+    if !llvm_lib_path.exists() {
+        panic!(
+            "Visual Studio の LLVM の llvm-lib.exe が見つかりません: {}\n\
+             Visual Studio 2022 または 2026 に `C++ Clang tools for Windows \
+             (Microsoft.VisualStudio.Component.VC.Llvm.Clang)` をインストールしてください。",
+            llvm_lib_path.display()
+        );
+    }
+    config.define(
+        "CMAKE_AR",
+        llvm_lib_path
+            .to_str()
+            .expect("llvm-lib.exe のパスを文字列に変換できませんでした"),
+    );
+}
+
 /// ターゲットに対応する静的ライブラリ名を返す。
 ///
 /// 引数:
@@ -1040,6 +1148,79 @@ fn static_library_filename_for_target(target_platform: &str) -> &'static str {
     } else {
         "libwebrtc_c.a"
     }
+}
+
+/// `ninja.exe` のパスを返す（キャッシュになければダウンロードする）。
+///
+/// 引数:
+/// - `out_dir`: Cargo の出力先ディレクトリ（`tools` ディレクトリの作成に使用）。
+/// - `build_metadata`: `Cargo.toml` 由来のビルド設定（Ninja のバージョンと SHA256）。
+///
+/// 環境変数依存: なし。
+///
+/// 戻り値: `ninja.exe` のパス。
+///
+/// 副作用:
+/// - 必要に応じて `tools` ディレクトリを作成する。
+/// - 必要に応じて `ninja-win.zip` をダウンロードして展開する。
+/// - ダウンロードや展開に失敗した場合は panic する。
+fn ninja_path(out_dir: &Path, build_metadata: &BuildMetadata) -> PathBuf {
+    let tools_dir = out_dir.join("tools");
+    fs::create_dir_all(&tools_dir).expect("tools ディレクトリの作成に失敗しました");
+    let ninja_path = tools_dir.join("ninja.exe");
+    if ninja_path.exists() {
+        return ninja_path;
+    }
+
+    // Windows 用のバイナリは x64 のみ提供されているため、常に x64 版を利用する
+    let archive_name = "ninja-win.zip";
+    let archive_url = format!(
+        "https://github.com/ninja-build/ninja/releases/download/v{}/{}",
+        build_metadata.ninja_version, archive_name
+    );
+    eprintln!("Ninja をダウンロード中: {}", archive_url);
+
+    let archive_path = tools_dir.join(archive_name);
+    download(&archive_url, &archive_path).expect("Ninja のダウンロードに失敗しました");
+    verify_sha256_value(&archive_path, &build_metadata.ninja_win_sha256)
+        .expect("Ninja の SHA256 チェックサム検証に失敗しました");
+    extract(&archive_path, &tools_dir).expect("Ninja の展開に失敗しました");
+    let _ = fs::remove_file(&archive_path);
+
+    if !ninja_path.exists() {
+        panic!(
+            "Ninja の展開後に ninja.exe が見つかりません: {}",
+            ninja_path.display()
+        );
+    }
+    ninja_path
+}
+
+/// `vswhere.exe` のパスを返す（キャッシュになければダウンロードする）。
+///
+/// 引数:
+/// - `out_dir`: Cargo の出力先ディレクトリ（`tools` ディレクトリの作成に使用）。
+///
+/// 環境変数依存: なし。
+///
+/// 戻り値: `vswhere.exe` のパス。
+///
+/// 副作用:
+/// - 必要に応じて `tools` ディレクトリを作成する。
+/// - 必要に応じて `vswhere.exe` をダウンロードする。
+/// - ダウンロードに失敗した場合は panic する。
+fn vswhere_path(out_dir: &Path) -> PathBuf {
+    let tools_dir = out_dir.join("tools");
+    fs::create_dir_all(&tools_dir).expect("tools ディレクトリの作成に失敗しました");
+    let vswhere_path = tools_dir.join("vswhere.exe");
+    if !vswhere_path.exists() {
+        download(
+            "https://github.com/microsoft/vswhere/releases/latest/download/vswhere.exe",
+            &vswhere_path,
+        )
+        .expect("vswhere.exe のダウンロードに失敗しました");
+    }
+    vswhere_path
 }
 
 /// Windows で `bindgen` 用 `libclang` を利用可能にする。
@@ -1061,18 +1242,7 @@ fn ensure_windows_libclang(out_dir: &Path) {
         return;
     }
 
-    let tools_dir = out_dir.join("tools");
-    fs::create_dir_all(&tools_dir).expect("tools ディレクトリの作成に失敗しました");
-    let vswhere_path = tools_dir.join("vswhere.exe");
-    if !vswhere_path.exists() {
-        download(
-            "https://github.com/microsoft/vswhere/releases/latest/download/vswhere.exe",
-            &vswhere_path,
-        )
-        .expect("vswhere.exe のダウンロードに失敗しました");
-    }
-
-    let installation_path = find_visual_studio_installation(&vswhere_path).expect(
+    let installation_path = find_visual_studio_installation(&vswhere_path(out_dir)).expect(
         "Visual Studio 2022 または 2026 の検出に失敗しました。\
          Visual Studio 2022 または 2026 に `Desktop development with C++` と \
          `C++ Clang tools for Windows (Microsoft.VisualStudio.Component.VC.Llvm.Clang)` \

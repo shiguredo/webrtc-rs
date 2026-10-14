@@ -519,7 +519,9 @@ cargo build --features source-build
 - Windows の場合:
   - Visual Studio 2022 (`Desktop development with C++`)
   - `C++ Clang tools for Windows` (`Microsoft.VisualStudio.Component.VC.Llvm.Clang`)
-    - `bindgen` 用の `libclang` として利用します (C++ コンパイルは MSVC を利用)
+    - `bindgen` 用の `libclang` と、静的ライブラリ作成用の `llvm-lib` として利用します
+  - C++ コンパイラには libwebrtc が利用する Clang (`clang-cl`) を利用するため、別途インストールする必要はありません
+  - ビルドには Ninja を利用します (自動的にダウンロードします)
 
 ```bash
 # Linux

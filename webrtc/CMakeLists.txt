@@ -114,13 +114,7 @@ set(WEBRTC_TARGETS_RASPBERRY_PI
 # WebRTC 向けの libc++ ヘッダーのダウンロードと使用（WebRTC との ABI 互換性のため）
 set(WEBRTC_USE_WEBRTC_LIBCXX TRUE)
 # WebRTC の Clang をコンパイラとして使用するかどうか
-# Windows 以外は WebRTC の Clang を使う
 set(WEBRTC_USE_WEBRTC_CLANG TRUE)
-
-if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
-  set(WEBRTC_USE_WEBRTC_LIBCXX FALSE)
-  set(WEBRTC_USE_WEBRTC_CLANG FALSE)
-endif()
 
 # ============================================================================
 # WEBRTC_BUILD_ROOT の有無で大きく 2 ルートに分岐する
@@ -160,8 +154,14 @@ if(DEFINED WEBRTC_BUILD_ROOT)
   set(_LOCAL_LIBCXX_DIR "${WEBRTC_BUILD_ROOT}/_source/${WEBRTC_C_TARGET}/webrtc/src/third_party/libc++/src")
   set(_LOCAL_BUILDTOOLS_DIR "${WEBRTC_BUILD_ROOT}/_source/${WEBRTC_C_TARGET}/webrtc/src/buildtools")
 
-  if(NOT EXISTS "${_LOCAL_CLANG_DIR}/bin/clang++")
-    message(FATAL_ERROR "Local Clang not found: ${_LOCAL_CLANG_DIR}/bin/clang++")
+  # Windows の WebRTC の Clang には clang-cl しか含まれない。
+  if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
+    set(_LOCAL_CLANG_COMPILER "${_LOCAL_CLANG_DIR}/bin/clang-cl.exe")
+  else()
+    set(_LOCAL_CLANG_COMPILER "${_LOCAL_CLANG_DIR}/bin/clang++")
+  endif()
+  if(NOT EXISTS "${_LOCAL_CLANG_COMPILER}")
+    message(FATAL_ERROR "Local Clang not found: ${_LOCAL_CLANG_COMPILER}")
   endif()
   if(NOT EXISTS "${_LOCAL_LIBCXX_DIR}/include")
     message(FATAL_ERROR "Local libc++ not found: ${_LOCAL_LIBCXX_DIR}/include")
@@ -364,8 +364,14 @@ endif()
 # Clang コンパイラの設定
 if(WEBRTC_USE_WEBRTC_CLANG)
   # Prebuilt Clang コンパイラのパスを設定（project() の前）
-  set(CMAKE_C_COMPILER "${LLVM_CLANG_DIR}/bin/clang" CACHE FILEPATH "" FORCE)
-  set(CMAKE_CXX_COMPILER "${LLVM_CLANG_DIR}/bin/clang++" CACHE FILEPATH "" FORCE)
+  # Windows の WebRTC の Clang には clang-cl しか含まれない。
+  if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
+    set(CMAKE_C_COMPILER "${LLVM_CLANG_DIR}/bin/clang-cl.exe" CACHE FILEPATH "" FORCE)
+    set(CMAKE_CXX_COMPILER "${LLVM_CLANG_DIR}/bin/clang-cl.exe" CACHE FILEPATH "" FORCE)
+  else()
+    set(CMAKE_C_COMPILER "${LLVM_CLANG_DIR}/bin/clang" CACHE FILEPATH "" FORCE)
+    set(CMAKE_CXX_COMPILER "${LLVM_CLANG_DIR}/bin/clang++" CACHE FILEPATH "" FORCE)
+  endif()
   message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
   message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
 else()
@@ -492,16 +498,15 @@ add_library(webrtc_c
     ${WEBRTC_OBJC_SOURCES}
     src/webrtc_c/std.cc
 )
-# CMake 4.x で C++20 モジュールスキャンが自動有効になるが、
-# WebRTC の clang に clang-scan-deps が含まれないため無効化する
-set_target_properties(webrtc_c PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 add_executable(whip_cpp src/whip.cpp)
 add_executable(whep_cpp src/whep.cpp)
 set(WEBRTC_CPP_TARGETS webrtc_c whip_cpp whep_cpp)
 set(WEBRTC_C_TARGETS whip_c whep_c)
 
+# CMake 4.x で C++20 モジュールスキャンが自動有効になるが、
+# WebRTC の clang に clang-scan-deps が含まれないため無効化する
 foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-  set_target_properties(${target} PROPERTIES CXX_STANDARD 20 C_STANDARD 20)
+  set_target_properties(${target} PROPERTIES CXX_STANDARD 20 C_STANDARD 20 CXX_SCAN_FOR_MODULES OFF)
 endforeach()
 
 foreach(target IN LISTS WEBRTC_CPP_TARGETS)
@@ -529,14 +534,20 @@ set(BUNDLE_STATIC_LIBS ${WEBRTC_LIBRARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}webrt
 
 if(WEBRTC_USE_WEBRTC_LIBCXX)
   # libc++ の設定（WebRTC と同じ libc++ ヘッダーを使用）
+  # clang-cl は -nostdinc++ と -isystem を解釈しないため、/clang: を経由して clang に渡す。
+  if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
+    set(_LIBCXX_COMPILE_OPTIONS "/clang:-nostdinc++" "/I${LIBCXX_INCLUDE_DIR}")
+  else()
+    set(_LIBCXX_COMPILE_OPTIONS "-nostdinc++" "-isystem${LIBCXX_INCLUDE_DIR}")
+  endif()
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_options(${target}
-      PRIVATE
-        "$<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>"
-        "$<$<COMPILE_LANGUAGE:CXX>:-isystem${LIBCXX_INCLUDE_DIR}>"
-        "$<$<COMPILE_LANGUAGE:OBJCXX>:-nostdinc++>"
-        "$<$<COMPILE_LANGUAGE:OBJCXX>:-isystem${LIBCXX_INCLUDE_DIR}>"
-    )
+    foreach(_option IN LISTS _LIBCXX_COMPILE_OPTIONS)
+      target_compile_options(${target}
+        PRIVATE
+          "$<$<COMPILE_LANGUAGE:CXX>:${_option}>"
+          "$<$<COMPILE_LANGUAGE:OBJCXX>:${_option}>"
+      )
+    endforeach()
   endforeach()
 endif()
 
@@ -605,9 +616,11 @@ function(bundle_static_library target static_libs bundled_target)
 endfunction()
 
 if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
-  # 文字コードを utf-8 として扱うのと、シンボルテーブル数を増やす
+  # 文字コードを utf-8 として扱うのと、シンボルテーブル数を増やす。
+  # clang-cl は C++ の例外が既定で無効なため、明示的に有効にする。
+  # CMAKE_CXX_FLAGS には -MD が入るため、CRT を静的リンクさせるために /MT も明示する
   foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_options(${target} PRIVATE /utf-8 /bigobj)
+    target_compile_options(${target} PRIVATE /utf-8 /bigobj /EHsc /MT)
     set_target_properties(${target}
       PROPERTIES
         # CRTライブラリを静的リンクさせる
@@ -649,7 +662,11 @@ if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
         _USE_MATH_DEFINES
         $<$<NOT:$<CONFIG:Debug>>:NDEBUG>
         RTC_ENABLE_H265
-        _ITERATOR_DEBUG_LEVEL=0
+        # libc++ の名前空間や ABI バージョンは WebRTC が利用する __config_site から与えられる。
+        # __config_site は _LIBCPP_HARDENING_MODE を定義しないため、アーカイブのビルドと同じ値をここで指定する
+        _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
+        # libc++ のシンボルを __declspec(dllimport) にしないために必要
+        _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS
     )
   endforeach()
 elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")

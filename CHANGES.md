@@ -16,7 +16,11 @@
   - ログは出力したスレッドでそのまま sink へ届くため、同じ sink の `on_log_message` は複数のスレッドから同時に呼ばれ得る。callback の入口で可変参照を作らず、共有参照として扱う
   - 可変状態を持つ実装は `Mutex` や atomic などで自身で保護する
   - @melpon
-- [UPDATE] libwebrtc m156 (m156.8078.3.4) に上げる
+- [UPDATE] libwebrtc m156 (m156.8078.3.5) に上げる
+  - @melpon
+- [UPDATE] Windows のビルドに libwebrtc が利用する Clang (clang-cl) と libc++ を利用するようにする
+  - @melpon
+- [FIX] C++20 モジュールスキャンの無効化が `whip_cpp` と `whep_cpp` に漏れていてビルドに失敗する問題を修正する
   - @melpon
 
 ## 0.156.0
