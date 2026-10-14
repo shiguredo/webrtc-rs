@@ -18,7 +18,17 @@
   - @melpon
 - [UPDATE] libwebrtc m156 (m156.8078.3.5) に上げる
   - @melpon
-- [UPDATE] Windows のビルドに libwebrtc が利用する Clang (clang-cl) と libc++ を利用するようにする
+- [UPDATE] Windows のビルドで libwebrtc が利用する Clang (clang-cl) と libc++ を利用するようにする
+  - MSVC (cl.exe) と MSVC STL ではなく libwebrtc と同じコンパイラと標準ライブラリを使い、C++ の型やシンボルの解釈を libwebrtc と一致させる
+  - C++ コンパイラに libwebrtc に含まれる `clang-cl.exe` を指定する。GCC 互換のオプションは `/clang:` を経由して渡す
+  - CRT を静的リンクし、例外処理を明示的に有効にする
+  - CMake のジェネレータを Ninja にする。Ninja は環境に依存しないよう自動でダウンロードする
+  - 静的ライブラリの作成には Visual Studio の `llvm-lib.exe` を使う。WebRTC の Clang には `llvm-lib.exe` が含まれないため
+  - @melpon
+- [UPDATE] Windows のデバッグビルドで CRT の指定が不足している場合に、ビルド時に検出して対処方法を案内するようにする
+  - libwebrtc のデバッグビルドは静的デバッグ CRT (`/MTd`) でコンパイルされており、Rust が既定でリンクするリリース CRT と衝突する
+  - ライブラリの build script からは最終バイナリのリンクを変更できないため、利用者が `RUSTFLAGS` と `CFLAGS`/`CXXFLAGS` を指定する必要がある
+  - 指定が不足したままリンクすると `_CrtDbgReportW` が未解決になるが、原因が分かりにくいため事前に検出して案内する
   - @melpon
 - [FIX] C++20 モジュールスキャンの無効化が `whip_cpp` と `whep_cpp` に漏れていてビルドに失敗する問題を修正する
   - @melpon

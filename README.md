@@ -535,10 +535,56 @@ sudo apt-get install build-essential libclang-dev libx11-dev
 # を有効化してください
 ```
 
+### デバッグビルド (Windows)
+
+libwebrtc のデバッグビルド (webrtc-build が `is_debug=true` でビルドしたもの) は、静的デバッグ CRT (`/MTd`) でコンパイルされています。
+一方 Rust は、デバッグビルドであっても既定でリリース CRT (`/defaultlib:msvcrt`) をリンクします。
+この 2 つは互いを `/disallowlib` で排除し合うため、そのままでは `_CrtDbgReportW` などのシンボルが未解決になってリンクに失敗します。
+
+この組み合わせを解消するには、**利用者側でリンクする CRT を明示的に指定する必要があります**。
+ライブラリ側からは指定できません (Rust の build script が最終バイナリのリンクに影響を与えられるのは、その crate 自身のバイナリだけで、ライブラリからは届かないためです)。
+
+Windows で `debug-build` feature を利用する場合は、次の 3 つを指定してください。
+
+1. `WEBRTC_BUILD_ROOT` — デバッグビルドの prebuilt バイナリは提供されていないため、ローカルの webrtc-build が必須です
+2. Rust 側のリンク設定 — 既定のリリース CRT を外し、libwebrtc と同じ静的デバッグ CRT をリンクします
+3. C/C++ 側のコンパイル設定 — `aws-lc-sys` などを静的デバッグ CRT でビルドし直します
+
+```powershell
+# ローカルの webrtc-build を指定する (デバッグビルドの prebuilt は提供されていない)
+$env:WEBRTC_BUILD_ROOT = "C:\path\to\webrtc-build"
+
+# Rust 側: 既定のリリース CRT を外し、libwebrtc と同じ静的デバッグ CRT をリンクする
+$env:RUSTFLAGS = "-C link-arg=/NODEFAULTLIB:msvcrt " +
+                 "-C link-arg=/NODEFAULTLIB:libucrt " +
+                 "-C link-arg=/DEFAULTLIB:libcmtd " +
+                 "-C link-arg=/DEFAULTLIB:libucrtd " +
+                 "-C link-arg=/DEFAULTLIB:libvcruntimed"
+
+# C/C++ 側: aws-lc-sys などを静的デバッグ CRT でビルドし直す
+$env:CFLAGS = "/MTd"
+$env:CXXFLAGS = "/MTd"
+
+cargo build --features source-build,debug-build
+```
+
+指定の意味:
+
+- `/NODEFAULTLIB:msvcrt` と `/NODEFAULTLIB:libucrt`
+  - Rust が既定でリンクするリリース CRT を外します
+- `/DEFAULTLIB:libcmtd` `/DEFAULTLIB:libucrtd` `/DEFAULTLIB:libvcruntimed`
+  - libwebrtc と同じ静的デバッグ CRT をリンクします。`_CrtDbgReportW` はここから解決されます
+- `CFLAGS` / `CXXFLAGS` の `/MTd`
+  - `aws-lc-sys` は既定で静的リリース CRT (`/MT`) を使うため、揃えないとリンクに失敗します
+
+`RUSTFLAGS` と `CFLAGS` / `CXXFLAGS` を変更した場合は、CRT が変わったオブジェクトを作り直す必要があるため、`cargo clean` してからビルドしてください。
+
 ## 環境変数
 
 - `WEBRTC_C_TARGET`
   - ビルドターゲットを変更する場合に指定 (デフォルトはホスト環境に応じて自動判定)
+- `WEBRTC_BUILD_ROOT`
+  - ローカルの webrtc-build を利用する場合に指定 (`source-build` feature と併用)
 
 ## ライセンス
 

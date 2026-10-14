@@ -137,6 +137,11 @@ fn main() {
         );
     }
 
+    // Windows のデバッグビルドでは、libwebrtc が静的デバッグ CRT でビルドされているため、
+    // Rust が既定でリンクするリリース CRT と衝突する。
+    // リンク時のエラーは原因が分かりにくいため、事前に検出して対処方法を案内する
+    check_windows_debug_crt_settings();
+
     let manifest_dir = PathBuf::from(
         env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR の取得に失敗しました"),
     );
@@ -184,6 +189,123 @@ fn main() {
 
 struct PrebuiltPaths {
     lib_path: PathBuf,
+}
+
+/// `CARGO_ENCODED_RUSTFLAGS` に指定したリンカ引数が含まれるかを調べる。
+///
+/// 引数:
+/// - `encoded_rustflags`: `CARGO_ENCODED_RUSTFLAGS` の値。
+/// - `arg`: 探すリンカ引数 (`/DEFAULTLIB:libcmtd` など)。
+///
+/// 環境変数依存: なし。
+///
+/// 戻り値:
+/// - `true`: `-C link-arg=<arg>` が指定されている。
+/// - `false`: 指定されていない。
+///
+/// 副作用: なし。
+///
+/// 値は 0x1f (ASCII Unit Separator) で区切られる。 rustc は `-C` とその引数を
+/// 別々の要素としても、 `-Clink-arg=...` のように連結した 1 つの要素としても受け付ける。
+/// 文字列の部分一致で調べると `/DEFAULTLIB:libcmtd_extra` のような別の引数まで
+/// 一致してしまうため、 要素に分けたうえで `-C` の引数と完全一致するものだけを探す
+fn has_link_arg(encoded_rustflags: &str, arg: &str) -> bool {
+    let expected = format!("link-arg={arg}");
+    let mut flags = encoded_rustflags.split('\u{1f}');
+    while let Some(flag) = flags.next() {
+        // `-C <value>` の 2 要素形式
+        if flag == "-C" {
+            if flags.next() == Some(expected.as_str()) {
+                return true;
+            }
+            continue;
+        }
+        // `-C<value>` の連結形式
+        if let Some(value) = flag.strip_prefix("-C")
+            && value == expected
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// Windows のデバッグビルドで CRT の指定が揃っているかを確認する。
+///
+/// 引数: なし。
+///
+/// 環境変数依存:
+/// - `CARGO_CFG_TARGET_OS`
+/// - `CARGO_FEATURE_DEBUG_BUILD`
+/// - `CARGO_ENCODED_RUSTFLAGS`
+/// - `CFLAGS`, `CXXFLAGS`
+///
+/// 戻り値: なし。
+///
+/// 副作用:
+/// - 指定が不足している場合は panic する。
+///
+/// libwebrtc のデバッグビルドは静的デバッグ CRT でコンパイルされており、
+/// Rust が既定でリンクするリリース CRT とは互いを `/disallowlib` で排除し合う。
+/// この食い違いはリンク時にしか現れず原因が分かりにくいため、事前に検出して案内する。
+/// ライブラリの build script から最終バイナリのリンクは変更できないので、
+/// ここでは指定を検証するだけに留める
+fn check_windows_debug_crt_settings() {
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
+        return;
+    }
+    if env::var("CARGO_FEATURE_DEBUG_BUILD").is_err() {
+        return;
+    }
+
+    // Rust 側でリリース CRT を外し、静的デバッグ CRT をリンクしているかを確認する。
+    //
+    // cargo が rustc に渡すフラグは CARGO_ENCODED_RUSTFLAGS で取得する。
+    // Rust 1.55 以降、build script の環境から RUSTFLAGS は削除されており、
+    // 代わりにこの変数を使うことが Cargo のドキュメントで指示されている。
+    // この変数には RUSTFLAGS だけでなく .cargo/config.toml の build.rustflags や
+    // target.<triple>.rustflags の内容も含まれる
+    let encoded_rustflags = env::var("CARGO_ENCODED_RUSTFLAGS").unwrap_or_default();
+    let has_debug_crt = has_link_arg(&encoded_rustflags, "/DEFAULTLIB:libcmtd")
+        && has_link_arg(&encoded_rustflags, "/NODEFAULTLIB:msvcrt");
+
+    // C/C++ 側のライブラリ (aws-lc-sys など) を静的デバッグ CRT でビルドしているかを確認する
+    let cflags = env::var("CFLAGS").unwrap_or_default();
+    let cxxflags = env::var("CXXFLAGS").unwrap_or_default();
+    let has_mtd = cflags.contains("/MTd") && cxxflags.contains("/MTd");
+
+    if has_debug_crt && has_mtd {
+        return;
+    }
+
+    let mut missing = Vec::new();
+    if !has_debug_crt {
+        missing.push(
+            "RUSTFLAGS に以下を指定してください:\n  \
+             -C link-arg=/NODEFAULTLIB:msvcrt\n  \
+             -C link-arg=/NODEFAULTLIB:libucrt\n  \
+             -C link-arg=/DEFAULTLIB:libcmtd\n  \
+             -C link-arg=/DEFAULTLIB:libucrtd\n  \
+             -C link-arg=/DEFAULTLIB:libvcruntimed"
+                .to_string(),
+        );
+    }
+    if !has_mtd {
+        missing.push(
+            "CFLAGS と CXXFLAGS に /MTd を指定してください。\
+             C/C++ 側のライブラリを静的デバッグ CRT でビルドし直すために必要です"
+                .to_string(),
+        );
+    }
+
+    panic!(
+        "Windows のデバッグビルドでは、libwebrtc が利用する静的デバッグ CRT に \
+         リンク設定を合わせる必要があります。\n\n{}\n\n\
+         RUSTFLAGS または CFLAGS/CXXFLAGS を変更した場合は、CRT が変わった \
+         オブジェクトを作り直す必要があるため、cargo clean してからビルドしてください。\n\
+         詳細は README の「デバッグビルド (Windows)」を参照してください。",
+        missing.join("\n\n")
+    );
 }
 
 /// prebuilt バイナリを使用するかどうかを判定する。
