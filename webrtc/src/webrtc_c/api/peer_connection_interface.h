@@ -366,6 +366,9 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryDependencies_delete(
 WEBRTC_EXPORT void webrtc_PeerConnectionFactoryDependencies_set_network_thread(
     struct webrtc_PeerConnectionFactoryDependencies* self,
     struct webrtc_Thread* network_thread);
+WEBRTC_EXPORT struct webrtc_Thread*
+webrtc_PeerConnectionFactoryDependencies_get_network_thread(
+    const struct webrtc_PeerConnectionFactoryDependencies* self);
 WEBRTC_EXPORT void
 webrtc_PeerConnectionFactoryDependencies_set_signaling_thread(
     struct webrtc_PeerConnectionFactoryDependencies* self,

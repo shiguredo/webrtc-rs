@@ -194,6 +194,17 @@ impl Thread {
         expect_non_null(raw, "webrtc_Thread_unique_get")
     }
 
+    /// このスレッドへの、所有権を持たないハンドルを返す。
+    ///
+    /// 返り値はこのスレッドの停止や破棄を行わない。
+    ///
+    /// # Safety
+    ///
+    /// 返り値は `self` より長く生存させないこと。
+    pub(crate) unsafe fn handle(&self) -> ThreadHandle {
+        ThreadHandle::from_raw(self.raw())
+    }
+
     /// スレッドを一定時間スリープさせるヘルパー。
     ///
     /// スリープがシグナルで中断された場合は `false` を返す（POSIX のみ）。
@@ -212,5 +223,76 @@ impl Default for Thread {
 impl Drop for Thread {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_Thread_unique_delete(self.raw_unique.as_ptr()) };
+    }
+}
+
+/// [Thread] が所有するスレッドへの、所有権を持たないハンドル。
+///
+/// スレッドの停止や破棄は行わない。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ThreadHandle {
+    raw: NonNull<ffi::webrtc_Thread>,
+}
+
+unsafe impl Send for ThreadHandle {}
+
+impl ThreadHandle {
+    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_Thread>) -> Self {
+        Self { raw }
+    }
+
+    /// スレッドの生ポインタを返す。
+    pub(crate) fn raw(&self) -> NonNull<ffi::webrtc_Thread> {
+        self.raw
+    }
+
+    /// スレッド内で関数を実行し、結果を待つ。
+    ///
+    /// `f` はこのハンドルが指すスレッドで実行される。基本的に呼び出し元と異なるスレッドで
+    /// 実行されるため `F: Send` を要求し、`f` は FFI 越しに消費されるため `F: 'static` を
+    /// 要求する。
+    ///
+    /// 停止中 (`quit` / `stop` 後) のスレッドに対して呼び出してはならない。libwebrtc の
+    /// `BlockingCall` は停止中のスレッドからの呼び出しを契約違反として扱い、デバッグビルドでは
+    /// `RTC_DCHECK` により検出されてプロセスが異常終了する。
+    ///
+    /// 契約違反の呼び出しではクロージャは実行されず、その場合は `f` の結果の代わりに
+    /// `R::default()` が返るため `R: Default` を要求する。クロージャは実行の有無にかかわらず
+    /// 破棄される。
+    pub(crate) fn blocking_call<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce() -> R,
+        F: Send + 'static,
+        R: Send + 'static,
+        R: Default,
+    {
+        if std::mem::size_of::<R>() == 0 {
+            let arg = Box::into_raw(Box::new(Some(f)));
+            unsafe {
+                ffi::webrtc_Thread_BlockingCall(
+                    self.raw.as_ptr(),
+                    Some(thread_trampoline::<F, R>),
+                    arg as *mut c_void,
+                );
+            }
+            drop(unsafe { Box::from_raw(arg) });
+            R::default()
+        } else {
+            let arg = Box::into_raw(Box::new(Some(f)));
+            let res_ptr = unsafe {
+                ffi::webrtc_Thread_BlockingCall_r(
+                    self.raw.as_ptr(),
+                    Some(thread_trampoline_r::<F, R>),
+                    arg as *mut c_void,
+                )
+            };
+            drop(unsafe { Box::from_raw(arg) });
+            if res_ptr.is_null() {
+                R::default()
+            } else {
+                let boxed_res: Box<R> = unsafe { Box::from_raw(res_ptr as *mut R) };
+                *boxed_res
+            }
+        }
     }
 }

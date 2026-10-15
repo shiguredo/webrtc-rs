@@ -996,6 +996,13 @@ WEBRTC_EXPORT void webrtc_PeerConnectionFactoryDependencies_set_network_thread(
   auto thread = reinterpret_cast<webrtc::Thread*>(network_thread);
   deps->network_thread = thread;
 }
+WEBRTC_EXPORT struct webrtc_Thread*
+webrtc_PeerConnectionFactoryDependencies_get_network_thread(
+    const struct webrtc_PeerConnectionFactoryDependencies* self) {
+  auto deps =
+      reinterpret_cast<const webrtc::PeerConnectionFactoryDependencies*>(self);
+  return reinterpret_cast<struct webrtc_Thread*>(deps->network_thread);
+}
 WEBRTC_EXPORT void
 webrtc_PeerConnectionFactoryDependencies_set_signaling_thread(
     struct webrtc_PeerConnectionFactoryDependencies* self,

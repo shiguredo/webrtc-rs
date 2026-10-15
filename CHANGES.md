@@ -11,6 +11,18 @@
 
 ## develop
 
+- [CHANGE] `AudioDeviceModule` にメソッドを実行するスレッドを指定するようにする
+  - `AudioDeviceModule::new` / `new_with_handler` / `from_refcounted_ptr` が `&Thread` を第 1 引数で受け取る。`PeerConnectionFactory` に設定する場合は `PeerConnectionFactoryDependencies::set_network_thread` に渡したのと同じ network thread を渡す
+  - `AudioDeviceModule` が指定されたスレッドを保持し、`init` / `recording_devices` / `recording_device_name` / `set_recording_device` の呼び出しを `BlockingCall` でそのスレッド上で実行する。これにより Rust 側の直接操作と libwebrtc の利用が同じスレッドに揃う
+  - `AudioDeviceModule` に `Send` と `Sync` を実装する。`&self` を取るメソッドを複数スレッドから呼んでも実行は保持したスレッドで直列化される
+  - `new` / `new_with_handler` / `from_refcounted_ptr` は `unsafe fn` になり、渡したスレッドが ADM より長く生存することを要求する
+  - `PeerConnectionFactoryDependencies::set_audio_device_module` が、ADM が保持するスレッドと `set_network_thread` で設定した network thread の食い違いを検出して panic する
+  - network thread を設定せずに `set_audio_device_module` を呼び出した場合も panic する。network thread を設定しないと libwebrtc がファクトリの生成時に内部で network thread を生成して ADM を利用するため、Rust 側から食い違いを検出できない
+  - @melpon
+- [CHANGE] `AudioDeviceModuleHandler` のメソッドの `&self` / `&mut self` を `webrtc::AudioDeviceModule` の `const` に合わせる
+  - `const` な問い合わせ (`initialized` / `playing` / `recording` / `get_stats` など) は `&self`、それ以外は `&mut self` になる
+  - 録音中かどうかを問い合わせるコールバックから `recording` のような問い合わせを再入しても可変参照が重ならない
+  - @melpon
 - [CHANGE] `PeerConnectionFactoryDependencies::set_worker_thread` を削除する
   - libwebrtc が `PeerConnectionFactoryDependencies::worker_thread` を非推奨にし、network thread と別の worker thread を渡す用途を廃止したため、対応する C API の `webrtc_PeerConnectionFactoryDependencies_set_worker_thread` も削除する
   - worker thread を指定しない場合は network thread が worker thread として使われるため、`set_worker_thread` に network thread を渡していた利用者は呼び出しを削除するだけでよい
