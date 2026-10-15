@@ -1,7 +1,7 @@
 # libwebrtc の worker_thread 削除に追随して worker_thread を削除する
 
 - Created: 2026-09-15
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-16
 - Branch: feature/remove-worker-thread
 - Polished: {YYYY-MM-DD}
 
@@ -39,4 +39,32 @@ worker_thread に依存しているのは以下。
 
 ## 解決方法
 
-（詳細は polish / 実装時に確定する）
+前提条件は「削除 CL を含むバージョンが出るまで着手できない」としていたが、現 pin の m156.8078.3.5 の時点で libwebrtc が `PeerConnectionFactoryDependencies::worker_thread` を既に非推奨にしており、network thread と別の worker thread を渡す用途を廃止している。deprecation を根拠に削除する方針へ変更し、pin の更新を待たずに対応した。
+
+現 pin での libwebrtc の挙動はソースで確認した。
+
+- `pc/connection_context.cc` の `ConnectionContext` は `worker_thread` が未指定のとき network thread を worker thread として使う。別のスレッドは生成しない
+- 同ファイルで `worker_thread` が network thread と異なるときだけ `RTC_LOG(LS_ERROR)` で DEPRECATION を出力する。network thread を渡していた従来の呼び出しでは出力されない
+- `PeerConnectionFactory::worker_thread()` は非推奨になっていない。`ConnectionContext::worker_thread()` を返すだけのアクセサであり、削除 CL 後も network thread を返す形で残る
+
+したがって worker thread は常に network thread に解決されるため、`set_worker_thread` を削除しても挙動は変わらない。
+
+- C API の `webrtc_PeerConnectionFactoryDependencies_set_worker_thread` の宣言と実装を削除した
+- Rust の `PeerConnectionFactoryDependencies::set_worker_thread` を削除した
+- `create_modular_with_context` の proxy 生成は `factory->worker_thread()` のままにした。削除 CL 後も network thread を返すため、network thread へ置き換える必要はない
+- `src/tests.rs` の 20 箇所、`examples/whip` / `examples/whep`、`README.md`、`skills/shiguredo-webrtc/SKILL.md` から呼び出しを削除した
+- `AudioDeviceModule` のスレッド契約は worker thread ではなく network thread を指すようになったため、`src/api/audio_device_module.rs` と `CHANGES.md` の該当記述を修正した
+- `CHANGES.md` の `## develop` に `[CHANGE]` を追記した
+
+完了条件との差異:
+
+- `Cargo.toml` の `package.metadata.external-dependencies.webrtc-build` は更新していない。deprecation を根拠に削除する方針へ変更し、現 pin で完結させたため
+- 目的に挙げていた `PeerConnectionFactoryInterface::worker_thread()` は現 pin の libwebrtc に存在しない。削除対象は `PeerConnectionFactoryDependencies::worker_thread` のみだった
+
+確認:
+
+- `git grep worker_thread` は issues 以外で 0 件になった
+- `cargo fmt --all -- --check` が通ることを確認した
+- `cargo clippy --workspace --features source-build --all-targets -- -D warnings` が通ることを確認した
+- `cargo test --workspace --features source-build` が通ることを確認した（158 + 35 + 1 + 8 件）
+- `python3 webrtc/run.py format --check` が通ることを確認した
