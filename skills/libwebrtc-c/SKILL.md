@@ -1,6 +1,6 @@
 ---
 name: libwebrtc-c
-description: webrtc-rs リポジトリ配下の webrtc/ サブプロジェクト (libwebrtc C++ API の薄い C ラッパー) の機能・設計ルールリファレンス。命名規則、*_refcounted / *_unique / *_vector / *_inlined_vector のメモリ管理、null チェック方針、Cbs ルール、RULES.md の移植ルール、webrtc_c.h の公開 API、CMake ビルドターゲット、WHIP/WHEP サンプル、セルフチェック手順に関する質問時に使用。
+description: webrtc-rs リポジトリ配下の webrtc/ サブプロジェクト (libwebrtc C++ API の薄い C ラッパー) の機能・設計ルールリファレンス。命名規則、*_refcounted / *_unique / *_vector / *_inlined_vector のメモリ管理、null チェック方針、Cbs ルール、RULES.md の移植ルール、webrtc_c.h の公開 API、CMake ビルドターゲット、セルフチェック手順に関する質問時に使用。
 ---
 
 # libwebrtc-c
@@ -25,8 +25,6 @@ webrtc/
 ├── scripts/                Apple 向け静的ライブラリ統合スクリプト
 └── src/
     ├── webrtc_c.h          統合ヘッダ (全 C API を re-export)
-    ├── whip.c, whep.c      WHIP/WHEP サンプル (C)
-    ├── whip.cpp, whep.cpp  WHIP/WHEP サンプル (C++)
     └── webrtc_c/
         ├── api/            PeerConnection, JSEP, RTP, 統計, video/audio codec, environment, observer 等 (audio/, audio_codecs/, environment/, video/, video_codecs/, stats/ サブディレクトリを含む)
         ├── pc/             connection_context (接続管理)
@@ -235,9 +233,7 @@ C アプリ側で `webrtc::scoped_refptr` に相互変換できるクラスを�
 | ターゲット | 種別 | 内容 |
 |-----------|------|------|
 | `webrtc_c` | 静的ライブラリ | C API 本体 (50+ ソースファイル) |
-| `whip_c`, `whep_c` | 実行可能 (C) | WHIP/WHEP の C サンプル |
-| `whip_cpp`, `whep_cpp` | 実行可能 (C++) | WHIP/WHEP の C++ サンプル |
-| `bundled_webrtc_c` | バンドル静的ライブラリ | `webrtc_c.a` と `libwebrtc.a` を統合 (`whip_c` / `whep_c` のリンク用) |
+| `bundled_webrtc_c` | バンドル静的ライブラリ | `webrtc_c.a` と `libwebrtc.a` を統合 |
 
 ### サポートターゲット
 
@@ -278,11 +274,9 @@ C アプリ側で `webrtc::scoped_refptr` に相互変換できるクラスを�
 - **Android**: `android.toolchain.cmake` + `sdk/android/` の JNI 連携 (`jni_export.cc`, `sdk/android/src/jni/jvm.cc`, `sdk/android/native_api/audio_device_module/audio_device_android.cc`, `sdk/android/native_api/codecs/wrapper.cc`, `sdk/android/native_api/jni/class_loader.cc`)
 - **Objective-C**: `sdk/objc/` の `objc.mm` 経由 (iOS のみ追加コンパイル、macOS は本体側)
 
-## WHIP / WHEP サンプル
+## C API の利用例
 
-- `src/whip.c` / `src/whep.c` が C API の利用例
-- C++ 版 `src/whip.cpp` / `src/whep.cpp` も同梱し、C/C++ 双方からの利用を示す
-- サンプルは **お手本** なので性能と堅牢性を両立させる方針 (リポジトリの `CLAUDE.md` を参照)
+Rust の `examples/whip` / `examples/whep` が `shiguredo_webrtc` crate 経由で C API を利用する例になっている。C / C++ から直接利用する例はこのリポジトリには置いていない。
 
 ## ヘルパースクリプト `run.py`
 

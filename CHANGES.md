@@ -36,7 +36,9 @@
   - `cargo test --doc` のバイナリをリンクするのは rustdoc であり、`RUSTFLAGS` ではなく `RUSTDOCFLAGS` に指定したリンカ引数が使われる。不足していれば同じように検出して案内する
   - C/C++ を含む依存を併用する場合は `CFLAGS`/`CXXFLAGS` も必要だが、依存の有無は build script から知り得ないため検査せず、案内だけを行う
   - @melpon
-- [FIX] C++20 モジュールスキャンの無効化が `whip_cpp` と `whep_cpp` に漏れていてビルドに失敗する問題を修正する
+- [CHANGE] C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除する
+  - どのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった
+  - 利用例は Rust の `examples/whip` / `examples/whep` を参照する。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る
   - @melpon
 - [FIX] 停止中のスレッドへ `Thread::blocking_call` を呼び出したときにクロージャが解放されない問題を修正する
   - libwebrtc の `BlockingCall` は停止中のスレッドではクロージャを実行せずに戻るため、実行されなかったクロージャを呼び出し元で回収して破棄する
