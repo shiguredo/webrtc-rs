@@ -1,6 +1,7 @@
 # whip.c の手書き strlen による HTTP リクエスト組み立てを整理する
 
 - Priority: Low
+- Completed: 2026-10-15
 - Polished: 2026-06-05
 - Created: 2026-06-05
 - Model: Opus 4.8
@@ -55,3 +56,9 @@ HTTP リクエストの組み立てを、長さ計算と書式が二重管理に
 - HTTP リクエストの組み立てが、長さ計算と書式の二重管理を解消した安全で読みやすい形になっている。
 - リクエストの送信内容が現状と等価である。
 - メモリ確保失敗時のエラーハンドリングと後処理が維持されている。
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+`whip.c` の手書き `strlen` による HTTP リクエスト組み立ては削除されたファイル内のコードである。

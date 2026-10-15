@@ -3,6 +3,7 @@
 - Priority: High
 - Created: 2026-06-05
 - Model: Claude Opus 4.8
+- Completed: 2026-10-15
 - Branch: feature/fix-whip-whep-tls-no-cert-verification
 - Polished: 2026-06-05
 
@@ -187,3 +188,9 @@ Rust 側 `examples/whip` 専用であり、本 issue の C/C++ サンプルに�
 - whip.c / whep.c / whip.cpp / whep.cpp の 4 ファイルすべてに証明書検証が適用される。
 - 検証失敗時に、通常の接続失敗と区別できる英語ログが出力される。
 - 手動確認手順とログ抜粋が、機密情報をプレースホルダ化したうえで PR 説明に記録されている。
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+TLS サーバ証明書検証の欠如は、削除対象の 4 ファイルの `SendRequest` / `whip_SendRequest` に固有の問題であった。Rust の `examples/whip` / `examples/whep` は `rustls` + `rustls-platform-verifier` で既に証明書を検証しており、この問題は存在しない。

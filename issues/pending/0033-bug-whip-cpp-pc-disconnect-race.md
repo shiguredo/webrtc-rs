@@ -1,6 +1,7 @@
 # whip.cpp の pc_ を Disconnect 時に保護し状態遷移の競合を解消する
 
 - Priority: High
+- Completed: 2026-10-15
 - Polished: 2026-06-05
 - Created: 2026-06-05
 - Model: Opus 4.8
@@ -71,3 +72,9 @@ SetRemoteDescription / レスポンス処理) から参照される一方、`Dis
 - `Disconnect` と、シグナリングスレッド上のコールバックによる `pc_` 参照が並行しても、解放済み `pc_` へのアクセスが起きない。
 - `state_` の遷移と `pc_` のライフサイクルが同じロックの下で一貫し、切断と状態遷移が並行しても競合しない。
 - `WaitForConnect` が、間に `kClosed` を経由したケースでも誤って `kConnected` を返さない。
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+`whip.cpp` の `pc_` の保護は削除されたファイル内のコードである。

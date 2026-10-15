@@ -1,6 +1,7 @@
 # whip/whep の巨大な接続関数を分割する
 
 - Priority: Medium
+- Completed: 2026-10-15
 - Polished: 2026-06-05
 - Created: 2026-06-05
 - Model: Opus 4.8
@@ -64,3 +65,9 @@ void SignalingWhip_Connect(struct SignalingWhip* self) {
 - 各関数が画面内で見通せる程度の長さに収まっている。
 - コールバックの入れ子の深さが浅くなっている。
 - 分割前後で WHIP の接続挙動が変わっていない。
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+巨大な接続関数の分割は、削除されたファイルの `Connect` を対象とするリファクタリングであった。

@@ -4,6 +4,7 @@
 - Polished: 2026-08-05
 - Created: 2026-06-05
 - Model: Opus 4.8
+- Completed: 2026-10-15
 - Branch: feature/fix-whip-whep-link-header-parse-fragile
 
 ## pending の理由
@@ -158,3 +159,9 @@ Medium。`Link` ヘッダが 1 行にカンマ区切りで複数エントリを�
 - 構文不正なエントリが混在しても、他のエントリの処理を継続して取得できる
 - エントリごとに独立した `IceServer` オブジェクトが生成される
 - C 版・C++ 版の 4 ファイルで同様の解析が行われる
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+Link ヘッダの解析は削除されたファイル内のコードである。

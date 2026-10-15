@@ -1,6 +1,7 @@
 # whep.c で libyuv の C ラッパーを使う
 
 - Priority: Medium
+- Completed: 2026-10-15
 - Polished: 2026-06-05
 - Created: 2026-06-05
 - Model: Opus 4.8
@@ -68,3 +69,9 @@ WEBRTC_EXPORT int libyuv_ConvertFromI420(const uint8_t* src_y,
 
 - `webrtc/src/whep.c` が libyuv の関数・シンボルを直接呼ばず、`libyuv_ConvertFromI420` と `libyuv_FOURCC_ARGB` を経由して変換を行っている。
 - 変換結果（描画内容）が変更前と一致している。
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+`whep.c` の libyuv 利用は削除されたファイル内のコードである。

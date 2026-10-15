@@ -4,6 +4,7 @@
 - Polished: 2026-06-06
 - Created: 2026-06-05
 - Model: Opus 4.8
+- Completed: 2026-10-15
 - Branch: feature/fix-whip-cpp-regex-exception-terminate
 
 ## pending の理由
@@ -98,3 +99,9 @@ Link ヘッダ解析の `std::regex_search` 3 箇所は `issues/0021` が RFC 82
 - ヘッダ行パースの挙動が regex 版と一致する（`:` の分割位置・値先頭の空白除去）
 - レスポンス受信時にサイズ上限が適用され、超過時はエラーとして扱われる
 - 完了条件の検証は上記のテスト戦略で行う
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+`std::regex` の例外処理は削除された `whip.cpp` / `whep.cpp` 内のコードである。

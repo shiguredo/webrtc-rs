@@ -1,6 +1,7 @@
 # whip.cpp の未使用 frame_counter_ を削除する
 
 - Priority: Low
+- Completed: 2026-10-15
 - Polished: 2026-06-05
 - Created: 2026-06-05
 - Model: Opus 4.8
@@ -46,3 +47,9 @@ whip/whep 関連の対応を保留するため
 
 - 未使用メンバ `frame_counter_` と関連する代入・インクリメントが除去される。
 - `whip` の挙動が変わらないこと。
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+`whip.cpp` の未使用 `frame_counter_` は削除されたファイル内のコードである。

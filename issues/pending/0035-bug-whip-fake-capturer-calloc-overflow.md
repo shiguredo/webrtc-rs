@@ -1,6 +1,7 @@
 # FakeVideoCapturer の calloc の整数オーバーフローと戻り値未チェックを修正する
 
 - Priority: Medium
+- Completed: 2026-10-15
 - Polished: 2026-06-05
 - Created: 2026-06-05
 - Model: Opus 4.8
@@ -65,3 +66,9 @@ struct FakeVideoCapturerConfig {
 - `width` / `height` に大きな値を指定しても、`int` 乗算のオーバーフローによる過小確保が起きず、オーバーフローを検出して安全に失敗する。
 - `calloc` が `NULL` を返した場合に `NULL` 参照でクラッシュしない。
 - 失敗時に確保済みリソースを解放したうえで安全に呼び出し元へ失敗が伝わる。
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+`FakeVideoCapturer` は削除された `whip.c` が持つローカル実装である。

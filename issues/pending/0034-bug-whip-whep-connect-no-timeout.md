@@ -1,6 +1,7 @@
 # whip/whep の接続処理にタイムアウトを設ける
 
 - Priority: Medium
+- Completed: 2026-10-15
 - Polished: 2026-06-05
 - Created: 2026-06-05
 - Model: Opus 4.8
@@ -77,3 +78,9 @@ whep でも同様に、シグナリングのレスポンスを待つ同期処理
 - 相手が応答しない場合でも、接続待機と同期 I/O が一定時間で打ち切られ、無期限にハングしない。
 - タイムアウト発生時は接続失敗として状態が遷移し、`WaitForConnect` 相当が戻る。
 - whip / whep の両方でタイムアウトが効く。
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+接続処理のタイムアウトは削除されたファイルの `Connect` に固有の問題であった。

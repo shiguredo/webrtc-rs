@@ -1,6 +1,7 @@
 # whip/whep が ICE/TURN 資格情報をログ出力しないようにする
 
 - Priority: Medium
+- Completed: 2026-10-15
 - Polished: 2026-06-05
 - Created: 2026-06-05
 - Model: Opus 4.8
@@ -68,3 +69,9 @@ Medium とする。クラッシュやメモリ破壊を引き起こすもので�
 
 - 実行時ログに ICE / TURN の資格情報 (TURN パスワード、資格情報を含むフルレスポンスや SDP) が平文で出力されない。
 - whip / whep の C 実装・C++ 実装の双方で、資格情報がログから除外またはマスクされている。
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+ICE / TURN 資格情報のログ出力は削除されたファイルの `SendRequest` に固有の問題であった。

@@ -3,6 +3,7 @@
 - Priority: High
 - Created: 2026-06-05
 - Model: Opus 4.8
+- Completed: 2026-10-15
 - Branch: feature/fix-whip-whep-http-status-not-checked
 - Polished: 2026-08-05
 
@@ -108,3 +109,9 @@ SDP 解析へ進まずエラー中断されることを確認する。状態が 
 `SignalingWhip_WaitForConnect` / `SignalingWhep_WaitForConnect` の戻り値で確認する。
 試験用サーバは実サーバとして位置づけ、レスポンスの差し替えを目的としたモック・スタブは
 使わない（AGENTS.md の「モックやスタブは絶対に利用しないこと」に従う）。
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+`whip_OnSendRequestResponse` / `whep_OnSendRequestResponse` および C++ 版の `SendRequest` コールバックは削除されたファイル内のコードである。

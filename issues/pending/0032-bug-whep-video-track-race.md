@@ -1,6 +1,7 @@
 # whep の受信トラック操作を mutex で保護する
 
 - Priority: High
+- Completed: 2026-10-15
 - Polished: 2026-06-05
 - Created: 2026-06-05
 - Model: Opus 4.8
@@ -91,3 +92,9 @@ C++ 側には `video_mutex_` メンバが宣言されているが (`webrtc/src/w
 - `video_track` / `video_track_` への読み書きが、シグナリングスレッドのコールバックとレンダリング処理の間で必ず排他制御される。
 - 受信トラックの差し替え・削除が並行して発生しても、解放済みポインタへのアクセスや二重解放が起きない。
 - `receiver` が `NULL` の場合でも安全に早期 return する。
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+`whep` の受信トラック操作は削除されたファイル内のコードである。

@@ -1,6 +1,7 @@
 # whip.c/whep.c の未使用 openssl/err.h を削除する
 
 - Priority: Low
+- Completed: 2026-10-15
 - Polished: 2026-06-05
 - Created: 2026-06-05
 - Model: Opus 4.8
@@ -47,3 +48,9 @@ whip/whep 関連の対応を保留するため
 
 - `.c` 側（`whip.c` と `whep.c`）から未使用 include `<openssl/err.h>` が除去される。
 - `whip` と `whep` がビルドでき、挙動が変わらないこと。
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+`whip.c` / `whep.c` の未使用 `openssl/err.h` は削除されたファイル内の include である。

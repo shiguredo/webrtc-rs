@@ -1,6 +1,7 @@
 # whep の RGB 値コメントに半角スペースを入れる
 
 - Priority: Low
+- Completed: 2026-10-15
 - Polished: 2026-06-05
 - Created: 2026-06-05
 - Model: Opus 4.8
@@ -48,3 +49,9 @@ static int AnsiRenderer_RgbToAnsi256(uint8_t r, uint8_t g, uint8_t b) {
 - `webrtc/src/whep.c:128` 付近のコメントが `RGB 値` になっている。
 - `webrtc/src/whep.cpp:380` 付近のコメントが `RGB 値` になっている。
 - いずれも半角と全角の間に半角スペースを持ち、AGENTS.md の表記規約に準拠している。
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+`whep` の RGB 値コメントは削除されたファイル内のコメントである。

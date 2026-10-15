@@ -1,6 +1,7 @@
 # whip/whep の usleep を POSIX 上限内に収める
 
 - Priority: Medium
+- Completed: 2026-10-15
 - Polished: 2026-06-05
 - Created: 2026-06-05
 - Model: Opus 4.8
@@ -46,3 +47,9 @@ POSIX の `usleep` は引数が 100 万マイクロ秒未満であることを�
 
 - `webrtc/src/whip.c` と `webrtc/src/whep.c` のスリープ呼び出しが、POSIX の定める引数範囲内に収まっている。
 - 待機時間が従来の意図（10 秒・30 秒）と一致している。
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+`usleep` の使い方は削除されたファイル内のコードである。

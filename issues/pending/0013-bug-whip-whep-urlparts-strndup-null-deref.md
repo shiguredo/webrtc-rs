@@ -3,6 +3,7 @@
 - Priority: High
 - Created: 2026-06-05
 - Model: Opus 4.8
+- Completed: 2026-10-15
 - Branch: feature/fix-whip-whep-urlparts-strndup-null-deref
 - Polished: 2026-08-05
 
@@ -160,3 +161,9 @@ whep.c も対応する全 10 箇所が同様に未検査。
 - 失敗経路でメモリリークや二重解放が発生しない
 - 正常系では従来どおりパースに成功し、URLParts の各フィールドが正しく設定される
 - whip.c / whep.c の両方で対応される
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+`URLParts_Parse` は削除対象の 4 ファイルがローカルに持っていた URL パーサであり、ファイルごと削除された。

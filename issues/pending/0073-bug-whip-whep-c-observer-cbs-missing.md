@@ -1,7 +1,7 @@
 # whip.c / whep.c の PeerConnectionObserver コールバックが未設定でクラッシュする
 
 - Created: 2026-08-03
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-15
 - Branch: feature/fix-whip-whep-c-observer-cbs
 - Polished: {YYYY-MM-DD}
 
@@ -47,6 +47,6 @@ C 版は `OnIceCandidate` が空実装のままだと candidate がサーバに�
 
 ## 解決方法
 
-- `webrtc/src/whip.c` の `SignalingWhip_Create`: `OnStandardizedIceConnectionChange` / `OnIceCandidate` / `OnIceCandidateError` / `OnIceGatheringChange` / `OnDataChannel` / `OnDestroy` の 6 個を追加設定する
-- `webrtc/src/whep.c` の `SignalingWhep_Create`: 同 6 個を追加設定する (うち `OnTrack` / `OnRemoveTrack` は設定済み)
-- 対応する実装関数 (`SignalingWhip_OnIceCandidate` 等) を追加する
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+C 版サンプルの `PeerConnectionObserver` コールバック未設定は、削除対象の `whip.c` / `whep.c` に固有の問題であった。C++ 版はクラス自体が `PeerConnectionObserver` を継承しており、この問題は存在しない。

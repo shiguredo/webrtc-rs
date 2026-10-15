@@ -3,6 +3,7 @@
 - Priority: High
 - Created: 2026-06-05
 - Model: Opus 4.8
+- Completed: 2026-10-15
 - Branch: feature/fix-whip-whep-ignore-url-scheme
 - Polished: 2026-08-05
 
@@ -169,3 +170,9 @@ return するとガードが未生成のため `on_response` が呼ばれない�
 - 不明な scheme（`ftp://`、`ws://`、`wss://` など）はエラーとして扱われる
 - `send()` の部分書き込みに対して全データ送信が保証される
 - `send()` が SIGPIPE でプロセス終了しない
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+URL scheme を無視して常に TLS を試みる挙動は、削除対象の 4 ファイルの `SendRequest` に固有の問題であった。

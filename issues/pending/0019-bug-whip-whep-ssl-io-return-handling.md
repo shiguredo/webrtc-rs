@@ -3,6 +3,7 @@
 - Priority: High
 - Created: 2026-06-05
 - Model: Opus 4.8
+- Completed: 2026-10-15
 - Branch: feature/fix-whip-whep-ssl-io-return-handling
 - Polished: 2026-06-06
 
@@ -128,3 +129,9 @@ WHIP / WHEP の送受信処理で、`SSL_read` / `SSL_write` / `SSL_connect` の
   確認し、どちらも受信完了として扱われることを確認する
 - 試験用サーバは実サーバとして位置づけ、モック・スタブは使わない（AGENTS.md の「モックや
   スタブは絶対に利用しないこと」に従う）
+
+## 解決方法
+
+C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除した。4 ファイルはどのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった。本 issue が対象としていたコードはこの削除でリポジトリから無くなり、修正の要否を検討する対象自体が存在しなくなるため closed にする。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る。利用例は Rust の `examples/whip` / `examples/whep` を参照する。
+
+`SSL_read` / `SSL_write` の戻り値処理は、削除されたファイルの `SendRequest` 内の SSL ブロックに固有の問題であった。
