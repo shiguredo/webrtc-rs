@@ -11,15 +11,16 @@ use std::slice;
 
 /// webrtc::AudioDeviceModule のラッパー。
 ///
-/// この ADM を生成したスレッドと同じスレッドで利用し、同じスレッドで破棄すること。
-/// `PeerConnectionFactory` に渡した後は libwebrtc が内部の worker thread からこの ADM を呼ぶため、
-/// 別スレッドから直接呼ばないこと ([AudioDeviceModuleHandler] と同じ契約)。
+/// この ADM は生成・利用・破棄をすべて同じスレッドで行う必要がある。`PeerConnectionFactory` に渡した場合は
+/// libwebrtc が worker thread からこの ADM を利用するため、その worker thread が ADM のスレッドに
+/// なる。別のスレッドから呼び出すとデバッグビルドではスレッド違反として検出されてプロセスが
+/// 異常終了する。
 pub struct AudioDeviceModule {
     raw_ref: ScopedRef<AudioDeviceModuleHandle>,
 }
 
-// AudioDeviceModule は生成と削除を同じスレッドで実行する必要がある（※）ため Send/Sync にはしない。
-// ※同一スレッドの制約があるのは一部のプラットフォーム（iOS, Android）のみ。実装によってはロックも取っていることもある
+// ADM は利用するスレッドを 1 つに限る契約であり、&self を取るメソッドを複数のスレッドから
+// 呼び出すとデータ競合になるため Send/Sync にはしない。
 // unsafe impl Send for AudioDeviceModule {}
 // unsafe impl Sync for AudioDeviceModule {}
 
@@ -939,7 +940,7 @@ impl Drop for AudioDeviceModuleStats {
 /// Rust 側で実装を差し替えられる webrtc::AudioDeviceModule。
 ///
 /// このトレイトを実装したオブジェクトを [AudioDeviceModule::new_with_handler] に渡して利用する。
-/// ADM を `PeerConnectionFactory` に渡した後は、同じ ADM のメソッドを別スレッドから呼ばないこと。
+/// この ADM のメソッドはすべて同じスレッドから呼び出すこと（[AudioDeviceModule] を参照）。
 pub trait AudioDeviceModuleHandler: Send {
     fn active_audio_layer(&mut self, audio_layer: &mut i32) -> i32 {
         *audio_layer = 0;

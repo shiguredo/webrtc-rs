@@ -1,7 +1,7 @@
 # Windows のデバッグビルドで AudioDeviceBuffer のデストラクタがスレッド違反になる
 
 - Created: 2026-10-14
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-15
 - Branch: feature/fix-audio-device-buffer-thread-check
 - Polished: {YYYY-MM-DD}
 
@@ -80,13 +80,14 @@ cargo test -p shiguredo_webrtc --lib --features source-build -- --test-threads=1
 
 ## 解決方法
 
-未確定。 `create_detached` が無効のまま `AudioDeviceBuffer` を生成スレッド以外で破棄していることは特定できたが、 どちらを直すべきかは決まっていない。
+`AudioDeviceBuffer` の `main_thread_checker_` は `SequenceChecker::kDetached` で作られ、 最初にチェックしたスレッドに紐付く。 テストでは ADM のハンドルをファクトリに渡したあとも保持していたため、 ファクトリを破棄したあとにテストスレッドで最後の参照を解放していた。 その結果、 利用 (`RegisterAudioCallback`) は worker thread、 破棄はテストスレッドで行われ、 チェックに失敗していた。
 
-考えられる方向は次の 2 つである。
+- `src/tests.rs` の `set_dummy_audio_device_module` で、 ADM のハンドルを依存に設定したあとすぐに破棄するようにした。 最後の参照は libwebrtc が保持するものになるため、 利用と破棄の両方が worker thread で行われる
+- `src/api/audio_device_module.rs` と `src/api/dtls_transport.rs` の Rustdoc を、 libwebrtc の実装に沿ったスレッド契約に修正した。 ADM は生成・利用・破棄をすべて同じスレッドで行い、 ファクトリに渡した場合は worker thread がそのスレッドになる。 `DtlsTransport` の observer の登録と解除は transport を生成したネットワークスレッドから行う
+- テストを契約に従わせた。 ネットワークスレッドにソケットサーバーを用意し、 `DtlsTransport` の observer の登録と解除をネットワークスレッド経由にした。 ファクトリに渡す ADM を生成する箇所はテスト用のヘルパーにまとめた
+- 停止中のスレッドへ `Thread::blocking_call` を呼び出したときに、 実行されなかったクロージャが解放されない問題を修正した。 libwebrtc の `BlockingCall` は停止中のスレッドではクロージャを実行せずに戻るため、 `Option` で包んで呼び出し元で回収し、 必ず破棄する
+- 停止要求を確認できる `Thread::is_quitting` を追加した。 `quit` / `stop` の後は `true` になり、 `stop` で join したスレッドを `start` で再開すると `false` に戻る
+- `webrtc/src/webrtc_c/rtc_base/thread.cc` で `self` を受け取る関数に `assert` を追加した
+- ADM のスレッドアフィニティを型で扱う設計の検討は `issues/0119-bug-adm-thread-affinity-bypass.md` に分けた
 
-- `src/tests.rs` の `get_stats_delivers_report` が `AudioDeviceModule` を生成したスレッドで破棄するようにする (テスト側の修正)
-- 生成スレッド以外で破棄され得るのが C ラッパーまたは libwebrtc の想定であるなら、 `AudioDeviceModule` の破棄を生成スレッドへ戻す、 または `create_detached` を有効にする経路を用意する (本体側の修正)
-
-`webrtc_CreateAudioDeviceModule` に対応する libwebrtc の公開 API に `create_detached` を指定する口が無いため、 本体側で直す場合は C ラッパー独自の経路を足すことになり、 薄いラッパーを保つ方針 (`webrtc/RULES.md`) と衝突しないかの判断が要る。
-
-テストのみの問題か本体側の問題かは調査で確定させる。 確定するまでは修正方針を決めない。
+デバッグビルドで 157 件、 リリースビルドで 158 件、 doctest が 9 件すべて成功し、 `cargo fmt --all -- --check` と `cargo clippy --workspace --features source-build --all-targets -- -D warnings` が通ることを確認した。 `tests::get_stats_delivers_report` を含む全テストが成功している。

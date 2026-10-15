@@ -16,6 +16,11 @@
   - ログは出力したスレッドでそのまま sink へ届くため、同じ sink の `on_log_message` は複数のスレッドから同時に呼ばれ得る。callback の入口で可変参照を作らず、共有参照として扱う
   - 可変状態を持つ実装は `Mutex` や atomic などで自身で保護する
   - @melpon
+- [ADD] `Thread::is_quitting` を追加する
+  - `quit` / `stop` の後は `true` になり、`stop` で join したスレッドを `start` で再開すると `false` に戻る
+  - 停止中のスレッドで `Thread::blocking_call` を呼び出す前に確認するために使う
+  - webrtc_c に `webrtc_Thread_IsQuitting` を追加する
+  - @melpon
 - [UPDATE] libwebrtc m156 (m156.8078.3.5) に上げる
   - @melpon
 - [UPDATE] Windows のビルドで libwebrtc が利用する Clang (clang-cl) と libc++ を利用するようにする
@@ -32,6 +37,21 @@
   - C/C++ を含む依存を併用する場合は `CFLAGS`/`CXXFLAGS` も必要だが、依存の有無は build script から知り得ないため検査せず、案内だけを行う
   - @melpon
 - [FIX] C++20 モジュールスキャンの無効化が `whip_cpp` と `whep_cpp` に漏れていてビルドに失敗する問題を修正する
+  - @melpon
+- [FIX] 停止中のスレッドへ `Thread::blocking_call` を呼び出したときにクロージャが解放されない問題を修正する
+  - libwebrtc の `BlockingCall` は停止中のスレッドではクロージャを実行せずに戻るため、実行されなかったクロージャを呼び出し元で回収して破棄する
+  - @melpon
+
+### misc
+
+- [FIX] `AudioDeviceModule` と `DtlsTransport` のスレッド契約のドキュメントが誤っていてデバッグビルドでスレッド違反になる問題を修正する
+  - `AudioDeviceModule` のメソッドはすべて同じスレッドから呼び出す必要があり、`RTC_DCHECK` が有効なデバッグビルドであればプラットフォームを問わず違反が検出される
+  - `PeerConnectionFactory` に渡した場合は worker thread がそのスレッドになる
+  - `DtlsTransport` の observer の登録と解除は、この transport を生成したネットワークスレッドから行う
+  - `DtlsTransport` の observer の登録と解除を行うテストをネットワークスレッド経由にし、ネットワークスレッドにソケットサーバーを用意する
+  - @melpon
+- [UPDATE] `Thread::blocking_call` を停止中のスレッドで呼び出してはならないことを Rustdoc に明記する
+  - 停止中のスレッドではクロージャは実行されず、リリースビルドでは `R::default()` が返る
   - @melpon
 
 ## 0.156.0

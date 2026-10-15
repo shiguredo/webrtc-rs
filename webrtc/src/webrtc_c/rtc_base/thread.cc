@@ -2,6 +2,7 @@
 
 #include <stdarg.h>
 #include <stddef.h>
+#include <cassert>
 #include <memory>
 
 // WebRTC
@@ -18,16 +19,24 @@ extern "C" {
 WEBRTC_DEFINE_UNIQUE(webrtc_Thread, webrtc::Thread);
 
 WEBRTC_EXPORT void webrtc_Thread_Stop(struct webrtc_Thread* self) {
+  assert(self != nullptr);
   auto p = reinterpret_cast<webrtc::Thread*>(self);
   p->Stop();
 }
 WEBRTC_EXPORT int webrtc_Thread_Start(struct webrtc_Thread* self) {
+  assert(self != nullptr);
   auto p = reinterpret_cast<webrtc::Thread*>(self);
   return p->Start() ? 1 : 0;
 }
 WEBRTC_EXPORT void webrtc_Thread_Quit(struct webrtc_Thread* self) {
+  assert(self != nullptr);
   auto p = reinterpret_cast<webrtc::Thread*>(self);
   p->Quit();
+}
+WEBRTC_EXPORT int webrtc_Thread_IsQuitting(struct webrtc_Thread* self) {
+  assert(self != nullptr);
+  auto p = reinterpret_cast<webrtc::Thread*>(self);
+  return p->IsQuitting() ? 1 : 0;
 }
 WEBRTC_EXPORT struct webrtc_Thread_unique* webrtc_Thread_Create() {
   auto p = webrtc::Thread::Create();
@@ -41,12 +50,14 @@ webrtc_Thread_CreateWithSocketServer() {
 WEBRTC_EXPORT void webrtc_Thread_BlockingCall(struct webrtc_Thread* self,
                                               void (*func)(void*),
                                               void* arg) {
+  assert(self != nullptr);
   auto p = reinterpret_cast<webrtc::Thread*>(self);
   p->BlockingCall([func, arg]() { func(arg); });
 }
 WEBRTC_EXPORT void* webrtc_Thread_BlockingCall_r(struct webrtc_Thread* self,
                                                  void* (*func)(void*),
                                                  void* arg) {
+  assert(self != nullptr);
   auto p = reinterpret_cast<webrtc::Thread*>(self);
   // 非 void テンプレートの BlockingCall はデフォルト初期化値を返すため、停止中
   // スレッドでは未初期化ポインタ（void*）が返り得る。ここでは nullptr を
