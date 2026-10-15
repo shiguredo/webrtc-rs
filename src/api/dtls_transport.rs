@@ -36,6 +36,12 @@ impl DtlsTransportState {
 }
 
 /// DtlsTransportInterface のラッパー。
+///
+/// この transport は libwebrtc のネットワークスレッド (ファクトリに設定した network thread) で
+/// 生成され、 [DtlsTransport::register_observer] と [DtlsTransport::unregister_observer] は
+/// そのスレッドから呼び出す必要がある。 別スレッドから呼び出すとデバッグビルドではスレッド違反
+/// として検出されてプロセスが異常終了する。 [DtlsTransport] は `Send` なので、
+/// `Thread::blocking_call` でネットワークスレッドへ移動してから呼び出すこと。
 pub struct DtlsTransport {
     raw_ref: ScopedRef<DtlsTransportHandle>,
 }
@@ -48,6 +54,8 @@ impl DtlsTransport {
     }
 
     /// DtlsTransport の状態を取得する。
+    ///
+    /// どのスレッドからでも呼び出せる。
     pub fn state(&self) -> DtlsTransportState {
         let state = unsafe { ffi::webrtc_DtlsTransportInterface_state(self.raw_ref.as_ptr()) };
         DtlsTransportState::from_int(state)
@@ -57,6 +65,8 @@ impl DtlsTransport {
     ///
     /// この DtlsTransport に登録した `observer` は、`unregister_observer` で登録を解除する
     /// まで drop してはならない。
+    ///
+    /// この transport を生成したネットワークスレッドから呼び出すこと ([DtlsTransport] を参照)。
     pub fn register_observer(&self, observer: &DtlsTransportObserver) {
         unsafe {
             ffi::webrtc_DtlsTransportInterface_RegisterObserver(
@@ -67,6 +77,8 @@ impl DtlsTransport {
     }
 
     /// Observer を解除する。
+    ///
+    /// この transport を生成したネットワークスレッドから呼び出すこと ([DtlsTransport] を参照)。
     pub fn unregister_observer(&self) {
         unsafe { ffi::webrtc_DtlsTransportInterface_UnregisterObserver(self.raw_ref.as_ptr()) };
     }

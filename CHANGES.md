@@ -37,6 +37,12 @@
   - @melpon
 - [FIX] C++20 モジュールスキャンの無効化が `whip_cpp` と `whep_cpp` に漏れていてビルドに失敗する問題を修正する
   - @melpon
+- [FIX] デバッグビルドで `AudioDeviceModule` と `DtlsTransport` がスレッド違反で異常終了する問題を修正する
+  - `RTC_DCHECK` が有効なデバッグビルドであればプラットフォームを問わず発生する
+  - `AudioDeviceModule` のメソッドはすべて同じスレッドから呼び出す必要があり、破棄もそのスレッドで行う必要がある。libwebrtc が worker thread から利用するため、利用者側のスレッドで最後の参照を解放するとデバッグビルドのスレッドチェックに引っかかる。ハンドルは `PeerConnectionFactory` を破棄する前に破棄する必要があることをドキュメントに明記する
+  - `DtlsTransport` の observer の登録と解除は、この transport を生成したネットワークスレッドから呼び出す必要があることをドキュメントに明記する
+  - テストをこれらの契約に従うようにし、ネットワークスレッドにソケットサーバーを用意する
+  - @melpon
 
 ### misc
 
