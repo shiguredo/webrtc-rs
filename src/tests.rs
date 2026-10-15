@@ -34,7 +34,7 @@ impl Drop for DropCounter {
 ///
 /// ADM のハンドルはこの関数を抜けるときに破棄する。ファクトリが ADM の参照を保持するため、
 /// ADM の破棄はファクトリの破棄時に行われる。Dummy の ADM はスレッドチェックを持たないため、
-/// 生成したスレッドと libwebrtc が利用する worker thread が異なってもテストでは検出されない。
+/// ADM を生成したスレッドと libwebrtc が ADM を利用するスレッドが異なってもテストでは検出されない。
 fn set_dummy_audio_device_module(deps: &mut PeerConnectionFactoryDependencies, env: &Environment) {
     let adm = AudioDeviceModule::new(env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
@@ -2007,7 +2007,6 @@ fn builtin_audio_factories_create() {
     network.start();
     signaling.start();
     deps.set_network_thread(&network);
-    deps.set_worker_thread(&network);
     deps.set_signaling_thread(&signaling);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
@@ -2327,7 +2326,6 @@ fn peer_connection_factory_and_capabilities() {
     network.start();
     signaling.start();
     deps.set_network_thread(&network);
-    deps.set_worker_thread(&network);
     deps.set_signaling_thread(&signaling);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
@@ -2503,7 +2501,6 @@ fn create_modular_with_context_returns_default_network_objects() {
     network.start();
     signaling.start();
     deps.set_network_thread(&network);
-    deps.set_worker_thread(&network);
     deps.set_signaling_thread(&signaling);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
@@ -2851,7 +2848,6 @@ fn rtp_sender_get_set_parameters() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -2940,7 +2936,6 @@ fn rtp_and_peer_connection_refcounted_wrappers_clone() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -3196,7 +3191,6 @@ fn peer_connection_create_and_transceiver() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -3285,7 +3279,6 @@ fn rtp_receiver_stream_ids() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -3511,7 +3504,6 @@ fn signaling_state_change_is_observed() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -3676,7 +3668,6 @@ fn media_stream_track_state() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -3745,7 +3736,6 @@ fn peer_connection_lookup_dtls_transport() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -3821,7 +3811,6 @@ fn get_stats_delivers_report() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -3864,7 +3853,6 @@ fn peer_connection_create_with_proxy_allocator() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -3917,7 +3905,6 @@ fn video_track_and_transceiver_with_track() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -4066,7 +4053,6 @@ fn always_negotiate_data_channels_adds_data_section() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -4132,7 +4118,6 @@ fn field_trials_reach_offer_sdp() {
         network.start();
         signaling.start();
         deps_factory.set_network_thread(&network);
-        deps_factory.set_worker_thread(&network);
         deps_factory.set_signaling_thread(&signaling);
         deps_factory.set_audio_encoder_factory(&enc);
         deps_factory.set_audio_decoder_factory(&dec);
@@ -5143,7 +5128,6 @@ fn create_local_media_stream_returns_requested_id() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -5182,7 +5166,6 @@ fn media_stream_track_round_trip() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
@@ -5319,7 +5302,6 @@ fn create_audio_source_with_audio_options() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -5359,7 +5341,6 @@ fn create_audio_source_with_default_audio_options() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
@@ -5412,7 +5393,6 @@ fn audio_refcounted_wrappers_clone() {
     network.start();
     signaling.start();
     deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
     deps_factory.set_signaling_thread(&signaling);
     deps_factory.set_audio_encoder_factory(&enc_clone);
     deps_factory.set_audio_decoder_factory(&dec_clone);

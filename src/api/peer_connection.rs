@@ -51,17 +51,6 @@ impl PeerConnectionFactoryDependencies {
     }
 
     /// start 済みの Thread を設定する。ライフサイクル管理は呼び出し側で行う。
-    pub fn set_worker_thread(&mut self, thread: &Thread) {
-        let raw = thread.raw();
-        unsafe {
-            ffi::webrtc_PeerConnectionFactoryDependencies_set_worker_thread(
-                self.raw.as_ptr(),
-                raw.as_ptr(),
-            );
-        }
-    }
-
-    /// start 済みの Thread を設定する。ライフサイクル管理は呼び出し側で行う。
     pub fn set_signaling_thread(&mut self, thread: &Thread) {
         let raw = thread.raw();
         unsafe {

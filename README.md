@@ -105,7 +105,6 @@ impl FactoryHolder {
 
         let mut deps = PeerConnectionFactoryDependencies::new();
         deps.set_network_thread(&network);
-        deps.set_worker_thread(&network);
         deps.set_signaling_thread(&signaling);
         deps.set_env(Some(env.clone()));
         let event_log = RtcEventLogFactory::new();
