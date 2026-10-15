@@ -132,7 +132,9 @@ deps.set_signaling_thread(&signaling);
 deps.set_env(Some(env.clone()));
 deps.set_event_log_factory(RtcEventLogFactory::new());
 
-let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)?;
+let adm = unsafe {
+    AudioDeviceModule::new(&network, &env, AudioDeviceModuleAudioLayer::Dummy)
+}?;
 deps.set_audio_device_module(&adm);
 deps.set_audio_encoder_factory(&AudioEncoderFactory::builtin());
 deps.set_audio_decoder_factory(&AudioDecoderFactory::builtin());
@@ -147,7 +149,9 @@ let (factory, context) =
 
 ### フィールドトライアル
 
-libwebrtc のフィールドトライアルは `FieldTrials` を作って `EnvironmentFactory` に設定し、生成した `Environment` を `PeerConnectionFactoryDependencies::set_env` と `AudioDeviceModule::new` に渡す。指定しない場合は `Environment::new()` を使う。
+libwebrtc のフィールドトライアルは `FieldTrials` を作って `EnvironmentFactory` に設定し、生成した `Environment` を `PeerConnectionFactoryDependencies::set_env` と `AudioDeviceModule::new` (第 2 引数) に渡す。指定しない場合は `Environment::new()` を使う。
+
+`AudioDeviceModule::new` / `new_with_handler` / `from_refcounted_ptr` の第 1 引数には、ADM のメソッドを実行する start 済みの `Thread` を渡す。`PeerConnectionFactory` に設定する場合は `set_network_thread` に渡したのと同じ network thread を渡す。これらの関数は `unsafe fn` であり、渡した thread が ADM より長く生存し、その間停止しないことを要求する。
 
 ```rust
 use shiguredo_webrtc::{EnvironmentFactory, FieldTrials};

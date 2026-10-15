@@ -3,24 +3,13 @@ use crate::helper::non_null::expect_non_null;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 
-unsafe extern "C" fn thread_trampoline<F, R>(data: *mut c_void)
-where
-    F: FnOnce() -> R + Send + 'static,
-    R: Send + 'static,
-{
-    let arg = unsafe { &mut *(data as *mut Option<F>) };
-    // クロージャの所有権は呼び出し元が持ったまま渡され、ここで取り出す。
-    // 停止中のスレッドではこの関数が呼ばれないため、呼び出し元が回収して破棄する。
-    let func = arg.take().expect("thread_trampoline: closure is not set");
-    func();
-}
-
 unsafe extern "C" fn thread_trampoline_r<F, R>(data: *mut c_void) -> *mut c_void
 where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
     let arg = unsafe { &mut *(data as *mut Option<F>) };
+    // クロージャの所有権は呼び出し元が持ったまま渡され、ここで取り出す。
     let func = arg.take().expect("thread_trampoline_r: closure is not set");
     let res = func();
     let boxed_res = Box::new(res);
@@ -99,14 +88,10 @@ impl Thread {
     /// 実行されるため `F: Send` が必要である。また、`f` は `Box::into_raw` で
     /// C++ 側のタスクとして渡され、FFI 越しに消費されるため `F: 'static` を要求する。
     ///
-    /// 停止中 (`quit` / `stop` 後) のスレッドに対して呼び出してはならない。libwebrtc の
-    /// `BlockingCall` は停止中のスレッドからの呼び出しを契約違反として扱い、デバッグビルドでは
-    /// `RTC_DCHECK` により検出されてプロセスが異常終了する。停止中かどうかは
-    /// [Thread::is_quitting] で確認できる。
-    ///
-    /// 契約違反の呼び出しではクロージャは実行されず、その場合は `f` の結果の代わりに
-    /// `R::default()` が返るため `R: Default` を要求する。クロージャは実行の有無にかかわらず
-    /// 破棄される。
+    /// start していないスレッド、および停止中 (`quit` / `stop` 後) のスレッドに対して呼び出しては
+    /// ならない。start していないスレッドでは `f` が実行されず、呼び出しが返らない。
+    /// start 済みかどうかは [Thread::is_quitting] では判定できないため、`start` を呼んだことを
+    /// 呼び出し側で保証する。
     ///
     /// ```
     /// use shiguredo_webrtc::Thread;
@@ -139,54 +124,42 @@ impl Thread {
     /// let value = 42;
     /// thread.blocking_call(|| value);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// 呼び出し時点で停止中のスレッドに対して呼び出した場合。
     pub fn blocking_call<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce() -> R,
         F: Send + 'static,
         R: Send + 'static,
-        R: Default,
     {
-        // クロージャは Option に包んで渡し、対象スレッドで実行された場合はそこで取り出される。
-        // 停止中のスレッドではクロージャが実行されないため、実行されなかったクロージャは
-        // ここで回収して破棄する（リークさせない）。
-        //
-        // R が () の場合は BlockingCall、そうでない場合は BlockingCall_r を使う。
-        // 単純化のため、() とそれ以外を分ける。
-        if std::mem::size_of::<R>() == 0 {
-            let raw = self.raw();
-            let arg = Box::into_raw(Box::new(Some(f)));
-            unsafe {
-                ffi::webrtc_Thread_BlockingCall(
-                    raw.as_ptr(),
-                    Some(thread_trampoline::<F, R>),
-                    arg as *mut c_void,
-                );
-            }
-            drop(unsafe { Box::from_raw(arg) });
-            // () を返す
-            R::default()
-        } else {
-            let raw = self.raw();
-            let arg = Box::into_raw(Box::new(Some(f)));
-            let res_ptr = unsafe {
-                ffi::webrtc_Thread_BlockingCall_r(
-                    raw.as_ptr(),
-                    Some(thread_trampoline_r::<F, R>),
-                    arg as *mut c_void,
-                )
-            };
-            drop(unsafe { Box::from_raw(arg) });
-            // 停止中スレッドでは functor が実行されず nullptr（未実行）が返る。C++ 側の非 void
-            // テンプレートは未実行時に未初期化の値を返すため、C ラッパーが nullptr に正規化して
-            // いる（webrtc_c/rtc_base/thread.cc）。実行経路 (thread_trampoline_r) は常に非 null を
-            // 返すため、nullptr は未実行を一意に表す。未実行時はデフォルト値を返す。
-            if res_ptr.is_null() {
-                R::default()
-            } else {
-                let boxed_res: Box<R> = unsafe { Box::from_raw(res_ptr as *mut R) };
-                *boxed_res
-            }
-        }
+        // 停止中のスレッドでは libwebrtc がクロージャを実行せずに戻るため、呼び出し側が成功と
+        // 区別できない。未実行の結果を返さないよう、ここで契約違反として拒否する。
+        assert!(
+            !self.is_quitting(),
+            "Thread::blocking_call: the thread is not running"
+        );
+        let raw = self.raw();
+        let arg = Box::into_raw(Box::new(Some(f)));
+        let res_ptr = unsafe {
+            ffi::webrtc_Thread_BlockingCall_r(
+                raw.as_ptr(),
+                Some(thread_trampoline_r::<F, R>),
+                arg as *mut c_void,
+            )
+        };
+        drop(unsafe { Box::from_raw(arg) });
+        // 入口の確認と PostTask の間に停止要求が入ると、クロージャは実行されず nullptr が返る。
+        // C++ 側の非 void テンプレートは未実行時に未初期化の値を返すため、C ラッパーが nullptr に
+        // 正規化している（webrtc_c/rtc_base/thread.cc）。実行経路 (thread_trampoline_r) は常に
+        // 非 null を返すため、nullptr は未実行を一意に表す。
+        assert!(
+            !res_ptr.is_null(),
+            "Thread::blocking_call: the closure was not executed"
+        );
+        let boxed_res: Box<R> = unsafe { Box::from_raw(res_ptr as *mut R) };
+        *boxed_res
     }
 
     pub fn raw(&self) -> NonNull<ffi::webrtc_Thread> {
@@ -229,7 +202,7 @@ impl Drop for Thread {
 /// [Thread] が所有するスレッドへの、所有権を持たないハンドル。
 ///
 /// スレッドの停止や破棄は行わない。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy)]
 pub(crate) struct ThreadHandle {
     raw: NonNull<ffi::webrtc_Thread>,
 }
@@ -237,7 +210,7 @@ pub(crate) struct ThreadHandle {
 unsafe impl Send for ThreadHandle {}
 
 impl ThreadHandle {
-    pub(crate) fn from_raw(raw: NonNull<ffi::webrtc_Thread>) -> Self {
+    fn from_raw(raw: NonNull<ffi::webrtc_Thread>) -> Self {
         Self { raw }
     }
 
@@ -246,53 +219,53 @@ impl ThreadHandle {
         self.raw
     }
 
+    /// スレッドに停止要求が出ているかどうかを返す。
+    ///
+    /// `quit` / `stop` の後は `true` になる。[Thread::is_quitting] と同じ値を返す。
+    pub(crate) fn is_quitting(&self) -> bool {
+        unsafe { ffi::webrtc_Thread_IsQuitting(self.raw.as_ptr()) != 0 }
+    }
+
     /// スレッド内で関数を実行し、結果を待つ。
     ///
     /// `f` はこのハンドルが指すスレッドで実行される。基本的に呼び出し元と異なるスレッドで
     /// 実行されるため `F: Send` を要求し、`f` は FFI 越しに消費されるため `F: 'static` を
     /// 要求する。
     ///
-    /// 停止中 (`quit` / `stop` 後) のスレッドに対して呼び出してはならない。libwebrtc の
-    /// `BlockingCall` は停止中のスレッドからの呼び出しを契約違反として扱い、デバッグビルドでは
-    /// `RTC_DCHECK` により検出されてプロセスが異常終了する。
+    /// 契約は [Thread::blocking_call] と同じである。start していないスレッドでは `f` が実行
+    /// されず、呼び出しが返らない。
     ///
-    /// 契約違反の呼び出しではクロージャは実行されず、その場合は `f` の結果の代わりに
-    /// `R::default()` が返るため `R: Default` を要求する。クロージャは実行の有無にかかわらず
-    /// 破棄される。
+    /// # Panics
+    ///
+    /// 呼び出し時点で停止中のスレッドに対して呼び出した場合、または停止要求と競合して `f` が
+    /// 実行されなかった場合。
     pub(crate) fn blocking_call<F, R>(&self, f: F) -> R
     where
         F: FnOnce() -> R,
         F: Send + 'static,
         R: Send + 'static,
-        R: Default,
     {
-        if std::mem::size_of::<R>() == 0 {
-            let arg = Box::into_raw(Box::new(Some(f)));
-            unsafe {
-                ffi::webrtc_Thread_BlockingCall(
-                    self.raw.as_ptr(),
-                    Some(thread_trampoline::<F, R>),
-                    arg as *mut c_void,
-                );
-            }
-            drop(unsafe { Box::from_raw(arg) });
-            R::default()
-        } else {
-            let arg = Box::into_raw(Box::new(Some(f)));
-            let res_ptr = unsafe {
-                ffi::webrtc_Thread_BlockingCall_r(
-                    self.raw.as_ptr(),
-                    Some(thread_trampoline_r::<F, R>),
-                    arg as *mut c_void,
-                )
-            };
-            drop(unsafe { Box::from_raw(arg) });
-            if res_ptr.is_null() {
-                R::default()
-            } else {
-                let boxed_res: Box<R> = unsafe { Box::from_raw(res_ptr as *mut R) };
-                *boxed_res
-            }
-        }
+        // 停止中のスレッドでは libwebrtc がクロージャを実行せずに戻るため、呼び出し側が成功と
+        // 区別できない。未実行の結果を返さないよう、ここで契約違反として拒否する。
+        assert!(
+            !self.is_quitting(),
+            "ThreadHandle::blocking_call: the thread is not running"
+        );
+        let arg = Box::into_raw(Box::new(Some(f)));
+        let res_ptr = unsafe {
+            ffi::webrtc_Thread_BlockingCall_r(
+                self.raw.as_ptr(),
+                Some(thread_trampoline_r::<F, R>),
+                arg as *mut c_void,
+            )
+        };
+        drop(unsafe { Box::from_raw(arg) });
+        // 入口の確認と PostTask の間に停止要求が入ると、クロージャは実行されず nullptr が返る。
+        assert!(
+            !res_ptr.is_null(),
+            "ThreadHandle::blocking_call: the closure was not executed"
+        );
+        let boxed_res: Box<R> = unsafe { Box::from_raw(res_ptr as *mut R) };
+        *boxed_res
     }
 }

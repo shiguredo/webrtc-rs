@@ -119,7 +119,8 @@ impl FactoryHolder {
         deps.set_signaling_thread(&signaling);
         let event_log = RtcEventLogFactory::new();
         deps.set_event_log_factory(event_log);
-        // ADM は deps の network thread 上で実行されるため、network thread を渡す。
+        // ADM は deps の network thread 上で実行される。set_audio_device_module が両者の一致を
+        // 検査するため、先に set_network_thread を呼んでおく必要がある。
         let adm = unsafe {
             AudioDeviceModule::new(&network, &env, AudioDeviceModuleAudioLayer::Dummy).ok()?
         };

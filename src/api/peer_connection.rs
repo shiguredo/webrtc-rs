@@ -157,12 +157,13 @@ impl PeerConnectionFactoryDependencies {
                 "PeerConnectionFactoryDependencies::set_audio_device_module: set_network_thread must be called before setting an AudioDeviceModule"
             )
         });
-        assert_eq!(
-            adm.thread_ptr(),
-            network_thread,
+        assert!(
+            adm.thread_ptr() == network_thread,
             "PeerConnectionFactoryDependencies::set_audio_device_module: the network thread set by set_network_thread must be the thread the AudioDeviceModule runs on"
         );
-        let raw_ref = adm.as_refcounted_ptr();
+        // Safety: ADM がメソッドを実行するスレッドが network thread と一致することを直前に確認
+        // しており、libwebrtc はそのスレッドから ADM を利用する。
+        let raw_ref = unsafe { adm.as_refcounted_ptr() };
         unsafe {
             ffi::webrtc_PeerConnectionFactoryDependencies_set_adm(self.raw.as_ptr(), raw_ref);
         }

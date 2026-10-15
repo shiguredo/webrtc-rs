@@ -21,15 +21,6 @@ impl VideoEncoderHandler for NoopHandler {}
 impl VideoDecoderHandler for NoopHandler {}
 impl AudioTransportHandler for NoopHandler {}
 
-/// drop されたときにカウンタを進める、テスト用のヘルパー。
-struct DropCounter(Arc<AtomicUsize>);
-
-impl Drop for DropCounter {
-    fn drop(&mut self) {
-        self.0.fetch_add(1, Ordering::SeqCst);
-    }
-}
-
 /// テスト用の Dummy の ADM を生成し、ファクトリの依存に設定する。
 ///
 /// `set_audio_device_module` は ADM の実行スレッドと network thread の一致を要求するため、
@@ -1962,29 +1953,18 @@ fn thread_is_quitting_reflects_state() {
 
 #[test]
 #[cfg(not(feature = "debug-build"))]
-fn thread_blocking_call_after_stop_returns_default() {
+#[should_panic(expected = "the thread is not running")]
+fn thread_blocking_call_after_stop_panics() {
     // 停止中のスレッドへの blocking_call は契約違反であり、クロージャは実行されない。
-    // デバッグビルドの libwebrtc では RTC_DCHECK で異常終了するため、リリースビルドの
-    // libwebrtc を使う構成でのみ確認する。未実行時に未初期化ポインタが渡り Box::from_raw で
-    // UB になる問題と、クロージャが解放されない問題の回帰テスト。
+    // 未実行を成功と区別できないため panic する。デバッグビルドの libwebrtc では RTC_DCHECK で
+    // 異常終了するため、リリースビルドの libwebrtc を使う構成でのみ確認する。
     let mut thread = Thread::new();
     assert!(thread.start());
     thread.stop();
+    thread.blocking_call(|| 42);
 
-    let dropped = Arc::new(AtomicUsize::new(0));
-    let counter = DropCounter(Arc::clone(&dropped));
-    let result = thread.blocking_call(move || {
-        // counter をムーブキャプチャさせ、実行の有無にかかわらずクロージャの破棄で
-        // drop されるようにする。
-        let _ = &counter;
-        42
-    });
-    assert_eq!(result, 0, "未実行時の戻り値がデフォルト値になっていません");
-    assert_eq!(
-        dropped.load(Ordering::SeqCst),
-        1,
-        "実行されなかったクロージャが解放されていません"
-    );
+    // panic するためここには到達しない。到達した場合は panic しなかったことになる。
+    assert!(thread.is_quitting());
 }
 
 #[test]
@@ -2162,8 +2142,7 @@ fn audio_device_module_runs_calls_on_its_thread() {
         )
     };
 
-    // 呼び出し元とは別のスレッドで実行されるため、ハンドラが呼ばれたスレッド ID は呼び出し元と
-    // 異なる。
+    // 呼び出し元とは別の、保持したスレッドで実行される。
     adm.init().expect("AudioDeviceModule::init が失敗しました");
     assert_eq!(adm.recording_devices(), 1);
     adm.recording_device_name(0)
@@ -2175,10 +2154,17 @@ fn audio_device_module_runs_calls_on_its_thread() {
         3,
         "すべての呼び出しがハンドラに届いていません"
     );
-    for id in called {
-        assert_ne!(
-            id, caller,
-            "ADM のメソッドが呼び出し元のスレッドで実行されました"
+    // すべての呼び出しが同じスレッドで実行され、そのスレッドが呼び出し元と異なることを確認する。
+    // 同じスレッドであることまで見ないと、別のスレッドに紐付いても検出できない。
+    let first = called[0];
+    assert_ne!(
+        first, caller,
+        "ADM のメソッドが呼び出し元のスレッドで実行されました"
+    );
+    for id in &called {
+        assert_eq!(
+            *id, first,
+            "ADM のメソッドが保持したスレッドとは別のスレッドで実行されました"
         );
     }
     thread.stop();
@@ -2186,17 +2172,35 @@ fn audio_device_module_runs_calls_on_its_thread() {
 
 #[test]
 fn audio_device_module_send_and_sync() {
-    // AudioDeviceModule は保持したスレッドで呼び出しを直列化するため Send かつ Sync である。
-    // この関数がコンパイルできることが、その確認になる。
+    // AudioDeviceModule は Send + Sync であり、この関数がコンパイルできることがその確認になる。
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<AudioDeviceModule>();
 
+    // 呼び出し回数を数え、複数スレッドからの呼び出しがすべて実行されたことを確認する。
+    struct CountingHandler {
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl AudioDeviceModuleHandler for CountingHandler {
+        fn recording_devices(&mut self) -> i16 {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            1
+        }
+    }
+
+    let calls = Arc::new(AtomicUsize::new(0));
     let mut thread = Thread::new();
     assert!(thread.start(), "スレッドの起動に失敗しました");
-    let adm =
-        Arc::new(unsafe { AudioDeviceModule::new_with_handler(&thread, Box::new(NoopHandler)) });
+    let adm = Arc::new(unsafe {
+        AudioDeviceModule::new_with_handler(
+            &thread,
+            Box::new(CountingHandler {
+                calls: Arc::clone(&calls),
+            }),
+        )
+    });
 
-    // 複数のスレッドから同じ ADM を共有して呼び出しても、実行は保持したスレッドに直列化される。
+    // Mutex を挟まずに、複数のスレッドから同じ ADM を共有して呼び出す。
     let mut handles = Vec::new();
     for _ in 0..4 {
         let adm = Arc::clone(&adm);
@@ -2205,10 +2209,15 @@ fn audio_device_module_send_and_sync() {
     for handle in handles {
         assert_eq!(
             handle.join().expect("スレッドの join に失敗しました"),
-            0,
+            1,
             "共有した ADM の呼び出し結果が不正です"
         );
     }
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        4,
+        "複数スレッドからの呼び出しがすべてハンドラに届いていません"
+    );
     drop(adm);
     thread.stop();
 }
@@ -2283,6 +2292,85 @@ fn audio_device_module_set_audio_device_module_requires_network_thread() {
     thread.stop();
 }
 
+#[test]
+#[cfg(not(feature = "debug-build"))]
+#[should_panic(expected = "the thread is not running")]
+fn audio_device_module_init_panics_after_thread_stop() {
+    // 停止中のスレッドへ送ったメソッドは実行されないため、未実行の結果を成功として返さず
+    // panic する。デバッグビルドの libwebrtc では RTC_DCHECK で異常終了するため、リリース
+    // ビルドの libwebrtc を使う構成でのみ確認する。
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let env = Environment::new();
+    let adm = unsafe {
+        AudioDeviceModule::new(&thread, &env, AudioDeviceModuleAudioLayer::Dummy)
+            .expect("AudioDeviceModule の生成に失敗しました")
+    };
+    thread.stop();
+    let _ = adm.init();
+
+    // panic するためここには到達しない。到達した場合は panic しなかったことになる。
+    drop(adm);
+}
+
+#[test]
+#[cfg(not(feature = "debug-build"))]
+#[should_panic(expected = "the thread is not running")]
+fn audio_device_module_recording_devices_panics_after_thread_stop() {
+    // 停止中のスレッドへ送ったメソッドは実行されないため、0 を返さず panic する。
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let env = Environment::new();
+    let adm = unsafe {
+        AudioDeviceModule::new(&thread, &env, AudioDeviceModuleAudioLayer::Dummy)
+            .expect("AudioDeviceModule の生成に失敗しました")
+    };
+    thread.stop();
+    adm.recording_devices();
+
+    // panic するためここには到達しない。到達した場合は panic しなかったことになる。
+    drop(adm);
+}
+
+#[test]
+#[cfg(not(feature = "debug-build"))]
+#[should_panic(expected = "the thread is not running")]
+fn audio_device_module_recording_device_name_panics_after_thread_stop() {
+    // 停止中のスレッドへ送ったメソッドは実行されないため、未実行を表すエラーではなく panic
+    // する。
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let env = Environment::new();
+    let adm = unsafe {
+        AudioDeviceModule::new(&thread, &env, AudioDeviceModuleAudioLayer::Dummy)
+            .expect("AudioDeviceModule の生成に失敗しました")
+    };
+    thread.stop();
+    let _ = adm.recording_device_name(0);
+
+    // panic するためここには到達しない。到達した場合は panic しなかったことになる。
+    drop(adm);
+}
+
+#[test]
+#[cfg(not(feature = "debug-build"))]
+#[should_panic(expected = "the thread is not running")]
+fn audio_device_module_set_recording_device_panics_after_thread_stop() {
+    // 停止中のスレッドへ送ったメソッドは実行されないため、成功として返さず panic する。
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let env = Environment::new();
+    let adm = unsafe {
+        AudioDeviceModule::new(&thread, &env, AudioDeviceModuleAudioLayer::Dummy)
+            .expect("AudioDeviceModule の生成に失敗しました")
+    };
+    thread.stop();
+    let _ = adm.set_recording_device(0);
+
+    // panic するためここには到達しない。到達した場合は panic しなかったことになる。
+    drop(adm);
+}
+
 /// ADM が破棄されたことをハンドラの破棄で観測するためのハンドラ。
 ///
 /// `AudioDeviceModule::new_with_handler` が設定する `OnDestroy` は `destroy_handler` を
@@ -2325,7 +2413,8 @@ fn audio_device_module_from_refcounted_ptr_shares_adm_after_add_ref() {
     };
 
     // 借用中のポインタを共有するため、呼び出し側で参照カウントを 1 増やしてから渡す。
-    let raw_ref = NonNull::new(adm.as_refcounted_ptr())
+    // Safety: ここでは ADM の生成と利用を同一スレッドで行う。
+    let raw_ref = NonNull::new(unsafe { adm.as_refcounted_ptr() })
         .expect("AudioDeviceModule のポインタが null になりました");
     unsafe { ffi::webrtc_AudioDeviceModule_AddRef(adm.as_ptr()) };
     let shared = unsafe { AudioDeviceModule::from_refcounted_ptr(&thread, raw_ref) };
@@ -2373,7 +2462,8 @@ fn audio_device_module_from_refcounted_ptr_takes_ownership() {
             }),
         )
     };
-    let raw_ref = NonNull::new(adm.as_refcounted_ptr())
+    // Safety: ここでは ADM の生成と利用を同一スレッドで行う。
+    let raw_ref = NonNull::new(unsafe { adm.as_refcounted_ptr() })
         .expect("AudioDeviceModule のポインタが null になりました");
     // 所有権付きの取り込みへ参照 1 つ分を渡すため、adm は drop せずに参照を手放す。
     std::mem::forget(adm);
@@ -2467,6 +2557,7 @@ fn audio_device_module_get_stats_returns_unique() {
         AudioDeviceModule::new_with_handler(&thread, Box::new(TestAudioDeviceModuleGetStatsHandler))
     };
     let mut out_stats: *mut ffi::webrtc_AudioDeviceModule_Stats_unique = std::ptr::null_mut();
+    // Safety: ここでは ADM の生成と利用を同一スレッドで行う。
     let ret = unsafe { ffi::webrtc_AudioDeviceModule_GetStats(adm.as_ptr(), &mut out_stats) };
     assert_eq!(ret, 1);
     assert!(!out_stats.is_null());
@@ -2502,6 +2593,7 @@ fn audio_device_module_get_stats_none_returns_zero() {
     assert!(thread.start(), "スレッドの起動に失敗しました");
     let adm = unsafe { AudioDeviceModule::new_with_handler(&thread, Box::new(NoopHandler)) };
     let mut out_stats: *mut ffi::webrtc_AudioDeviceModule_Stats_unique = std::ptr::null_mut();
+    // Safety: ここでは ADM の生成と利用を同一スレッドで行う。
     let ret = unsafe { ffi::webrtc_AudioDeviceModule_GetStats(adm.as_ptr(), &mut out_stats) };
     assert_eq!(ret, 0);
     assert!(out_stats.is_null());
