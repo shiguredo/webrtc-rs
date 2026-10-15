@@ -147,8 +147,7 @@ impl PeerConnectionFactoryDependencies {
 
     /// ADM をファクトリの依存に設定する。
     ///
-    /// ファクトリは ADM の参照を保持し、 worker thread からこの ADM を利用する。 設定した側の
-    /// ハンドルはファクトリを破棄する前に破棄すること ([AudioDeviceModule] を参照)。
+    /// 設定した側のハンドルはファクトリを破棄する前に破棄すること（[AudioDeviceModule] を参照）。
     pub fn set_audio_device_module(&mut self, adm: &AudioDeviceModule) {
         let raw_ref = adm.as_refcounted_ptr();
         unsafe {

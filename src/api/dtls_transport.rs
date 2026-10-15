@@ -38,10 +38,11 @@ impl DtlsTransportState {
 /// DtlsTransportInterface のラッパー。
 ///
 /// この transport は libwebrtc のネットワークスレッド (ファクトリに設定した network thread) で
-/// 生成され、 [DtlsTransport::register_observer] と [DtlsTransport::unregister_observer] は
-/// そのスレッドから呼び出す必要がある。 別スレッドから呼び出すとデバッグビルドではスレッド違反
-/// として検出されてプロセスが異常終了する。 [DtlsTransport] は `Send` なので、
-/// `Thread::blocking_call` でネットワークスレッドへ移動してから呼び出すこと。
+/// 生成され、[DtlsTransport::register_observer] と [DtlsTransport::unregister_observer] は
+/// そのスレッドから呼び出す必要がある。別スレッドから呼び出すとデバッグビルドではスレッド違反
+/// として検出されてプロセスが異常終了する。[DtlsTransport] は `Send` なので、
+/// [Thread::blocking_call](crate::Thread::blocking_call) でネットワークスレッドへ移動してから
+/// 呼び出すこと。
 pub struct DtlsTransport {
     raw_ref: ScopedRef<DtlsTransportHandle>,
 }
@@ -96,9 +97,15 @@ impl Clone for DtlsTransport {
 // DtlsTransportObserver
 // -------------------------
 
+/// DtlsTransport の状態変化を受け取るハンドラ。
+///
+/// 各メソッドはこの transport を生成したネットワークスレッド (ファクトリに設定した network
+/// thread) で呼び出される ([DtlsTransport] を参照)。
 pub trait DtlsTransportObserverHandler: Send {
+    /// DTLS の状態が変化したときに呼び出される。
     #[expect(unused_variables)]
     fn on_state_change(&mut self, new_state: DtlsTransportState) {}
+    /// DTLS でエラーが発生したときに呼び出される。
     fn on_error(&mut self) {}
 }
 

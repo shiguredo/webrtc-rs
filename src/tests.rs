@@ -21,13 +21,20 @@ impl VideoEncoderHandler for NoopHandler {}
 impl VideoDecoderHandler for NoopHandler {}
 impl AudioTransportHandler for NoopHandler {}
 
-/// テスト用の Dummy の ADM を生成し、 ファクトリの依存に設定する。
+/// drop されたときにカウンタを進める、テスト用のヘルパー。
+struct DropCounter(Arc<AtomicUsize>);
+
+impl Drop for DropCounter {
+    fn drop(&mut self) {
+        self.0.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+/// テスト用の Dummy の ADM を生成し、ファクトリの依存に設定する。
 ///
-/// ADM のハンドルはこの関数を抜けるときに破棄する。 ADM は利用するスレッドを 1 つに限り、
-/// 破棄もそのスレッドで行う必要がある。 ファクトリに渡した ADM を利用するのは libwebrtc の
-/// worker thread なので、 利用者側の参照が最後まで残るとテストスレッドで破棄されることになり、
-/// デバッグビルドではスレッド違反として検出される。 ファクトリは ADM の参照を保持するため、
-/// ここでハンドルを破棄しても ADM はファクトリの破棄まで生存する。
+/// ADM のハンドルはこの関数を抜けるときに破棄する。ファクトリが ADM の参照を保持するため、
+/// ADM の破棄はファクトリの破棄時に行われる。Dummy の ADM はスレッドチェックを持たないため、
+/// 生成したスレッドと libwebrtc が利用する worker thread が異なってもテストでは検出されない。
 fn set_dummy_audio_device_module(deps: &mut PeerConnectionFactoryDependencies, env: &Environment) {
     let adm = AudioDeviceModule::new(env, AudioDeviceModuleAudioLayer::Dummy)
         .expect("AudioDeviceModule の生成に失敗しました");
@@ -1951,6 +1958,33 @@ fn thread_is_quitting_reflects_state() {
 }
 
 #[test]
+#[cfg(not(feature = "debug-build"))]
+fn thread_blocking_call_after_stop_returns_default() {
+    // 停止中のスレッドへの blocking_call は契約違反であり、クロージャは実行されない。
+    // デバッグビルドの libwebrtc では RTC_DCHECK で異常終了するため、リリースビルドの
+    // libwebrtc を使う構成でのみ確認する。未実行時に未初期化ポインタが渡り Box::from_raw で
+    // UB になる問題と、クロージャが解放されない問題の回帰テスト。
+    let mut thread = Thread::new();
+    assert!(thread.start());
+    thread.stop();
+
+    let dropped = Arc::new(AtomicUsize::new(0));
+    let counter = DropCounter(Arc::clone(&dropped));
+    let result = thread.blocking_call(move || {
+        // counter をムーブキャプチャさせ、実行の有無にかかわらずクロージャの破棄で
+        // drop されるようにする。
+        let _ = &counter;
+        42
+    });
+    assert_eq!(result, 0, "未実行時の戻り値がデフォルト値になっていません");
+    assert_eq!(
+        dropped.load(Ordering::SeqCst),
+        1,
+        "実行されなかったクロージャが解放されていません"
+    );
+}
+
+#[test]
 fn thread_sleep_ms_runs() {
     assert!(Thread::sleep_ms(1));
 }
@@ -3115,8 +3149,7 @@ fn rtp_and_peer_connection_refcounted_wrappers_clone() {
         dtls_state,
         "元の DtlsTransport の drop 後に clone が使えません"
     );
-    // DtlsTransport はネットワークスレッドで生成されるオブジェクトであり、 observer の
-    // 登録と解除もそのスレッドで行う必要がある。
+    // DtlsTransport の observer の登録と解除は、transport を生成したネットワークスレッドで行う。
     network.blocking_call({
         let dtls_transport = dtls_transport_clone.clone();
         move || {
@@ -3677,6 +3710,32 @@ fn media_stream_track_state() {
 
 #[test]
 fn peer_connection_lookup_dtls_transport() {
+    // offer の生成完了を待つための処理。
+    struct OfferHandler {
+        tx: mpsc::Sender<Result<String>>,
+    }
+
+    impl CreateSessionDescriptionObserverHandler for OfferHandler {
+        fn on_success(&mut self, desc: SessionDescription) {
+            let _ = self.tx.send(desc.to_string());
+        }
+
+        fn on_failure(&mut self, err: RtcError) {
+            let _ = self.tx.send(Err(err.into()));
+        }
+    }
+
+    // local description の設定完了を待つための処理。
+    struct SetLocalDescriptionHandler {
+        tx: mpsc::Sender<bool>,
+    }
+
+    impl SetLocalDescriptionObserverHandler for SetLocalDescriptionHandler {
+        fn on_set_local_description_complete(&mut self, error: RtcError) {
+            let _ = self.tx.send(error.ok());
+        }
+    }
+
     let dec = AudioDecoderFactory::builtin();
     let enc = AudioEncoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
@@ -3709,16 +3768,41 @@ fn peer_connection_lookup_dtls_transport() {
         .add_transceiver(MediaType::Audio, &transceiver_init)
         .expect("transceiver の追加に失敗しました");
 
-    if let Some(dtls_transport) = pc.lookup_dtls_transport_by_mid("0") {
-        let _ = dtls_transport.state();
-        // DtlsTransport はネットワークスレッドで生成されるオブジェクトであり、 observer の
-        // 登録と解除もそのスレッドで行う必要がある。
-        network.blocking_call(move || {
-            let observer = DtlsTransportObserver::new_with_handler(Box::new(NoopHandler));
-            dtls_transport.register_observer(&observer);
-            dtls_transport.unregister_observer();
-        });
-    }
+    // local description を設定しないと transport が生成されないため、offer を設定する。
+    let opts = PeerConnectionOfferAnswerOptions::new();
+    let (offer_tx, offer_rx) = mpsc::channel::<Result<String>>();
+    let mut offer_observer =
+        CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferHandler { tx: offer_tx }));
+    pc.create_offer(&mut offer_observer, &opts);
+    let sdp = offer_rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("createOffer がタイムアウトしました")
+        .expect("createOffer が失敗しました");
+    let (local_tx, local_rx) = mpsc::channel::<bool>();
+    let local_observer =
+        SetLocalDescriptionObserver::new_with_handler(Box::new(SetLocalDescriptionHandler {
+            tx: local_tx,
+        }));
+    let local_description =
+        SessionDescription::new(SdpType::Offer, &sdp).expect("Offer の組み立てに失敗しました");
+    pc.set_local_description(local_description, &local_observer);
+    assert!(
+        local_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("setLocalDescription がタイムアウトしました"),
+        "setLocalDescription が失敗しました"
+    );
+
+    let dtls_transport = pc
+        .lookup_dtls_transport_by_mid("0")
+        .expect("DtlsTransport の取得に失敗しました");
+    let _ = dtls_transport.state();
+    // DtlsTransport の observer の登録と解除は、transport を生成したネットワークスレッドで行う。
+    network.blocking_call(move || {
+        let observer = DtlsTransportObserver::new_with_handler(Box::new(NoopHandler));
+        dtls_transport.register_observer(&observer);
+        dtls_transport.unregister_observer();
+    });
 
     drop(pc);
     drop(factory);
@@ -4053,9 +4137,9 @@ fn field_trials_reach_offer_sdp() {
         deps_factory.set_audio_encoder_factory(&enc);
         deps_factory.set_audio_decoder_factory(&dec);
         deps_factory.set_audio_processing_builder(apb);
-        set_dummy_audio_device_module(&mut deps_factory, env);
         // フィールドトライアルを持つ Environment をファクトリに設定する
         deps_factory.set_env(Some(env.clone()));
+        set_dummy_audio_device_module(&mut deps_factory, env);
         deps_factory.enable_media();
         let factory = PeerConnectionFactory::create_modular(deps_factory)
             .expect("PeerConnectionFactory の生成に失敗しました");

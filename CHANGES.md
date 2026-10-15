@@ -17,8 +17,8 @@
   - 可変状態を持つ実装は `Mutex` や atomic などで自身で保護する
   - @melpon
 - [ADD] `Thread::is_quitting` を追加する
-  - スレッドのメッセージループが停止中かどうかを返す
-  - 停止中のスレッドでは `Thread::blocking_call` を呼び出せないため、呼び出す前に確認するために使う
+  - `quit` / `stop` の後は `true` になり、`stop` で join したスレッドを `start` で再開すると `false` に戻る
+  - 停止中のスレッドで `Thread::blocking_call` を呼び出す前に確認するために使う
   - webrtc_c に `webrtc_Thread_IsQuitting` を追加する
   - @melpon
 - [UPDATE] libwebrtc m156 (m156.8078.3.5) に上げる
@@ -37,18 +37,20 @@
   - @melpon
 - [FIX] C++20 モジュールスキャンの無効化が `whip_cpp` と `whep_cpp` に漏れていてビルドに失敗する問題を修正する
   - @melpon
-- [FIX] デバッグビルドで `AudioDeviceModule` と `DtlsTransport` がスレッド違反で異常終了する問題を修正する
-  - `RTC_DCHECK` が有効なデバッグビルドであればプラットフォームを問わず発生する
-  - `AudioDeviceModule` のメソッドはすべて同じスレッドから呼び出す必要があり、破棄もそのスレッドで行う必要がある。libwebrtc が worker thread から利用するため、利用者側のスレッドで最後の参照を解放するとデバッグビルドのスレッドチェックに引っかかる。ハンドルは `PeerConnectionFactory` を破棄する前に破棄する必要があることをドキュメントに明記する
-  - `DtlsTransport` の observer の登録と解除は、この transport を生成したネットワークスレッドから呼び出す必要があることをドキュメントに明記する
-  - テストをこれらの契約に従うようにし、ネットワークスレッドにソケットサーバーを用意する
+- [FIX] 停止中のスレッドへ `Thread::blocking_call` を呼び出したときにクロージャが解放されない問題を修正する
+  - libwebrtc の `BlockingCall` は停止中のスレッドではクロージャを実行せずに戻るため、実行されなかったクロージャを呼び出し元で回収して破棄する
   - @melpon
 
 ### misc
 
-- [UPDATE] `Thread::blocking_call` を停止中のスレッドで呼び出してはならないことをドキュメントに明記する
-  - libwebrtc の `BlockingCall` は停止中のスレッドからの呼び出しを契約違反として扱い、デバッグビルドの `RTC_DCHECK` で検出する
-  - 停止中のスレッドで呼び出すことを前提にしていたテストを削除する
+- [FIX] `AudioDeviceModule` と `DtlsTransport` のスレッド契約のドキュメントが誤っていてデバッグビルドでスレッド違反になる問題を修正する
+  - `AudioDeviceModule` のメソッドはすべて同じスレッドから呼び出す必要があり、`RTC_DCHECK` が有効なデバッグビルドであればプラットフォームを問わず違反が検出される
+  - `PeerConnectionFactory` に渡した場合は worker thread がそのスレッドになる
+  - `DtlsTransport` の observer の登録と解除は、この transport を生成したネットワークスレッドから行う
+  - `DtlsTransport` の observer の登録と解除を行うテストをネットワークスレッド経由にし、ネットワークスレッドにソケットサーバーを用意する
+  - @melpon
+- [UPDATE] `Thread::blocking_call` を停止中のスレッドで呼び出してはならないことを Rustdoc に明記する
+  - 停止中のスレッドではクロージャは実行されず、リリースビルドでは `R::default()` が返る
   - @melpon
 
 ## 0.156.0
