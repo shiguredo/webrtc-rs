@@ -1,7 +1,7 @@
 # C/C++ の WHIP / WHEP サンプルを削除する
 
 - Created: 2026-10-15
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-16
 - Branch: feature/remove-whip-whep-samples
 - Polished: {YYYY-MM-DD}
 
@@ -50,3 +50,21 @@
 - `cargo test --workspace --features source-build` と `cargo clippy --workspace --features source-build --all-targets -- -D warnings` が通る
 - `skills/libwebrtc-c/SKILL.md` と `CHANGES.md` が更新されている
 - 4 ファイルのいずれかを対象にしていた issue がすべて closed になっている
+
+## 解決方法
+
+- `webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp` を削除する
+- `webrtc/CMakeLists.txt` から `whip_c` / `whep_c` / `whip_cpp` / `whep_cpp` の 4 ターゲットを削除し、`WEBRTC_CPP_TARGETS` / `WEBRTC_C_TARGETS` を廃止して `webrtc_c` に直接設定を適用する。これに伴い各プラットフォーム別ブロックの `foreach` と、後半の `whip_c` / `whep_c` 向けリンク設定が不要になるため削除する
+- `skills/libwebrtc-c/SKILL.md` のディレクトリ構成・主要ビルドターゲット表・WHIP / WHEP サンプル節を削除し、`description` からもサンプルの記述を外す
+- `webrtc/RULES.md` のビルドと実行の節から、削除された `whip_c` を指す実行コマンド 2 行を削除する
+- `CHANGES.md` に削除を追記する。設計方針では `[REMOVE]` としていたが、`shiguredo-changelog` の種別は CHANGE / ADD / UPDATE / FIX の 4 つであり `[REMOVE]` は存在しないため、後方互換のない変更として `[CHANGE]` とする。develop にあった C++20 モジュールスキャンの `[FIX]` は対象が無くなるため削除する
+- 4 ファイルを対象としていた issue 40 件を closed にする。`issues/` と `issues/pending/` を `whip.c` / `whep.c` / `whip.cpp` / `whep.cpp` / `whip_c` / `whep_c` で検索すると 42 件が該当するが、うち `0027-bug-webrtc-c-std-map-iterator-lifetime` と `0092-add-file-rotating-log-sink` は `whip_c` が `webrtc_c` などの別名に部分一致しただけの誤検出であり、対象外として `issues/pending/` に残す
+- `0073-bug-whip-whep-c-observer-cbs-missing` には解決方法が既に書かれていたが、削除対象のコードへの修正手順であったため、削除による解決へ差し替える
+
+### 検証結果
+
+- `cargo build --workspace --features source-build` が成功する。`webrtc/_build/<target>/release/build/bundled/` に `libwebrtc_c.a` が生成され、パスとファイル名は変更前と同じである
+- `cargo clippy --workspace --features source-build --all-targets -- -D warnings` が成功する
+- `cargo test --workspace --features source-build` が 202 件すべて成功する
+- CMake のターゲット一覧から 4 ターゲットが消え、`webrtc_c` と `bundled_webrtc_c_bundling` だけになる
+- macOS / Windows でのビルドは CMake 4.2 以上を要するため手元では検証できず、CI での確認に委ねる
