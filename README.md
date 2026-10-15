@@ -560,6 +560,9 @@ $env:WEBRTC_BUILD_ROOT = "C:\path\to\webrtc-build"
 $env:RUSTFLAGS = "-C link-arg=/NODEFAULTLIB:msvcrt " +
                  "-C link-arg=/DEFAULTLIB:libcmtd"
 
+# doctest を実行する場合は rustdoc 側にも同じ指定が必要
+$env:RUSTDOCFLAGS = $env:RUSTFLAGS
+
 # C/C++ 側: rustls など C/C++ を含む依存を静的デバッグ CRT でビルドし直す
 $env:CFLAGS = "/MTd"
 $env:CXXFLAGS = "/MTd"
@@ -573,6 +576,8 @@ cargo build --features source-build,debug-build
   - Rust が既定でリンクするリリース CRT を外します
 - `/DEFAULTLIB:libcmtd`
   - libwebrtc と同じ静的デバッグ CRT をリンクします。`libucrtd.lib` と `libvcruntimed.lib` はここから推移的にリンクされるため、個別の指定は不要です
+- `RUSTDOCFLAGS`
+  - `cargo test --doc` を実行する場合に必要です。doctest のバイナリをリンクするのは rustdoc であり、`RUSTFLAGS` ではなく `RUSTDOCFLAGS` に指定したリンカ引数が使われるためです。未設定のまま実行すると `_CrtDbgReportW` が未解決になってリンクに失敗します
 - `CFLAGS` / `CXXFLAGS` の `/MTd`
   - C/C++ を含む依存 (rustls の `aws-lc-sys` など) は既定で静的リリース CRT (`/MT`) を使うため、揃えないとリンクに失敗します
   - `shiguredo_webrtc` 単体には C/C++ の依存が無いため、これらが無くてもビルドは通ります

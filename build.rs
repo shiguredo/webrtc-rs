@@ -121,6 +121,7 @@ fn main() {
     println!("cargo::rerun-if-env-changed=WEBRTC_BUILD_ROOT");
     println!("cargo::rerun-if-env-changed=CARGO_FEATURE_DEBUG_BUILD");
     println!("cargo::rerun-if-env-changed=CARGO_ENCODED_RUSTFLAGS");
+    println!("cargo::rerun-if-env-changed=RUSTDOCFLAGS");
 
     // WEBRTC_BUILD_ROOT が設定されているのに source-build feature が無効な場合はエラー
     if env::var("WEBRTC_BUILD_ROOT").is_ok() && env::var("CARGO_FEATURE_SOURCE_BUILD").is_err() {
@@ -190,10 +191,29 @@ struct PrebuiltPaths {
     lib_path: PathBuf,
 }
 
-/// `CARGO_ENCODED_RUSTFLAGS` に指定したリンカ引数が含まれるかを調べる。
+/// 静的デバッグ CRT にリンクするためのリンカ引数がすべて指定されているかを調べる。
 ///
 /// 引数:
-/// - `encoded_rustflags`: `CARGO_ENCODED_RUSTFLAGS` の値。
+/// - `flags`: コンパイラに渡るフラグの値。
+/// - `separator`: `flags` の区切り文字。
+///
+/// 環境変数依存: なし。
+///
+/// 戻り値:
+/// - `true`: `/NODEFAULTLIB:msvcrt` と `/DEFAULTLIB:libcmtd` の両方が指定されている。
+/// - `false`: 指定されていないものがある。
+///
+/// 副作用: なし
+fn has_debug_crt_link_args(flags: &str, separator: char) -> bool {
+    has_link_arg(flags, separator, "/NODEFAULTLIB:msvcrt")
+        && has_link_arg(flags, separator, "/DEFAULTLIB:libcmtd")
+}
+
+/// 指定したリンカ引数が含まれるかを調べる。
+///
+/// 引数:
+/// - `flags`: コンパイラに渡るフラグの値。
+/// - `separator`: `flags` の区切り文字。
 /// - `arg`: 探すリンカ引数 (`/DEFAULTLIB:libcmtd` など)。
 ///
 /// 環境変数依存: なし。
@@ -204,12 +224,12 @@ struct PrebuiltPaths {
 ///
 /// 副作用: なし。
 ///
-/// 値は 0x1f (ASCII Unit Separator) で区切られる。 rustc は `-C` とその引数を
-/// 別々の要素としても、 `-Clink-arg=...` のように連結した 1 つの要素としても受け付ける
-fn has_link_arg(encoded_rustflags: &str, arg: &str) -> bool {
+/// rustc は `-C` とその引数を別々の要素としても、 `-Clink-arg=...` のように連結した
+/// 1 つの要素としても受け付ける。 `arg` に渡す文字列は要素の値の一部としても現れ得るため、
+/// 要素全体で一致を判定する
+fn has_link_arg(flags: &str, separator: char, arg: &str) -> bool {
     let expected = format!("link-arg={arg}");
-    let mut flags = encoded_rustflags.split('\u{1f}');
-    // `arg` に渡す文字列は要素の値の一部としても現れ得るため、要素全体で一致を判定する
+    let mut flags = flags.split(separator);
     while let Some(flag) = flags.next() {
         // `-C <value>` の 2 要素形式
         if flag == "-C" {
@@ -236,11 +256,14 @@ fn has_link_arg(encoded_rustflags: &str, arg: &str) -> bool {
 /// - `CARGO_CFG_TARGET_OS`
 /// - `CARGO_FEATURE_DEBUG_BUILD`
 /// - `CARGO_ENCODED_RUSTFLAGS`
+/// - `RUSTDOCFLAGS`
 ///
 /// 戻り値: なし。
 ///
 /// 副作用:
-/// - 指定が不足している場合は panic する。リンク設定は変更しない。
+/// - `RUSTFLAGS` の指定が不足している場合は panic する。
+/// - `RUSTDOCFLAGS` の指定が不足している場合は警告する。
+/// - いずれの場合もリンク設定は変更しない。
 ///
 /// libwebrtc のデバッグビルドは静的デバッグ CRT でコンパイルされており、
 /// Rust が既定でリンクするリリース CRT とは互いを `/disallowlib` で排除し合う。
@@ -253,31 +276,44 @@ fn check_windows_debug_crt_settings() {
         return;
     }
 
-    // Rust 側でリリース CRT を外し、静的デバッグ CRT をリンクしているかを確認する。
+    // RUSTFLAGS は最終バイナリのリンクに使われるため、指定が不足しているとビルド自体が失敗する。
     //
     // build script の環境に RUSTFLAGS は無いため、cargo が rustc に渡すフラグは
     // CARGO_ENCODED_RUSTFLAGS から取得する。 この変数には RUSTFLAGS だけでなく
-    // .cargo/config.toml の build.rustflags や target.<triple>.rustflags の内容も含まれる
+    // .cargo/config.toml の build.rustflags や target.<triple>.rustflags の内容も含まれ、
+    // 値は 0x1f (ASCII Unit Separator) で区切られる
     let encoded_rustflags = env::var("CARGO_ENCODED_RUSTFLAGS").unwrap_or_default();
-    let has_debug_crt = has_link_arg(&encoded_rustflags, "/DEFAULTLIB:libcmtd")
-        && has_link_arg(&encoded_rustflags, "/NODEFAULTLIB:msvcrt");
-
-    if has_debug_crt {
-        return;
+    if !has_debug_crt_link_args(&encoded_rustflags, '\u{1f}') {
+        panic!(
+            "Windows のデバッグビルドでは、libwebrtc が利用する静的デバッグ CRT に\
+             リンク設定を合わせる必要があります。\n\n\
+             RUSTFLAGS に以下を指定してください:\n  \
+             -C link-arg=/NODEFAULTLIB:msvcrt\n  \
+             -C link-arg=/DEFAULTLIB:libcmtd\n\n\
+             C/C++ を含む依存 (rustls の aws-lc-sys など) を併用する場合は、\
+             CFLAGS と CXXFLAGS に /MTd も指定してください。\n\
+             RUSTFLAGS または CFLAGS / CXXFLAGS を変更した場合は、CRT が変わった\
+             オブジェクトを作り直す必要があるため、cargo clean してからビルドしてください。\n\
+             詳細は README の「デバッグビルド (Windows)」を参照してください。"
+        );
     }
 
-    panic!(
-        "Windows のデバッグビルドでは、libwebrtc が利用する静的デバッグ CRT に \
-         リンク設定を合わせる必要があります。\n\n\
-         RUSTFLAGS に以下を指定してください:\n  \
-         -C link-arg=/NODEFAULTLIB:msvcrt\n  \
-         -C link-arg=/DEFAULTLIB:libcmtd\n\n\
-         C/C++ を含む依存 (rustls の aws-lc-sys など) を併用する場合は、\
-         CFLAGS と CXXFLAGS に /MTd も指定してください。\n\
-         RUSTFLAGS または CFLAGS / CXXFLAGS を変更した場合は、CRT が変わった \
-         オブジェクトを作り直す必要があるため、cargo clean してからビルドしてください。\n\
-         詳細は README の「デバッグビルド (Windows)」を参照してください。"
-    );
+    // doctest のバイナリをリンクするのは rustdoc であり、RUSTFLAGS ではなく
+    // RUSTDOCFLAGS に指定したリンカ引数が使われる。 この変数は build script へ
+    // エンコードされずに渡るため、空白で区切って調べる。
+    //
+    // 指定が不足していてもビルドは通り、cargo test --doc を実行したときだけリンクに失敗する。
+    // そのため panic ではなく警告に留める
+    let rustdocflags = env::var("RUSTDOCFLAGS").unwrap_or_default();
+    if !has_debug_crt_link_args(&rustdocflags, ' ') {
+        // cargo の警告は 1 行で出力する必要があるため、詳細は README に委ねる
+        println!(
+            "cargo::warning=Windows のデバッグビルドで doctest を実行する場合は、\
+             RUSTDOCFLAGS にも RUSTFLAGS と同じリンカ引数を指定してください \
+             (未設定のまま cargo test --doc を実行すると _CrtDbgReportW が未解決になってリンクに失敗します)。\
+             詳細は README の「デバッグビルド (Windows)」を参照してください。"
+        );
+    }
 }
 
 /// prebuilt バイナリを使用するかどうかを判定する。

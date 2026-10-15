@@ -28,6 +28,7 @@
 - [UPDATE] Windows のデバッグビルドで `RUSTFLAGS` が不足している場合に、ビルド時に検出して対処方法を案内するようにする
   - libwebrtc のデバッグビルドは静的デバッグ CRT (`/MTd`) でコンパイルされており、Rust が既定でリンクするリリース CRT と衝突する
   - ライブラリの build script からは最終バイナリのリンクを変更できないため、利用者が `RUSTFLAGS` を指定する必要がある
+  - `cargo test --doc` のバイナリをリンクするのは rustdoc であり、`RUSTFLAGS` ではなく `RUSTDOCFLAGS` に指定したリンカ引数が使われる。不足していれば同じように検出して案内する
   - C/C++ を含む依存を併用する場合は `CFLAGS`/`CXXFLAGS` も必要だが、依存の有無は build script から知り得ないため検査せず、案内だけを行う
   - @melpon
 - [FIX] C++20 モジュールスキャンの無効化が `whip_cpp` と `whep_cpp` に漏れていてビルドに失敗する問題を修正する
