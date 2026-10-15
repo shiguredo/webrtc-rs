@@ -99,25 +99,7 @@ let _ = adm.recording_devices();                      // 元のスレッドか�
 
 ## 解決方法
 
-### C API
-
-- `webrtc/src/webrtc_c/api/peer_connection_interface.h` / `.cc` に `webrtc_PeerConnectionFactoryDependencies_get_network_thread` を追加する。 `deps->network_thread` を返すだけ
-- `webrtc/src/webrtc_c/rtc_base/thread.h` / `.cc` に `webrtc_Thread_IsCurrent` を追加する。 `Thread::IsCurrent()` を返すだけ。 テストで、 呼び出しが保持した thread 上で実行されたことを確認するために使う
-
-### Rust
-
-- `AudioDeviceModule` に利用する thread のメンバを追加し、 `new` / `new_with_handler` / `from_refcounted_ptr` が `&Thread` を受け取るようにする。 `new` 系を `unsafe fn` にし、 `# Safety` に thread の生存要求を書く
-- `init` / `recording_devices` / `recording_device_name` / `set_recording_device` を保持した thread への `blocking_call` 経由にする。 クロージャは `Send` を要求するため、 `!Send` な生ポインタを運ぶ薄いラッパーを `src/helper/` に用意する
-- `Thread` に、 生ポインタ経由で `blocking_call` する crate 内部専用のヘルパーを追加する。 `Thread` を借用として保持しない型から呼ぶために使う
-- `AudioDeviceModule` に `Send` / `Sync` を実装する。 `Clone` は thread も複製する
-- `set_audio_device_module` で deps の network thread と ADM の保持 thread を比較し、 食い違えば panic する
-- `AudioDeviceModuleHandler` のメソッドを C++ の `const` に合わせて `&self` / `&mut self` に分け、 `adm_state` を trampoline ごとに `&` / `&mut` で使い分ける
-
-### テスト
-
-- 実物の C ラッパーで、 別 thread から呼び出した ADM の操作が保持した thread 上で実行されることを `webrtc_Thread_IsCurrent` で確認する
-- `AudioDeviceModuleHandler` の `Sync` 非要求と、 `&self` メソッドが再入しても可変参照が重ならないことを確認する
-- `set_audio_device_module` の食い違い検査を確認する
+未確定。 closed にするときに、 実際に何をどう修正したかを書く。
 
 ## 検討したが採らなかった案
 
