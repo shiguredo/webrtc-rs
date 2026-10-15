@@ -11,6 +11,10 @@
 
 ## develop
 
+- [CHANGE] `PeerConnectionFactoryDependencies::set_worker_thread` を削除する
+  - libwebrtc が `PeerConnectionFactoryDependencies::worker_thread` を非推奨にし、network thread と別の worker thread を渡す用途を廃止したため、対応する C API の `webrtc_PeerConnectionFactoryDependencies_set_worker_thread` も削除する
+  - worker thread を指定しない場合は network thread が worker thread として使われるため、`set_worker_thread` に network thread を渡していた利用者は呼び出しを削除するだけでよい
+  - @melpon
 - [CHANGE] `log::LogSinkHandler` で同じ sink の callback が同時に呼ばれても安全に使えるようにする
   - `log::LogSinkHandler` は `Send + Sync` を要求し、`on_log_message` は `&self` を受け取る
   - ログは出力したスレッドでそのまま sink へ届くため、同じ sink の `on_log_message` は複数のスレッドから同時に呼ばれ得る。callback の入口で可変参照を作らず、共有参照として扱う
@@ -48,7 +52,7 @@
 
 - [FIX] `AudioDeviceModule` と `DtlsTransport` のスレッド契約のドキュメントが誤っていてデバッグビルドでスレッド違反になる問題を修正する
   - `AudioDeviceModule` のメソッドはすべて同じスレッドから呼び出す必要があり、`RTC_DCHECK` が有効なデバッグビルドであればプラットフォームを問わず違反が検出される
-  - `PeerConnectionFactory` に渡した場合は worker thread がそのスレッドになる
+  - `PeerConnectionFactory` に渡した場合は network thread がそのスレッドになる
   - `DtlsTransport` の observer の登録と解除は、この transport を生成したネットワークスレッドから行う
   - `DtlsTransport` の observer の登録と解除を行うテストをネットワークスレッド経由にし、ネットワークスレッドにソケットサーバーを用意する
   - @melpon

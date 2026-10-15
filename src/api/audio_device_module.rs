@@ -12,7 +12,7 @@ use std::slice;
 /// webrtc::AudioDeviceModule のラッパー。
 ///
 /// この ADM は生成・利用・破棄をすべて同じスレッドで行う必要がある。`PeerConnectionFactory` に渡した場合は
-/// libwebrtc が worker thread からこの ADM を利用するため、その worker thread が ADM のスレッドに
+/// libwebrtc が network thread からこの ADM を利用するため、その network thread が ADM のスレッドに
 /// なる。別のスレッドから呼び出すとデバッグビルドではスレッド違反として検出されてプロセスが
 /// 異常終了する。
 pub struct AudioDeviceModule {
