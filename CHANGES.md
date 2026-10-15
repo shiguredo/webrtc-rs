@@ -16,6 +16,11 @@
   - ログは出力したスレッドでそのまま sink へ届くため、同じ sink の `on_log_message` は複数のスレッドから同時に呼ばれ得る。callback の入口で可変参照を作らず、共有参照として扱う
   - 可変状態を持つ実装は `Mutex` や atomic などで自身で保護する
   - @melpon
+- [ADD] `Thread::is_quitting` を追加する
+  - スレッドのメッセージループが停止中かどうかを返す
+  - 停止中のスレッドでは `Thread::blocking_call` を呼び出せないため、呼び出す前に確認するために使う
+  - webrtc_c に `webrtc_Thread_IsQuitting` を追加する
+  - @melpon
 - [UPDATE] libwebrtc m156 (m156.8078.3.5) に上げる
   - @melpon
 - [UPDATE] Windows のビルドで libwebrtc が利用する Clang (clang-cl) と libc++ を利用するようにする
@@ -31,6 +36,13 @@
   - C/C++ を含む依存を併用する場合は `CFLAGS`/`CXXFLAGS` も必要だが、依存の有無は build script から知り得ないため検査せず、案内だけを行う
   - @melpon
 - [FIX] C++20 モジュールスキャンの無効化が `whip_cpp` と `whep_cpp` に漏れていてビルドに失敗する問題を修正する
+  - @melpon
+
+### misc
+
+- [UPDATE] `Thread::blocking_call` を停止中のスレッドで呼び出してはならないことをドキュメントに明記する
+  - libwebrtc の `BlockingCall` は停止中のスレッドからの呼び出しを契約違反として扱い、デバッグビルドの `RTC_DCHECK` で検出する
+  - 停止中のスレッドで呼び出すことを前提にしていたテストを削除する
   - @melpon
 
 ## 0.156.0

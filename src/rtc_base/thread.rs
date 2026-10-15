@@ -71,11 +71,20 @@ impl Thread {
     /// スレッドのメッセージループを停止させる。
     ///
     /// `stop` とは異なり join しない。このスレッドに対する以降の Post / Send
-    /// は失敗する。停止中に実行すると、`blocking_call` はクロージャを実行せずに
-    /// 即座に戻る。
+    /// は失敗する。停止後に [Thread::blocking_call] を呼び出してはならない。
     pub fn quit(&mut self) {
         let raw = self.raw();
         unsafe { ffi::webrtc_Thread_Quit(raw.as_ptr()) };
+    }
+
+    /// スレッドのメッセージループが停止中かどうかを返す。
+    ///
+    /// `quit` / `stop` の後は `true` になり、停止したスレッドを `start` で再開すると
+    /// `false` に戻る。停止中のスレッドでは [Thread::blocking_call] を呼び出せないため、
+    /// 呼び出す前にこの関数で確認する。
+    pub fn is_quitting(&self) -> bool {
+        let raw = self.raw();
+        unsafe { ffi::webrtc_Thread_IsQuitting(raw.as_ptr()) != 0 }
     }
 
     /// スレッド内で関数を実行し、結果を待つ。
@@ -84,8 +93,13 @@ impl Thread {
     /// 実行されるため `F: Send` が必要である。また、`f` は `Box::into_raw` で
     /// C++ 側のタスクとして渡され、FFI 越しに消費されるため `F: 'static` を要求する。
     ///
-    /// 対象スレッドが停止中 (`quit` / `stop` 後) の場合はクロージャは実行されず、
-    /// `f` の結果を返す代わりに `R::default()` が返る。このため `R: Default` を要求する。
+    /// 停止中 (`quit` / `stop` 後) のスレッドに対して呼び出してはならない。 libwebrtc の
+    /// `BlockingCall` は停止中のスレッドからの呼び出しを契約違反として扱い、 デバッグビルドでは
+    /// `RTC_DCHECK` により検出されてプロセスが異常終了する。 停止中かどうかは
+    /// [Thread::is_quitting] で確認できる。
+    ///
+    /// クロージャが実行されなかった場合は `f` の結果の代わりに `R::default()` が返るため
+    /// `R: Default` を要求する。
     ///
     /// ```
     /// use shiguredo_webrtc::Thread;
@@ -95,18 +109,6 @@ impl Thread {
     /// let result = thread.blocking_call(|| 42);
     /// assert_eq!(result, 42);
     /// thread.stop();
-    /// ```
-    ///
-    /// 停止中スレッドではクロージャは実行されず `R::default()` が返る。
-    ///
-    /// ```
-    /// use shiguredo_webrtc::Thread;
-    ///
-    /// let mut thread = Thread::new();
-    /// assert!(thread.start());
-    /// thread.stop();
-    /// let result = thread.blocking_call(|| 42);
-    /// assert_eq!(result, 0);
     /// ```
     ///
     /// 非 Send な値をキャプチャしたクロージャは `F: Send` によりコンパイルエラーになる。

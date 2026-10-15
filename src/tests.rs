@@ -1905,36 +1905,36 @@ fn thread_quit_runs() {
 }
 
 #[test]
-fn thread_blocking_call_after_quit_does_not_run() {
-    // quit 後はメッセージループが停止し、() を返す blocking_call は
-    // クロージャを実行せずに即座に戻ることを確認する。
+fn thread_is_quitting_reflects_state() {
+    // 起動直後は停止中ではない
     let mut thread = Thread::new();
     assert!(thread.start());
-    thread.quit();
-
-    let called = Arc::new(AtomicBool::new(false));
-    let called_clone = Arc::clone(&called);
-    // 必ず quit の後に blocking_call を呼び、quit との競合を避ける。
-    thread.blocking_call(move || {
-        called_clone.store(true, Ordering::SeqCst);
-    });
     assert!(
-        !called.load(Ordering::SeqCst),
-        "quit 後にブロックしたコールバックが実行されました"
+        !thread.is_quitting(),
+        "起動直後のスレッドが停止中になっています"
+    );
+
+    // quit 後は停止中になる
+    thread.quit();
+    assert!(
+        thread.is_quitting(),
+        "quit 後のスレッドが停止中になっていません"
+    );
+
+    // stop 後も停止中になる
+    thread.stop();
+    assert!(
+        thread.is_quitting(),
+        "stop 後のスレッドが停止中になっていません"
+    );
+
+    // 停止したスレッドを再度 start すると停止状態が解除される
+    assert!(thread.start());
+    assert!(
+        !thread.is_quitting(),
+        "再開したスレッドが停止中になっています"
     );
     thread.stop();
-}
-
-#[test]
-fn thread_blocking_call_after_stop_returns_default() {
-    // stop 後はメッセージループが停止し、非 void の blocking_call は
-    // クロージャを実行せずに R::default() (0) を返すことを確認する。
-    // 未実行時に未初期化ポインタが渡り Box::from_raw で UB になる問題の回帰テスト。
-    let mut thread = Thread::new();
-    assert!(thread.start());
-    thread.stop();
-    let result = thread.blocking_call(|| 42);
-    assert_eq!(result, 0);
 }
 
 #[test]
