@@ -1,7 +1,7 @@
 # AudioDeviceModule のスレッドアフィニティが safe なコードだけで破られる
 
 - Created: 2026-10-15
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-16
 - Branch: feature/fix-adm-thread-affinity
 - Polished: {YYYY-MM-DD}
 
@@ -99,7 +99,36 @@ let _ = adm.recording_devices();                      // 元のスレッドか�
 
 ## 解決方法
 
-未確定。 closed にするときに、 実際に何をどう修正したかを書く。
+設計方針どおり案 D を実装した。
+
+- `AudioDeviceModule` が利用する thread を `ThreadHandle` として保持し、 `init` / `recording_devices` / `recording_device_name` / `set_recording_device` の呼び出しを `Thread::blocking_call` でその thread 上で実行するようにした。 呼び出し元の thread を問わず native の呼び出しが保持した thread に揃うため、 Rust 側の直接操作と libwebrtc の利用が直列化される
+- `AudioDeviceModule::new` / `new_with_handler` / `from_refcounted_ptr` が `&Thread` を第 1 引数で受け取るようにした。 渡した thread が ADM より長く生存し、 その間停止しないことを `# Safety` で要求する
+- 4 個の直接操作を `&self` にし、 `AudioDeviceModule` に `Send` と `Sync` を実装した。 `&self` メソッドを複数の thread から呼んでも実行は保持した thread に直列化されるため、 `Mutex` なしで共有できる
+- `PeerConnectionFactoryDependencies::set_audio_device_module` で、 ADM が保持する thread と `set_network_thread` で設定した network thread の食い違いを検査して panic するようにした。 network thread が未設定の場合も panic する (未設定だと libwebrtc がファクトリの生成時に内部で network thread を生成するため、 Rust 側から食い違いを検出できない)
+- webrtc_c に `webrtc_PeerConnectionFactoryDependencies_get_network_thread` を追加した
+- `AudioDeviceModuleHandler` の `&self` / `&mut self` を `webrtc::AudioDeviceModule` の `const` に合わせた。 読み取り専用の問い合わせ 28 個が `&self` になる
+
+### 再入への対応
+
+`AudioDeviceModuleHandler` が同じ ADM のメソッドを再入すると、 同じ handler state に対する可変参照が重複して未定義動作になる。 `&self` メソッドの実行中に別の `&self` メソッドを再入するだけで到達できるため、 型では防げない。
+
+ADM 専用の handler state を用意し、 ハンドラを `RefCell` で包むことで二重借用を検出するようにした。 再入した場合は `RefCell` の二重借用として検出され、 `extern "C"` の trampoline を越えるため unwind できずプロセスが異常終了する。 これは未定義動作ではなくなる。
+
+なお `HandlerState` は 11 種類のハンドラが共有する共通骨格であり、 `RefCell` を要求するのは ADM だけなので、 ADM 専用の型を定義した。
+
+### 停止中の thread の扱い
+
+`Thread::blocking_call` は停止中の thread ではクロージャを実行せずに戻るため、 戻り値から未実行を判別できず既定値を成功の結果として扱えてしまう。 停止中の thread へ送ったメソッドは panic するようにし、 未実行の結果を返さないようにした。 これに伴い `R: Default` 境界が不要になった。
+
+### 生ポインタの扱い
+
+`as_ptr` / `as_refcounted_ptr` が返す生ポインタを使った libwebrtc の呼び出しは、 この型のメソッドが持つ thread の直列化を通らない。 返り値を保持した thread からのみ使うことを `# Safety` で要求し、 `unsafe fn` にした。
+
+### 残った制約
+
+- `AudioDeviceModuleHandler` のメソッドの実行中に同じ ADM のメソッドを呼び出してはならない。 再入は検出されるが、 プロセスの異常終了という形になる。 停止中 panic と同様、 回復はできない
+- `from_refcounted_ptr` に渡す thread が ADM の利用 thread と一致するかは実行時に検査されない。 利用 thread は Rust 側から辿れないため
+- 再入による異常終了は `catch_unwind` では捕捉できず `#[should_panic]` を使うテストでも検証できないため、 テストでは確認していない
 
 ## 検討したが採らなかった案
 
