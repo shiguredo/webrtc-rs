@@ -136,9 +136,34 @@ impl PeerConnectionFactoryDependencies {
 
     /// ADM をファクトリの依存に設定する。
     ///
+    /// `adm` は [PeerConnectionFactoryDependencies::set_network_thread] で設定した network thread
+    /// 上でメソッドを実行するものでなければならない。
+    ///
     /// 設定した側のハンドルはファクトリを破棄する前に破棄すること（[AudioDeviceModule] を参照）。
+    ///
+    /// # Panics
+    ///
+    /// network thread が未設定の場合、または `adm` がメソッドを実行するスレッドが設定済みの
+    /// network thread と異なる場合。
     pub fn set_audio_device_module(&mut self, adm: &AudioDeviceModule) {
-        let raw_ref = adm.as_refcounted_ptr();
+        // network thread が未設定の場合、libwebrtc はファクトリの生成時に内部で network thread を
+        // 生成する。そのスレッドは Rust 側から辿れず ADM のスレッドと一致する保証がないため、
+        // 食い違いを検出できない。ここで設定を拒否する。
+        let network_thread = unsafe {
+            ffi::webrtc_PeerConnectionFactoryDependencies_get_network_thread(self.raw.as_ptr())
+        };
+        let network_thread = NonNull::new(network_thread).unwrap_or_else(|| {
+            panic!(
+                "PeerConnectionFactoryDependencies::set_audio_device_module: set_network_thread must be called before setting an AudioDeviceModule"
+            )
+        });
+        assert!(
+            adm.runs_on(network_thread),
+            "PeerConnectionFactoryDependencies::set_audio_device_module: the network thread set by set_network_thread must be the thread the AudioDeviceModule runs on"
+        );
+        // Safety: ADM がメソッドを実行するスレッドが network thread と一致することを直前に確認
+        // しており、libwebrtc はそのスレッドから ADM を利用する。
+        let raw_ref = unsafe { adm.as_refcounted_ptr() };
         unsafe {
             ffi::webrtc_PeerConnectionFactoryDependencies_set_adm(self.raw.as_ptr(), raw_ref);
         }

@@ -109,9 +109,11 @@ impl FactoryHolder {
         deps.set_env(Some(env.clone()));
         let event_log = RtcEventLogFactory::new();
         deps.set_event_log_factory(event_log);
-        let adm = AudioDeviceModule::new(
-            &env, AudioDeviceModuleAudioLayer::Dummy,
-        ).ok()?;
+        let adm = unsafe {
+            AudioDeviceModule::new(
+                &network, &env, AudioDeviceModuleAudioLayer::Dummy,
+            )
+        }.ok()?;
         deps.set_audio_device_module(&adm);
         let audio_enc = AudioEncoderFactory::builtin();
         let audio_dec = AudioDecoderFactory::builtin();
