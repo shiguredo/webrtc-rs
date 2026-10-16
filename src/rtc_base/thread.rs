@@ -75,8 +75,8 @@ impl Thread {
     /// スレッドに停止要求が出ているかどうかを返す。
     ///
     /// `quit` / `stop` の後は `true` になる。`stop` で join したスレッドを `start` で再開すると
-    /// `false` に戻る。停止中のスレッドでは [Thread::blocking_call] を呼び出せないため、
-    /// 呼び出す前にこの関数で確認する。
+    /// `false` に戻る。[Thread::blocking_call] は停止中のスレッドでは panic するが、`start` を
+    /// 呼んだかどうかはこの関数では判定できない。
     pub fn is_quitting(&self) -> bool {
         let raw = self.raw();
         unsafe { ffi::webrtc_Thread_IsQuitting(raw.as_ptr()) != 0 }
@@ -127,39 +127,17 @@ impl Thread {
     ///
     /// # Panics
     ///
-    /// 呼び出し時点で停止中のスレッドに対して呼び出した場合。
+    /// 呼び出し時点で停止中のスレッドに対して呼び出した場合、または停止要求と競合して `f` が
+    /// 実行されなかった場合。
     pub fn blocking_call<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce() -> R,
         F: Send + 'static,
         R: Send + 'static,
     {
-        // 停止中のスレッドでは libwebrtc がクロージャを実行せずに戻るため、呼び出し側が成功と
-        // 区別できない。未実行の結果を返さないよう、ここで契約違反として拒否する。
-        assert!(
-            !self.is_quitting(),
-            "Thread::blocking_call: the thread is not running"
-        );
-        let raw = self.raw();
-        let arg = Box::into_raw(Box::new(Some(f)));
-        let res_ptr = unsafe {
-            ffi::webrtc_Thread_BlockingCall_r(
-                raw.as_ptr(),
-                Some(thread_trampoline_r::<F, R>),
-                arg as *mut c_void,
-            )
-        };
-        drop(unsafe { Box::from_raw(arg) });
-        // 入口の確認と PostTask の間に停止要求が入ると、クロージャは実行されず nullptr が返る。
-        // C++ 側の非 void テンプレートは未実行時に未初期化の値を返すため、C ラッパーが nullptr に
-        // 正規化している（webrtc_c/rtc_base/thread.cc）。実行経路 (thread_trampoline_r) は常に
-        // 非 null を返すため、nullptr は未実行を一意に表す。
-        assert!(
-            !res_ptr.is_null(),
-            "Thread::blocking_call: the closure was not executed"
-        );
-        let boxed_res: Box<R> = unsafe { Box::from_raw(res_ptr as *mut R) };
-        *boxed_res
+        // Safety: handle() が返すハンドルは self を破棄するまで有効であり、ここでは self が
+        // 生存している呼び出しの中で使い切る。
+        unsafe { self.handle() }.blocking_call(f)
     }
 
     pub fn raw(&self) -> NonNull<ffi::webrtc_Thread> {
@@ -260,7 +238,8 @@ impl ThreadHandle {
             )
         };
         drop(unsafe { Box::from_raw(arg) });
-        // 入口の確認と PostTask の間に停止要求が入ると、クロージャは実行されず nullptr が返る。
+        // 入口の確認と PostTask の間に停止要求が入ると、クロージャは実行されず nullptr が
+        // 返る。実行された場合は常に非 null が返るため、nullptr は未実行を一意に表す。
         assert!(
             !res_ptr.is_null(),
             "ThreadHandle::blocking_call: the closure was not executed"

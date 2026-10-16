@@ -18,18 +18,17 @@ use std::slice;
 /// 共有するために `Mutex` は要らない。
 ///
 /// [AudioDeviceModule::as_ptr] と [AudioDeviceModule::as_refcounted_ptr] が返す生ポインタを
-/// 使った native の呼び出しは、生成時に指定したスレッド上で行うこと。
+/// 使った libwebrtc の呼び出しは、生成時に指定したスレッド上で行うこと。
 pub struct AudioDeviceModule {
     raw_ref: ScopedRef<AudioDeviceModuleHandle>,
     /// この ADM のメソッドを実行するスレッド。ADM の生存中は生存している必要がある。
     thread: ThreadHandle,
 }
 
-// native の AudioDeviceModule は同時に 1 つのスレッドからしか呼ばれてはならないが、この型は
-// 呼び出しを保持したスレッドへ寄せるため、複数のスレッドから共有しても native の呼び出しが
-// 競合しない。&self を取るメソッドは複数のスレッドから同時に呼び出しても、実行は保持した
-// スレッドで直列化される。生ポインタを返すメソッドは unsafe であり、返り値をどのスレッドで
-// 使うかを呼び出し側が引き受ける。したがって Send と Sync を実装してよい。
+// メソッドの呼び出しは保持したスレッドへ寄せられ、そのスレッド上で順に実行される。&self を取る
+// メソッドは複数のスレッドから同時に呼び出しても、実行は保持したスレッドで直列化される。生ポインタ
+// を返すメソッドは unsafe であり、返り値をどのスレッドで使うかを呼び出し側が引き受ける。したがって
+// Send と Sync を実装してよい。
 unsafe impl Send for AudioDeviceModule {}
 unsafe impl Sync for AudioDeviceModule {}
 
@@ -55,7 +54,7 @@ impl AudioDeviceModule {
     ///
     /// `thread` は start 済みであり、返り値の ADM より長く生存すること。また、返り値の ADM
     /// が生存している間は `thread` を停止させないこと。停止させた場合、ADM のメソッドは panic
-    /// するか、停止要求と実行の間に呼び出した場合は未実行の既定値を返す。
+    /// する。
     pub unsafe fn new(
         thread: &Thread,
         env: &Environment,
@@ -82,7 +81,7 @@ impl AudioDeviceModule {
     ///
     /// `thread` は start 済みであり、返り値の ADM より長く生存すること。また、返り値の ADM
     /// が生存している間は `thread` を停止させないこと。停止させた場合、ADM のメソッドは panic
-    /// するか、停止要求と実行の間に呼び出した場合は未実行の既定値を返す。
+    /// する。
     pub unsafe fn new_with_handler(
         thread: &Thread,
         handler: Box<dyn AudioDeviceModuleHandler>,
@@ -200,7 +199,7 @@ impl AudioDeviceModule {
 
     /// この ADM の生ポインタを返す。
     ///
-    /// 返り値を使った native の呼び出しは、この型のメソッドが持つスレッドの直列化を通らない。
+    /// 返り値を使った libwebrtc の呼び出しは、この型のメソッドが持つスレッドの直列化を通らない。
     ///
     /// # Safety
     ///
@@ -211,7 +210,7 @@ impl AudioDeviceModule {
 
     /// この ADM が保持している参照の refcounted ポインタを返す。
     ///
-    /// 返り値を使った native の呼び出しは、この型のメソッドが持つスレッドの直列化を通らない。
+    /// 返り値を使った libwebrtc の呼び出しは、この型のメソッドが持つスレッドの直列化を通らない。
     ///
     /// # Safety
     ///
@@ -220,14 +219,16 @@ impl AudioDeviceModule {
         self.raw_ref.as_refcounted_ptr()
     }
 
-    /// この ADM がメソッドを実行するスレッドの生ポインタを返す。
-    pub(crate) fn thread_ptr(&self) -> NonNull<ffi::webrtc_Thread> {
-        self.thread.raw()
+    /// この ADM がメソッドを実行するスレッドが `thread` と同一かどうかを返す。
+    pub(crate) fn runs_on(&self, thread: NonNull<ffi::webrtc_Thread>) -> bool {
+        self.thread.raw() == thread
     }
 
     /// 保持したスレッド上で `f` を実行し、結果を待つ。
     ///
-    /// `f` には ADM の生ポインタが渡される。
+    /// `f` には ADM の生ポインタが渡される。生ポインタは `Send` ではないため、呼び出し元で
+    /// 取り出してクロージャへ渡せない。そのため [RawAudioDeviceModule] で包んでから
+    /// [ThreadHandle::blocking_call] へ渡し、保持したスレッド上で取り出す。
     ///
     /// # Panics
     ///
@@ -275,12 +276,7 @@ impl AudioDeviceModule {
     pub fn recording_device_name(&self, index: u16) -> Result<(String, String)> {
         // 保持したスレッド上で C 文字列を読み取り、String に変換してから返す。スレッドを
         // またいで送れるのは変換後の値だけなので、失敗の理由も値として持ち帰る。
-        enum NameError {
-            CallFailed(i32),
-            InvalidUtf8(Error),
-        }
-
-        let result = self.blocking_call(move |raw| {
+        self.blocking_call(move |raw| {
             let mut name = [0 as c_char; 128];
             let mut guid = [0 as c_char; 128];
             let ret = unsafe {
@@ -292,26 +288,21 @@ impl AudioDeviceModule {
                 )
             };
             if ret != 0 {
-                return Err(NameError::CallFailed(ret));
+                return Err(Error::Message(format!(
+                    "AudioDeviceModule::RecordingDeviceName failed: {}",
+                    ret
+                )));
             }
-            let name_str = match unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }.to_str() {
-                Ok(value) => value.to_string(),
-                Err(e) => return Err(NameError::InvalidUtf8(Error::Utf8Error(e))),
-            };
-            let guid_str = match unsafe { std::ffi::CStr::from_ptr(guid.as_ptr()) }.to_str() {
-                Ok(value) => value.to_string(),
-                Err(e) => return Err(NameError::InvalidUtf8(Error::Utf8Error(e))),
-            };
+            let name_str = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
+                .to_str()
+                .map_err(Error::Utf8Error)?
+                .to_string();
+            let guid_str = unsafe { std::ffi::CStr::from_ptr(guid.as_ptr()) }
+                .to_str()
+                .map_err(Error::Utf8Error)?
+                .to_string();
             Ok((name_str, guid_str))
-        });
-        match result {
-            Ok(value) => Ok(value),
-            Err(NameError::CallFailed(ret)) => Err(Error::Message(format!(
-                "AudioDeviceModule::RecordingDeviceName failed: {}",
-                ret
-            ))),
-            Err(NameError::InvalidUtf8(err)) => Err(err),
-        }
+        })
     }
 
     /// 録音デバイスを選択する。
@@ -1075,7 +1066,7 @@ impl Drop for AudioDeviceModuleStats {
 ///
 /// ハンドラのメソッドの実行中に、同じ ADM のメソッドを呼び出してはならない。ハンドラが同じ ADM
 /// のハンドルを保持して呼び出すと、そのハンドラを可変参照で借りたまま別のメソッドを実行しようと
-/// するため panic する。
+/// するため、二重借用の検出によりプロセスが異常終了する。
 pub trait AudioDeviceModuleHandler: Send {
     fn active_audio_layer(&self, audio_layer: &mut i32) -> i32 {
         *audio_layer = 0;
@@ -1305,9 +1296,8 @@ pub trait AudioDeviceModuleHandler: Send {
 
 /// ADM ハンドラの状態。
 ///
-/// ハンドラを `RefCell` で包み、trampoline がハンドラを可変参照で借りている間に別の trampoline が
-/// 同じハンドラを借りることを検出する。ハンドラが自身の ADM のメソッドを呼び出すと、この検出に
-/// より二重借用が panic になる。
+/// ハンドラを `RefCell` で保持して再入を検出するため、他のハンドラが使う [HandlerState] ではなく
+/// この型を定義する。
 struct AudioDeviceModuleHandlerState {
     handler: RefCell<Box<dyn AudioDeviceModuleHandler>>,
 }
@@ -1340,38 +1330,6 @@ fn write_c_string(dest: &mut [c_char], value: &str) {
     }
 }
 
-/// `user_data` が指す ADM ハンドラを可変参照で借りる。
-///
-/// `const` ではないメソッドを実行する trampoline が先頭で呼び出す。既に別の trampoline が
-/// ハンドラを借りている場合は panic する。
-///
-/// # Safety
-///
-/// `user_data` は `Box::into_raw` で変換した `Box<AudioDeviceModuleHandlerState>` の
-/// 生ポインタであり有効なメモリを指していること。
-unsafe fn adm_state_mut(
-    user_data: *mut c_void,
-) -> RefMut<'static, Box<dyn AudioDeviceModuleHandler>> {
-    unsafe { &*(user_data as *const AudioDeviceModuleHandlerState) }
-        .handler
-        .borrow_mut()
-}
-
-/// `user_data` が指す ADM ハンドラを共有参照で借りる。
-///
-/// `const` なメソッドを実行する trampoline が先頭で呼び出す。ハンドラを可変参照で借りている
-/// 最中に呼び出した場合は panic する。
-///
-/// # Safety
-///
-/// `user_data` は `Box::into_raw` で変換した `Box<AudioDeviceModuleHandlerState>` の
-/// 生ポインタであり有効なメモリを指していること。
-unsafe fn adm_state(user_data: *mut c_void) -> Ref<'static, Box<dyn AudioDeviceModuleHandler>> {
-    unsafe { &*(user_data as *const AudioDeviceModuleHandlerState) }
-        .handler
-        .borrow()
-}
-
 fn write_i32(out: *mut i32, value: i32) {
     if out.is_null() {
         return;
@@ -1397,6 +1355,40 @@ fn write_u16(out: *mut u16, value: u16) {
     unsafe {
         *out = value;
     }
+}
+
+/// `user_data` が指す ADM ハンドラを可変参照で借りる。
+///
+/// `const` ではないメソッドを実行する trampoline が先頭で呼び出す。既に別の trampoline が
+/// ハンドラを借りている場合は panic する。
+///
+/// # Safety
+///
+/// `user_data` は `Box::into_raw` で変換した `Box<AudioDeviceModuleHandlerState>` の
+/// 生ポインタであり有効なメモリを指していること。返り値は `'static` だが、その生存期間は
+/// `user_data` が指す状態の生存期間に限られる。trampoline の FFI 呼び出し 1 回の中で使い切ること。
+unsafe fn adm_state_mut(
+    user_data: *mut c_void,
+) -> RefMut<'static, Box<dyn AudioDeviceModuleHandler>> {
+    unsafe { &*(user_data as *const AudioDeviceModuleHandlerState) }
+        .handler
+        .borrow_mut()
+}
+
+/// `user_data` が指す ADM ハンドラを共有参照で借りる。
+///
+/// `const` なメソッドを実行する trampoline が先頭で呼び出す。ハンドラを可変参照で借りている
+/// 最中に呼び出した場合は panic する。
+///
+/// # Safety
+///
+/// `user_data` は `Box::into_raw` で変換した `Box<AudioDeviceModuleHandlerState>` の
+/// 生ポインタであり有効なメモリを指していること。返り値は `'static` だが、その生存期間は
+/// `user_data` が指す状態の生存期間に限られる。trampoline の FFI 呼び出し 1 回の中で使い切ること。
+unsafe fn adm_state(user_data: *mut c_void) -> Ref<'static, Box<dyn AudioDeviceModuleHandler>> {
+    unsafe { &*(user_data as *const AudioDeviceModuleHandlerState) }
+        .handler
+        .borrow()
 }
 
 unsafe extern "C" fn adm_active_audio_layer(audio_layer: *mut i32, user_data: *mut c_void) -> i32 {
@@ -1731,7 +1723,7 @@ unsafe extern "C" fn adm_stereo_playout_is_available(
     available: *mut i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state_mut(user_data) };
+    let state = unsafe { adm_state(user_data) };
     let mut value = false;
     let ret = state.stereo_playout_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
@@ -1755,7 +1747,7 @@ unsafe extern "C" fn adm_stereo_recording_is_available(
     available: *mut i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state_mut(user_data) };
+    let state = unsafe { adm_state(user_data) };
     let mut value = false;
     let ret = state.stereo_recording_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
@@ -1822,7 +1814,7 @@ unsafe extern "C" fn adm_get_playout_audio_parameters(
     out_params: *mut *mut ffi::webrtc_AudioParameters_unique,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state_mut(user_data) };
+    let state = unsafe { adm_state(user_data) };
     let mut params = None;
     let ret = state.get_playout_audio_parameters(&mut params);
     if ret != 0 {
@@ -1846,7 +1838,7 @@ unsafe extern "C" fn adm_get_record_audio_parameters(
     out_params: *mut *mut ffi::webrtc_AudioParameters_unique,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state_mut(user_data) };
+    let state = unsafe { adm_state(user_data) };
     let mut params = None;
     let ret = state.get_record_audio_parameters(&mut params);
     if ret != 0 {
@@ -1870,7 +1862,7 @@ unsafe extern "C" fn adm_get_stats(
     out_stats: *mut *mut ffi::webrtc_AudioDeviceModule_Stats_unique,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state_mut(user_data) };
+    let state = unsafe { adm_state(user_data) };
     let stats = match state.get_stats() {
         Some(stats) => stats,
         None => return 0,

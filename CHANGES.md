@@ -15,16 +15,18 @@
   - `AudioDeviceModule::new` / `new_with_handler` / `from_refcounted_ptr` が `&Thread` を第 1 引数で受け取る。`PeerConnectionFactory` に設定する場合は `PeerConnectionFactoryDependencies::set_network_thread` に渡したのと同じ network thread を渡す
   - `AudioDeviceModule` が指定されたスレッドを保持し、`init` / `recording_devices` / `recording_device_name` / `set_recording_device` の呼び出しを `BlockingCall` でそのスレッド上で実行する。これにより Rust 側の直接操作と libwebrtc の利用が同じスレッドに揃う
   - `AudioDeviceModule` に `Send` と `Sync` を実装する。`init` / `recording_devices` / `recording_device_name` / `set_recording_device` が `&self` を取り、複数のスレッドから同時に呼び出しても実行は保持したスレッドで直列化される。複数のスレッドで共有するために `Mutex` は要らない
-  - `AudioDeviceModule::as_ptr` / `as_refcounted_ptr` は `unsafe fn` になり、返り値をこの ADM がメソッドを実行するスレッドからのみ使うことを要求する。生ポインタを使った native の呼び出しは、この型のメソッドが持つスレッドの直列化を通らない
+  - `AudioDeviceModule::as_ptr` / `as_refcounted_ptr` は `unsafe fn` になり、返り値をこの ADM がメソッドを実行するスレッドからのみ使うことを要求する。生ポインタを使った libwebrtc の呼び出しは、この型のメソッドが持つスレッドの直列化を通らない
   - `new` / `new_with_handler` / `from_refcounted_ptr` は `unsafe fn` になり、渡したスレッドが ADM より長く生存することと、ADM の生存中は停止させないことを要求する
   - `init` / `recording_devices` / `recording_device_name` / `set_recording_device` は、保持したスレッドが停止している場合に panic する。停止中のスレッドではメソッドが実行されないため、未実行の結果を返さない
-  - `AudioDeviceModuleHandler` のメソッドの実行中に、同じ ADM のメソッドを呼び出してはならない。ハンドラを可変参照で借りたまま別のメソッドを実行しようとするため、二重借用によりプロセスが異常終了する
+  - `AudioDeviceModuleHandler` の読み取り専用メソッド 28 個が `&mut self` から `&self` になる。`&mut self` で実装していたハンドラは書き換えが必要になる
+  - `AudioDeviceModuleHandler` のメソッドの実行中に、同じ ADM のメソッドを呼び出してはならない。ハンドラを可変参照で借りたまま別のメソッドを実行しようとするため、二重借用によりプロセスが異常終了する。この終了は `catch_unwind` では捕捉できない
   - `PeerConnectionFactoryDependencies::set_audio_device_module` が、ADM が保持するスレッドと `set_network_thread` で設定した network thread の食い違いを検出して panic する
   - network thread を設定せずに `set_audio_device_module` を呼び出した場合も panic する。network thread を設定しないと libwebrtc がファクトリの生成時に内部で network thread を生成して ADM を利用するため、Rust 側から食い違いを検出できない
+  - webrtc_c に `webrtc_PeerConnectionFactoryDependencies_get_network_thread` を追加する
   - @melpon
 - [CHANGE] `Thread::blocking_call` が停止中のスレッドで panic するようにする
   - 停止中のスレッドでは libwebrtc がクロージャを実行せずに戻るため、戻り値から未実行を判別できず、既定値を成功の結果として扱えてしまう
-  - 停止中かどうかは呼び出し前に `Thread::is_quitting` で確認する
+  - 停止中のスレッドでは panic するため、呼び出し前の確認は不要
   - 未実行時に `R::default()` を返さなくなったため `R: Default` 境界が不要になる
   - @melpon
 - [CHANGE] `PeerConnectionFactoryDependencies::set_worker_thread` を削除する
@@ -42,7 +44,7 @@
   - @melpon
 - [ADD] `Thread::is_quitting` を追加する
   - `quit` / `stop` の後は `true` になり、`stop` で join したスレッドを `start` で再開すると `false` に戻る
-  - 停止中のスレッドで `Thread::blocking_call` を呼び出す前に確認するために使う
+  - 停止中のスレッドでは `Thread::blocking_call` が panic するが、`start` 済みかどうかはこの関数では判定できない
   - webrtc_c に `webrtc_Thread_IsQuitting` を追加する
   - @melpon
 - [UPDATE] libwebrtc m156 (m156.8078.3.5) に上げる
@@ -60,9 +62,6 @@
   - `cargo test --doc` のバイナリをリンクするのは rustdoc であり、`RUSTFLAGS` ではなく `RUSTDOCFLAGS` に指定したリンカ引数が使われる。不足していれば同じように検出して案内する
   - C/C++ を含む依存を併用する場合は `CFLAGS`/`CXXFLAGS` も必要だが、依存の有無は build script から知り得ないため検査せず、案内だけを行う
   - @melpon
-- [FIX] 停止中のスレッドへ `Thread::blocking_call` を呼び出したときにクロージャが解放されない問題を修正する
-  - libwebrtc の `BlockingCall` は停止中のスレッドではクロージャを実行せずに戻るため、実行されなかったクロージャを呼び出し元で回収して破棄する
-  - @melpon
 
 ### misc
 
@@ -70,7 +69,7 @@
   - 停止中のスレッドではクロージャは実行されず panic する
   - @melpon
 - [FIX] `AudioDeviceModule` と `DtlsTransport` のスレッド契約のドキュメントが誤っていてデバッグビルドでスレッド違反になる問題を修正する
-  - `AudioDeviceModule` のメソッドはすべて同じスレッドから呼び出す必要があり、`RTC_DCHECK` が有効なデバッグビルドであればプラットフォームを問わず違反が検出される
+  - `AudioDeviceModule` のメソッドは生成時に指定したスレッドで実行され、`RTC_DCHECK` が有効なデバッグビルドであればプラットフォームを問わず違反が検出される
   - `PeerConnectionFactory` に渡した場合は network thread がそのスレッドになる
   - `DtlsTransport` の observer の登録と解除は、この transport を生成したネットワークスレッドから行う
   - `DtlsTransport` の observer の登録と解除を行うテストをネットワークスレッド経由にし、ネットワークスレッドにソケットサーバーを用意する

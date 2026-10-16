@@ -158,7 +158,7 @@ impl PeerConnectionFactoryDependencies {
             )
         });
         assert!(
-            adm.thread_ptr() == network_thread,
+            adm.runs_on(network_thread),
             "PeerConnectionFactoryDependencies::set_audio_device_module: the network thread set by set_network_thread must be the thread the AudioDeviceModule runs on"
         );
         // Safety: ADM がメソッドを実行するスレッドが network thread と一致することを直前に確認
