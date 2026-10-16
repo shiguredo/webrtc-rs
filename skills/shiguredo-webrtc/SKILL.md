@@ -156,6 +156,8 @@ libwebrtc のフィールドトライアルは `FieldTrials` を作って `Envir
 
 `AudioDeviceModule::new` / `new_with_handler` / `from_refcounted_ptr` の第 1 引数には、ADM のメソッドを実行する start 済みの `Thread` を渡す。`PeerConnectionFactory` に設定する場合は `PeerConnectionFactoryDependenciesParams::network_thread` に渡したのと同じ network thread を渡す。これらの関数は `unsafe fn` であり、渡した thread が ADM より長く生存し、その間停止しないことを要求する。
 
+ADM のハンドルを破棄するのは、ADM がメソッドを実行するスレッド上で行うこと。`PeerConnectionFactoryDependenciesParams::adm` に clone を渡した場合は呼び出し側のハンドルが残るため、そのハンドルを network thread 上で破棄する。
+
 ```rust
 use shiguredo_webrtc::{EnvironmentFactory, FieldTrials};
 

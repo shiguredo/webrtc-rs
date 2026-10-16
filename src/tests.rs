@@ -23,11 +23,25 @@ impl AudioTransportHandler for NoopHandler {}
 
 /// テスト用の Dummy の ADM を生成する。
 ///
-/// `from_params` は ADM の実行スレッドと network thread の一致を要求するため、
-/// `thread` には `Params` の `network_thread` に渡すのと同じスレッドを渡すこと。
+/// 返り値のメソッドは `thread` 上で実行される。
 fn create_dummy_audio_device_module(thread: &Thread, env: &Environment) -> AudioDeviceModule {
     unsafe { AudioDeviceModule::new(thread, env, AudioDeviceModuleAudioLayer::Dummy) }
         .expect("AudioDeviceModule の生成に失敗しました")
+}
+
+/// Dummy の ADM を設定した `PeerConnectionFactoryDependencies` を生成する。
+///
+/// ADM は `network` 上で実行されるものを生成して設定する。
+fn create_deps(
+    network: &Thread,
+    signaling: &Thread,
+    env: &Environment,
+) -> PeerConnectionFactoryDependencies {
+    PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
+        network_thread: network,
+        signaling_thread: signaling,
+        adm: Some(create_dummy_audio_device_module(network, env)),
+    })
 }
 
 #[test]
@@ -1984,12 +1998,7 @@ fn builtin_audio_factories_create() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps = create_deps(&network, &signaling, &env);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
     deps.set_audio_processing_builder(apb);
@@ -2220,7 +2229,7 @@ fn audio_device_module_send_and_sync() {
 
 #[test]
 fn peer_connection_factory_dependencies_accepts_matching_network_thread() {
-    // ADM が保持するスレッドと Params の network thread が一致していれば依存を生成できる。
+    // ADM が保持するスレッドと network thread が一致していれば依存を生成できる。
     let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     assert!(network.start(), "スレッドの起動に失敗しました");
@@ -2241,9 +2250,9 @@ fn peer_connection_factory_dependencies_accepts_matching_network_thread() {
 }
 
 #[test]
-#[should_panic(expected = "the network thread must be the thread the AudioDeviceModule runs on")]
+#[should_panic(expected = "params.adm must run on the thread params.network_thread points to")]
 fn peer_connection_factory_dependencies_rejects_mismatched_network_thread() {
-    // ADM が保持するスレッドと Params の network thread が食い違う場合は panic する。
+    // ADM が保持するスレッドと network thread が食い違う場合は panic する。
     let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     let mut other = Thread::new();
@@ -2603,12 +2612,7 @@ fn peer_connection_factory_and_capabilities() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps = create_deps(&network, &signaling, &env);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
     deps.set_audio_processing_builder(apb);
@@ -2780,12 +2784,7 @@ fn create_modular_with_context_returns_default_network_objects() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps = create_deps(&network, &signaling, &env);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
     deps.set_audio_processing_builder(apb);
@@ -3129,12 +3128,7 @@ fn rtp_sender_get_set_parameters() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
     deps_factory.set_video_encoder_factory(enc_video);
@@ -3219,12 +3213,7 @@ fn rtp_and_peer_connection_refcounted_wrappers_clone() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
     deps_factory.set_video_encoder_factory(enc_video);
@@ -3476,12 +3465,7 @@ fn peer_connection_create_and_transceiver() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
@@ -3566,12 +3550,7 @@ fn rtp_receiver_stream_ids() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
     deps_factory.set_video_encoder_factory(enc_video);
@@ -3793,12 +3772,7 @@ fn signaling_state_change_is_observed() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
     deps_factory.set_video_encoder_factory(enc_video);
@@ -3959,12 +3933,7 @@ fn media_stream_track_state() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
     deps_factory.set_video_encoder_factory(enc_video);
@@ -4029,12 +3998,7 @@ fn peer_connection_lookup_dtls_transport() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
@@ -4106,12 +4070,7 @@ fn get_stats_delivers_report() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
@@ -4150,12 +4109,7 @@ fn peer_connection_create_with_proxy_allocator() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
@@ -4204,12 +4158,7 @@ fn video_track_and_transceiver_with_track() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
     deps_factory.set_video_encoder_factory(enc_video);
@@ -4354,12 +4303,7 @@ fn always_negotiate_data_channels_adds_data_section() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
@@ -4420,13 +4364,7 @@ fn field_trials_reach_offer_sdp() {
         let mut signaling = Thread::new();
         network.start();
         signaling.start();
-        let mut deps_factory = PeerConnectionFactoryDependencies::from_params(
-            PeerConnectionFactoryDependenciesParams {
-                network_thread: &network,
-                signaling_thread: &signaling,
-                adm: Some(create_dummy_audio_device_module(&network, env)),
-            },
-        );
+        let mut deps_factory = create_deps(&network, &signaling, env);
         deps_factory.set_audio_encoder_factory(&enc);
         deps_factory.set_audio_decoder_factory(&dec);
         deps_factory.set_audio_processing_builder(apb);
@@ -5434,12 +5372,7 @@ fn create_local_media_stream_returns_requested_id() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
@@ -5474,12 +5407,7 @@ fn media_stream_track_round_trip() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
     deps_factory.set_video_encoder_factory(enc_video);
@@ -5612,12 +5540,7 @@ fn create_audio_source_with_audio_options() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
@@ -5653,12 +5576,7 @@ fn create_audio_source_with_default_audio_options() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
@@ -5707,12 +5625,7 @@ fn audio_refcounted_wrappers_clone() {
     network.start();
     signaling.start();
     let env = Environment::new();
-    let mut deps_factory =
-        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
-            network_thread: &network,
-            signaling_thread: &signaling,
-            adm: Some(create_dummy_audio_device_module(&network, &env)),
-        });
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_clone);
     deps_factory.set_audio_decoder_factory(&dec_clone);
     deps_factory.set_audio_processing_builder(apb);

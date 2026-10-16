@@ -19,6 +19,9 @@ use std::slice;
 ///
 /// [AudioDeviceModule::as_ptr] と [AudioDeviceModule::as_refcounted_ptr] が返す生ポインタを
 /// 使った libwebrtc の呼び出しは、生成時に指定したスレッド上で行うこと。
+///
+/// 最後のハンドルを破棄するのは、生成時に指定したスレッド上で行うこと。 別のスレッドで破棄
+/// すると、 ADM の破棄がメソッドの実行と同じスレッドで行われない。
 pub struct AudioDeviceModule {
     raw_ref: ScopedRef<AudioDeviceModuleHandle>,
     /// この ADM のメソッドを実行するスレッド。ADM の生存中は生存している必要がある。

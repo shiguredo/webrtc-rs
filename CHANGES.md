@@ -12,11 +12,12 @@
 ## develop
 
 - [CHANGE] `PeerConnectionFactoryDependencies` の構築 API を `from_params` に集約する
-  - `PeerConnectionFactoryDependencies::new` を削除し、`PeerConnectionFactoryDependencies::from_params` と `PeerConnectionFactoryDependenciesParams` を追加する。`network_thread` / `signaling_thread` / `adm` を `PeerConnectionFactoryDependenciesParams` で受け取り、構築時に確定する
+  - `PeerConnectionFactoryDependencies::new` を削除し、`PeerConnectionFactoryDependencies::from_params` と `PeerConnectionFactoryDependenciesParams` を追加する。`network_thread` / `signaling_thread` / `adm` を `PeerConnectionFactoryDependenciesParams` で受け取り、構築時に確定する。`new` が呼んでいた `Default` も合わせて削除する
   - `PeerConnectionFactoryDependencies::set_network_thread` / `set_signaling_thread` / `set_audio_device_module` を削除する。これらの値は `from_params` で確定するため setter で差し替えられない
   - `set_audio_device_module` が持っていた ADM のスレッドと network thread の一致検査は `from_params` に移る。network thread を差し替える経路が無くなるため、設定順で検査を回避できなくなる
   - network thread を指定しない状態が無くなったため、network thread 未設定時の panic は発生しなくなる。libwebrtc が内部で network thread を生成する経路も塞がれる
-  - `PeerConnectionFactoryDependencies::default` を削除する
+  - `from_params` は `adm` を値で受け取るため、ADM のハンドルを破棄するスレッドを確定させたい利用者は `adm` の clone を渡して呼び出し側にもハンドルを残す
+  - C API の `webrtc_PeerConnectionFactoryDependencies_get_network_thread` は変更しない。Rust 側で唯一の利用者だった `set_audio_device_module` が無くなるため、Rust からは呼ばなくなる
   - @melpon
 - [CHANGE] `AudioDeviceModule` にメソッドを実行するスレッドを指定するようにする
   - `AudioDeviceModule::new` / `new_with_handler` / `from_refcounted_ptr` が `&Thread` を第 1 引数で受け取る。`PeerConnectionFactory` に設定する場合は `PeerConnectionFactoryDependenciesParams::network_thread` に渡したのと同じ network thread を渡す

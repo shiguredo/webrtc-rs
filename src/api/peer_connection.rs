@@ -50,16 +50,28 @@ impl PeerConnectionFactoryDependencies {
     /// 渡した `Thread` は、 返り値とそこから生成した factory より長く生存させること。また、
     /// 返り値とそこから生成した factory が生存している間は停止させないこと。
     ///
+    /// `params.adm` に渡した ADM のハンドルを破棄するのは、 ADM がメソッドを実行するスレッド上で
+    /// 行うこと。 clone を渡した場合は呼び出し側のハンドルが残るため、 そのハンドルを
+    /// `params.network_thread` 上で破棄すること。
+    ///
     /// # Panics
     ///
     /// `params.adm` がメソッドを実行するスレッドが `params.network_thread` と異なる場合。
     pub fn from_params(params: PeerConnectionFactoryDependenciesParams<'_>) -> Self {
+        let network_raw = params.network_thread.raw();
+        let signaling_raw = params.signaling_thread.raw();
+        // ADM のスレッドの検査は依存を確保する前に行う。確保した後に panic すると、返り値を
+        // 構築できないため確保した依存を解放する手段が無くなる。
+        if let Some(adm) = &params.adm {
+            assert!(
+                adm.runs_on(network_raw),
+                "params.adm must run on the thread params.network_thread points to"
+            );
+        }
         let raw = expect_non_null(
             unsafe { ffi::webrtc_PeerConnectionFactoryDependencies_new() },
             "webrtc_PeerConnectionFactoryDependencies_new",
         );
-        let network_raw = params.network_thread.raw();
-        let signaling_raw = params.signaling_thread.raw();
         unsafe {
             ffi::webrtc_PeerConnectionFactoryDependencies_set_network_thread(
                 raw.as_ptr(),
@@ -70,16 +82,9 @@ impl PeerConnectionFactoryDependencies {
                 signaling_raw.as_ptr(),
             );
         }
-        // ADM を libwebrtc に渡す前に、この ADM がメソッドを実行するスレッドが network thread と
-        // 一致することを検査する。両者を同じ呼び出しで受け取るため、この検査が通れば対応は
-        // 返り値の生存中も崩れない。
         if let Some(adm) = &params.adm {
-            assert!(
-                adm.runs_on(network_raw),
-                "PeerConnectionFactoryDependencies::from_params: the network thread must be the thread the AudioDeviceModule runs on"
-            );
-            // Safety: ADM がメソッドを実行するスレッドが network thread と一致することを直前に
-            // 確認しており、libwebrtc はそのスレッドから ADM を利用する。
+            // Safety: ADM がメソッドを実行するスレッドが network thread と一致することをこの関数の
+            // 冒頭で確認しており、libwebrtc はそのスレッドから ADM を利用する。
             let adm_raw_ref = unsafe { adm.as_refcounted_ptr() };
             unsafe {
                 ffi::webrtc_PeerConnectionFactoryDependencies_set_adm(raw.as_ptr(), adm_raw_ref);

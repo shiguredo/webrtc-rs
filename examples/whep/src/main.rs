@@ -37,8 +37,7 @@ impl FactoryHolder {
         network.start();
         signaling.start();
 
-        // ADM は deps の network thread 上で実行される。from_params が両者の一致を検査するため、
-        // network_thread に渡すのと同じスレッドを渡す。
+        // ADM は network thread 上で実行されるため、同じスレッドを渡す。
         let adm = unsafe {
             AudioDeviceModule::new(&network, &env, AudioDeviceModuleAudioLayer::Dummy).ok()?
         };
