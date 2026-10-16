@@ -84,6 +84,7 @@ use shiguredo_webrtc::{
     AudioDecoderFactory, AudioDeviceModule, AudioDeviceModuleAudioLayer,
     AudioEncoderFactory, AudioProcessingBuilder, ConnectionContext, Environment,
     PeerConnectionFactory, PeerConnectionFactoryDependencies,
+    PeerConnectionFactoryDependenciesParams,
     RtcEventLogFactory, Thread, VideoDecoderFactory, VideoEncoderFactory,
 };
 use std::sync::Arc;
@@ -103,18 +104,21 @@ impl FactoryHolder {
         network.start();
         signaling.start();
 
-        let mut deps = PeerConnectionFactoryDependencies::new();
-        deps.set_network_thread(&network);
-        deps.set_signaling_thread(&signaling);
-        deps.set_env(Some(env.clone()));
-        let event_log = RtcEventLogFactory::new();
-        deps.set_event_log_factory(event_log);
         let adm = unsafe {
             AudioDeviceModule::new(
                 &network, &env, AudioDeviceModuleAudioLayer::Dummy,
             )
         }.ok()?;
-        deps.set_audio_device_module(&adm);
+        let mut deps = PeerConnectionFactoryDependencies::from_params(
+            PeerConnectionFactoryDependenciesParams {
+                network_thread: &network,
+                signaling_thread: &signaling,
+                adm: Some(adm),
+            },
+        );
+        deps.set_env(Some(env.clone()));
+        let event_log = RtcEventLogFactory::new();
+        deps.set_event_log_factory(event_log);
         let audio_enc = AudioEncoderFactory::builtin();
         let audio_dec = AudioDecoderFactory::builtin();
         deps.set_audio_encoder_factory(&audio_enc);

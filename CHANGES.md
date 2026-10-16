@@ -11,8 +11,15 @@
 
 ## develop
 
+- [CHANGE] `PeerConnectionFactoryDependencies` の構築 API を `from_params` に集約する
+  - `PeerConnectionFactoryDependencies::new` を削除し、`PeerConnectionFactoryDependencies::from_params` と `PeerConnectionFactoryDependenciesParams` を追加する。`network_thread` / `signaling_thread` / `adm` を `PeerConnectionFactoryDependenciesParams` で受け取り、構築時に確定する
+  - `PeerConnectionFactoryDependencies::set_network_thread` / `set_signaling_thread` / `set_audio_device_module` を削除する。これらの値は `from_params` で確定するため setter で差し替えられない
+  - `set_audio_device_module` が持っていた ADM のスレッドと network thread の一致検査は `from_params` に移る。network thread を差し替える経路が無くなるため、設定順で検査を回避できなくなる
+  - network thread を指定しない状態が無くなったため、network thread 未設定時の panic は発生しなくなる。libwebrtc が内部で network thread を生成する経路も塞がれる
+  - `PeerConnectionFactoryDependencies::default` を削除する
+  - @melpon
 - [CHANGE] `AudioDeviceModule` にメソッドを実行するスレッドを指定するようにする
-  - `AudioDeviceModule::new` / `new_with_handler` / `from_refcounted_ptr` が `&Thread` を第 1 引数で受け取る。`PeerConnectionFactory` に設定する場合は `PeerConnectionFactoryDependencies::set_network_thread` に渡したのと同じ network thread を渡す
+  - `AudioDeviceModule::new` / `new_with_handler` / `from_refcounted_ptr` が `&Thread` を第 1 引数で受け取る。`PeerConnectionFactory` に設定する場合は `PeerConnectionFactoryDependenciesParams::network_thread` に渡したのと同じ network thread を渡す
   - `AudioDeviceModule` が指定されたスレッドを保持し、`init` / `recording_devices` / `recording_device_name` / `set_recording_device` の呼び出しを `BlockingCall` でそのスレッド上で実行する。これにより Rust 側の直接操作と libwebrtc の利用が同じスレッドに揃う
   - `AudioDeviceModule` に `Send` と `Sync` を実装する。`init` / `recording_devices` / `recording_device_name` / `set_recording_device` が `&self` を取り、複数のスレッドから同時に呼び出しても実行は保持したスレッドで直列化される。複数のスレッドで共有するために `Mutex` は要らない
   - `AudioDeviceModule::as_ptr` / `as_refcounted_ptr` は `unsafe fn` になり、返り値をこの ADM がメソッドを実行するスレッドからのみ使うことを要求する。生ポインタを使った libwebrtc の呼び出しは、この型のメソッドが持つスレッドの直列化を通らない
@@ -20,8 +27,7 @@
   - `init` / `recording_devices` / `recording_device_name` / `set_recording_device` は、保持したスレッドが停止している場合に panic する。停止中のスレッドではメソッドが実行されないため、未実行の結果を返さない
   - `AudioDeviceModuleHandler` の読み取り専用メソッド 28 個が `&mut self` から `&self` になる。`&mut self` で実装していたハンドラは書き換えが必要になる
   - `AudioDeviceModuleHandler` のメソッドの実行中に、同じ ADM のメソッドを呼び出してはならない。ハンドラを可変参照で借りたまま別のメソッドを実行しようとするため、二重借用によりプロセスが異常終了する。この終了は `catch_unwind` では捕捉できない
-  - `PeerConnectionFactoryDependencies::set_audio_device_module` が、ADM が保持するスレッドと `set_network_thread` で設定した network thread の食い違いを検出して panic する
-  - network thread を設定せずに `set_audio_device_module` を呼び出した場合も panic する。network thread を設定しないと libwebrtc がファクトリの生成時に内部で network thread を生成して ADM を利用するため、Rust 側から食い違いを検出できない
+  - `from_params` が、ADM が保持するスレッドと `PeerConnectionFactoryDependenciesParams::network_thread` の食い違いを検出して panic する
   - webrtc_c に `webrtc_PeerConnectionFactoryDependencies_get_network_thread` を追加する
   - @melpon
 - [CHANGE] `Thread::blocking_call` が停止中のスレッドで panic するようにする
