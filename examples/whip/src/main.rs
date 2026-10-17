@@ -8,14 +8,14 @@ use shiguredo_webrtc::{
     CreateSessionDescriptionObserver, CreateSessionDescriptionObserverHandler, CxxString,
     Environment, I420Buffer, IceServer, IceTransportsType, MediaType, PeerConnection,
     PeerConnectionDependencies, PeerConnectionFactory, PeerConnectionFactoryDependencies,
-    PeerConnectionObserver, PeerConnectionObserverHandler, PeerConnectionOfferAnswerOptions,
-    PeerConnectionRtcConfiguration, PeerConnectionState, RtcError, RtcEventLogFactory, RtpCodec,
-    RtpCodecCapabilityVector, RtpEncodingParameters, RtpEncodingParametersVector,
-    RtpTransceiverDirection, RtpTransceiverInit, SdpType, SessionDescription,
-    SetLocalDescriptionObserver, SetLocalDescriptionObserverHandler, SetRemoteDescriptionObserver,
-    SetRemoteDescriptionObserverHandler, Thread, TimestampAligner, VideoDecoderFactory,
-    VideoEncoderFactory, VideoFrame, VideoTrackSource, abgr_to_i420, log, random_string,
-    time_millis,
+    PeerConnectionFactoryDependenciesParams, PeerConnectionObserver, PeerConnectionObserverHandler,
+    PeerConnectionOfferAnswerOptions, PeerConnectionRtcConfiguration, PeerConnectionState,
+    RtcError, RtcEventLogFactory, RtpCodec, RtpCodecCapabilityVector, RtpEncodingParameters,
+    RtpEncodingParametersVector, RtpTransceiverDirection, RtpTransceiverInit, SdpType,
+    SessionDescription, SetLocalDescriptionObserver, SetLocalDescriptionObserverHandler,
+    SetRemoteDescriptionObserver, SetRemoteDescriptionObserverHandler, Thread, TimestampAligner,
+    VideoDecoderFactory, VideoEncoderFactory, VideoFrame, VideoTrackSource, abgr_to_i420, log,
+    random_string, time_millis,
 };
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -114,17 +114,19 @@ impl FactoryHolder {
         network.start();
         signaling.start();
 
-        let mut deps = PeerConnectionFactoryDependencies::new();
-        deps.set_network_thread(&network);
-        deps.set_signaling_thread(&signaling);
-        let event_log = RtcEventLogFactory::new();
-        deps.set_event_log_factory(event_log);
-        // ADM は deps の network thread 上で実行される。set_audio_device_module が両者の一致を
-        // 検査するため、先に set_network_thread を呼んでおく必要がある。
+        // ADM は network thread 上で実行されるため、同じスレッドを渡す。
         let adm = unsafe {
             AudioDeviceModule::new(&network, &env, AudioDeviceModuleAudioLayer::Dummy).ok()?
         };
-        deps.set_audio_device_module(&adm);
+        let mut deps = PeerConnectionFactoryDependencies::from_params(
+            PeerConnectionFactoryDependenciesParams {
+                network_thread: &network,
+                signaling_thread: &signaling,
+                adm: Some(adm),
+            },
+        );
+        let event_log = RtcEventLogFactory::new();
+        deps.set_event_log_factory(event_log);
         let audio_enc = AudioEncoderFactory::builtin();
         let audio_dec = AudioDecoderFactory::builtin();
         deps.set_audio_encoder_factory(&audio_enc);

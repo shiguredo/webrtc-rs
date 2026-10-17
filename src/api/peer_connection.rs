@@ -22,42 +22,75 @@ use std::marker::PhantomData;
 use std::os::raw::{c_char, c_void};
 use std::ptr::NonNull;
 
-/// PeerConnectionFactoryDependencies のラッパー。
-/// スレッドやファクトリーのライフサイクルは呼び出し側で管理する。
-pub struct PeerConnectionFactoryDependencies {
-    raw: NonNull<ffi::webrtc_PeerConnectionFactoryDependencies>,
+/// [PeerConnectionFactoryDependencies::from_params] が受け取る依存。
+///
+/// ここに含まれる値は依存の生成時に確定し、以後 setter で差し替えることはできない。
+pub struct PeerConnectionFactoryDependenciesParams<'a> {
+    /// factory がネットワーク処理とメディア処理を実行するスレッド。start 済みであること。
+    pub network_thread: &'a Thread,
+    /// factory を生成するスレッド、および接続のシグナリングを扱うスレッド。start 済みであること。
+    pub signaling_thread: &'a Thread,
+    /// factory が使う ADM。`None` の場合は ADM が設定されない。
+    pub adm: Option<AudioDeviceModule>,
 }
 
-unsafe impl Send for PeerConnectionFactoryDependencies {}
+/// PeerConnectionFactoryDependencies のラッパー。
+/// スレッドやファクトリーのライフサイクルは呼び出し側で管理する。
+pub struct PeerConnectionFactoryDependencies<'a> {
+    raw: NonNull<ffi::webrtc_PeerConnectionFactoryDependencies>,
+    /// [PeerConnectionFactoryDependencies::from_params] に渡された `Thread` の借用を保持する。
+    /// 借用をこの型に結び付けて、`Thread` がこの型より長生きすることを型で要求する。
+    _marker: PhantomData<&'a Thread>,
+}
 
-impl PeerConnectionFactoryDependencies {
-    pub fn new() -> Self {
+unsafe impl Send for PeerConnectionFactoryDependencies<'_> {}
+
+impl<'a> PeerConnectionFactoryDependencies<'a> {
+    /// スレッドと ADM を受け取って依存を生成する。
+    ///
+    /// `params` の各値はこの時点で確定し、以後 setter で差し替えることはできない。
+    ///
+    /// 渡した `Thread` は、返り値とそこから生成した factory が生存している間は停止させないこと。
+    ///
+    /// # Panics
+    ///
+    /// `params.adm` がメソッドを実行するスレッドが `params.network_thread` と異なる場合。
+    pub fn from_params(params: PeerConnectionFactoryDependenciesParams<'a>) -> Self {
+        let network_raw = params.network_thread.raw();
+        let signaling_raw = params.signaling_thread.raw();
+        // ADM のスレッドの検査は依存を確保する前に行う。確保した後に panic すると、返り値を
+        // 構築できないため確保した依存を解放する手段が無くなる。
+        if let Some(adm) = &params.adm {
+            assert!(
+                adm.runs_on(network_raw),
+                "params.adm must run on the thread params.network_thread points to"
+            );
+        }
         let raw = expect_non_null(
             unsafe { ffi::webrtc_PeerConnectionFactoryDependencies_new() },
             "webrtc_PeerConnectionFactoryDependencies_new",
         );
-        Self { raw }
-    }
-
-    /// start 済みの Thread を設定する。ライフサイクル管理は呼び出し側で行う。
-    pub fn set_network_thread(&mut self, thread: &Thread) {
-        let raw = thread.raw();
         unsafe {
             ffi::webrtc_PeerConnectionFactoryDependencies_set_network_thread(
-                self.raw.as_ptr(),
                 raw.as_ptr(),
+                network_raw.as_ptr(),
+            );
+            ffi::webrtc_PeerConnectionFactoryDependencies_set_signaling_thread(
+                raw.as_ptr(),
+                signaling_raw.as_ptr(),
             );
         }
-    }
-
-    /// start 済みの Thread を設定する。ライフサイクル管理は呼び出し側で行う。
-    pub fn set_signaling_thread(&mut self, thread: &Thread) {
-        let raw = thread.raw();
-        unsafe {
-            ffi::webrtc_PeerConnectionFactoryDependencies_set_signaling_thread(
-                self.raw.as_ptr(),
-                raw.as_ptr(),
-            );
+        if let Some(adm) = &params.adm {
+            // Safety: ADM がメソッドを実行するスレッドが network thread と一致することをこの関数の
+            // 冒頭で確認しており、libwebrtc はそのスレッドから ADM を利用する。
+            let adm_raw_ref = unsafe { adm.as_refcounted_ptr() };
+            unsafe {
+                ffi::webrtc_PeerConnectionFactoryDependencies_set_adm(raw.as_ptr(), adm_raw_ref);
+            }
+        }
+        Self {
+            raw,
+            _marker: PhantomData,
         }
     }
 
@@ -134,41 +167,6 @@ impl PeerConnectionFactoryDependencies {
         }
     }
 
-    /// ADM をファクトリの依存に設定する。
-    ///
-    /// `adm` は [PeerConnectionFactoryDependencies::set_network_thread] で設定した network thread
-    /// 上でメソッドを実行するものでなければならない。
-    ///
-    /// 設定した側のハンドルはファクトリを破棄する前に破棄すること（[AudioDeviceModule] を参照）。
-    ///
-    /// # Panics
-    ///
-    /// network thread が未設定の場合、または `adm` がメソッドを実行するスレッドが設定済みの
-    /// network thread と異なる場合。
-    pub fn set_audio_device_module(&mut self, adm: &AudioDeviceModule) {
-        // network thread が未設定の場合、libwebrtc はファクトリの生成時に内部で network thread を
-        // 生成する。そのスレッドは Rust 側から辿れず ADM のスレッドと一致する保証がないため、
-        // 食い違いを検出できない。ここで設定を拒否する。
-        let network_thread = unsafe {
-            ffi::webrtc_PeerConnectionFactoryDependencies_get_network_thread(self.raw.as_ptr())
-        };
-        let network_thread = NonNull::new(network_thread).unwrap_or_else(|| {
-            panic!(
-                "PeerConnectionFactoryDependencies::set_audio_device_module: set_network_thread must be called before setting an AudioDeviceModule"
-            )
-        });
-        assert!(
-            adm.runs_on(network_thread),
-            "PeerConnectionFactoryDependencies::set_audio_device_module: the network thread set by set_network_thread must be the thread the AudioDeviceModule runs on"
-        );
-        // Safety: ADM がメソッドを実行するスレッドが network thread と一致することを直前に確認
-        // しており、libwebrtc はそのスレッドから ADM を利用する。
-        let raw_ref = unsafe { adm.as_refcounted_ptr() };
-        unsafe {
-            ffi::webrtc_PeerConnectionFactoryDependencies_set_adm(self.raw.as_ptr(), raw_ref);
-        }
-    }
-
     pub fn enable_media(&mut self) {
         unsafe { ffi::webrtc_EnableMedia(self.raw.as_ptr()) };
     }
@@ -178,13 +176,7 @@ impl PeerConnectionFactoryDependencies {
     }
 }
 
-impl Default for PeerConnectionFactoryDependencies {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Drop for PeerConnectionFactoryDependencies {
+impl Drop for PeerConnectionFactoryDependencies<'_> {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_PeerConnectionFactoryDependencies_delete(self.raw.as_ptr()) };
     }

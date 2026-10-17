@@ -7,6 +7,7 @@ use crate::{Environment, Error, Result, ScopedRef, Thread, ffi};
 use std::cell::{Ref, RefCell, RefMut};
 use std::ffi::c_char;
 use std::marker::PhantomData;
+use std::mem::ManuallyDrop;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 use std::slice;
@@ -17,11 +18,18 @@ use std::slice;
 /// 呼び出しは生成時に指定したスレッド上で順に実行される。したがって、この型を複数のスレッドで
 /// 共有するために `Mutex` は要らない。
 ///
-/// [AudioDeviceModule::as_ptr] と [AudioDeviceModule::as_refcounted_ptr] が返す生ポインタを
-/// 使った libwebrtc の呼び出しは、生成時に指定したスレッド上で行うこと。
+/// 生成時に指定したスレッドは start 済みであり、この ADM より長く生存し、ADM が生存している間は
+/// 停止させないこと。
+///
+/// # Panics
+///
+/// 生成時に指定したスレッドを停止した後に、この ADM のメソッドを呼び出した場合。または、最後の
+/// ハンドルを破棄した場合。
 pub struct AudioDeviceModule {
-    raw_ref: ScopedRef<AudioDeviceModuleHandle>,
-    /// この ADM のメソッドを実行するスレッド。ADM の生存中は生存している必要がある。
+    // Drop で参照の解放をこの ADM のスレッドに行わせるため、ScopedRef の Drop による Release は
+    // 使わない。
+    raw_ref: ManuallyDrop<ScopedRef<AudioDeviceModuleHandle>>,
+    /// この ADM のメソッドを実行するスレッド。
     thread: ThreadHandle,
 }
 
@@ -45,6 +53,20 @@ impl RawAudioDeviceModule {
     }
 }
 
+/// ADM の参照を `blocking_call` のクロージャへ渡すためのラッパー。
+///
+/// 参照の解放は保持したスレッドで行う必要があるため、 この型は参照を他のスレッドへ渡せることを
+/// 表す。
+#[expect(
+    dead_code,
+    reason = "フィールドはこの型自身の Drop で解放するため、読み出す箇所が無い"
+)]
+struct SendAudioDeviceModuleRef(ScopedRef<AudioDeviceModuleHandle>);
+
+// ADM は Send + Sync であり、参照カウントの操作もスレッドセーフである。値は渡した先のスレッドで
+// 解放するためだけに使う。
+unsafe impl Send for SendAudioDeviceModuleRef {}
+
 impl AudioDeviceModule {
     /// 指定した音声レイヤーの ADM を生成する。
     ///
@@ -52,9 +74,7 @@ impl AudioDeviceModule {
     ///
     /// # Safety
     ///
-    /// `thread` は start 済みであり、返り値の ADM より長く生存すること。また、返り値の ADM
-    /// が生存している間は `thread` を停止させないこと。停止させた場合、ADM のメソッドは panic
-    /// する。
+    /// `thread` が [AudioDeviceModule] のスレッドの契約を満たすこと。
     pub unsafe fn new(
         thread: &Thread,
         env: &Environment,
@@ -66,7 +86,7 @@ impl AudioDeviceModule {
         .ok_or(Error::NullPointer("webrtc_CreateAudioDeviceModule"))?;
         let raw_ref = ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw);
         Ok(Self {
-            raw_ref,
+            raw_ref: ManuallyDrop::new(raw_ref),
             // Safety: thread は ADM の生存中は常に有効です。
             thread: unsafe { thread.handle() },
         })
@@ -75,13 +95,11 @@ impl AudioDeviceModule {
     /// Rust 側で拡張可能な AudioDeviceModule を生成する。
     ///
     /// 返り値のメソッドはすべて `thread` 上で実行され、ハンドラのメソッドもそのスレッドから
-    /// 呼ばれる。ハンドラの破棄は、返り値の最後のハンドルを破棄したスレッドで実行される。
+    /// 呼ばれる。ハンドラの破棄もそのスレッドで実行される。
     ///
     /// # Safety
     ///
-    /// `thread` は start 済みであり、返り値の ADM より長く生存すること。また、返り値の ADM
-    /// が生存している間は `thread` を停止させないこと。停止させた場合、ADM のメソッドは panic
-    /// する。
+    /// `thread` が [AudioDeviceModule] のスレッドの契約を満たすこと。
     pub unsafe fn new_with_handler(
         thread: &Thread,
         handler: Box<dyn AudioDeviceModuleHandler>,
@@ -166,7 +184,7 @@ impl AudioDeviceModule {
         };
         let raw_ref = ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw);
         Self {
-            raw_ref,
+            raw_ref: ManuallyDrop::new(raw_ref),
             // Safety: thread は ADM の生存中は常に有効です。
             thread: unsafe { thread.handle() },
         }
@@ -181,17 +199,15 @@ impl AudioDeviceModule {
     /// `raw_ref` は有効な `webrtc::AudioDeviceModule` の refcounted ポインタを指し、その参照
     /// 1 つ分の所有権が呼び出し側にあること。
     ///
-    /// `thread` は start 済みであり、返り値の ADM より長く生存すること。ADM が既に別の
-    /// スレッドから利用されている場合、そのスレッドと同じものであること。また、返り値の ADM
-    /// が生存している間は `thread` を停止させないこと。
-    ///
-    /// `thread` が ADM の利用スレッドと一致するかは実行時には検査されない。
+    /// `thread` が [AudioDeviceModule] のスレッドの契約を満たすこと。ADM が既に別のスレッドから
+    /// 利用されている場合、そのスレッドと同じものであること。`thread` が ADM の利用スレッドと
+    /// 一致するかは実行時には検査されない。
     pub unsafe fn from_refcounted_ptr(
         thread: &Thread,
         raw_ref: NonNull<ffi::webrtc_AudioDeviceModule_refcounted>,
     ) -> Self {
         Self {
-            raw_ref: ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw_ref),
+            raw_ref: ManuallyDrop::new(ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw_ref)),
             // Safety: thread は ADM の生存中は常に有効です。
             thread: unsafe { thread.handle() },
         }
@@ -327,9 +343,20 @@ impl AudioDeviceModule {
 impl Clone for AudioDeviceModule {
     fn clone(&self) -> Self {
         Self {
-            raw_ref: ScopedRef::clone(&self.raw_ref),
+            raw_ref: ManuallyDrop::new(ScopedRef::clone(&self.raw_ref)),
             thread: self.thread,
         }
+    }
+}
+
+impl Drop for AudioDeviceModule {
+    fn drop(&mut self) {
+        // 参照の解放は、この ADM のメソッドの実行と同じスレッドで行う。最後の参照の解放は実体の
+        // 破棄を伴い、そのスレッドが破棄するスレッドになるためである。
+        let raw_ref = SendAudioDeviceModuleRef(unsafe { ManuallyDrop::take(&mut self.raw_ref) });
+        self.thread.blocking_call(move || {
+            drop(raw_ref);
+        });
     }
 }
 
