@@ -1,6 +1,7 @@
 use super::*;
 use crate::const_non_null::ConstNonNull;
 use std::cell::Cell;
+use std::mem::ManuallyDrop;
 use std::ptr::NonNull;
 use std::sync::{
     Arc, Mutex,
@@ -2093,6 +2094,8 @@ fn audio_device_module_handler_requires_only_send() {
     // 呼び出しごとに trampoline が &mut self でハンドラを呼ぶため、状態が保持される。
     assert_eq!(adm.recording_devices(), 1);
     assert_eq!(adm.recording_devices(), 2);
+    // ADM はメソッドを実行するスレッドが停止する前に破棄する。
+    drop(adm);
     thread.stop();
 }
 
@@ -2172,6 +2175,8 @@ fn audio_device_module_runs_calls_on_its_thread() {
             "ADM のメソッドが保持したスレッドとは別のスレッドで実行されました"
         );
     }
+    // ADM はメソッドを実行するスレッドが停止する前に破棄する。
+    drop(adm);
     thread.stop();
 }
 
@@ -2289,11 +2294,11 @@ fn audio_device_module_init_panics_after_thread_stop() {
         AudioDeviceModule::new(&thread, &env, AudioDeviceModuleAudioLayer::Dummy)
             .expect("AudioDeviceModule の生成に失敗しました")
     };
+    // ADM も停止中のスレッドでは破棄できず panic する。巻き戻し中の drop は panic の二重発生に
+    // なって abort するため、ここでは破棄せずにメソッドの panic だけを確認する。
+    let adm = ManuallyDrop::new(adm);
     thread.stop();
     let _ = adm.init();
-
-    // panic するためここには到達しない。到達した場合は panic しなかったことになる。
-    drop(adm);
 }
 
 #[test]
@@ -2308,11 +2313,11 @@ fn audio_device_module_recording_devices_panics_after_thread_stop() {
         AudioDeviceModule::new(&thread, &env, AudioDeviceModuleAudioLayer::Dummy)
             .expect("AudioDeviceModule の生成に失敗しました")
     };
+    // ADM も停止中のスレッドでは破棄できず panic する。巻き戻し中の drop は panic の二重発生に
+    // なって abort するため、ここでは破棄せずにメソッドの panic だけを確認する。
+    let adm = ManuallyDrop::new(adm);
     thread.stop();
     adm.recording_devices();
-
-    // panic するためここには到達しない。到達した場合は panic しなかったことになる。
-    drop(adm);
 }
 
 #[test]
@@ -2328,11 +2333,11 @@ fn audio_device_module_recording_device_name_panics_after_thread_stop() {
         AudioDeviceModule::new(&thread, &env, AudioDeviceModuleAudioLayer::Dummy)
             .expect("AudioDeviceModule の生成に失敗しました")
     };
+    // ADM も停止中のスレッドでは破棄できず panic する。巻き戻し中の drop は panic の二重発生に
+    // なって abort するため、ここでは破棄せずにメソッドの panic だけを確認する。
+    let adm = ManuallyDrop::new(adm);
     thread.stop();
     let _ = adm.recording_device_name(0);
-
-    // panic するためここには到達しない。到達した場合は panic しなかったことになる。
-    drop(adm);
 }
 
 #[test]
@@ -2347,11 +2352,11 @@ fn audio_device_module_set_recording_device_panics_after_thread_stop() {
         AudioDeviceModule::new(&thread, &env, AudioDeviceModuleAudioLayer::Dummy)
             .expect("AudioDeviceModule の生成に失敗しました")
     };
+    // ADM も停止中のスレッドでは破棄できず panic する。巻き戻し中の drop は panic の二重発生に
+    // なって abort するため、ここでは破棄せずにメソッドの panic だけを確認する。
+    let adm = ManuallyDrop::new(adm);
     thread.stop();
     let _ = adm.set_recording_device(0);
-
-    // panic するためここには到達しない。到達した場合は panic しなかったことになる。
-    drop(adm);
 }
 
 /// ADM が破棄されたことをハンドラの破棄で観測するためのハンドラ。
@@ -2474,6 +2479,65 @@ fn audio_device_module_from_refcounted_ptr_takes_ownership() {
     thread.stop();
 }
 
+/// ADM が破棄されたスレッドを記録するハンドラ。
+struct TestDestroyThreadHandler {
+    destroyed_on: Arc<Mutex<Vec<std::thread::ThreadId>>>,
+}
+
+impl Drop for TestDestroyThreadHandler {
+    fn drop(&mut self) {
+        self.destroyed_on
+            .lock()
+            .expect("ロックに失敗しました")
+            .push(std::thread::current().id());
+    }
+}
+
+impl AudioDeviceModuleHandler for TestDestroyThreadHandler {}
+
+#[test]
+fn audio_device_module_drop_on_other_thread_releases_on_its_thread() {
+    // ADM を生成したスレッドとは別のスレッドで最後のハンドルを drop しても、破棄は ADM が
+    // メソッドを実行するスレッドで行われる。
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let destroyed_on = Arc::new(Mutex::new(Vec::new()));
+    let adm = unsafe {
+        AudioDeviceModule::new_with_handler(
+            &thread,
+            Box::new(TestDestroyThreadHandler {
+                destroyed_on: Arc::clone(&destroyed_on),
+            }),
+        )
+    };
+
+    // 別のスレッドでハンドルを drop する。ハンドラの破棄がメインスレッドで起きていれば、
+    // 解放が ADM のスレッドで行われていないことになる。
+    let main_thread = std::thread::current().id();
+    std::thread::spawn(move || drop(adm))
+        .join()
+        .expect("drop するスレッドの実行に失敗しました");
+
+    // 破棄されたスレッドが ADM のメソッドを実行するスレッドそのものであることを確認する。
+    let adm_thread = thread.blocking_call(|| std::thread::current().id());
+    let destroyed_on = destroyed_on.lock().expect("ロックに失敗しました").clone();
+    assert_eq!(
+        destroyed_on.len(),
+        1,
+        "ADM が破棄されなかったか、複数回破棄されました"
+    );
+    assert_ne!(
+        destroyed_on[0], main_thread,
+        "ADM が drop したスレッドで破棄されました"
+    );
+    assert_eq!(
+        destroyed_on[0], adm_thread,
+        "ADM がメソッドを実行するスレッドとは別のスレッドで破棄されました"
+    );
+
+    thread.stop();
+}
+
 #[test]
 fn audio_parameters_unique_roundtrip() {
     let raw = unsafe { ffi::webrtc_AudioParameters_new(48_000, 2, 480) };
@@ -2567,6 +2631,8 @@ fn audio_device_module_get_stats_returns_unique() {
         5
     );
     unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_delete(out_stats) };
+    // ADM はメソッドを実行するスレッドが停止する前に破棄する。
+    drop(adm);
     thread.stop();
 }
 
@@ -2580,6 +2646,8 @@ fn audio_device_module_get_stats_none_returns_zero() {
     let ret = unsafe { ffi::webrtc_AudioDeviceModule_GetStats(adm.as_ptr(), &mut out_stats) };
     assert_eq!(ret, 0);
     assert!(out_stats.is_null());
+    // ADM はメソッドを実行するスレッドが停止する前に破棄する。
+    drop(adm);
     thread.stop();
 }
 

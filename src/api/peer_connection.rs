@@ -50,10 +50,6 @@ impl PeerConnectionFactoryDependencies {
     /// 渡した `Thread` は、 返り値とそこから生成した factory より長く生存させること。また、
     /// 返り値とそこから生成した factory が生存している間は停止させないこと。
     ///
-    /// `params.adm` に渡した ADM のハンドルを破棄するのは、 ADM がメソッドを実行するスレッド上で
-    /// 行うこと。 clone を渡した場合は呼び出し側のハンドルが残るため、 そのハンドルを
-    /// `params.network_thread` 上で破棄すること。
-    ///
     /// # Panics
     ///
     /// `params.adm` がメソッドを実行するスレッドが `params.network_thread` と異なる場合。

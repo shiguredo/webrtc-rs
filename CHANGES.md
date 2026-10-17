@@ -16,7 +16,7 @@
   - `PeerConnectionFactoryDependencies::set_network_thread` / `set_signaling_thread` / `set_audio_device_module` を削除する。これらの値は `from_params` で確定するため setter で差し替えられない
   - `set_audio_device_module` が持っていた ADM のスレッドと network thread の一致検査は `from_params` に移る。network thread を差し替える経路が無くなるため、設定順で検査を回避できなくなる
   - network thread を指定しない状態が無くなったため、network thread 未設定時の panic は発生しなくなる。libwebrtc が内部で network thread を生成する経路も塞がれる
-  - `from_params` は `adm` を値で受け取るため、ADM のハンドルを破棄するスレッドを確定させたい利用者は `adm` の clone を渡して呼び出し側にもハンドルを残す
+  - `from_params` は `adm` を値で受け取る。ADM の最後のハンドルはどのスレッドで破棄してもよく、破棄は ADM がメソッドを実行するスレッドで行われる。そのスレッドを停止した後に最後のハンドルを破棄すると panic する
   - C API の `webrtc_PeerConnectionFactoryDependencies_get_network_thread` は変更しない。Rust 側で唯一の利用者だった `set_audio_device_module` が無くなるため、Rust からは呼ばなくなる
   - @melpon
 - [CHANGE] `AudioDeviceModule` にメソッドを実行するスレッドを指定するようにする
@@ -53,6 +53,10 @@
   - `quit` / `stop` の後は `true` になり、`stop` で join したスレッドを `start` で再開すると `false` に戻る
   - 停止中のスレッドでは `Thread::blocking_call` が panic するが、`start` 済みかどうかはこの関数では判定できない
   - webrtc_c に `webrtc_Thread_IsQuitting` を追加する
+  - @melpon
+- [ADD] `Thread::is_current` を追加する
+  - 呼び出したスレッドがその `Thread` 自身かどうかを返す
+  - webrtc_c に `webrtc_Thread_IsCurrent` を追加する
   - @melpon
 - [UPDATE] libwebrtc m156 (m156.8078.3.5) に上げる
   - @melpon
