@@ -33,11 +33,11 @@ fn create_dummy_audio_device_module(thread: &Thread, env: &Environment) -> Audio
 /// Dummy の ADM を設定した `PeerConnectionFactoryDependencies` を生成する。
 ///
 /// ADM は `network` 上で実行されるものを生成して設定する。
-fn create_deps(
-    network: &Thread,
-    signaling: &Thread,
+fn create_deps<'a>(
+    network: &'a Thread,
+    signaling: &'a Thread,
     env: &Environment,
-) -> PeerConnectionFactoryDependencies {
+) -> PeerConnectionFactoryDependencies<'a> {
     PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
         network_thread: network,
         signaling_thread: signaling,
@@ -2267,7 +2267,7 @@ fn peer_connection_factory_dependencies_rejects_mismatched_network_thread() {
 
     let env = Environment::new();
     let adm = create_dummy_audio_device_module(&other, &env);
-    let _deps =
+    let deps =
         PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
             network_thread: &network,
             signaling_thread: &signaling,
@@ -2275,6 +2275,7 @@ fn peer_connection_factory_dependencies_rejects_mismatched_network_thread() {
         });
 
     // panic するためここには到達しない。到達した場合は panic しなかったことになる。
+    drop(deps);
     other.stop();
     signaling.stop();
     network.stop();

@@ -55,7 +55,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 
 | モジュール | 主な型 | 用途 |
 |----------|--------|------|
-| `peer_connection` | `PeerConnection`, `PeerConnectionFactory`, `PeerConnectionFactoryDependencies`, `PeerConnectionFactoryOptions`, `PeerConnectionDependencies`, `PeerConnectionRtcConfiguration`, `PeerConnectionOfferAnswerOptions`, `PeerConnectionObserver`, `PeerConnectionObserverHandler`, `SignalingState`, `PeerConnectionState`, `IceConnectionState`, `IceGatheringState`, `IceCandidateError`, `IceTransportsType`, `TlsCertPolicy`, `ConnectionContext`, `NetworkManagerRef`, `PacketSocketFactoryRef`, `IceServer`, `IceServerRef`, `IceServerVector`, `IceServerVectorRef`, `CreateSessionDescriptionObserver`, `CreateSessionDescriptionObserverHandler`, `SetLocalDescriptionObserver`, `SetLocalDescriptionObserverHandler`, `SetRemoteDescriptionObserver`, `SetRemoteDescriptionObserverHandler` | 接続の生成と管理、ICE 設定、Observer |
+| `peer_connection` | `PeerConnection`, `PeerConnectionFactory`, `PeerConnectionFactoryDependencies`, `PeerConnectionFactoryDependenciesParams`, `PeerConnectionFactoryOptions`, `PeerConnectionDependencies`, `PeerConnectionRtcConfiguration`, `PeerConnectionOfferAnswerOptions`, `PeerConnectionObserver`, `PeerConnectionObserverHandler`, `SignalingState`, `PeerConnectionState`, `IceConnectionState`, `IceGatheringState`, `IceCandidateError`, `IceTransportsType`, `TlsCertPolicy`, `ConnectionContext`, `NetworkManagerRef`, `PacketSocketFactoryRef`, `IceServer`, `IceServerRef`, `IceServerVector`, `IceServerVectorRef`, `CreateSessionDescriptionObserver`, `CreateSessionDescriptionObserverHandler`, `SetLocalDescriptionObserver`, `SetLocalDescriptionObserverHandler`, `SetRemoteDescriptionObserver`, `SetRemoteDescriptionObserverHandler` | 接続の生成と管理、ICE 設定、Observer |
 | `audio` | `AudioTrack`, `AudioTrackSource`, `AudioTrackSink`, `AudioTrackSinkHandler`, `AudioEncoderFactory`, `AudioDecoderFactory`, `AudioProcessingBuilder` | 音声トラックとコーデック |
 | `audio_device_module` | `AudioDeviceModule`, `AudioDeviceModuleAudioLayer`, `AudioDeviceModuleHandler`, `AudioDeviceModuleStats`, `AudioParameters`, `AudioTransport`, `AudioTransportRef`, `AudioTransportHandler` | プラットフォーム音声 I/O、カスタム ADM |
 | `video` | `VideoTrack`, `VideoTrackSource`, `AdaptedVideoTrackSource`, `AdaptedSize`, `AdaptFrameResult`, `VideoSink`, `VideoSinkHandler`, `VideoSinkWants` | 映像トラックとフレーム配信 |
@@ -110,7 +110,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 
 ## PeerConnectionFactory 構築フロー
 
-README に記載のフローを要約。`PeerConnectionFactoryDependencies` にスレッドとファクトリ群を登録して `PeerConnectionFactory::create_modular_with_context()` を呼び、`(PeerConnectionFactory, ConnectionContext)` を受け取る。
+README に記載のフローを要約。`PeerConnectionFactoryDependencies::from_params` にスレッドと ADM を渡して依存を確定し、ファクトリ群を setter で設定して `PeerConnectionFactory::create_modular_with_context()` を呼び、`(PeerConnectionFactory, ConnectionContext)` を受け取る。
 
 ```rust
 use shiguredo_webrtc::{
@@ -195,7 +195,9 @@ assert_eq!(
 
 ### Thread の扱い
 
-`Thread` は `start()` 済みのものを `set_*_thread` で登録する。ライフサイクル (停止・破棄) は呼び出し側で管理する必要がある。一般的には `FactoryHolder` 等でまとめて保持する。
+`Thread` は `start()` 済みのものを `PeerConnectionFactoryDependenciesParams` の `network_thread` / `signaling_thread` に渡す。ライフサイクル (停止・破棄) は呼び出し側で管理する必要がある。一般的には `FactoryHolder` 等でまとめて保持する。
+
+`PeerConnectionFactoryDependencies` は渡された `Thread` の借用を保持するため、`Thread` が依存より長生きしなければならない。`Thread` を先に破棄してから依存を使うコードはコンパイルエラーになる。
 
 ### PeerConnection の TURN Proxy / 暗号化無効化
 

@@ -23,7 +23,7 @@ use std::slice;
 ///
 /// # Panics
 ///
-/// 生成時に指定したスレッドを停止した後に、この ADM のメソッドを呼び出した場合、または最後の
+/// 生成時に指定したスレッドを停止した後に、この ADM のメソッドを呼び出した場合。または、最後の
 /// ハンドルを破棄した場合。
 pub struct AudioDeviceModule {
     // Drop で参照の解放をこの ADM のスレッドに行わせるため、ScopedRef の Drop による Release は
@@ -57,18 +57,15 @@ impl RawAudioDeviceModule {
 ///
 /// 参照の解放は保持したスレッドで行う必要があるため、 この型は参照を他のスレッドへ渡せることを
 /// 表す。
-struct SendAudioDeviceModuleRef(Option<ScopedRef<AudioDeviceModuleHandle>>);
+#[expect(
+    dead_code,
+    reason = "フィールドはこの型自身の Drop で解放するため、読み出す箇所が無い"
+)]
+struct SendAudioDeviceModuleRef(ScopedRef<AudioDeviceModuleHandle>);
 
 // ADM は Send + Sync であり、参照カウントの操作もスレッドセーフである。値は渡した先のスレッドで
 // 解放するためだけに使う。
 unsafe impl Send for SendAudioDeviceModuleRef {}
-
-impl Drop for SendAudioDeviceModuleRef {
-    fn drop(&mut self) {
-        // 保持している参照を落とす。最後の参照であればここで実体が破棄される。
-        drop(self.0.take());
-    }
-}
 
 impl AudioDeviceModule {
     /// 指定した音声レイヤーの ADM を生成する。
@@ -98,7 +95,7 @@ impl AudioDeviceModule {
     /// Rust 側で拡張可能な AudioDeviceModule を生成する。
     ///
     /// 返り値のメソッドはすべて `thread` 上で実行され、ハンドラのメソッドもそのスレッドから
-    /// 呼ばれる。ハンドラの破棄は、返り値の最後のハンドルを破棄したスレッドで実行される。
+    /// 呼ばれる。ハンドラの破棄もそのスレッドで実行される。
     ///
     /// # Safety
     ///
@@ -356,8 +353,7 @@ impl Drop for AudioDeviceModule {
     fn drop(&mut self) {
         // 参照の解放は、この ADM のメソッドの実行と同じスレッドで行う。最後の参照の解放は実体の
         // 破棄を伴い、そのスレッドが破棄するスレッドになるためである。
-        let raw_ref =
-            SendAudioDeviceModuleRef(Some(unsafe { ManuallyDrop::take(&mut self.raw_ref) }));
+        let raw_ref = SendAudioDeviceModuleRef(unsafe { ManuallyDrop::take(&mut self.raw_ref) });
         self.thread.blocking_call(move || {
             drop(raw_ref);
         });

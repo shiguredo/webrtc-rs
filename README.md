@@ -213,6 +213,9 @@ assert_eq!(
   - 接続の管理
 - `PeerConnectionFactoryDependencies`
   - ファクトリの依存関係設定
+  - `from_params(...)` でスレッドと ADM を確定する
+- `PeerConnectionFactoryDependenciesParams`
+  - `from_params(...)` に渡すスレッドと ADM
 - `PeerConnectionFactoryOptions`
   - ファクトリオプション (暗号化無効化)
 - `PeerConnectionDependencies`

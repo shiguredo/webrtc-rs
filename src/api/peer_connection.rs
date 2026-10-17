@@ -24,36 +24,38 @@ use std::ptr::NonNull;
 
 /// [PeerConnectionFactoryDependencies::from_params] が受け取る依存。
 ///
-/// ここに含まれる値は依存の生成時に確定し、 以後 setter で差し替えることはできない。
+/// ここに含まれる値は依存の生成時に確定し、以後 setter で差し替えることはできない。
 pub struct PeerConnectionFactoryDependenciesParams<'a> {
-    /// factory がネットワーク処理とメディア処理を実行するスレッド。 start 済みであること。
+    /// factory がネットワーク処理とメディア処理を実行するスレッド。start 済みであること。
     pub network_thread: &'a Thread,
-    /// factory を生成するスレッド、および接続のシグナリングを扱うスレッド。 start 済みであること。
+    /// factory を生成するスレッド、および接続のシグナリングを扱うスレッド。start 済みであること。
     pub signaling_thread: &'a Thread,
-    /// factory が使う ADM。 `None` の場合は ADM が設定されない。
+    /// factory が使う ADM。`None` の場合は ADM が設定されない。
     pub adm: Option<AudioDeviceModule>,
 }
 
 /// PeerConnectionFactoryDependencies のラッパー。
 /// スレッドやファクトリーのライフサイクルは呼び出し側で管理する。
-pub struct PeerConnectionFactoryDependencies {
+pub struct PeerConnectionFactoryDependencies<'a> {
     raw: NonNull<ffi::webrtc_PeerConnectionFactoryDependencies>,
+    /// [PeerConnectionFactoryDependencies::from_params] に渡された `Thread` の借用を保持する。
+    /// 借用をこの型に結び付けて、`Thread` がこの型より長生きすることを型で要求する。
+    _marker: PhantomData<&'a Thread>,
 }
 
-unsafe impl Send for PeerConnectionFactoryDependencies {}
+unsafe impl Send for PeerConnectionFactoryDependencies<'_> {}
 
-impl PeerConnectionFactoryDependencies {
+impl<'a> PeerConnectionFactoryDependencies<'a> {
     /// スレッドと ADM を受け取って依存を生成する。
     ///
-    /// `params` の各値はこの時点で確定し、 以後 setter で差し替えることはできない。
+    /// `params` の各値はこの時点で確定し、以後 setter で差し替えることはできない。
     ///
-    /// 渡した `Thread` は、 返り値とそこから生成した factory より長く生存させること。また、
-    /// 返り値とそこから生成した factory が生存している間は停止させないこと。
+    /// 渡した `Thread` は、返り値とそこから生成した factory が生存している間は停止させないこと。
     ///
     /// # Panics
     ///
     /// `params.adm` がメソッドを実行するスレッドが `params.network_thread` と異なる場合。
-    pub fn from_params(params: PeerConnectionFactoryDependenciesParams<'_>) -> Self {
+    pub fn from_params(params: PeerConnectionFactoryDependenciesParams<'a>) -> Self {
         let network_raw = params.network_thread.raw();
         let signaling_raw = params.signaling_thread.raw();
         // ADM のスレッドの検査は依存を確保する前に行う。確保した後に panic すると、返り値を
@@ -86,7 +88,10 @@ impl PeerConnectionFactoryDependencies {
                 ffi::webrtc_PeerConnectionFactoryDependencies_set_adm(raw.as_ptr(), adm_raw_ref);
             }
         }
-        Self { raw }
+        Self {
+            raw,
+            _marker: PhantomData,
+        }
     }
 
     /// PeerConnectionFactory が使う Environment を設定する。
@@ -171,7 +176,7 @@ impl PeerConnectionFactoryDependencies {
     }
 }
 
-impl Drop for PeerConnectionFactoryDependencies {
+impl Drop for PeerConnectionFactoryDependencies<'_> {
     fn drop(&mut self) {
         unsafe { ffi::webrtc_PeerConnectionFactoryDependencies_delete(self.raw.as_ptr()) };
     }

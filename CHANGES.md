@@ -12,7 +12,8 @@
 ## develop
 
 - [CHANGE] `PeerConnectionFactoryDependencies` の構築 API を `from_params` に集約する
-  - `PeerConnectionFactoryDependencies::new` を削除し、`PeerConnectionFactoryDependencies::from_params` と `PeerConnectionFactoryDependenciesParams` を追加する。`network_thread` / `signaling_thread` / `adm` を `PeerConnectionFactoryDependenciesParams` で受け取り、構築時に確定する。`new` が呼んでいた `Default` も合わせて削除する
+  - `PeerConnectionFactoryDependencies::new` を削除し、`PeerConnectionFactoryDependencies::from_params` と `PeerConnectionFactoryDependenciesParams` を追加する。`network_thread` / `signaling_thread` / `adm` を `PeerConnectionFactoryDependenciesParams` で受け取り、構築時に確定する。`new` を呼んでいた `Default` も合わせて削除する
+  - `PeerConnectionFactoryDependencies` が `from_params` に渡された `Thread` の借用を保持するようになり、ライフタイムパラメータ `'a` を持つ。`Thread` を先に破棄してから依存を使うコードはコンパイルエラーになる。依存は `Thread` の生ポインタを C++ 側に保存するため、`Thread` が先に破棄されると use-after-free になる
   - `PeerConnectionFactoryDependencies::set_network_thread` / `set_signaling_thread` / `set_audio_device_module` を削除する。これらの値は `from_params` で確定するため setter で差し替えられない
   - `set_audio_device_module` が持っていた ADM のスレッドと network thread の一致検査は `from_params` に移る。network thread を差し替える経路が無くなるため、設定順で検査を回避できなくなる
   - network thread を指定しない状態が無くなったため、network thread 未設定時の panic は発生しなくなる。libwebrtc が内部で network thread を生成する経路も塞がれる
@@ -53,10 +54,6 @@
   - `quit` / `stop` の後は `true` になり、`stop` で join したスレッドを `start` で再開すると `false` に戻る
   - 停止中のスレッドでは `Thread::blocking_call` が panic するが、`start` 済みかどうかはこの関数では判定できない
   - webrtc_c に `webrtc_Thread_IsQuitting` を追加する
-  - @melpon
-- [ADD] `Thread::is_current` を追加する
-  - 呼び出したスレッドがその `Thread` 自身かどうかを返す
-  - webrtc_c に `webrtc_Thread_IsCurrent` を追加する
   - @melpon
 - [UPDATE] libwebrtc m156 (m156.8078.3.5) に上げる
   - @melpon
