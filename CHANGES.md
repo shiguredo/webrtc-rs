@@ -11,18 +11,13 @@
 
 ## develop
 
-- [CHANGE] MSRV (rust-version) を 1.95 に上げる
-  - `rust-toolchain.toml` のツールチェーンも MSRV と同じ 1.95 に揃える
-  - @melpon
-- [UPDATE] 依存ライブラリを更新する
-  - ビルド依存の `bindgen` を 0.73 に、`shiguredo_toml` を 2026.3 に更新する
-  - `rustls` を 0.23.46 に、`rustls-platform-verifier` を 0.7.1 に更新する
-  - @melpon
-
-## 0.156.1
+## 0.156.2
 
 **リリース日**: 2026-11-11
 
+- [CHANGE] MSRV (rust-version) を 1.95 に上げる
+  - `rust-toolchain.toml` のツールチェーンも MSRV と同じ 1.95 に揃える
+  - @melpon
 - [CHANGE] `PeerConnectionFactoryDependencies` の構築 API を `from_params` に集約する
   - `PeerConnectionFactoryDependencies::new` を削除し、`PeerConnectionFactoryDependencies::from_params` と `PeerConnectionFactoryDependenciesParams` を追加する。`network_thread` / `signaling_thread` / `adm` を `PeerConnectionFactoryDependenciesParams` で受け取り、構築時に確定する。`new` を呼んでいた `Default` も合わせて削除する
   - `PeerConnectionFactoryDependencies` が `from_params` に渡された `Thread` の借用を保持するようになり、ライフタイムパラメータ `'a` を持つ。`Thread` を先に破棄してから依存を使うコードはコンパイルエラーになる。依存は `Thread` の生ポインタを C++ 側に保存するため、`Thread` が先に破棄されると use-after-free になる
@@ -68,6 +63,10 @@
   - webrtc_c に `webrtc_Thread_IsQuitting` を追加する
   - @melpon
 - [UPDATE] libwebrtc m156 (m156.8078.5.1) に上げる
+  - @melpon
+- [UPDATE] 依存ライブラリを更新する
+  - ビルド依存の `bindgen` を 0.73 に、`shiguredo_toml` を 2026.3 に更新する
+  - `rustls` を 0.23.46 に、`rustls-platform-verifier` を 0.7.1 に更新する
   - @melpon
 - [UPDATE] Windows のビルドで libwebrtc が利用する Clang (clang-cl) と libc++ を利用するようにする
   - MSVC (cl.exe) と MSVC STL ではなく libwebrtc と同じコンパイラと標準ライブラリを使い、C++ の型やシンボルの解釈を libwebrtc と一致させる

@@ -1,6 +1,6 @@
 [package]
 name = "shiguredo_webrtc"
-version = "0.156.1"
+version = "0.156.2"
 edition = "2024"
 rust-version = "1.95"
 description = "Rust bindings for libwebrtc"
