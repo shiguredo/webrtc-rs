@@ -2,41 +2,110 @@ use crate::const_non_null::ConstNonNull;
 use crate::helper::handler::{HandlerState, create_with_handler, destroy_handler};
 use crate::helper::non_null::expect_non_null;
 use crate::helper::ref_count::AudioDeviceModuleHandle;
-use crate::{Environment, Error, Result, ScopedRef, ffi};
+use crate::rtc_base::ThreadHandle;
+use crate::{Environment, Error, Result, ScopedRef, Thread, ffi};
+use std::cell::{Ref, RefCell, RefMut};
 use std::ffi::c_char;
 use std::marker::PhantomData;
+use std::mem::ManuallyDrop;
 use std::os::raw::c_void;
 use std::ptr::NonNull;
 use std::slice;
 
 /// webrtc::AudioDeviceModule のラッパー。
 ///
-/// この ADM を生成したスレッドと同じスレッドで利用し、同じスレッドで破棄すること。
-/// `PeerConnectionFactory` に渡した後は libwebrtc が内部の worker thread からこの ADM を呼ぶため、
-/// 別スレッドから直接呼ばないこと ([AudioDeviceModuleHandler] と同じ契約)。
+/// メソッドはどのスレッドから呼び出してもよい。複数のスレッドから同時に呼び出してもよく、各
+/// 呼び出しは生成時に指定したスレッド上で順に実行される。したがって、この型を複数のスレッドで
+/// 共有するために `Mutex` は要らない。
+///
+/// 生成時に指定したスレッドは start 済みであり、この ADM より長く生存し、ADM が生存している間は
+/// 停止させないこと。
+///
+/// # Panics
+///
+/// 生成時に指定したスレッドを停止した後に、この ADM のメソッドを呼び出した場合。または、最後の
+/// ハンドルを破棄した場合。
 pub struct AudioDeviceModule {
-    raw_ref: ScopedRef<AudioDeviceModuleHandle>,
+    // Drop で参照の解放をこの ADM のスレッドに行わせるため、ScopedRef の Drop による Release は
+    // 使わない。
+    raw_ref: ManuallyDrop<ScopedRef<AudioDeviceModuleHandle>>,
+    /// この ADM のメソッドを実行するスレッド。
+    thread: ThreadHandle,
 }
 
-// AudioDeviceModule は生成と削除を同じスレッドで実行する必要がある（※）ため Send/Sync にはしない。
-// ※同一スレッドの制約があるのは一部のプラットフォーム（iOS, Android）のみ。実装によってはロックも取っていることもある
-// unsafe impl Send for AudioDeviceModule {}
-// unsafe impl Sync for AudioDeviceModule {}
+// メソッドの呼び出しは保持したスレッドへ寄せられ、そのスレッド上で順に実行される。&self を取る
+// メソッドは複数のスレッドから同時に呼び出しても、実行は保持したスレッドで直列化される。生ポインタ
+// を返すメソッドは unsafe であり、返り値をどのスレッドで使うかを呼び出し側が引き受ける。したがって
+// Send と Sync を実装してよい。
+unsafe impl Send for AudioDeviceModule {}
+unsafe impl Sync for AudioDeviceModule {}
+
+/// `blocking_call` のクロージャへ渡すために Send にした ADM の生ポインタ。
+struct RawAudioDeviceModule(*mut ffi::webrtc_AudioDeviceModule);
+
+// 生ポインタは Send ではないため、クロージャへ渡すために Send にする。値は保持したスレッド上で
+// だけ使う。
+unsafe impl Send for RawAudioDeviceModule {}
+
+impl RawAudioDeviceModule {
+    fn as_ptr(&self) -> *mut ffi::webrtc_AudioDeviceModule {
+        self.0
+    }
+}
+
+/// ADM の参照を `blocking_call` のクロージャへ渡すためのラッパー。
+///
+/// 参照の解放は保持したスレッドで行う必要があるため、 この型は参照を他のスレッドへ渡せることを
+/// 表す。
+#[expect(
+    dead_code,
+    reason = "フィールドはこの型自身の Drop で解放するため、読み出す箇所が無い"
+)]
+struct SendAudioDeviceModuleRef(ScopedRef<AudioDeviceModuleHandle>);
+
+// ADM は Send + Sync であり、参照カウントの操作もスレッドセーフである。値は渡した先のスレッドで
+// 解放するためだけに使う。
+unsafe impl Send for SendAudioDeviceModuleRef {}
 
 impl AudioDeviceModule {
     /// 指定した音声レイヤーの ADM を生成する。
-    pub fn new(env: &Environment, audio_type: AudioDeviceModuleAudioLayer) -> Result<Self> {
+    ///
+    /// 返り値のメソッドはすべて `thread` 上で実行される。
+    ///
+    /// # Safety
+    ///
+    /// `thread` が [AudioDeviceModule] のスレッドの契約を満たすこと。
+    pub unsafe fn new(
+        thread: &Thread,
+        env: &Environment,
+        audio_type: AudioDeviceModuleAudioLayer,
+    ) -> Result<Self> {
         let raw = NonNull::new(unsafe {
             ffi::webrtc_CreateAudioDeviceModule(env.as_ptr(), audio_type.to_int())
         })
         .ok_or(Error::NullPointer("webrtc_CreateAudioDeviceModule"))?;
         let raw_ref = ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw);
-        Ok(Self { raw_ref })
+        Ok(Self {
+            raw_ref: ManuallyDrop::new(raw_ref),
+            // Safety: thread は ADM の生存中は常に有効です。
+            thread: unsafe { thread.handle() },
+        })
     }
 
     /// Rust 側で拡張可能な AudioDeviceModule を生成する。
-    pub fn new_with_handler(handler: Box<dyn AudioDeviceModuleHandler>) -> Self {
-        let user_data = Box::into_raw(Box::new(HandlerState::new(handler))) as *mut c_void;
+    ///
+    /// 返り値のメソッドはすべて `thread` 上で実行され、ハンドラのメソッドもそのスレッドから
+    /// 呼ばれる。ハンドラの破棄もそのスレッドで実行される。
+    ///
+    /// # Safety
+    ///
+    /// `thread` が [AudioDeviceModule] のスレッドの契約を満たすこと。
+    pub unsafe fn new_with_handler(
+        thread: &Thread,
+        handler: Box<dyn AudioDeviceModuleHandler>,
+    ) -> Self {
+        let user_data =
+            Box::into_raw(Box::new(AudioDeviceModuleHandlerState::new(handler))) as *mut c_void;
         let mut cbs = ffi::webrtc_AudioDeviceModule_cbs {
             ActiveAudioLayer: Some(adm_active_audio_layer),
             RegisterAudioCallback: Some(adm_register_audio_callback),
@@ -114,7 +183,11 @@ impl AudioDeviceModule {
             )
         };
         let raw_ref = ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw);
-        Self { raw_ref }
+        Self {
+            raw_ref: ManuallyDrop::new(raw_ref),
+            // Safety: thread は ADM の生存中は常に有効です。
+            thread: unsafe { thread.handle() },
+        }
     }
 
     /// Rust の外で作成された ADM を、所有権を持つ refcounted ポインタから取り込む。
@@ -125,27 +198,74 @@ impl AudioDeviceModule {
     ///
     /// `raw_ref` は有効な `webrtc::AudioDeviceModule` の refcounted ポインタを指し、その参照
     /// 1 つ分の所有権が呼び出し側にあること。
+    ///
+    /// `thread` が [AudioDeviceModule] のスレッドの契約を満たすこと。ADM が既に別のスレッドから
+    /// 利用されている場合、そのスレッドと同じものであること。`thread` が ADM の利用スレッドと
+    /// 一致するかは実行時には検査されない。
     pub unsafe fn from_refcounted_ptr(
+        thread: &Thread,
         raw_ref: NonNull<ffi::webrtc_AudioDeviceModule_refcounted>,
     ) -> Self {
         Self {
-            raw_ref: ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw_ref),
+            raw_ref: ManuallyDrop::new(ScopedRef::<AudioDeviceModuleHandle>::from_raw(raw_ref)),
+            // Safety: thread は ADM の生存中は常に有効です。
+            thread: unsafe { thread.handle() },
         }
     }
 
     /// この ADM の生ポインタを返す。
-    pub fn as_ptr(&self) -> *mut ffi::webrtc_AudioDeviceModule {
+    ///
+    /// 返り値を使った libwebrtc の呼び出しは、この型のメソッドが持つスレッドの直列化を通らない。
+    ///
+    /// # Safety
+    ///
+    /// 返り値はこの ADM がメソッドを実行するスレッドからのみ使い、他のスレッドからは使わないこと。
+    pub unsafe fn as_ptr(&self) -> *mut ffi::webrtc_AudioDeviceModule {
         self.raw_ref.as_ptr()
     }
 
     /// この ADM が保持している参照の refcounted ポインタを返す。
-    pub fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_AudioDeviceModule_refcounted {
+    ///
+    /// 返り値を使った libwebrtc の呼び出しは、この型のメソッドが持つスレッドの直列化を通らない。
+    ///
+    /// # Safety
+    ///
+    /// 返り値はこの ADM がメソッドを実行するスレッドからのみ使い、他のスレッドからは使わないこと。
+    pub unsafe fn as_refcounted_ptr(&self) -> *mut ffi::webrtc_AudioDeviceModule_refcounted {
         self.raw_ref.as_refcounted_ptr()
     }
 
+    /// この ADM がメソッドを実行するスレッドが `thread` と同一かどうかを返す。
+    pub(crate) fn runs_on(&self, thread: NonNull<ffi::webrtc_Thread>) -> bool {
+        self.thread.raw() == thread
+    }
+
+    /// 保持したスレッド上で `f` を実行し、結果を待つ。
+    ///
+    /// `f` には ADM の生ポインタが渡される。生ポインタは `Send` ではないため、呼び出し元で
+    /// 取り出してクロージャへ渡せない。そのため [RawAudioDeviceModule] で包んでから
+    /// [ThreadHandle::blocking_call] へ渡し、保持したスレッド上で取り出す。
+    ///
+    /// # Panics
+    ///
+    /// 保持したスレッドが停止している場合。
+    fn blocking_call<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(*mut ffi::webrtc_AudioDeviceModule) -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        // 生ポインタは Send ではないため、呼び出し元ではなく保持したスレッド上で取り出す。
+        let raw = RawAudioDeviceModule(self.raw_ref.as_ptr());
+        self.thread.blocking_call(move || f(raw.as_ptr()))
+    }
+
     /// ADM を初期化する。デバイス列挙・選択の前に呼び出す必要がある。
-    pub fn init(&mut self) -> Result<()> {
-        let ret = unsafe { ffi::webrtc_AudioDeviceModule_Init(self.as_ptr()) };
+    ///
+    /// # Panics
+    ///
+    /// この ADM がメソッドを実行するスレッドが停止している場合。
+    pub fn init(&self) -> Result<()> {
+        let ret = self.blocking_call(|raw| unsafe { ffi::webrtc_AudioDeviceModule_Init(raw) });
         if ret != 0 {
             return Err(Error::Message(format!(
                 "AudioDeviceModule::Init failed: {}",
@@ -156,42 +276,60 @@ impl AudioDeviceModule {
     }
 
     /// 録音デバイスの数を返す。
+    ///
+    /// # Panics
+    ///
+    /// この ADM がメソッドを実行するスレッドが停止している場合。
     pub fn recording_devices(&self) -> i16 {
-        unsafe { ffi::webrtc_AudioDeviceModule_RecordingDevices(self.as_ptr()) }
+        self.blocking_call(|raw| unsafe { ffi::webrtc_AudioDeviceModule_RecordingDevices(raw) })
     }
 
     /// 録音デバイスの名前と GUID を取得する。
+    ///
+    /// # Panics
+    ///
+    /// この ADM がメソッドを実行するスレッドが停止している場合。
     pub fn recording_device_name(&self, index: u16) -> Result<(String, String)> {
-        let mut name = [0 as c_char; 128];
-        let mut guid = [0 as c_char; 128];
-        let ret = unsafe {
-            ffi::webrtc_AudioDeviceModule_RecordingDeviceName(
-                self.as_ptr(),
-                index,
-                name.as_mut_ptr(),
-                guid.as_mut_ptr(),
-            )
-        };
-        if ret != 0 {
-            return Err(Error::Message(format!(
-                "AudioDeviceModule::RecordingDeviceName failed: {}",
-                ret
-            )));
-        }
-        let name_str = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
-            .to_str()
-            .map_err(Error::Utf8Error)?
-            .to_string();
-        let guid_str = unsafe { std::ffi::CStr::from_ptr(guid.as_ptr()) }
-            .to_str()
-            .map_err(Error::Utf8Error)?
-            .to_string();
-        Ok((name_str, guid_str))
+        // 保持したスレッド上で C 文字列を読み取り、String に変換してから返す。スレッドを
+        // またいで送れるのは変換後の値だけなので、失敗の理由も値として持ち帰る。
+        self.blocking_call(move |raw| {
+            let mut name = [0 as c_char; 128];
+            let mut guid = [0 as c_char; 128];
+            let ret = unsafe {
+                ffi::webrtc_AudioDeviceModule_RecordingDeviceName(
+                    raw,
+                    index,
+                    name.as_mut_ptr(),
+                    guid.as_mut_ptr(),
+                )
+            };
+            if ret != 0 {
+                return Err(Error::Message(format!(
+                    "AudioDeviceModule::RecordingDeviceName failed: {}",
+                    ret
+                )));
+            }
+            let name_str = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
+                .to_str()
+                .map_err(Error::Utf8Error)?
+                .to_string();
+            let guid_str = unsafe { std::ffi::CStr::from_ptr(guid.as_ptr()) }
+                .to_str()
+                .map_err(Error::Utf8Error)?
+                .to_string();
+            Ok((name_str, guid_str))
+        })
     }
 
     /// 録音デバイスを選択する。
-    pub fn set_recording_device(&mut self, index: u16) -> Result<()> {
-        let ret = unsafe { ffi::webrtc_AudioDeviceModule_SetRecordingDevice(self.as_ptr(), index) };
+    ///
+    /// # Panics
+    ///
+    /// この ADM がメソッドを実行するスレッドが停止している場合。
+    pub fn set_recording_device(&self, index: u16) -> Result<()> {
+        let ret = self.blocking_call(move |raw| unsafe {
+            ffi::webrtc_AudioDeviceModule_SetRecordingDevice(raw, index)
+        });
         if ret != 0 {
             return Err(Error::Message(format!(
                 "AudioDeviceModule::SetRecordingDevice failed: {}",
@@ -205,8 +343,20 @@ impl AudioDeviceModule {
 impl Clone for AudioDeviceModule {
     fn clone(&self) -> Self {
         Self {
-            raw_ref: ScopedRef::clone(&self.raw_ref),
+            raw_ref: ManuallyDrop::new(ScopedRef::clone(&self.raw_ref)),
+            thread: self.thread,
         }
+    }
+}
+
+impl Drop for AudioDeviceModule {
+    fn drop(&mut self) {
+        // 参照の解放は、この ADM のメソッドの実行と同じスレッドで行う。最後の参照の解放は実体の
+        // 破棄を伴い、そのスレッドが破棄するスレッドになるためである。
+        let raw_ref = SendAudioDeviceModuleRef(unsafe { ManuallyDrop::take(&mut self.raw_ref) });
+        self.thread.blocking_call(move || {
+            drop(raw_ref);
+        });
     }
 }
 
@@ -939,9 +1089,13 @@ impl Drop for AudioDeviceModuleStats {
 /// Rust 側で実装を差し替えられる webrtc::AudioDeviceModule。
 ///
 /// このトレイトを実装したオブジェクトを [AudioDeviceModule::new_with_handler] に渡して利用する。
-/// ADM を `PeerConnectionFactory` に渡した後は、同じ ADM のメソッドを別スレッドから呼ばないこと。
+/// メソッドは 1 つのスレッドから順に呼ばれるため、ハンドラ自身が排他や直列化を担う必要はない。
+///
+/// ハンドラのメソッドの実行中に、同じ ADM のメソッドを呼び出してはならない。ハンドラが同じ ADM
+/// のハンドルを保持して呼び出すと、そのハンドラを可変参照で借りたまま別のメソッドを実行しようと
+/// するため、二重借用の検出によりプロセスが異常終了する。
 pub trait AudioDeviceModuleHandler: Send {
-    fn active_audio_layer(&mut self, audio_layer: &mut i32) -> i32 {
+    fn active_audio_layer(&self, audio_layer: &mut i32) -> i32 {
         *audio_layer = 0;
         0
     }
@@ -955,7 +1109,7 @@ pub trait AudioDeviceModuleHandler: Send {
     fn terminate(&mut self) -> i32 {
         0
     }
-    fn initialized(&mut self) -> bool {
+    fn initialized(&self) -> bool {
         false
     }
     fn playout_devices(&mut self) -> i16 {
@@ -995,7 +1149,7 @@ pub trait AudioDeviceModuleHandler: Send {
     fn init_playout(&mut self) -> i32 {
         0
     }
-    fn playout_is_initialized(&mut self) -> bool {
+    fn playout_is_initialized(&self) -> bool {
         true
     }
     fn recording_is_available(&mut self, available: &mut bool) -> i32 {
@@ -1005,7 +1159,7 @@ pub trait AudioDeviceModuleHandler: Send {
     fn init_recording(&mut self) -> i32 {
         0
     }
-    fn recording_is_initialized(&mut self) -> bool {
+    fn recording_is_initialized(&self) -> bool {
         true
     }
     fn start_playout(&mut self) -> i32 {
@@ -1014,7 +1168,7 @@ pub trait AudioDeviceModuleHandler: Send {
     fn stop_playout(&mut self) -> i32 {
         0
     }
-    fn playing(&mut self) -> bool {
+    fn playing(&self) -> bool {
         false
     }
     fn start_recording(&mut self) -> i32 {
@@ -1023,19 +1177,19 @@ pub trait AudioDeviceModuleHandler: Send {
     fn stop_recording(&mut self) -> i32 {
         0
     }
-    fn recording(&mut self) -> bool {
+    fn recording(&self) -> bool {
         false
     }
     fn init_speaker(&mut self) -> i32 {
         0
     }
-    fn speaker_is_initialized(&mut self) -> bool {
+    fn speaker_is_initialized(&self) -> bool {
         true
     }
     fn init_microphone(&mut self) -> i32 {
         0
     }
-    fn microphone_is_initialized(&mut self) -> bool {
+    fn microphone_is_initialized(&self) -> bool {
         true
     }
     fn speaker_volume_is_available(&mut self, available: &mut bool) -> i32 {
@@ -1046,15 +1200,15 @@ pub trait AudioDeviceModuleHandler: Send {
     fn set_speaker_volume(&mut self, volume: u32) -> i32 {
         0
     }
-    fn speaker_volume(&mut self, volume: &mut u32) -> i32 {
+    fn speaker_volume(&self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn max_speaker_volume(&mut self, volume: &mut u32) -> i32 {
+    fn max_speaker_volume(&self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn min_speaker_volume(&mut self, volume: &mut u32) -> i32 {
+    fn min_speaker_volume(&self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
@@ -1066,15 +1220,15 @@ pub trait AudioDeviceModuleHandler: Send {
     fn set_microphone_volume(&mut self, volume: u32) -> i32 {
         0
     }
-    fn microphone_volume(&mut self, volume: &mut u32) -> i32 {
+    fn microphone_volume(&self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn max_microphone_volume(&mut self, volume: &mut u32) -> i32 {
+    fn max_microphone_volume(&self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
-    fn min_microphone_volume(&mut self, volume: &mut u32) -> i32 {
+    fn min_microphone_volume(&self, volume: &mut u32) -> i32 {
         *volume = 0;
         0
     }
@@ -1086,7 +1240,7 @@ pub trait AudioDeviceModuleHandler: Send {
     fn set_speaker_mute(&mut self, enable: bool) -> i32 {
         0
     }
-    fn speaker_mute(&mut self, enabled: &mut bool) -> i32 {
+    fn speaker_mute(&self, enabled: &mut bool) -> i32 {
         *enabled = false;
         0
     }
@@ -1098,11 +1252,11 @@ pub trait AudioDeviceModuleHandler: Send {
     fn set_microphone_mute(&mut self, enable: bool) -> i32 {
         0
     }
-    fn microphone_mute(&mut self, enabled: &mut bool) -> i32 {
+    fn microphone_mute(&self, enabled: &mut bool) -> i32 {
         *enabled = false;
         0
     }
-    fn stereo_playout_is_available(&mut self, available: &mut bool) -> i32 {
+    fn stereo_playout_is_available(&self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
@@ -1110,11 +1264,11 @@ pub trait AudioDeviceModuleHandler: Send {
     fn set_stereo_playout(&mut self, enable: bool) -> i32 {
         0
     }
-    fn stereo_playout(&mut self, enabled: &mut bool) -> i32 {
+    fn stereo_playout(&self, enabled: &mut bool) -> i32 {
         *enabled = false;
         0
     }
-    fn stereo_recording_is_available(&mut self, available: &mut bool) -> i32 {
+    fn stereo_recording_is_available(&self, available: &mut bool) -> i32 {
         *available = false;
         0
     }
@@ -1122,21 +1276,21 @@ pub trait AudioDeviceModuleHandler: Send {
     fn set_stereo_recording(&mut self, enable: bool) -> i32 {
         0
     }
-    fn stereo_recording(&mut self, enabled: &mut bool) -> i32 {
+    fn stereo_recording(&self, enabled: &mut bool) -> i32 {
         *enabled = false;
         0
     }
-    fn playout_delay(&mut self, delay_ms: &mut u16) -> i32 {
+    fn playout_delay(&self, delay_ms: &mut u16) -> i32 {
         *delay_ms = 0;
         0
     }
-    fn built_in_aec_is_available(&mut self) -> bool {
+    fn built_in_aec_is_available(&self) -> bool {
         false
     }
-    fn built_in_agc_is_available(&mut self) -> bool {
+    fn built_in_agc_is_available(&self) -> bool {
         false
     }
-    fn built_in_ns_is_available(&mut self) -> bool {
+    fn built_in_ns_is_available(&self) -> bool {
         false
     }
     #[expect(unused_variables)]
@@ -1151,23 +1305,37 @@ pub trait AudioDeviceModuleHandler: Send {
     fn enable_built_in_ns(&mut self, enable: bool) -> i32 {
         -1
     }
-    fn get_playout_underrun_count(&mut self) -> i32 {
+    fn get_playout_underrun_count(&self) -> i32 {
         -1
     }
-    fn get_playout_audio_parameters(&mut self, params: &mut Option<AudioParameters>) -> i32 {
+    fn get_playout_audio_parameters(&self, params: &mut Option<AudioParameters>) -> i32 {
         *params = None;
         -1
     }
-    fn get_record_audio_parameters(&mut self, params: &mut Option<AudioParameters>) -> i32 {
+    fn get_record_audio_parameters(&self, params: &mut Option<AudioParameters>) -> i32 {
         *params = None;
         -1
     }
-    fn get_stats(&mut self) -> Option<AudioDeviceModuleStats> {
+    fn get_stats(&self) -> Option<AudioDeviceModuleStats> {
         None
     }
 }
 
-type AudioDeviceModuleHandlerState = HandlerState<dyn AudioDeviceModuleHandler>;
+/// ADM ハンドラの状態。
+///
+/// ハンドラを `RefCell` で保持して再入を検出するため、他のハンドラが使う [HandlerState] ではなく
+/// この型を定義する。
+struct AudioDeviceModuleHandlerState {
+    handler: RefCell<Box<dyn AudioDeviceModuleHandler>>,
+}
+
+impl AudioDeviceModuleHandlerState {
+    fn new(handler: Box<dyn AudioDeviceModuleHandler>) -> Self {
+        Self {
+            handler: RefCell::new(handler),
+        }
+    }
+}
 
 fn bool_to_i32(value: bool) -> i32 {
     if value { 1 } else { 0 }
@@ -1187,19 +1355,6 @@ fn write_c_string(dest: &mut [c_char], value: &str) {
     for (out, src) in dest[..len].iter_mut().zip(bytes.iter()) {
         *out = *src as c_char;
     }
-}
-
-/// `user_data` が指す ADM ハンドラの状態を返す。
-///
-/// ADM の各 trampoline が先頭で呼び出し、ハンドラのメソッドを実行するために使う。
-///
-/// # Safety
-///
-/// `user_data` は `Box::into_raw` で変換した `Box<AudioDeviceModuleHandlerState>` の
-/// 生ポインタであり有効なメモリを指していること。同じ状態を同時に借用する
-/// 別の trampoline が動いていないこと。
-unsafe fn adm_state(user_data: *mut c_void) -> &'static mut AudioDeviceModuleHandlerState {
-    unsafe { &mut *(user_data as *mut AudioDeviceModuleHandlerState) }
 }
 
 fn write_i32(out: *mut i32, value: i32) {
@@ -1229,6 +1384,40 @@ fn write_u16(out: *mut u16, value: u16) {
     }
 }
 
+/// `user_data` が指す ADM ハンドラを可変参照で借りる。
+///
+/// `const` ではないメソッドを実行する trampoline が先頭で呼び出す。既に別の trampoline が
+/// ハンドラを借りている場合は panic する。
+///
+/// # Safety
+///
+/// `user_data` は `Box::into_raw` で変換した `Box<AudioDeviceModuleHandlerState>` の
+/// 生ポインタであり有効なメモリを指していること。返り値は `'static` だが、その生存期間は
+/// `user_data` が指す状態の生存期間に限られる。trampoline の FFI 呼び出し 1 回の中で使い切ること。
+unsafe fn adm_state_mut(
+    user_data: *mut c_void,
+) -> RefMut<'static, Box<dyn AudioDeviceModuleHandler>> {
+    unsafe { &*(user_data as *const AudioDeviceModuleHandlerState) }
+        .handler
+        .borrow_mut()
+}
+
+/// `user_data` が指す ADM ハンドラを共有参照で借りる。
+///
+/// `const` なメソッドを実行する trampoline が先頭で呼び出す。ハンドラを可変参照で借りている
+/// 最中に呼び出した場合は panic する。
+///
+/// # Safety
+///
+/// `user_data` は `Box::into_raw` で変換した `Box<AudioDeviceModuleHandlerState>` の
+/// 生ポインタであり有効なメモリを指していること。返り値は `'static` だが、その生存期間は
+/// `user_data` が指す状態の生存期間に限られる。trampoline の FFI 呼び出し 1 回の中で使い切ること。
+unsafe fn adm_state(user_data: *mut c_void) -> Ref<'static, Box<dyn AudioDeviceModuleHandler>> {
+    unsafe { &*(user_data as *const AudioDeviceModuleHandlerState) }
+        .handler
+        .borrow()
+}
+
 unsafe extern "C" fn adm_active_audio_layer(audio_layer: *mut i32, user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut value = if audio_layer.is_null() {
@@ -1236,7 +1425,7 @@ unsafe extern "C" fn adm_active_audio_layer(audio_layer: *mut i32, user_data: *m
     } else {
         unsafe { *audio_layer }
     };
-    let ret = state.handler.active_audio_layer(&mut value);
+    let ret = state.active_audio_layer(&mut value);
     write_i32(audio_layer, value);
     ret
 }
@@ -1245,34 +1434,34 @@ unsafe extern "C" fn adm_register_audio_callback(
     audio_transport: *mut ffi::webrtc_AudioTransport,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state(user_data) };
+    let mut state = unsafe { adm_state_mut(user_data) };
     let transport = NonNull::new(audio_transport).map(AudioTransportPtr::from_raw);
-    state.handler.register_audio_callback(transport)
+    state.register_audio_callback(transport)
 }
 
 unsafe extern "C" fn adm_init(user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.init()
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.init()
 }
 
 unsafe extern "C" fn adm_terminate(user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.terminate()
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.terminate()
 }
 
 unsafe extern "C" fn adm_initialized(user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
-    bool_to_i32(state.handler.initialized())
+    bool_to_i32(state.initialized())
 }
 
 unsafe extern "C" fn adm_playout_devices(user_data: *mut c_void) -> i16 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.playout_devices()
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.playout_devices()
 }
 
 unsafe extern "C" fn adm_recording_devices(user_data: *mut c_void) -> i16 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.recording_devices()
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.recording_devices()
 }
 
 fn handle_device_name(
@@ -1300,8 +1489,8 @@ unsafe extern "C" fn adm_playout_device_name(
     guid: *mut c_char,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    handle_device_name(state.handler.playout_device_name(index), name, guid)
+    let mut state = unsafe { adm_state_mut(user_data) };
+    handle_device_name(state.playout_device_name(index), name, guid)
 }
 
 unsafe extern "C" fn adm_recording_device_name(
@@ -1310,149 +1499,145 @@ unsafe extern "C" fn adm_recording_device_name(
     guid: *mut c_char,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    handle_device_name(state.handler.recording_device_name(index), name, guid)
+    let mut state = unsafe { adm_state_mut(user_data) };
+    handle_device_name(state.recording_device_name(index), name, guid)
 }
 
 unsafe extern "C" fn adm_set_playout_device(index: u16, user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.set_playout_device(index)
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.set_playout_device(index)
 }
 
 unsafe extern "C" fn adm_set_playout_device_with_windows_device_type(
     device: i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state
-        .handler
-        .set_playout_device_with_windows_device_type(device)
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.set_playout_device_with_windows_device_type(device)
 }
 
 unsafe extern "C" fn adm_set_recording_device(index: u16, user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.set_recording_device(index)
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.set_recording_device(index)
 }
 
 unsafe extern "C" fn adm_set_recording_device_with_windows_device_type(
     device: i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state
-        .handler
-        .set_recording_device_with_windows_device_type(device)
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.set_recording_device_with_windows_device_type(device)
 }
 
 unsafe extern "C" fn adm_playout_is_available(available: *mut i32, user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
+    let mut state = unsafe { adm_state_mut(user_data) };
     let mut value = false;
-    let ret = state.handler.playout_is_available(&mut value);
+    let ret = state.playout_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_init_playout(user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.init_playout()
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.init_playout()
 }
 
 unsafe extern "C" fn adm_playout_is_initialized(user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
-    bool_to_i32(state.handler.playout_is_initialized())
+    bool_to_i32(state.playout_is_initialized())
 }
 
 unsafe extern "C" fn adm_recording_is_available(
     available: *mut i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state(user_data) };
+    let mut state = unsafe { adm_state_mut(user_data) };
     let mut value = false;
-    let ret = state.handler.recording_is_available(&mut value);
+    let ret = state.recording_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_init_recording(user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.init_recording()
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.init_recording()
 }
 
 unsafe extern "C" fn adm_recording_is_initialized(user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
-    bool_to_i32(state.handler.recording_is_initialized())
+    bool_to_i32(state.recording_is_initialized())
 }
 
 unsafe extern "C" fn adm_start_playout(user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.start_playout()
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.start_playout()
 }
 
 unsafe extern "C" fn adm_stop_playout(user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.stop_playout()
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.stop_playout()
 }
 
 unsafe extern "C" fn adm_playing(user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
-    bool_to_i32(state.handler.playing())
+    bool_to_i32(state.playing())
 }
 
 unsafe extern "C" fn adm_start_recording(user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.start_recording()
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.start_recording()
 }
 
 unsafe extern "C" fn adm_stop_recording(user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.stop_recording()
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.stop_recording()
 }
 
 unsafe extern "C" fn adm_recording(user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
-    bool_to_i32(state.handler.recording())
+    bool_to_i32(state.recording())
 }
 
 unsafe extern "C" fn adm_init_speaker(user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.init_speaker()
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.init_speaker()
 }
 
 unsafe extern "C" fn adm_speaker_is_initialized(user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
-    bool_to_i32(state.handler.speaker_is_initialized())
+    bool_to_i32(state.speaker_is_initialized())
 }
 
 unsafe extern "C" fn adm_init_microphone(user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.init_microphone()
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.init_microphone()
 }
 
 unsafe extern "C" fn adm_microphone_is_initialized(user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
-    bool_to_i32(state.handler.microphone_is_initialized())
+    bool_to_i32(state.microphone_is_initialized())
 }
 
 unsafe extern "C" fn adm_speaker_volume_is_available(
     available: *mut i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state(user_data) };
+    let mut state = unsafe { adm_state_mut(user_data) };
     let mut value = false;
-    let ret = state.handler.speaker_volume_is_available(&mut value);
+    let ret = state.speaker_volume_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_set_speaker_volume(volume: u32, user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.set_speaker_volume(volume)
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.set_speaker_volume(volume)
 }
 
 unsafe extern "C" fn adm_speaker_volume(volume: *mut u32, user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut value = 0;
-    let ret = state.handler.speaker_volume(&mut value);
+    let ret = state.speaker_volume(&mut value);
     write_u32(volume, value);
     ret
 }
@@ -1460,7 +1645,7 @@ unsafe extern "C" fn adm_speaker_volume(volume: *mut u32, user_data: *mut c_void
 unsafe extern "C" fn adm_max_speaker_volume(volume: *mut u32, user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut value = 0;
-    let ret = state.handler.max_speaker_volume(&mut value);
+    let ret = state.max_speaker_volume(&mut value);
     write_u32(volume, value);
     ret
 }
@@ -1468,7 +1653,7 @@ unsafe extern "C" fn adm_max_speaker_volume(volume: *mut u32, user_data: *mut c_
 unsafe extern "C" fn adm_min_speaker_volume(volume: *mut u32, user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut value = 0;
-    let ret = state.handler.min_speaker_volume(&mut value);
+    let ret = state.min_speaker_volume(&mut value);
     write_u32(volume, value);
     ret
 }
@@ -1477,22 +1662,22 @@ unsafe extern "C" fn adm_microphone_volume_is_available(
     available: *mut i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state(user_data) };
+    let mut state = unsafe { adm_state_mut(user_data) };
     let mut value = false;
-    let ret = state.handler.microphone_volume_is_available(&mut value);
+    let ret = state.microphone_volume_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_set_microphone_volume(volume: u32, user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.set_microphone_volume(volume)
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.set_microphone_volume(volume)
 }
 
 unsafe extern "C" fn adm_microphone_volume(volume: *mut u32, user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut value = 0;
-    let ret = state.handler.microphone_volume(&mut value);
+    let ret = state.microphone_volume(&mut value);
     write_u32(volume, value);
     ret
 }
@@ -1500,7 +1685,7 @@ unsafe extern "C" fn adm_microphone_volume(volume: *mut u32, user_data: *mut c_v
 unsafe extern "C" fn adm_max_microphone_volume(volume: *mut u32, user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut value = 0;
-    let ret = state.handler.max_microphone_volume(&mut value);
+    let ret = state.max_microphone_volume(&mut value);
     write_u32(volume, value);
     ret
 }
@@ -1508,7 +1693,7 @@ unsafe extern "C" fn adm_max_microphone_volume(volume: *mut u32, user_data: *mut
 unsafe extern "C" fn adm_min_microphone_volume(volume: *mut u32, user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut value = 0;
-    let ret = state.handler.min_microphone_volume(&mut value);
+    let ret = state.min_microphone_volume(&mut value);
     write_u32(volume, value);
     ret
 }
@@ -1517,22 +1702,22 @@ unsafe extern "C" fn adm_speaker_mute_is_available(
     available: *mut i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state(user_data) };
+    let mut state = unsafe { adm_state_mut(user_data) };
     let mut value = false;
-    let ret = state.handler.speaker_mute_is_available(&mut value);
+    let ret = state.speaker_mute_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_set_speaker_mute(enable: i32, user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.set_speaker_mute(bool_from_i32(enable))
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.set_speaker_mute(bool_from_i32(enable))
 }
 
 unsafe extern "C" fn adm_speaker_mute(enabled: *mut i32, user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = state.handler.speaker_mute(&mut value);
+    let ret = state.speaker_mute(&mut value);
     write_i32(enabled, bool_to_i32(value));
     ret
 }
@@ -1541,22 +1726,22 @@ unsafe extern "C" fn adm_microphone_mute_is_available(
     available: *mut i32,
     user_data: *mut c_void,
 ) -> i32 {
-    let state = unsafe { adm_state(user_data) };
+    let mut state = unsafe { adm_state_mut(user_data) };
     let mut value = false;
-    let ret = state.handler.microphone_mute_is_available(&mut value);
+    let ret = state.microphone_mute_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_set_microphone_mute(enable: i32, user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.set_microphone_mute(bool_from_i32(enable))
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.set_microphone_mute(bool_from_i32(enable))
 }
 
 unsafe extern "C" fn adm_microphone_mute(enabled: *mut i32, user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = state.handler.microphone_mute(&mut value);
+    let ret = state.microphone_mute(&mut value);
     write_i32(enabled, bool_to_i32(value));
     ret
 }
@@ -1567,20 +1752,20 @@ unsafe extern "C" fn adm_stereo_playout_is_available(
 ) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = state.handler.stereo_playout_is_available(&mut value);
+    let ret = state.stereo_playout_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_set_stereo_playout(enable: i32, user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.set_stereo_playout(bool_from_i32(enable))
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.set_stereo_playout(bool_from_i32(enable))
 }
 
 unsafe extern "C" fn adm_stereo_playout(enabled: *mut i32, user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = state.handler.stereo_playout(&mut value);
+    let ret = state.stereo_playout(&mut value);
     write_i32(enabled, bool_to_i32(value));
     ret
 }
@@ -1591,20 +1776,20 @@ unsafe extern "C" fn adm_stereo_recording_is_available(
 ) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = state.handler.stereo_recording_is_available(&mut value);
+    let ret = state.stereo_recording_is_available(&mut value);
     write_i32(available, bool_to_i32(value));
     ret
 }
 
 unsafe extern "C" fn adm_set_stereo_recording(enable: i32, user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.set_stereo_recording(bool_from_i32(enable))
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.set_stereo_recording(bool_from_i32(enable))
 }
 
 unsafe extern "C" fn adm_stereo_recording(enabled: *mut i32, user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut value = false;
-    let ret = state.handler.stereo_recording(&mut value);
+    let ret = state.stereo_recording(&mut value);
     write_i32(enabled, bool_to_i32(value));
     ret
 }
@@ -1612,44 +1797,44 @@ unsafe extern "C" fn adm_stereo_recording(enabled: *mut i32, user_data: *mut c_v
 unsafe extern "C" fn adm_playout_delay(delay_ms: *mut u16, user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut value = 0u16;
-    let ret = state.handler.playout_delay(&mut value);
+    let ret = state.playout_delay(&mut value);
     write_u16(delay_ms, value);
     ret
 }
 
 unsafe extern "C" fn adm_built_in_aec_is_available(user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
-    bool_to_i32(state.handler.built_in_aec_is_available())
+    bool_to_i32(state.built_in_aec_is_available())
 }
 
 unsafe extern "C" fn adm_built_in_agc_is_available(user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
-    bool_to_i32(state.handler.built_in_agc_is_available())
+    bool_to_i32(state.built_in_agc_is_available())
 }
 
 unsafe extern "C" fn adm_built_in_ns_is_available(user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
-    bool_to_i32(state.handler.built_in_ns_is_available())
+    bool_to_i32(state.built_in_ns_is_available())
 }
 
 unsafe extern "C" fn adm_enable_built_in_aec(enable: i32, user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.enable_built_in_aec(bool_from_i32(enable))
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.enable_built_in_aec(bool_from_i32(enable))
 }
 
 unsafe extern "C" fn adm_enable_built_in_agc(enable: i32, user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.enable_built_in_agc(bool_from_i32(enable))
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.enable_built_in_agc(bool_from_i32(enable))
 }
 
 unsafe extern "C" fn adm_enable_built_in_ns(enable: i32, user_data: *mut c_void) -> i32 {
-    let state = unsafe { adm_state(user_data) };
-    state.handler.enable_built_in_ns(bool_from_i32(enable))
+    let mut state = unsafe { adm_state_mut(user_data) };
+    state.enable_built_in_ns(bool_from_i32(enable))
 }
 
 unsafe extern "C" fn adm_get_playout_underrun_count(user_data: *mut c_void) -> i32 {
     let state = unsafe { adm_state(user_data) };
-    state.handler.get_playout_underrun_count()
+    state.get_playout_underrun_count()
 }
 
 unsafe extern "C" fn adm_get_playout_audio_parameters(
@@ -1658,7 +1843,7 @@ unsafe extern "C" fn adm_get_playout_audio_parameters(
 ) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut params = None;
-    let ret = state.handler.get_playout_audio_parameters(&mut params);
+    let ret = state.get_playout_audio_parameters(&mut params);
     if ret != 0 {
         return ret;
     }
@@ -1682,7 +1867,7 @@ unsafe extern "C" fn adm_get_record_audio_parameters(
 ) -> i32 {
     let state = unsafe { adm_state(user_data) };
     let mut params = None;
-    let ret = state.handler.get_record_audio_parameters(&mut params);
+    let ret = state.get_record_audio_parameters(&mut params);
     if ret != 0 {
         return ret;
     }
@@ -1705,7 +1890,7 @@ unsafe extern "C" fn adm_get_stats(
     user_data: *mut c_void,
 ) -> i32 {
     let state = unsafe { adm_state(user_data) };
-    let stats = match state.handler.get_stats() {
+    let stats = match state.get_stats() {
         Some(stats) => stats,
         None => return 0,
     };

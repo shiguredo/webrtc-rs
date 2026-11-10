@@ -114,13 +114,7 @@ set(WEBRTC_TARGETS_RASPBERRY_PI
 # WebRTC 向けの libc++ ヘッダーのダウンロードと使用（WebRTC との ABI 互換性のため）
 set(WEBRTC_USE_WEBRTC_LIBCXX TRUE)
 # WebRTC の Clang をコンパイラとして使用するかどうか
-# Windows 以外は WebRTC の Clang を使う
 set(WEBRTC_USE_WEBRTC_CLANG TRUE)
-
-if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
-  set(WEBRTC_USE_WEBRTC_LIBCXX FALSE)
-  set(WEBRTC_USE_WEBRTC_CLANG FALSE)
-endif()
 
 # ============================================================================
 # WEBRTC_BUILD_ROOT の有無で大きく 2 ルートに分岐する
@@ -160,8 +154,14 @@ if(DEFINED WEBRTC_BUILD_ROOT)
   set(_LOCAL_LIBCXX_DIR "${WEBRTC_BUILD_ROOT}/_source/${WEBRTC_C_TARGET}/webrtc/src/third_party/libc++/src")
   set(_LOCAL_BUILDTOOLS_DIR "${WEBRTC_BUILD_ROOT}/_source/${WEBRTC_C_TARGET}/webrtc/src/buildtools")
 
-  if(NOT EXISTS "${_LOCAL_CLANG_DIR}/bin/clang++")
-    message(FATAL_ERROR "Local Clang not found: ${_LOCAL_CLANG_DIR}/bin/clang++")
+  # Windows の WebRTC の Clang には clang-cl しか含まれない。
+  if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
+    set(_LOCAL_CLANG_COMPILER "${_LOCAL_CLANG_DIR}/bin/clang-cl.exe")
+  else()
+    set(_LOCAL_CLANG_COMPILER "${_LOCAL_CLANG_DIR}/bin/clang++")
+  endif()
+  if(NOT EXISTS "${_LOCAL_CLANG_COMPILER}")
+    message(FATAL_ERROR "Local Clang not found: ${_LOCAL_CLANG_COMPILER}")
   endif()
   if(NOT EXISTS "${_LOCAL_LIBCXX_DIR}/include")
     message(FATAL_ERROR "Local libc++ not found: ${_LOCAL_LIBCXX_DIR}/include")
@@ -364,8 +364,14 @@ endif()
 # Clang コンパイラの設定
 if(WEBRTC_USE_WEBRTC_CLANG)
   # Prebuilt Clang コンパイラのパスを設定（project() の前）
-  set(CMAKE_C_COMPILER "${LLVM_CLANG_DIR}/bin/clang" CACHE FILEPATH "" FORCE)
-  set(CMAKE_CXX_COMPILER "${LLVM_CLANG_DIR}/bin/clang++" CACHE FILEPATH "" FORCE)
+  # Windows の WebRTC の Clang には clang-cl しか含まれない。
+  if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
+    set(CMAKE_C_COMPILER "${LLVM_CLANG_DIR}/bin/clang-cl.exe" CACHE FILEPATH "" FORCE)
+    set(CMAKE_CXX_COMPILER "${LLVM_CLANG_DIR}/bin/clang-cl.exe" CACHE FILEPATH "" FORCE)
+  else()
+    set(CMAKE_C_COMPILER "${LLVM_CLANG_DIR}/bin/clang" CACHE FILEPATH "" FORCE)
+    set(CMAKE_CXX_COMPILER "${LLVM_CLANG_DIR}/bin/clang++" CACHE FILEPATH "" FORCE)
+  endif()
   message(STATUS "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}")
   message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
 else()
@@ -494,48 +500,40 @@ add_library(webrtc_c
 )
 # CMake 4.x で C++20 モジュールスキャンが自動有効になるが、
 # WebRTC の clang に clang-scan-deps が含まれないため無効化する
-set_target_properties(webrtc_c PROPERTIES CXX_SCAN_FOR_MODULES OFF)
-add_executable(whip_cpp src/whip.cpp)
-add_executable(whep_cpp src/whep.cpp)
-set(WEBRTC_CPP_TARGETS webrtc_c whip_cpp whep_cpp)
-set(WEBRTC_C_TARGETS whip_c whep_c)
+set_target_properties(webrtc_c PROPERTIES CXX_STANDARD 20 C_STANDARD 20 CXX_SCAN_FOR_MODULES OFF)
 
-foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-  set_target_properties(${target} PROPERTIES CXX_STANDARD 20 C_STANDARD 20)
-endforeach()
+target_include_directories(webrtc_c
+  PRIVATE
+    ${WEBRTC_INCLUDE_DIR}
+    ${WEBRTC_INCLUDE_DIR}/third_party/abseil-cpp
+    ${WEBRTC_INCLUDE_DIR}/third_party/boringssl/src/include
+    ${WEBRTC_INCLUDE_DIR}/third_party/libyuv/include
+    ${WEBRTC_INCLUDE_DIR}/third_party/zlib
+    ${WEBRTC_INCLUDE_DIR}/sdk/objc
+    ${WEBRTC_INCLUDE_DIR}/sdk/objc/base
+)
 
-foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-  target_include_directories(${target}
-    PRIVATE
-      ${WEBRTC_INCLUDE_DIR}
-      ${WEBRTC_INCLUDE_DIR}/third_party/abseil-cpp
-      ${WEBRTC_INCLUDE_DIR}/third_party/boringssl/src/include
-      ${WEBRTC_INCLUDE_DIR}/third_party/libyuv/include
-      ${WEBRTC_INCLUDE_DIR}/third_party/zlib
-      ${WEBRTC_INCLUDE_DIR}/sdk/objc
-      ${WEBRTC_INCLUDE_DIR}/sdk/objc/base
-  )
-endforeach()
-
-foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-  target_link_libraries(${target}
-    PRIVATE
-      ${WEBRTC_LIBRARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}webrtc${CMAKE_STATIC_LIBRARY_SUFFIX}
-      Threads::Threads
-  )
-endforeach()
+target_link_libraries(webrtc_c
+  PRIVATE
+    ${WEBRTC_LIBRARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}webrtc${CMAKE_STATIC_LIBRARY_SUFFIX}
+    Threads::Threads
+)
 
 set(BUNDLE_STATIC_LIBS ${WEBRTC_LIBRARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}webrtc${CMAKE_STATIC_LIBRARY_SUFFIX})
 
 if(WEBRTC_USE_WEBRTC_LIBCXX)
   # libc++ の設定（WebRTC と同じ libc++ ヘッダーを使用）
-  foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_options(${target}
+  # clang-cl は -nostdinc++ と -isystem を解釈しないため、/clang: を経由して clang に渡す。
+  if(WEBRTC_C_TARGET STREQUAL "windows_x86_64")
+    set(_LIBCXX_COMPILE_OPTIONS "/clang:-nostdinc++" "/I${LIBCXX_INCLUDE_DIR}")
+  else()
+    set(_LIBCXX_COMPILE_OPTIONS "-nostdinc++" "-isystem${LIBCXX_INCLUDE_DIR}")
+  endif()
+  foreach(_option IN LISTS _LIBCXX_COMPILE_OPTIONS)
+    target_compile_options(webrtc_c
       PRIVATE
-        "$<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>"
-        "$<$<COMPILE_LANGUAGE:CXX>:-isystem${LIBCXX_INCLUDE_DIR}>"
-        "$<$<COMPILE_LANGUAGE:OBJCXX>:-nostdinc++>"
-        "$<$<COMPILE_LANGUAGE:OBJCXX>:-isystem${LIBCXX_INCLUDE_DIR}>"
+        "$<$<COMPILE_LANGUAGE:CXX>:${_option}>"
+        "$<$<COMPILE_LANGUAGE:OBJCXX>:${_option}>"
     )
   endforeach()
 endif()
@@ -605,53 +603,56 @@ function(bundle_static_library target static_libs bundled_target)
 endfunction()
 
 if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
-  # 文字コードを utf-8 として扱うのと、シンボルテーブル数を増やす
-  foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_options(${target} PRIVATE /utf-8 /bigobj)
-    set_target_properties(${target}
-      PROPERTIES
-        # CRTライブラリを静的リンクさせる
-        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
-    )
-    target_link_libraries(${target}
-      PRIVATE
-      #  dbghelp.lib
-      #  delayimp.lib
-      #  dnsapi.lib
-      #  msimg32.lib
-      #  oleaut32.lib
-      #  psapi.lib
-      #  shell32.lib
-      #  shlwapi.lib
-      #  usp10.lib
-      #  version.lib
-      #  wininet.lib
-        winmm.lib
-        ws2_32.lib
-      #  amstrmid.lib
-        Strmiids.lib
-      #  crypt32.lib
-        dmoguids.lib
-        iphlpapi.lib
-        msdmo.lib
-        Secur32.lib
-        wmcodecdspuuid.lib
-    )
-    target_compile_definitions(${target}
-      PRIVATE
-        _CONSOLE
-        _WIN32_WINNT=0x0A00
-        WEBRTC_WIN
-        NOMINMAX
-        WIN32_LEAN_AND_MEAN
-        UNICODE
-        _UNICODE
-        _USE_MATH_DEFINES
-        $<$<NOT:$<CONFIG:Debug>>:NDEBUG>
-        RTC_ENABLE_H265
-        _ITERATOR_DEBUG_LEVEL=0
-    )
-  endforeach()
+  # 文字コードを utf-8 として扱うのと、シンボルテーブル数を増やす。
+  # clang-cl は C++ の例外が既定で無効なため、明示的に有効にする。
+  target_compile_options(webrtc_c PRIVATE /utf-8 /bigobj /EHsc)
+  set_target_properties(webrtc_c
+    PROPERTIES
+      # CRTライブラリを静的リンクさせる
+      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+  )
+  target_link_libraries(webrtc_c
+    PRIVATE
+    #  dbghelp.lib
+    #  delayimp.lib
+    #  dnsapi.lib
+    #  msimg32.lib
+    #  oleaut32.lib
+    #  psapi.lib
+    #  shell32.lib
+    #  shlwapi.lib
+    #  usp10.lib
+    #  version.lib
+    #  wininet.lib
+      winmm.lib
+      ws2_32.lib
+    #  amstrmid.lib
+      Strmiids.lib
+    #  crypt32.lib
+      dmoguids.lib
+      iphlpapi.lib
+      msdmo.lib
+      Secur32.lib
+      wmcodecdspuuid.lib
+  )
+  target_compile_definitions(webrtc_c
+    PRIVATE
+      _CONSOLE
+      _WIN32_WINNT=0x0A00
+      WEBRTC_WIN
+      NOMINMAX
+      WIN32_LEAN_AND_MEAN
+      UNICODE
+      _UNICODE
+      _USE_MATH_DEFINES
+      $<$<NOT:$<CONFIG:Debug>>:NDEBUG>
+      RTC_ENABLE_H265
+      # libc++ の名前空間や ABI バージョンは WebRTC が利用する __config_site から与えられる。
+      # __config_site は _LIBCPP_HARDENING_MODE を定義しないため、アーカイブのビルドと同じ値をここで指定する
+      _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
+      # libc++ のシンボルを __declspec(dllimport) にしないために必要
+      _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS
+  )
 elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
   enable_language(OBJCXX)
 
@@ -660,50 +661,46 @@ elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
       src/webrtc_c/objc.mm
   )
 
-  foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_options(${target}
-      PRIVATE
-        -fconstant-string-class=NSConstantString
-        "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>"
-    )
-    target_compile_definitions(${target}
-      PRIVATE
-        WEBRTC_POSIX
-        WEBRTC_MAC
-        _LIBCPP_ABI_NAMESPACE=Cr
-        _LIBCPP_ABI_VERSION=2
-        _LIBCPP_DISABLE_AVAILABILITY
-        _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS
-        _LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS
-        _LIBCPP_ENABLE_NODISCARD
-        _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
-    )
-    set_target_properties(${target} PROPERTIES CXX_VISIBILITY_PRESET hidden)
-  endforeach()
+  target_compile_options(webrtc_c
+    PRIVATE
+      -fconstant-string-class=NSConstantString
+      "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>"
+  )
+  target_compile_definitions(webrtc_c
+    PRIVATE
+      WEBRTC_POSIX
+      WEBRTC_MAC
+      _LIBCPP_ABI_NAMESPACE=Cr
+      _LIBCPP_ABI_VERSION=2
+      _LIBCPP_DISABLE_AVAILABILITY
+      _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS
+      _LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS
+      _LIBCPP_ENABLE_NODISCARD
+      _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
+  )
+  set_target_properties(webrtc_c PROPERTIES CXX_VISIBILITY_PRESET hidden)
 
-  foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_link_libraries(${target}
-      PRIVATE
-        "-framework AVFoundation"
-        "-framework AppKit"
-        "-framework AudioToolbox"
-        "-framework CoreAudio"
-        "-framework CoreMedia"
-        "-framework IOSurface"
-        "-framework Metal"
-        "-framework MetalKit"
-        "-framework OpenGL"
-        "-framework QuartzCore"
-        "-framework ScreenCaptureKit"
-        "-framework VideoToolbox"
-        #"-framework AudioUnit"
-        #"-framework CoreFoundation"
-        #"-framework CoreGraphics"
-        #"-framework CoreServices"
-        #"-framework CoreVideo"
-        #"-framework Foundation"
-    )
-  endforeach()
+  target_link_libraries(webrtc_c
+    PRIVATE
+      "-framework AVFoundation"
+      "-framework AppKit"
+      "-framework AudioToolbox"
+      "-framework CoreAudio"
+      "-framework CoreMedia"
+      "-framework IOSurface"
+      "-framework Metal"
+      "-framework MetalKit"
+      "-framework OpenGL"
+      "-framework QuartzCore"
+      "-framework ScreenCaptureKit"
+      "-framework VideoToolbox"
+      #"-framework AudioUnit"
+      #"-framework CoreFoundation"
+      #"-framework CoreGraphics"
+      #"-framework CoreServices"
+      #"-framework CoreVideo"
+      #"-framework Foundation"
+  )
 
 elseif (WEBRTC_C_TARGET STREQUAL "ios_arm64")
   enable_language(OBJCXX)
@@ -714,104 +711,96 @@ elseif (WEBRTC_C_TARGET STREQUAL "ios_arm64")
       src/webrtc_c/sdk/objc/components/audio/audio_session.mm
   )
 
-  foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_options(${target}
-      PRIVATE
-        -fconstant-string-class=NSConstantString
-        "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>"
-    )
-    target_compile_definitions(${target}
-      PRIVATE
-        WEBRTC_POSIX
-        WEBRTC_MAC
-        WEBRTC_IOS
-        _LIBCPP_ABI_NAMESPACE=Cr
-        _LIBCPP_ABI_VERSION=2
-        _LIBCPP_DISABLE_AVAILABILITY
-        _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS
-        _LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS
-        _LIBCPP_ENABLE_NODISCARD
-        _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
-    )
-    set_target_properties(${target} PROPERTIES CXX_VISIBILITY_PRESET hidden)
-  endforeach()
+  target_compile_options(webrtc_c
+    PRIVATE
+      -fconstant-string-class=NSConstantString
+      "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>"
+  )
+  target_compile_definitions(webrtc_c
+    PRIVATE
+      WEBRTC_POSIX
+      WEBRTC_MAC
+      WEBRTC_IOS
+      _LIBCPP_ABI_NAMESPACE=Cr
+      _LIBCPP_ABI_VERSION=2
+      _LIBCPP_DISABLE_AVAILABILITY
+      _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS
+      _LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS
+      _LIBCPP_ENABLE_NODISCARD
+      _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
+  )
+  set_target_properties(webrtc_c PROPERTIES CXX_VISIBILITY_PRESET hidden)
 
-  foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_link_libraries(${target}
-      PRIVATE
-        "-framework CoreFoundation"
-        "-framework AVFoundation"
-        "-framework AudioToolbox"
-        "-framework CoreAudio"
-        "-framework CoreMedia"
-        "-framework CoreVideo"
-        "-framework VideoToolbox"
-        "-framework Metal"
-        "-framework IOSurface"
-        "-framework QuartzCore"
-        "-framework UIKit"
-    )
-  endforeach()
+  target_link_libraries(webrtc_c
+    PRIVATE
+      "-framework CoreFoundation"
+      "-framework AVFoundation"
+      "-framework AudioToolbox"
+      "-framework CoreAudio"
+      "-framework CoreMedia"
+      "-framework CoreVideo"
+      "-framework VideoToolbox"
+      "-framework Metal"
+      "-framework IOSurface"
+      "-framework QuartzCore"
+      "-framework UIKit"
+  )
 
 elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_UBUNTU)
-  foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_definitions(${target}
-      PRIVATE
-        WEBRTC_POSIX
-        WEBRTC_LINUX
-        _LIBCPP_ABI_NAMESPACE=Cr
-        _LIBCPP_ABI_VERSION=2
-        _LIBCPP_DISABLE_AVAILABILITY
-        _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
-        # https://github.com/boostorg/container_hash/issues/22 と同じ問題が clang-15 でも起きるので、これを手動で定義して回避する
-        BOOST_NO_CXX98_FUNCTION_BASE
-        RTC_ENABLE_H265
-    )
-    target_compile_options(${target} PRIVATE -Wno-nullability-completeness)
-    set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    target_link_libraries(${target}
-      PRIVATE
-        X11
-        #Xau
-        #Xdmcp
-        #Xtst
-        #xcb
-        #plds4
-        #Xext
-        #expat
-        dl
-        #nss3
-        #nssutil3
-        #plc4
-        #nspr4
-        rt
-        Threads::Threads
-    )
-  endforeach()
+  target_compile_definitions(webrtc_c
+    PRIVATE
+      WEBRTC_POSIX
+      WEBRTC_LINUX
+      _LIBCPP_ABI_NAMESPACE=Cr
+      _LIBCPP_ABI_VERSION=2
+      _LIBCPP_DISABLE_AVAILABILITY
+      _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
+      # https://github.com/boostorg/container_hash/issues/22 と同じ問題が clang-15 でも起きるので、これを手動で定義して回避する
+      BOOST_NO_CXX98_FUNCTION_BASE
+      RTC_ENABLE_H265
+  )
+  target_compile_options(webrtc_c PRIVATE -Wno-nullability-completeness)
+  set_target_properties(webrtc_c PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  target_link_libraries(webrtc_c
+    PRIVATE
+      X11
+      #Xau
+      #Xdmcp
+      #Xtst
+      #xcb
+      #plds4
+      #Xext
+      #expat
+      dl
+      #nss3
+      #nssutil3
+      #plc4
+      #nspr4
+      rt
+      Threads::Threads
+  )
 
 elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_RASPBERRY_PI)
-  foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_definitions(${target}
-      PRIVATE
-        WEBRTC_POSIX
-        WEBRTC_LINUX
-        _LIBCPP_ABI_NAMESPACE=Cr
-        _LIBCPP_ABI_VERSION=2
-        _LIBCPP_DISABLE_AVAILABILITY
-        _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
-        BOOST_NO_CXX98_FUNCTION_BASE
-        RTC_ENABLE_H265
-    )
-    target_compile_options(${target} PRIVATE -Wno-nullability-completeness)
-    set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    target_link_libraries(${target}
-      PRIVATE
-        X11
-        dl
-        rt
-        Threads::Threads
-    )
-  endforeach()
+  target_compile_definitions(webrtc_c
+    PRIVATE
+      WEBRTC_POSIX
+      WEBRTC_LINUX
+      _LIBCPP_ABI_NAMESPACE=Cr
+      _LIBCPP_ABI_VERSION=2
+      _LIBCPP_DISABLE_AVAILABILITY
+      _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
+      BOOST_NO_CXX98_FUNCTION_BASE
+      RTC_ENABLE_H265
+  )
+  target_compile_options(webrtc_c PRIVATE -Wno-nullability-completeness)
+  set_target_properties(webrtc_c PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  target_link_libraries(webrtc_c
+    PRIVATE
+      X11
+      dl
+      rt
+      Threads::Threads
+  )
 
 elseif (WEBRTC_C_TARGET STREQUAL "android_arm64")
   target_sources(webrtc_c
@@ -823,30 +812,28 @@ elseif (WEBRTC_C_TARGET STREQUAL "android_arm64")
       src/webrtc_c/sdk/android/native_api/jni/class_loader.cc
   )
 
-  foreach(target IN LISTS WEBRTC_CPP_TARGETS)
-    target_compile_definitions(${target}
-      PRIVATE
-        WEBRTC_POSIX
-        WEBRTC_LINUX
-        WEBRTC_ANDROID
-        _LIBCPP_ABI_NAMESPACE=Cr
-        _LIBCPP_ABI_VERSION=2
-        _LIBCPP_DISABLE_AVAILABILITY
-        _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
-        RTC_ENABLE_H265
-    )
-    # libwebrtc.a は Relative VTable ABI でビルドされているため、
-    # webrtc_c 側も同じフラグでコンパイルする必要がある
-    target_compile_options(${target} PRIVATE
-      "$<$<COMPILE_LANGUAGE:CXX>:-fexperimental-relative-c++-abi-vtables>"
-    )
-    set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    target_link_libraries(${target}
-      PRIVATE
-        log
-        OpenSLES
-    )
-  endforeach()
+  target_compile_definitions(webrtc_c
+    PRIVATE
+      WEBRTC_POSIX
+      WEBRTC_LINUX
+      WEBRTC_ANDROID
+      _LIBCPP_ABI_NAMESPACE=Cr
+      _LIBCPP_ABI_VERSION=2
+      _LIBCPP_DISABLE_AVAILABILITY
+      _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE
+      RTC_ENABLE_H265
+  )
+  # libwebrtc.a は Relative VTable ABI でビルドされているため、
+  # webrtc_c 側も同じフラグでコンパイルする必要がある
+  target_compile_options(webrtc_c PRIVATE
+    "$<$<COMPILE_LANGUAGE:CXX>:-fexperimental-relative-c++-abi-vtables>"
+  )
+  set_target_properties(webrtc_c PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  target_link_libraries(webrtc_c
+    PRIVATE
+      log
+      OpenSLES
+  )
 
 endif()
 
@@ -855,98 +842,3 @@ bundle_static_library(webrtc_c "${BUNDLE_STATIC_LIBS}" bundled_webrtc_c)
 
 # bundled_webrtc_c をインストールする
 install(FILES ${CMAKE_BINARY_DIR}/bundled/${CMAKE_STATIC_LIBRARY_PREFIX}webrtc_c${CMAKE_STATIC_LIBRARY_SUFFIX} DESTINATION lib)
-
-# bundled_webrtc_c を使った whip_c ターゲットを作成する
-add_executable(whip_c src/whip.c)
-add_executable(whep_c src/whep.c)
-foreach(target IN LISTS WEBRTC_C_TARGETS)
-  target_include_directories(${target}
-    PRIVATE
-      ${WEBRTC_INCLUDE_DIR}
-      ${WEBRTC_INCLUDE_DIR}/third_party/abseil-cpp
-      ${WEBRTC_INCLUDE_DIR}/third_party/boringssl/src/include
-      ${WEBRTC_INCLUDE_DIR}/third_party/libyuv/include
-      ${WEBRTC_INCLUDE_DIR}/third_party/zlib
-  )
-  target_link_libraries(${target} PRIVATE bundled_webrtc_c)
-  if(NOT WEBRTC_C_TARGET STREQUAL "windows_x86_64")
-    target_link_libraries(${target} PRIVATE m)
-  endif()
-endforeach()
-
-# プラットフォーム固有のリンク設定 (WEBRTC_C_TARGETS)
-if (WEBRTC_C_TARGET STREQUAL "windows_x86_64")
-  foreach(target IN LISTS WEBRTC_C_TARGETS)
-    target_link_libraries(${target}
-      PRIVATE
-        winmm.lib
-        ws2_32.lib
-        Strmiids.lib
-        dmoguids.lib
-        iphlpapi.lib
-        msdmo.lib
-        Secur32.lib
-        wmcodecdspuuid.lib
-    )
-    target_compile_definitions(${target}
-      PRIVATE
-        _CONSOLE
-        _WIN32_WINNT=0x0A00
-        WEBRTC_WIN
-        NOMINMAX
-        WIN32_LEAN_AND_MEAN
-        UNICODE
-        _UNICODE
-        _USE_MATH_DEFINES
-        $<$<NOT:$<CONFIG:Debug>>:NDEBUG>
-        RTC_ENABLE_H265
-    )
-  endforeach()
-elseif (WEBRTC_C_TARGET STREQUAL "macos_arm64")
-  foreach(target IN LISTS WEBRTC_C_TARGETS)
-    target_link_libraries(${target}
-      PRIVATE
-        "-framework AVFoundation"
-        "-framework AudioToolbox"
-        "-framework CoreAudio"
-        "-framework QuartzCore"
-        "-framework CoreMedia"
-        "-framework VideoToolbox"
-        "-framework AppKit"
-        "-framework Metal"
-        "-framework MetalKit"
-        "-framework OpenGL"
-        "-framework IOSurface"
-        "-framework ScreenCaptureKit"
-    )
-  endforeach()
-elseif (WEBRTC_C_TARGET STREQUAL "ios_arm64")
-  foreach(target IN LISTS WEBRTC_C_TARGETS)
-    target_link_libraries(${target}
-      PRIVATE
-        "-framework CoreFoundation"
-        "-framework AVFoundation"
-        "-framework AudioToolbox"
-        "-framework CoreAudio"
-        "-framework CoreMedia"
-        "-framework CoreVideo"
-        "-framework VideoToolbox"
-        "-framework Metal"
-        "-framework IOSurface"
-        "-framework QuartzCore"
-        "-framework UIKit"
-    )
-  endforeach()
-elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_UBUNTU)
-  foreach(target IN LISTS WEBRTC_C_TARGETS)
-    target_link_libraries(${target} PRIVATE X11 dl rt Threads::Threads)
-  endforeach()
-elseif (WEBRTC_C_TARGET IN_LIST WEBRTC_TARGETS_RASPBERRY_PI)
-  foreach(target IN LISTS WEBRTC_C_TARGETS)
-    target_link_libraries(${target} PRIVATE X11 dl rt Threads::Threads)
-  endforeach()
-elseif (WEBRTC_C_TARGET STREQUAL "android_arm64")
-  foreach(target IN LISTS WEBRTC_C_TARGETS)
-    target_link_libraries(${target} PRIVATE log OpenSLES)
-  endforeach()
-endif()

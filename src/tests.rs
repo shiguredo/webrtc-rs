@@ -1,6 +1,7 @@
 use super::*;
 use crate::const_non_null::ConstNonNull;
 use std::cell::Cell;
+use std::mem::ManuallyDrop;
 use std::ptr::NonNull;
 use std::sync::{
     Arc, Mutex,
@@ -20,6 +21,29 @@ impl SetRemoteDescriptionObserverHandler for NoopHandler {}
 impl VideoEncoderHandler for NoopHandler {}
 impl VideoDecoderHandler for NoopHandler {}
 impl AudioTransportHandler for NoopHandler {}
+
+/// テスト用の Dummy の ADM を生成する。
+///
+/// 返り値のメソッドは `thread` 上で実行される。
+fn create_dummy_audio_device_module(thread: &Thread, env: &Environment) -> AudioDeviceModule {
+    unsafe { AudioDeviceModule::new(thread, env, AudioDeviceModuleAudioLayer::Dummy) }
+        .expect("AudioDeviceModule の生成に失敗しました")
+}
+
+/// Dummy の ADM を設定した `PeerConnectionFactoryDependencies` を生成する。
+///
+/// ADM は `network` 上で実行されるものを生成して設定する。
+fn create_deps<'a>(
+    network: &'a Thread,
+    signaling: &'a Thread,
+    env: &Environment,
+) -> PeerConnectionFactoryDependencies<'a> {
+    PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
+        network_thread: network,
+        signaling_thread: signaling,
+        adm: Some(create_dummy_audio_device_module(network, env)),
+    })
+}
 
 #[test]
 fn create_and_drop_environment() {
@@ -1755,9 +1779,9 @@ fn logging_sink_helper() {
     }
 
     impl log::LogSinkHandler for TestSinkHandler {
-        fn on_log_message(&mut self, line: log::LogLineRef<'_>) {
+        fn on_log_message(&self, line: log::LogLineRef<'_>) {
             if line.message().contains(&self.expected) && line.severity() == log::Severity::Info {
-                *self.seen.lock().unwrap() = true;
+                *self.seen.lock().expect("seen のロックに失敗しました") = true;
             }
         }
     }
@@ -1783,8 +1807,93 @@ fn logging_sink_helper() {
     }
     log::print(log::Severity::Info, "webrtc-c", 0, &expected);
     assert!(
-        *seen.lock().unwrap(),
+        *seen.lock().expect("seen のロックに失敗しました"),
         "sink がメッセージを受け取っていません"
+    );
+}
+
+#[test]
+fn logging_sink_receives_concurrent_log_lines() {
+    let exe = std::env::current_exe().expect("テストバイナリのパスを取得できませんでした");
+    // log::print はグローバルの LoggingConfig へ sink を登録するため、
+    // initialize_logging の競合を避けるべくサブプロセスとして実行する。
+    let output = std::process::Command::new(&exe)
+        .arg("logging_sink_concurrent_helper")
+        .env("WEBRTC_LOG_SINK_CONCURRENT", "1")
+        .output()
+        .expect("サブプロセスの実行に失敗しました");
+    assert!(
+        output.status.success(),
+        "複数スレッドからの sink 呼び出しで全件を受け取れていません\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn logging_sink_concurrent_helper() {
+    // 検証用ヘルパー。logging_sink_receives_concurrent_log_lines から
+    // サブプロセスとして実行され、複数スレッドから同時に log::print を呼んでも
+    // 同じ sink が全件を受け取ることを検証する。sink の on_log_message は
+    // 同時に呼ばれ得るため &self で呼ばれ、件数は AtomicUsize で数える。
+    const THREADS: usize = 8;
+    const LINES_PER_THREAD: usize = 64;
+    const MARKER: &str = "concurrent sink test message";
+
+    struct TestSinkHandler {
+        received: Arc<AtomicUsize>,
+    }
+
+    impl log::LogSinkHandler for TestSinkHandler {
+        fn on_log_message(&self, line: log::LogLineRef<'_>) {
+            // 同じプロセスで出る他のログと区別するため、このテストが出力した
+            // メッセージだけを数える。
+            if line.message().contains(MARKER) {
+                self.received.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+    }
+
+    // このヘルパーは logging_sink_receives_concurrent_log_lines からのみ
+    // サブプロセスとして実行される。テスト本体として直接実行された場合
+    // （グローバルの LoggingConfig が別のテストで既に初期化済みで、検証が
+    // 意味を持たない場合）は何もせず成功とする。
+    if std::env::var("WEBRTC_LOG_SINK_CONCURRENT").is_err() {
+        return;
+    }
+    let received = Arc::new(AtomicUsize::new(0));
+    let mut config = log::LoggingConfig::new();
+    config.set_min_severity(log::Severity::Info);
+    config.set_debug_severity(log::Severity::Info);
+    config.add_sink(log::LogSink::new_with_handler(Box::new(TestSinkHandler {
+        received: received.clone(),
+    })));
+    if !log::initialize_logging(config) {
+        panic!("logging_sink_concurrent_helper: initialize_logging が失敗しました");
+    }
+
+    // 全スレッドで一斉に出力し、sink への同時呼び出しを発生させる。
+    let threads: Vec<_> = (0..THREADS)
+        .map(|i| {
+            std::thread::spawn(move || {
+                for j in 0..LINES_PER_THREAD {
+                    log::print(
+                        log::Severity::Info,
+                        "webrtc-c",
+                        0,
+                        &format!("{MARKER} thread={i} line={j}"),
+                    );
+                }
+            })
+        })
+        .collect();
+    for thread in threads {
+        thread.join().expect("スレッドの join に失敗しました");
+    }
+
+    assert_eq!(
+        received.load(Ordering::SeqCst),
+        THREADS * LINES_PER_THREAD,
+        "sink が受け取った件数が出力した件数と一致しません"
     );
 }
 
@@ -1820,36 +1929,52 @@ fn thread_quit_runs() {
 }
 
 #[test]
-fn thread_blocking_call_after_quit_does_not_run() {
-    // quit 後はメッセージループが停止し、() を返す blocking_call は
-    // クロージャを実行せずに即座に戻ることを確認する。
+fn thread_is_quitting_reflects_state() {
+    // 起動直後は停止中ではない
     let mut thread = Thread::new();
     assert!(thread.start());
-    thread.quit();
-
-    let called = Arc::new(AtomicBool::new(false));
-    let called_clone = Arc::clone(&called);
-    // 必ず quit の後に blocking_call を呼び、quit との競合を避ける。
-    thread.blocking_call(move || {
-        called_clone.store(true, Ordering::SeqCst);
-    });
     assert!(
-        !called.load(Ordering::SeqCst),
-        "quit 後にブロックしたコールバックが実行されました"
+        !thread.is_quitting(),
+        "起動直後のスレッドが停止中になっています"
+    );
+
+    // quit 後は停止中になる
+    thread.quit();
+    assert!(
+        thread.is_quitting(),
+        "quit 後のスレッドが停止中になっていません"
+    );
+
+    // stop 後も停止中になる
+    thread.stop();
+    assert!(
+        thread.is_quitting(),
+        "stop 後のスレッドが停止中になっていません"
+    );
+
+    // 停止したスレッドを再度 start すると停止状態が解除される
+    assert!(thread.start());
+    assert!(
+        !thread.is_quitting(),
+        "再開したスレッドが停止中になっています"
     );
     thread.stop();
 }
 
 #[test]
-fn thread_blocking_call_after_stop_returns_default() {
-    // stop 後はメッセージループが停止し、非 void の blocking_call は
-    // クロージャを実行せずに R::default() (0) を返すことを確認する。
-    // 未実行時に未初期化ポインタが渡り Box::from_raw で UB になる問題の回帰テスト。
+#[cfg(not(feature = "debug-build"))]
+#[should_panic(expected = "the thread is not running")]
+fn thread_blocking_call_after_stop_panics() {
+    // 停止中のスレッドへの blocking_call は契約違反であり、クロージャは実行されない。
+    // 未実行を成功と区別できないため panic する。デバッグビルドの libwebrtc では RTC_DCHECK で
+    // 異常終了するため、リリースビルドの libwebrtc を使う構成でのみ確認する。
     let mut thread = Thread::new();
     assert!(thread.start());
     thread.stop();
-    let result = thread.blocking_call(|| 42);
-    assert_eq!(result, 0);
+    thread.blocking_call(|| 42);
+
+    // panic するためここには到達しない。到達した場合は panic しなかったことになる。
+    assert!(thread.is_quitting());
 }
 
 #[test]
@@ -1869,22 +1994,15 @@ fn builtin_audio_factories_create() {
     assert!(!apb.as_ptr().is_null());
 
     // PeerConnectionFactoryDependencies を組み立てて EnableMedia まで呼ぶ。
-    let mut deps = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps.set_network_thread(&network);
-    deps.set_worker_thread(&network);
-    deps.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps = create_deps(&network, &signaling, &env);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
     deps.set_audio_processing_builder(apb);
-    // Dummy ADM を設定してメディア初期化を通す。
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps.set_audio_device_module(&adm);
     deps.enable_media();
     assert!(!deps.as_ptr().is_null());
     drop(deps);
@@ -1921,16 +2039,20 @@ fn audio_device_module_recording_device_name_roundtrip() {
         (0..len).map(|i| (b'a' + (i % 26) as u8) as char).collect()
     }
 
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
     let lengths = [0usize, 1, 2, 3, 7, 31, 63, 64];
     for &len in &lengths {
         let name = make_ascii_string(len);
         let guid = make_ascii_string(64usize.saturating_sub(len));
         let expected_name = name.clone();
         let expected_guid = guid.clone();
-        let mut adm = AudioDeviceModule::new_with_handler(Box::new(TestAudioDeviceModuleHandler {
-            name,
-            guid,
-        }));
+        let adm = unsafe {
+            AudioDeviceModule::new_with_handler(
+                &thread,
+                Box::new(TestAudioDeviceModuleHandler { name, guid }),
+            )
+        };
         adm.init().expect("AudioDeviceModule::init が失敗しました");
         assert_eq!(adm.recording_devices(), 1);
         let (got_name, got_guid) = adm
@@ -1939,13 +2061,14 @@ fn audio_device_module_recording_device_name_roundtrip() {
         assert_eq!(got_name, expected_name);
         assert_eq!(got_guid, expected_guid);
     }
+    thread.stop();
 }
 
 #[test]
 fn audio_device_module_handler_requires_only_send() {
-    // AudioDeviceModuleHandler は Send だけを要求し、各メソッドは &mut self を取る。
-    // Cell<i32> は Send だが Sync ではないため、Sync を要求していたらこの実装は
-    // コンパイルできない。これにより bound が Send だけであることを型で確認する。
+    // AudioDeviceModuleHandler は Send だけを要求し、Sync は要求しない。Cell<i32> は Send だが
+    // Sync ではないため、Sync を要求していたらこの実装はコンパイルできない。これにより bound が
+    // Send だけであることを型で確認する。
     struct NotSyncHandler {
         count: Cell<i32>,
     }
@@ -1958,12 +2081,283 @@ fn audio_device_module_handler_requires_only_send() {
         }
     }
 
-    let adm = AudioDeviceModule::new_with_handler(Box::new(NotSyncHandler {
-        count: Cell::new(0),
-    }));
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let adm = unsafe {
+        AudioDeviceModule::new_with_handler(
+            &thread,
+            Box::new(NotSyncHandler {
+                count: Cell::new(0),
+            }),
+        )
+    };
     // 呼び出しごとに trampoline が &mut self でハンドラを呼ぶため、状態が保持される。
     assert_eq!(adm.recording_devices(), 1);
     assert_eq!(adm.recording_devices(), 2);
+    // ADM はメソッドを実行するスレッドが停止する前に破棄する。
+    drop(adm);
+    thread.stop();
+}
+
+#[test]
+fn audio_device_module_runs_calls_on_its_thread() {
+    // 呼び出し元のスレッド ID と、ハンドラが呼ばれたスレッド ID が異なることを確認する。
+    let caller = std::thread::current().id();
+    let called = Arc::new(Mutex::new(Vec::new()));
+
+    struct RecordingThreadHandler {
+        called: Arc<Mutex<Vec<std::thread::ThreadId>>>,
+    }
+
+    impl AudioDeviceModuleHandler for RecordingThreadHandler {
+        fn init(&mut self) -> i32 {
+            self.called
+                .lock()
+                .expect("ロックに失敗しました")
+                .push(std::thread::current().id());
+            0
+        }
+
+        fn recording_devices(&mut self) -> i16 {
+            self.called
+                .lock()
+                .expect("ロックに失敗しました")
+                .push(std::thread::current().id());
+            1
+        }
+
+        fn recording_device_name(&mut self, index: u16) -> Option<(String, String)> {
+            self.called
+                .lock()
+                .expect("ロックに失敗しました")
+                .push(std::thread::current().id());
+            if index == 0 {
+                Some((String::from("mic"), String::from("guid")))
+            } else {
+                None
+            }
+        }
+    }
+
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let adm = unsafe {
+        AudioDeviceModule::new_with_handler(
+            &thread,
+            Box::new(RecordingThreadHandler {
+                called: Arc::clone(&called),
+            }),
+        )
+    };
+
+    // 呼び出し元とは別の、保持したスレッドで実行される。
+    adm.init().expect("AudioDeviceModule::init が失敗しました");
+    assert_eq!(adm.recording_devices(), 1);
+    adm.recording_device_name(0)
+        .expect("recording_device_name が失敗しました");
+
+    let called = called.lock().expect("ロックに失敗しました").clone();
+    assert_eq!(
+        called.len(),
+        3,
+        "すべての呼び出しがハンドラに届いていません"
+    );
+    // すべての呼び出しが同じスレッドで実行され、そのスレッドが呼び出し元と異なることを確認する。
+    // 同じスレッドであることまで見ないと、別のスレッドに紐付いても検出できない。
+    let first = called[0];
+    assert_ne!(
+        first, caller,
+        "ADM のメソッドが呼び出し元のスレッドで実行されました"
+    );
+    for id in &called {
+        assert_eq!(
+            *id, first,
+            "ADM のメソッドが保持したスレッドとは別のスレッドで実行されました"
+        );
+    }
+    // ADM はメソッドを実行するスレッドが停止する前に破棄する。
+    drop(adm);
+    thread.stop();
+}
+
+#[test]
+fn audio_device_module_send_and_sync() {
+    // AudioDeviceModule は Send + Sync であり、この関数がコンパイルできることがその確認になる。
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<AudioDeviceModule>();
+
+    // 呼び出し回数を数え、複数スレッドからの呼び出しがすべて実行されたことを確認する。
+    struct CountingHandler {
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl AudioDeviceModuleHandler for CountingHandler {
+        fn recording_devices(&mut self) -> i16 {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            1
+        }
+    }
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let adm = Arc::new(unsafe {
+        AudioDeviceModule::new_with_handler(
+            &thread,
+            Box::new(CountingHandler {
+                calls: Arc::clone(&calls),
+            }),
+        )
+    });
+
+    // Mutex を挟まずに、複数のスレッドから同じ ADM を共有して呼び出す。
+    let mut handles = Vec::new();
+    for _ in 0..4 {
+        let adm = Arc::clone(&adm);
+        handles.push(std::thread::spawn(move || adm.recording_devices()));
+    }
+    for handle in handles {
+        assert_eq!(
+            handle.join().expect("スレッドの join に失敗しました"),
+            1,
+            "共有した ADM の呼び出し結果が不正です"
+        );
+    }
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        4,
+        "複数スレッドからの呼び出しがすべてハンドラに届いていません"
+    );
+    drop(adm);
+    thread.stop();
+}
+
+#[test]
+fn peer_connection_factory_dependencies_accepts_matching_network_thread() {
+    // ADM が保持するスレッドと network thread が一致していれば依存を生成できる。
+    let mut network = Thread::new_with_socket_server();
+    let mut signaling = Thread::new();
+    assert!(network.start(), "スレッドの起動に失敗しました");
+    assert!(signaling.start(), "スレッドの起動に失敗しました");
+
+    let env = Environment::new();
+    let adm = create_dummy_audio_device_module(&network, &env);
+    let deps =
+        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
+            network_thread: &network,
+            signaling_thread: &signaling,
+            adm: Some(adm),
+        });
+
+    drop(deps);
+    signaling.stop();
+    network.stop();
+}
+
+#[test]
+#[should_panic(expected = "params.adm must run on the thread params.network_thread points to")]
+fn peer_connection_factory_dependencies_rejects_mismatched_network_thread() {
+    // ADM が保持するスレッドと network thread が食い違う場合は panic する。
+    let mut network = Thread::new_with_socket_server();
+    let mut signaling = Thread::new();
+    let mut other = Thread::new();
+    assert!(network.start(), "スレッドの起動に失敗しました");
+    assert!(signaling.start(), "スレッドの起動に失敗しました");
+    assert!(other.start(), "スレッドの起動に失敗しました");
+
+    let env = Environment::new();
+    let adm = create_dummy_audio_device_module(&other, &env);
+    let deps =
+        PeerConnectionFactoryDependencies::from_params(PeerConnectionFactoryDependenciesParams {
+            network_thread: &network,
+            signaling_thread: &signaling,
+            adm: Some(adm),
+        });
+
+    // panic するためここには到達しない。到達した場合は panic しなかったことになる。
+    drop(deps);
+    other.stop();
+    signaling.stop();
+    network.stop();
+}
+
+#[test]
+#[cfg(not(feature = "debug-build"))]
+#[should_panic(expected = "the thread is not running")]
+fn audio_device_module_init_panics_after_thread_stop() {
+    // 停止中のスレッドへ送ったメソッドは実行されないため、未実行の結果を成功として返さず
+    // panic する。デバッグビルドの libwebrtc では RTC_DCHECK で異常終了するため、リリース
+    // ビルドの libwebrtc を使う構成でのみ確認する。
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let env = Environment::new();
+    let adm = unsafe {
+        AudioDeviceModule::new(&thread, &env, AudioDeviceModuleAudioLayer::Dummy)
+            .expect("AudioDeviceModule の生成に失敗しました")
+    };
+    // ADM も停止中のスレッドでは破棄できず panic する。巻き戻し中の drop は panic の二重発生に
+    // なって abort するため、ここでは破棄せずにメソッドの panic だけを確認する。
+    let adm = ManuallyDrop::new(adm);
+    thread.stop();
+    let _ = adm.init();
+}
+
+#[test]
+#[cfg(not(feature = "debug-build"))]
+#[should_panic(expected = "the thread is not running")]
+fn audio_device_module_recording_devices_panics_after_thread_stop() {
+    // 停止中のスレッドへ送ったメソッドは実行されないため、0 を返さず panic する。
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let env = Environment::new();
+    let adm = unsafe {
+        AudioDeviceModule::new(&thread, &env, AudioDeviceModuleAudioLayer::Dummy)
+            .expect("AudioDeviceModule の生成に失敗しました")
+    };
+    // ADM も停止中のスレッドでは破棄できず panic する。巻き戻し中の drop は panic の二重発生に
+    // なって abort するため、ここでは破棄せずにメソッドの panic だけを確認する。
+    let adm = ManuallyDrop::new(adm);
+    thread.stop();
+    adm.recording_devices();
+}
+
+#[test]
+#[cfg(not(feature = "debug-build"))]
+#[should_panic(expected = "the thread is not running")]
+fn audio_device_module_recording_device_name_panics_after_thread_stop() {
+    // 停止中のスレッドへ送ったメソッドは実行されないため、未実行を表すエラーではなく panic
+    // する。
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let env = Environment::new();
+    let adm = unsafe {
+        AudioDeviceModule::new(&thread, &env, AudioDeviceModuleAudioLayer::Dummy)
+            .expect("AudioDeviceModule の生成に失敗しました")
+    };
+    // ADM も停止中のスレッドでは破棄できず panic する。巻き戻し中の drop は panic の二重発生に
+    // なって abort するため、ここでは破棄せずにメソッドの panic だけを確認する。
+    let adm = ManuallyDrop::new(adm);
+    thread.stop();
+    let _ = adm.recording_device_name(0);
+}
+
+#[test]
+#[cfg(not(feature = "debug-build"))]
+#[should_panic(expected = "the thread is not running")]
+fn audio_device_module_set_recording_device_panics_after_thread_stop() {
+    // 停止中のスレッドへ送ったメソッドは実行されないため、成功として返さず panic する。
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let env = Environment::new();
+    let adm = unsafe {
+        AudioDeviceModule::new(&thread, &env, AudioDeviceModuleAudioLayer::Dummy)
+            .expect("AudioDeviceModule の生成に失敗しました")
+    };
+    // ADM も停止中のスレッドでは破棄できず panic する。巻き戻し中の drop は panic の二重発生に
+    // なって abort するため、ここでは破棄せずにメソッドの panic だけを確認する。
+    let adm = ManuallyDrop::new(adm);
+    thread.stop();
+    let _ = adm.set_recording_device(0);
 }
 
 /// ADM が破棄されたことをハンドラの破棄で観測するためのハンドラ。
@@ -1994,17 +2388,25 @@ impl AudioDeviceModuleHandler for TestDestroyCountingHandler {
 
 #[test]
 fn audio_device_module_from_refcounted_ptr_shares_adm_after_add_ref() {
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
     let destroyed = Arc::new(AtomicUsize::new(0));
-    let adm = AudioDeviceModule::new_with_handler(Box::new(TestDestroyCountingHandler {
-        destroyed: Arc::clone(&destroyed),
-        count: 0,
-    }));
+    let adm = unsafe {
+        AudioDeviceModule::new_with_handler(
+            &thread,
+            Box::new(TestDestroyCountingHandler {
+                destroyed: Arc::clone(&destroyed),
+                count: 0,
+            }),
+        )
+    };
 
     // 借用中のポインタを共有するため、呼び出し側で参照カウントを 1 増やしてから渡す。
-    let raw_ref = NonNull::new(adm.as_refcounted_ptr())
+    // Safety: ここでは ADM の生成と利用を同一スレッドで行う。
+    let raw_ref = NonNull::new(unsafe { adm.as_refcounted_ptr() })
         .expect("AudioDeviceModule のポインタが null になりました");
     unsafe { ffi::webrtc_AudioDeviceModule_AddRef(adm.as_ptr()) };
-    let shared = unsafe { AudioDeviceModule::from_refcounted_ptr(raw_ref) };
+    let shared = unsafe { AudioDeviceModule::from_refcounted_ptr(&thread, raw_ref) };
     assert_eq!(
         shared.recording_devices(),
         1,
@@ -2032,22 +2434,31 @@ fn audio_device_module_from_refcounted_ptr_shares_adm_after_add_ref() {
         1,
         "最後の参照を drop したのに ADM が破棄されませんでした"
     );
+    thread.stop();
 }
 
 #[test]
 fn audio_device_module_from_refcounted_ptr_takes_ownership() {
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
     let destroyed = Arc::new(AtomicUsize::new(0));
-    let adm = AudioDeviceModule::new_with_handler(Box::new(TestDestroyCountingHandler {
-        destroyed: Arc::clone(&destroyed),
-        count: 0,
-    }));
-    let raw_ref = NonNull::new(adm.as_refcounted_ptr())
+    let adm = unsafe {
+        AudioDeviceModule::new_with_handler(
+            &thread,
+            Box::new(TestDestroyCountingHandler {
+                destroyed: Arc::clone(&destroyed),
+                count: 0,
+            }),
+        )
+    };
+    // Safety: ここでは ADM の生成と利用を同一スレッドで行う。
+    let raw_ref = NonNull::new(unsafe { adm.as_refcounted_ptr() })
         .expect("AudioDeviceModule のポインタが null になりました");
     // 所有権付きの取り込みへ参照 1 つ分を渡すため、adm は drop せずに参照を手放す。
     std::mem::forget(adm);
 
     // 参照カウントを増やさずに取り込み、取り込んだハンドルが唯一の参照になる。
-    let owned = unsafe { AudioDeviceModule::from_refcounted_ptr(raw_ref) };
+    let owned = unsafe { AudioDeviceModule::from_refcounted_ptr(&thread, raw_ref) };
     assert_eq!(
         destroyed.load(Ordering::SeqCst),
         0,
@@ -2066,6 +2477,66 @@ fn audio_device_module_from_refcounted_ptr_takes_ownership() {
         1,
         "唯一の参照を drop したのに ADM が破棄されませんでした"
     );
+    thread.stop();
+}
+
+/// ADM が破棄されたスレッドを記録するハンドラ。
+struct TestDestroyThreadHandler {
+    destroyed_on: Arc<Mutex<Vec<std::thread::ThreadId>>>,
+}
+
+impl Drop for TestDestroyThreadHandler {
+    fn drop(&mut self) {
+        self.destroyed_on
+            .lock()
+            .expect("ロックに失敗しました")
+            .push(std::thread::current().id());
+    }
+}
+
+impl AudioDeviceModuleHandler for TestDestroyThreadHandler {}
+
+#[test]
+fn audio_device_module_drop_on_other_thread_releases_on_its_thread() {
+    // ADM を生成したスレッドとは別のスレッドで最後のハンドルを drop しても、破棄は ADM が
+    // メソッドを実行するスレッドで行われる。
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let destroyed_on = Arc::new(Mutex::new(Vec::new()));
+    let adm = unsafe {
+        AudioDeviceModule::new_with_handler(
+            &thread,
+            Box::new(TestDestroyThreadHandler {
+                destroyed_on: Arc::clone(&destroyed_on),
+            }),
+        )
+    };
+
+    // 別のスレッドでハンドルを drop する。ハンドラの破棄がメインスレッドで起きていれば、
+    // 解放が ADM のスレッドで行われていないことになる。
+    let main_thread = std::thread::current().id();
+    std::thread::spawn(move || drop(adm))
+        .join()
+        .expect("drop するスレッドの実行に失敗しました");
+
+    // 破棄されたスレッドが ADM のメソッドを実行するスレッドそのものであることを確認する。
+    let adm_thread = thread.blocking_call(|| std::thread::current().id());
+    let destroyed_on = destroyed_on.lock().expect("ロックに失敗しました").clone();
+    assert_eq!(
+        destroyed_on.len(),
+        1,
+        "ADM が破棄されなかったか、複数回破棄されました"
+    );
+    assert_ne!(
+        destroyed_on[0], main_thread,
+        "ADM が drop したスレッドで破棄されました"
+    );
+    assert_eq!(
+        destroyed_on[0], adm_thread,
+        "ADM がメソッドを実行するスレッドとは別のスレッドで破棄されました"
+    );
+
+    thread.stop();
 }
 
 #[test]
@@ -2123,13 +2594,18 @@ fn audio_device_module_get_stats_returns_unique() {
     struct TestAudioDeviceModuleGetStatsHandler;
 
     impl AudioDeviceModuleHandler for TestAudioDeviceModuleGetStatsHandler {
-        fn get_stats(&mut self) -> Option<AudioDeviceModuleStats> {
+        fn get_stats(&self) -> Option<AudioDeviceModuleStats> {
             Some(AudioDeviceModuleStats::new(1.0, 2, 3.0, 4.0, 5))
         }
     }
 
-    let adm = AudioDeviceModule::new_with_handler(Box::new(TestAudioDeviceModuleGetStatsHandler));
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let adm = unsafe {
+        AudioDeviceModule::new_with_handler(&thread, Box::new(TestAudioDeviceModuleGetStatsHandler))
+    };
     let mut out_stats: *mut ffi::webrtc_AudioDeviceModule_Stats_unique = std::ptr::null_mut();
+    // Safety: ここでは ADM の生成と利用を同一スレッドで行う。
     let ret = unsafe { ffi::webrtc_AudioDeviceModule_GetStats(adm.as_ptr(), &mut out_stats) };
     assert_eq!(ret, 1);
     assert!(!out_stats.is_null());
@@ -2156,15 +2632,24 @@ fn audio_device_module_get_stats_returns_unique() {
         5
     );
     unsafe { ffi::webrtc_AudioDeviceModule_Stats_unique_delete(out_stats) };
+    // ADM はメソッドを実行するスレッドが停止する前に破棄する。
+    drop(adm);
+    thread.stop();
 }
 
 #[test]
 fn audio_device_module_get_stats_none_returns_zero() {
-    let adm = AudioDeviceModule::new_with_handler(Box::new(NoopHandler));
+    let mut thread = Thread::new();
+    assert!(thread.start(), "スレッドの起動に失敗しました");
+    let adm = unsafe { AudioDeviceModule::new_with_handler(&thread, Box::new(NoopHandler)) };
     let mut out_stats: *mut ffi::webrtc_AudioDeviceModule_Stats_unique = std::ptr::null_mut();
+    // Safety: ここでは ADM の生成と利用を同一スレッドで行う。
     let ret = unsafe { ffi::webrtc_AudioDeviceModule_GetStats(adm.as_ptr(), &mut out_stats) };
     assert_eq!(ret, 0);
     assert!(out_stats.is_null());
+    // ADM はメソッドを実行するスレッドが停止する前に破棄する。
+    drop(adm);
+    thread.stop();
 }
 
 #[test]
@@ -2191,23 +2676,17 @@ fn peer_connection_factory_and_capabilities() {
     let apb = AudioProcessingBuilder::new_builtin();
 
     // PeerConnectionFactoryDependencies を組み立てる。スレッドのライフサイクルはここで管理する。
-    let mut deps = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps.set_network_thread(&network);
-    deps.set_worker_thread(&network);
-    deps.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps = create_deps(&network, &signaling, &env);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
     deps.set_audio_processing_builder(apb);
     let event_log = RtcEventLogFactory::new();
     deps.set_event_log_factory(event_log);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps.set_audio_device_module(&adm);
     deps.enable_media();
 
     // Factory を生成し、オプションと RTP 能力を取得する。
@@ -2369,21 +2848,15 @@ fn create_modular_with_context_returns_default_network_objects() {
     let enc = AudioEncoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
 
-    let mut deps = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps.set_network_thread(&network);
-    deps.set_worker_thread(&network);
-    deps.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps = create_deps(&network, &signaling, &env);
     deps.set_audio_encoder_factory(&enc);
     deps.set_audio_decoder_factory(&dec);
     deps.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps.set_audio_device_module(&adm);
     deps.enable_media();
 
     let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps)
@@ -2719,23 +3192,17 @@ fn rtp_sender_get_set_parameters() {
     let dec_video = VideoDecoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
 
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
     deps_factory.set_video_encoder_factory(enc_video);
     deps_factory.set_video_decoder_factory(dec_video);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -2771,7 +3238,6 @@ fn rtp_sender_get_set_parameters() {
     drop(vts);
     drop(source);
     drop(factory);
-    drop(adm);
     drop(env);
     network.stop();
     signaling.stop();
@@ -2811,23 +3277,17 @@ fn rtp_and_peer_connection_refcounted_wrappers_clone() {
     let enc_video = VideoEncoderFactory::builtin();
     let dec_video = VideoDecoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
     deps_factory.set_video_encoder_factory(enc_video);
     deps_factory.set_video_decoder_factory(dec_video);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3028,12 +3488,17 @@ fn rtp_and_peer_connection_refcounted_wrappers_clone() {
         dtls_state,
         "元の DtlsTransport の drop 後に clone が使えません"
     );
-    let dtls_observer = DtlsTransportObserver::new_with_handler(Box::new(NoopHandler));
-    dtls_transport_clone.register_observer(&dtls_observer);
-    dtls_transport_clone.unregister_observer();
+    // DtlsTransport の observer の登録と解除は、transport を生成したネットワークスレッドで行う。
+    network.blocking_call({
+        let dtls_transport = dtls_transport_clone.clone();
+        move || {
+            let dtls_observer = DtlsTransportObserver::new_with_handler(Box::new(NoopHandler));
+            dtls_transport.register_observer(&dtls_observer);
+            dtls_transport.unregister_observer();
+        }
+    });
 
     // webrtc オブジェクトを先に解放してからスレッドを停止する。
-    drop(dtls_observer);
     drop(dtls_transport_clone);
     drop(data_channel_clone);
     drop(data_channel_init);
@@ -3053,7 +3518,6 @@ fn rtp_and_peer_connection_refcounted_wrappers_clone() {
     drop(pc_clone);
     drop(observer);
     drop(factory_clone);
-    drop(adm);
     drop(env);
     network.stop();
     signaling.stop();
@@ -3065,21 +3529,15 @@ fn peer_connection_create_and_transceiver() {
     let dec = AudioDecoderFactory::builtin();
     let enc = AudioEncoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3156,23 +3614,17 @@ fn rtp_receiver_stream_ids() {
     let enc_video = VideoEncoderFactory::builtin();
     let dec_video = VideoDecoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
     deps_factory.set_video_encoder_factory(enc_video);
     deps_factory.set_video_decoder_factory(dec_video);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3281,7 +3733,6 @@ fn rtp_receiver_stream_ids() {
     drop(vts);
     drop(source);
     drop(factory);
-    drop(adm);
     drop(env);
     network.stop();
     signaling.stop();
@@ -3385,23 +3836,17 @@ fn signaling_state_change_is_observed() {
     let enc_video = VideoEncoderFactory::builtin();
     let dec_video = VideoDecoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
     deps_factory.set_video_encoder_factory(enc_video);
     deps_factory.set_video_decoder_factory(dec_video);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3521,7 +3966,6 @@ fn signaling_state_change_is_observed() {
     drop(answer_pc);
     drop(offer_pc);
     drop(factory);
-    drop(adm);
     drop(env);
     network.stop();
     signaling.stop();
@@ -3553,23 +3997,17 @@ fn media_stream_track_state() {
     let enc_video = VideoEncoderFactory::builtin();
     let dec_video = VideoDecoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
     deps_factory.set_video_encoder_factory(enc_video);
     deps_factory.set_video_decoder_factory(dec_video);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3588,7 +4026,6 @@ fn media_stream_track_state() {
     drop(vts);
     drop(source);
     drop(factory);
-    drop(adm);
     drop(env);
     network.stop();
     signaling.stop();
@@ -3596,24 +4033,44 @@ fn media_stream_track_state() {
 
 #[test]
 fn peer_connection_lookup_dtls_transport() {
+    // offer の生成完了を待つための処理。
+    struct OfferHandler {
+        tx: mpsc::Sender<Result<String>>,
+    }
+
+    impl CreateSessionDescriptionObserverHandler for OfferHandler {
+        fn on_success(&mut self, desc: SessionDescription) {
+            let _ = self.tx.send(desc.to_string());
+        }
+
+        fn on_failure(&mut self, err: RtcError) {
+            let _ = self.tx.send(Err(err.into()));
+        }
+    }
+
+    // local description の設定完了を待つための処理。
+    struct SetLocalDescriptionHandler {
+        tx: mpsc::Sender<bool>,
+    }
+
+    impl SetLocalDescriptionObserverHandler for SetLocalDescriptionHandler {
+        fn on_set_local_description_complete(&mut self, error: RtcError) {
+            let _ = self.tx.send(error.ok());
+        }
+    }
+
     let dec = AudioDecoderFactory::builtin();
     let enc = AudioEncoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3630,12 +4087,41 @@ fn peer_connection_lookup_dtls_transport() {
         .add_transceiver(MediaType::Audio, &transceiver_init)
         .expect("transceiver の追加に失敗しました");
 
-    if let Some(dtls_transport) = pc.lookup_dtls_transport_by_mid("0") {
+    // local description を設定しないと transport が生成されないため、offer を設定する。
+    let opts = PeerConnectionOfferAnswerOptions::new();
+    let (offer_tx, offer_rx) = mpsc::channel::<Result<String>>();
+    let mut offer_observer =
+        CreateSessionDescriptionObserver::new_with_handler(Box::new(OfferHandler { tx: offer_tx }));
+    pc.create_offer(&mut offer_observer, &opts);
+    let sdp = offer_rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("createOffer がタイムアウトしました")
+        .expect("createOffer が失敗しました");
+    let (local_tx, local_rx) = mpsc::channel::<bool>();
+    let local_observer =
+        SetLocalDescriptionObserver::new_with_handler(Box::new(SetLocalDescriptionHandler {
+            tx: local_tx,
+        }));
+    let local_description =
+        SessionDescription::new(SdpType::Offer, &sdp).expect("Offer の組み立てに失敗しました");
+    pc.set_local_description(local_description, &local_observer);
+    assert!(
+        local_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("setLocalDescription がタイムアウトしました"),
+        "setLocalDescription が失敗しました"
+    );
+
+    let dtls_transport = pc
+        .lookup_dtls_transport_by_mid("0")
+        .expect("DtlsTransport の取得に失敗しました");
+    let _ = dtls_transport.state();
+    // DtlsTransport の observer の登録と解除は、transport を生成したネットワークスレッドで行う。
+    network.blocking_call(move || {
         let observer = DtlsTransportObserver::new_with_handler(Box::new(NoopHandler));
-        let _ = dtls_transport.state();
         dtls_transport.register_observer(&observer);
         dtls_transport.unregister_observer();
-    }
+    });
 
     drop(pc);
     drop(factory);
@@ -3648,21 +4134,15 @@ fn get_stats_delivers_report() {
     let dec = AudioDecoderFactory::builtin();
     let enc = AudioEncoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3693,21 +4173,15 @@ fn peer_connection_create_with_proxy_allocator() {
     let dec = AudioDecoderFactory::builtin();
     let enc = AudioEncoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let (factory, context) = PeerConnectionFactory::create_modular_with_context(deps_factory)
         .expect("PeerConnectionFactory と ConnectionContext の生成に失敗しました");
@@ -3748,23 +4222,17 @@ fn video_track_and_transceiver_with_track() {
     let dec_video = VideoDecoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
 
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
     deps_factory.set_video_encoder_factory(enc_video);
     deps_factory.set_video_decoder_factory(dec_video);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3802,7 +4270,6 @@ fn video_track_and_transceiver_with_track() {
     drop(vts);
     drop(source);
     drop(factory);
-    drop(adm);
     drop(env);
     network.stop();
     signaling.stop();
@@ -3900,21 +4367,15 @@ fn always_negotiate_data_channels_adds_data_section() {
     let dec = AudioDecoderFactory::builtin();
     let enc = AudioEncoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -3937,7 +4398,6 @@ fn always_negotiate_data_channels_adds_data_section() {
     );
 
     drop(factory);
-    drop(adm);
     drop(env);
     network.stop();
     signaling.stop();
@@ -3969,20 +4429,14 @@ fn field_trials_reach_offer_sdp() {
         let enc = AudioEncoderFactory::builtin();
         let dec = AudioDecoderFactory::builtin();
         let apb = AudioProcessingBuilder::new_builtin();
-        let mut deps_factory = PeerConnectionFactoryDependencies::new();
-        let mut network = Thread::new();
+        let mut network = Thread::new_with_socket_server();
         let mut signaling = Thread::new();
         network.start();
         signaling.start();
-        deps_factory.set_network_thread(&network);
-        deps_factory.set_worker_thread(&network);
-        deps_factory.set_signaling_thread(&signaling);
+        let mut deps_factory = create_deps(&network, &signaling, env);
         deps_factory.set_audio_encoder_factory(&enc);
         deps_factory.set_audio_decoder_factory(&dec);
         deps_factory.set_audio_processing_builder(apb);
-        let adm = AudioDeviceModule::new(env, AudioDeviceModuleAudioLayer::Dummy)
-            .expect("AudioDeviceModule の生成に失敗しました");
-        deps_factory.set_audio_device_module(&adm);
         // フィールドトライアルを持つ Environment をファクトリに設定する
         deps_factory.set_env(Some(env.clone()));
         deps_factory.enable_media();
@@ -4982,21 +5436,15 @@ fn create_local_media_stream_returns_requested_id() {
     let dec = AudioDecoderFactory::builtin();
     let enc = AudioEncoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -5011,7 +5459,6 @@ fn create_local_media_stream_returns_requested_id() {
 
     drop(stream);
     drop(factory);
-    drop(adm);
     drop(env);
     network.stop();
     signaling.stop();
@@ -5024,23 +5471,17 @@ fn media_stream_track_round_trip() {
     let enc_video = VideoEncoderFactory::builtin();
     let dec_video = VideoDecoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_audio);
     deps_factory.set_audio_decoder_factory(&dec_audio);
     deps_factory.set_video_encoder_factory(enc_video);
     deps_factory.set_video_decoder_factory(dec_video);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -5111,7 +5552,6 @@ fn media_stream_track_round_trip() {
     drop(audio_options);
     drop(stream);
     drop(factory);
-    drop(adm);
     drop(env);
     network.stop();
     signaling.stop();
@@ -5164,21 +5604,15 @@ fn create_audio_source_with_audio_options() {
     let dec = AudioDecoderFactory::builtin();
     let enc = AudioEncoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -5195,7 +5629,6 @@ fn create_audio_source_with_audio_options() {
     drop(audio_source);
     drop(options);
     drop(factory);
-    drop(adm);
     drop(env);
     network.stop();
     signaling.stop();
@@ -5207,21 +5640,15 @@ fn create_audio_source_with_default_audio_options() {
     let dec = AudioDecoderFactory::builtin();
     let enc = AudioEncoderFactory::builtin();
     let apb = AudioProcessingBuilder::new_builtin();
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc);
     deps_factory.set_audio_decoder_factory(&dec);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -5234,7 +5661,6 @@ fn create_audio_source_with_default_audio_options() {
     drop(audio_source);
     drop(options);
     drop(factory);
-    drop(adm);
     drop(env);
     network.stop();
     signaling.stop();
@@ -5263,21 +5689,15 @@ fn audio_refcounted_wrappers_clone() {
     drop(dec);
     drop(enc);
     let apb = AudioProcessingBuilder::new_builtin();
-    let mut deps_factory = PeerConnectionFactoryDependencies::new();
-    let mut network = Thread::new();
+    let mut network = Thread::new_with_socket_server();
     let mut signaling = Thread::new();
     network.start();
     signaling.start();
-    deps_factory.set_network_thread(&network);
-    deps_factory.set_worker_thread(&network);
-    deps_factory.set_signaling_thread(&signaling);
+    let env = Environment::new();
+    let mut deps_factory = create_deps(&network, &signaling, &env);
     deps_factory.set_audio_encoder_factory(&enc_clone);
     deps_factory.set_audio_decoder_factory(&dec_clone);
     deps_factory.set_audio_processing_builder(apb);
-    let env = Environment::new();
-    let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)
-        .expect("AudioDeviceModule の生成に失敗しました");
-    deps_factory.set_audio_device_module(&adm);
     deps_factory.enable_media();
     let factory = PeerConnectionFactory::create_modular(deps_factory)
         .expect("PeerConnectionFactory の生成に失敗しました");
@@ -5331,7 +5751,6 @@ fn audio_refcounted_wrappers_clone() {
     drop(track_clone);
     drop(options);
     drop(factory);
-    drop(adm);
     drop(env);
     network.stop();
     signaling.stop();
@@ -5855,14 +6274,17 @@ fn audio_encoder_encoded_info_encoder_type_validation() {
         info.set_encoder_type(codec_type);
         assert_eq!(info.encoder_type(), codec_type);
     }
+}
+
+#[test]
+#[should_panic(expected = "encoder_type must be a known codec type")]
+fn audio_encoder_encoded_info_encoder_type_unknown_panics() {
     // 範囲外 (6以上) は libwebrtc 内部 OOB になるため panic する。
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        info.set_encoder_type(AudioCodecType::Unknown(6));
-    }));
-    assert!(
-        result.is_err(),
-        "encoder_type の範囲外指定は panic する想定です"
-    );
+    let mut info = AudioEncoderEncodedInfo::new();
+    info.set_encoder_type(AudioCodecType::Unknown(6));
+
+    // panic するためここには到達しない。到達した場合は panic しなかったことになる。
+    assert_eq!(info.encoder_type(), AudioCodecType::Unknown(6));
 }
 
 #[test]

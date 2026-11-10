@@ -55,7 +55,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 
 | モジュール | 主な型 | 用途 |
 |----------|--------|------|
-| `peer_connection` | `PeerConnection`, `PeerConnectionFactory`, `PeerConnectionFactoryDependencies`, `PeerConnectionFactoryOptions`, `PeerConnectionDependencies`, `PeerConnectionRtcConfiguration`, `PeerConnectionOfferAnswerOptions`, `PeerConnectionObserver`, `PeerConnectionObserverHandler`, `SignalingState`, `PeerConnectionState`, `IceConnectionState`, `IceGatheringState`, `IceCandidateError`, `IceTransportsType`, `TlsCertPolicy`, `ConnectionContext`, `NetworkManagerRef`, `PacketSocketFactoryRef`, `IceServer`, `IceServerRef`, `IceServerVector`, `IceServerVectorRef`, `CreateSessionDescriptionObserver`, `CreateSessionDescriptionObserverHandler`, `SetLocalDescriptionObserver`, `SetLocalDescriptionObserverHandler`, `SetRemoteDescriptionObserver`, `SetRemoteDescriptionObserverHandler` | 接続の生成と管理、ICE 設定、Observer |
+| `peer_connection` | `PeerConnection`, `PeerConnectionFactory`, `PeerConnectionFactoryDependencies`, `PeerConnectionFactoryDependenciesParams`, `PeerConnectionFactoryOptions`, `PeerConnectionDependencies`, `PeerConnectionRtcConfiguration`, `PeerConnectionOfferAnswerOptions`, `PeerConnectionObserver`, `PeerConnectionObserverHandler`, `SignalingState`, `PeerConnectionState`, `IceConnectionState`, `IceGatheringState`, `IceCandidateError`, `IceTransportsType`, `TlsCertPolicy`, `ConnectionContext`, `NetworkManagerRef`, `PacketSocketFactoryRef`, `IceServer`, `IceServerRef`, `IceServerVector`, `IceServerVectorRef`, `CreateSessionDescriptionObserver`, `CreateSessionDescriptionObserverHandler`, `SetLocalDescriptionObserver`, `SetLocalDescriptionObserverHandler`, `SetRemoteDescriptionObserver`, `SetRemoteDescriptionObserverHandler` | 接続の生成と管理、ICE 設定、Observer |
 | `audio` | `AudioTrack`, `AudioTrackSource`, `AudioTrackSink`, `AudioTrackSinkHandler`, `AudioEncoderFactory`, `AudioDecoderFactory`, `AudioProcessingBuilder` | 音声トラックとコーデック |
 | `audio_device_module` | `AudioDeviceModule`, `AudioDeviceModuleAudioLayer`, `AudioDeviceModuleHandler`, `AudioDeviceModuleStats`, `AudioParameters`, `AudioTransport`, `AudioTransportRef`, `AudioTransportHandler` | プラットフォーム音声 I/O、カスタム ADM |
 | `video` | `VideoTrack`, `VideoTrackSource`, `AdaptedVideoTrackSource`, `AdaptedSize`, `AdaptFrameResult`, `VideoSink`, `VideoSinkHandler`, `VideoSinkWants` | 映像トラックとフレーム配信 |
@@ -110,13 +110,14 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 
 ## PeerConnectionFactory 構築フロー
 
-README に記載のフローを要約。`PeerConnectionFactoryDependencies` にスレッドとファクトリ群を登録して `PeerConnectionFactory::create_modular_with_context()` を呼び、`(PeerConnectionFactory, ConnectionContext)` を受け取る。
+README に記載のフローを要約。`PeerConnectionFactoryDependencies::from_params` にスレッドと ADM を渡して依存を確定し、ファクトリ群を setter で設定して `PeerConnectionFactory::create_modular_with_context()` を呼び、`(PeerConnectionFactory, ConnectionContext)` を受け取る。
 
 ```rust
 use shiguredo_webrtc::{
     AudioDecoderFactory, AudioDeviceModule, AudioDeviceModuleAudioLayer,
     AudioEncoderFactory, AudioProcessingBuilder, ConnectionContext, Environment,
     PeerConnectionFactory, PeerConnectionFactoryDependencies,
+    PeerConnectionFactoryDependenciesParams,
     RtcEventLogFactory, Thread, VideoDecoderFactory, VideoEncoderFactory,
 };
 
@@ -126,15 +127,18 @@ let mut signaling = Thread::new();
 network.start();
 signaling.start();
 
-let mut deps = PeerConnectionFactoryDependencies::new();
-deps.set_network_thread(&network);
-deps.set_worker_thread(&network);
-deps.set_signaling_thread(&signaling);
+let adm = unsafe {
+    AudioDeviceModule::new(&network, &env, AudioDeviceModuleAudioLayer::Dummy)
+}?;
+let mut deps = PeerConnectionFactoryDependencies::from_params(
+    PeerConnectionFactoryDependenciesParams {
+        network_thread: &network,
+        signaling_thread: &signaling,
+        adm: Some(adm),
+    },
+);
 deps.set_env(Some(env.clone()));
 deps.set_event_log_factory(RtcEventLogFactory::new());
-
-let adm = AudioDeviceModule::new(&env, AudioDeviceModuleAudioLayer::Dummy)?;
-deps.set_audio_device_module(&adm);
 deps.set_audio_encoder_factory(&AudioEncoderFactory::builtin());
 deps.set_audio_decoder_factory(&AudioDecoderFactory::builtin());
 deps.set_video_encoder_factory(VideoEncoderFactory::builtin());
@@ -148,7 +152,9 @@ let (factory, context) =
 
 ### フィールドトライアル
 
-libwebrtc のフィールドトライアルは `FieldTrials` を作って `EnvironmentFactory` に設定し、生成した `Environment` を `PeerConnectionFactoryDependencies::set_env` と `AudioDeviceModule::new` に渡す。指定しない場合は `Environment::new()` を使う。
+libwebrtc のフィールドトライアルは `FieldTrials` を作って `EnvironmentFactory` に設定し、生成した `Environment` を `PeerConnectionFactoryDependencies::set_env` と `AudioDeviceModule::new` (第 2 引数) に渡す。指定しない場合は `Environment::new()` を使う。
+
+`AudioDeviceModule::new` / `new_with_handler` / `from_refcounted_ptr` の第 1 引数には、ADM のメソッドを実行する start 済みの `Thread` を渡す。`PeerConnectionFactory` に設定する場合は `PeerConnectionFactoryDependenciesParams::network_thread` に渡したのと同じ network thread を渡す。これらの関数は `unsafe fn` であり、渡した thread が ADM より長く生存し、その間停止しないことを要求する。
 
 ```rust
 use shiguredo_webrtc::{EnvironmentFactory, FieldTrials};
@@ -189,7 +195,9 @@ assert_eq!(
 
 ### Thread の扱い
 
-`Thread` は `start()` 済みのものを `set_*_thread` で登録する。ライフサイクル (停止・破棄) は呼び出し側で管理する必要がある。一般的には `FactoryHolder` 等でまとめて保持する。
+`Thread` は `start()` 済みのものを `PeerConnectionFactoryDependenciesParams` の `network_thread` / `signaling_thread` に渡す。ライフサイクル (停止・破棄) は呼び出し側で管理する必要がある。一般的には `FactoryHolder` 等でまとめて保持する。
+
+`PeerConnectionFactoryDependencies` は渡された `Thread` の借用を保持するため、`Thread` が依存より長生きしなければならない。`Thread` を先に破棄してから依存を使うコードはコンパイルエラーになる。
 
 ### PeerConnection の TURN Proxy / 暗号化無効化
 
@@ -279,6 +287,10 @@ libwebrtc の `scoped_refptr` 相当を Rust 側で安全に扱うための型:
 - source-build (Linux): 上記 + `build-essential`, `libclang-dev`
 - source-build (macOS): 上記 + Xcode Command Line Tools
 - source-build (Windows): 上記 + Visual Studio 2022 (`Desktop development with C++` + `C++ Clang tools for Windows`)
+  - `C++ Clang tools for Windows` は bindgen 用の `libclang` と静的ライブラリ作成用の `llvm-lib` として使う
+  - C++ コンパイラには libwebrtc に含まれる `clang-cl` を使うため、別途インストールは不要
+  - Ninja はビルド時に自動でダウンロードされる
+  - `debug-build` feature を使う場合は追加の指定が必要 (README の「デバッグビルド (Windows)」を参照)
 
 ## ワークスペース構成
 

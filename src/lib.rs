@@ -110,4 +110,29 @@ mod compile_fail_doctests {
     //! let raw = NonNull::<ffi::webrtc_RtpCapabilities>::dangling();
     //! let _ = RtpCapabilities::from_raw(raw);
     //! ```
+    //!
+    //! `PeerConnectionFactoryDependencies` は `from_params` に渡した `Thread` の借用を保持する
+    //! ため、`Thread` が依存より長生きしなければならない。依存が `Thread` の生ポインタを C++ 側へ
+    //! 保存するため、`Thread` を先に破棄できると use-after-free になる。ブロックを抜けて
+    //! `Thread` を破棄した後に依存を使うことはできない (E0597)。
+    //!
+    //! ```compile_fail,E0597
+    //! use shiguredo_webrtc::{
+    //!     PeerConnectionFactory, PeerConnectionFactoryDependencies,
+    //!     PeerConnectionFactoryDependenciesParams, Thread,
+    //! };
+    //!
+    //! let deps = {
+    //!     let mut thread = Thread::new_with_socket_server();
+    //!     thread.start();
+    //!     PeerConnectionFactoryDependencies::from_params(
+    //!         PeerConnectionFactoryDependenciesParams {
+    //!             network_thread: &thread,
+    //!             signaling_thread: &thread,
+    //!             adm: None,
+    //!         },
+    //!     )
+    //! }; // ここで thread が破棄される
+    //! let _ = PeerConnectionFactory::create_modular(deps);
+    //! ```
 }

@@ -73,6 +73,11 @@ jobs:
           sudo apt-get install -y build-essential \
             libclang-dev \
             libx11-dev
+      # Windows では MAX_PATH (260 文字) を超えるパスを扱うため、git の長いパスの
+      # サポートを有効にする (既定では無効。有効にしないとチェックアウトに失敗する)
+      - name: Configure git long paths
+        if: runner.os == 'Windows'
+        run: git config --global core.longpaths true
       # ツールチェーンは rust-toolchain.toml で MSRV に固定しており、
       # cargo 実行時に rustup がそのツールチェーンを導入する
       - name: Build (native)

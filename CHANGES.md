@@ -11,6 +11,82 @@
 
 ## develop
 
+## 0.156.1
+
+**リリース日**: 2026-11-11
+
+- [CHANGE] `PeerConnectionFactoryDependencies` の構築 API を `from_params` に集約する
+  - `PeerConnectionFactoryDependencies::new` を削除し、`PeerConnectionFactoryDependencies::from_params` と `PeerConnectionFactoryDependenciesParams` を追加する。`network_thread` / `signaling_thread` / `adm` を `PeerConnectionFactoryDependenciesParams` で受け取り、構築時に確定する。`new` を呼んでいた `Default` も合わせて削除する
+  - `PeerConnectionFactoryDependencies` が `from_params` に渡された `Thread` の借用を保持するようになり、ライフタイムパラメータ `'a` を持つ。`Thread` を先に破棄してから依存を使うコードはコンパイルエラーになる。依存は `Thread` の生ポインタを C++ 側に保存するため、`Thread` が先に破棄されると use-after-free になる
+  - `PeerConnectionFactoryDependencies::set_network_thread` / `set_signaling_thread` / `set_audio_device_module` を削除する。これらの値は `from_params` で確定するため setter で差し替えられない
+  - `set_audio_device_module` が持っていた ADM のスレッドと network thread の一致検査は `from_params` に移る。network thread を差し替える経路が無くなるため、設定順で検査を回避できなくなる
+  - network thread を指定しない状態が無くなったため、network thread 未設定時の panic は発生しなくなる。libwebrtc が内部で network thread を生成する経路も塞がれる
+  - `from_params` は `adm` を値で受け取る。ADM の最後のハンドルはどのスレッドで破棄してもよく、破棄は ADM がメソッドを実行するスレッドで行われる。そのスレッドを停止した後に最後のハンドルを破棄すると panic する
+  - C API の `webrtc_PeerConnectionFactoryDependencies_get_network_thread` は変更しない。Rust 側で唯一の利用者だった `set_audio_device_module` が無くなるため、Rust からは呼ばなくなる
+  - @melpon
+- [CHANGE] `AudioDeviceModule` にメソッドを実行するスレッドを指定するようにする
+  - `AudioDeviceModule::new` / `new_with_handler` / `from_refcounted_ptr` が `&Thread` を第 1 引数で受け取る。`PeerConnectionFactory` に設定する場合は `PeerConnectionFactoryDependenciesParams::network_thread` に渡したのと同じ network thread を渡す
+  - `AudioDeviceModule` が指定されたスレッドを保持し、`init` / `recording_devices` / `recording_device_name` / `set_recording_device` の呼び出しを `BlockingCall` でそのスレッド上で実行する。これにより Rust 側の直接操作と libwebrtc の利用が同じスレッドに揃う
+  - `AudioDeviceModule` に `Send` と `Sync` を実装する。`init` / `recording_devices` / `recording_device_name` / `set_recording_device` が `&self` を取り、複数のスレッドから同時に呼び出しても実行は保持したスレッドで直列化される。複数のスレッドで共有するために `Mutex` は要らない
+  - `AudioDeviceModule::as_ptr` / `as_refcounted_ptr` は `unsafe fn` になり、返り値をこの ADM がメソッドを実行するスレッドからのみ使うことを要求する。生ポインタを使った libwebrtc の呼び出しは、この型のメソッドが持つスレッドの直列化を通らない
+  - `new` / `new_with_handler` / `from_refcounted_ptr` は `unsafe fn` になり、渡したスレッドが ADM より長く生存することと、ADM の生存中は停止させないことを要求する
+  - `init` / `recording_devices` / `recording_device_name` / `set_recording_device` は、保持したスレッドが停止している場合に panic する。停止中のスレッドではメソッドが実行されないため、未実行の結果を返さない
+  - `AudioDeviceModuleHandler` の読み取り専用メソッド 28 個が `&mut self` から `&self` になる。`&mut self` で実装していたハンドラは書き換えが必要になる
+  - `AudioDeviceModuleHandler` のメソッドの実行中に、同じ ADM のメソッドを呼び出してはならない。ハンドラを可変参照で借りたまま別のメソッドを実行しようとするため、二重借用によりプロセスが異常終了する。この終了は `catch_unwind` では捕捉できない
+  - `from_params` が、ADM が保持するスレッドと `PeerConnectionFactoryDependenciesParams::network_thread` の食い違いを検出して panic する
+  - webrtc_c に `webrtc_PeerConnectionFactoryDependencies_get_network_thread` を追加する
+  - @melpon
+- [CHANGE] `Thread::blocking_call` が停止中のスレッドで panic するようにする
+  - 停止中のスレッドでは libwebrtc がクロージャを実行せずに戻るため、戻り値から未実行を判別できず、既定値を成功の結果として扱えてしまう
+  - 停止中のスレッドでは panic するため、呼び出し前の確認は不要
+  - 未実行時に `R::default()` を返さなくなったため `R: Default` 境界が不要になる
+  - @melpon
+- [CHANGE] `PeerConnectionFactoryDependencies::set_worker_thread` を削除する
+  - libwebrtc が `PeerConnectionFactoryDependencies::worker_thread` を非推奨にし、network thread と別の worker thread を渡す用途を廃止したため、対応する C API の `webrtc_PeerConnectionFactoryDependencies_set_worker_thread` も削除する
+  - worker thread を指定しない場合は network thread が worker thread として使われるため、`set_worker_thread` に network thread を渡していた利用者は呼び出しを削除するだけでよい
+  - @melpon
+- [CHANGE] `log::LogSinkHandler` で同じ sink の callback が同時に呼ばれても安全に使えるようにする
+  - `log::LogSinkHandler` は `Send + Sync` を要求し、`on_log_message` は `&self` を受け取る
+  - ログは出力したスレッドでそのまま sink へ届くため、同じ sink の `on_log_message` は複数のスレッドから同時に呼ばれ得る。callback の入口で可変参照を作らず、共有参照として扱う
+  - 可変状態を持つ実装は `Mutex` や atomic などで自身で保護する
+  - @melpon
+- [CHANGE] C/C++ の WHIP / WHEP サンプル (`webrtc/src/whip.c` / `whep.c` / `whip.cpp` / `whep.cpp`) と、対応する CMake ターゲット (`whip_c` / `whep_c` / `whip_cpp` / `whep_cpp`) を削除する
+  - どのサポートプラットフォームでもビルドできず、C API / C++ API の利用例として機能していなかった
+  - 利用例は Rust の `examples/whip` / `examples/whep` を参照する。C API 本体 (`webrtc/src/webrtc_c/`) と `webrtc_c.h` はそのまま残る
+  - @melpon
+- [ADD] `Thread::is_quitting` を追加する
+  - `quit` / `stop` の後は `true` になり、`stop` で join したスレッドを `start` で再開すると `false` に戻る
+  - 停止中のスレッドでは `Thread::blocking_call` が panic するが、`start` 済みかどうかはこの関数では判定できない
+  - webrtc_c に `webrtc_Thread_IsQuitting` を追加する
+  - @melpon
+- [UPDATE] libwebrtc m156 (m156.8078.3.5) に上げる
+  - @melpon
+- [UPDATE] Windows のビルドで libwebrtc が利用する Clang (clang-cl) と libc++ を利用するようにする
+  - MSVC (cl.exe) と MSVC STL ではなく libwebrtc と同じコンパイラと標準ライブラリを使い、C++ の型やシンボルの解釈を libwebrtc と一致させる
+  - C++ コンパイラに libwebrtc に含まれる `clang-cl.exe` を指定する。GCC 互換のオプションは `/clang:` を経由して渡す
+  - C++ のターゲットを CRT 静的リンクにし、例外処理を明示的に有効にする。C のターゲットも同じ CRT を選ぶようにする
+  - CMake のジェネレータを Ninja にする。Ninja は環境に依存しないよう自動でダウンロードする
+  - 静的ライブラリの作成には Visual Studio の `llvm-lib.exe` を使う。WebRTC の Clang には `llvm-lib.exe` が含まれないため
+  - @melpon
+- [UPDATE] Windows のデバッグビルドで `RUSTFLAGS` が不足している場合に、ビルド時に検出して対処方法を案内するようにする
+  - libwebrtc のデバッグビルドは静的デバッグ CRT (`/MTd`) でコンパイルされており、Rust が既定でリンクするリリース CRT と衝突する
+  - ライブラリの build script からは最終バイナリのリンクを変更できないため、利用者が `RUSTFLAGS` を指定する必要がある
+  - `cargo test --doc` のバイナリをリンクするのは rustdoc であり、`RUSTFLAGS` ではなく `RUSTDOCFLAGS` に指定したリンカ引数が使われる。不足していれば同じように検出して案内する
+  - C/C++ を含む依存を併用する場合は `CFLAGS`/`CXXFLAGS` も必要だが、依存の有無は build script から知り得ないため検査せず、案内だけを行う
+  - @melpon
+
+### misc
+
+- [UPDATE] `Thread::blocking_call` を停止中のスレッドで呼び出してはならないことを Rustdoc に明記する
+  - 停止中のスレッドではクロージャは実行されず panic する
+  - @melpon
+- [FIX] `AudioDeviceModule` と `DtlsTransport` のスレッド契約のドキュメントが誤っていてデバッグビルドでスレッド違反になる問題を修正する
+  - `AudioDeviceModule` のメソッドは生成時に指定したスレッドで実行され、`RTC_DCHECK` が有効なデバッグビルドであればプラットフォームを問わず違反が検出される
+  - `PeerConnectionFactory` に渡した場合は network thread がそのスレッドになる
+  - `DtlsTransport` の observer の登録と解除は、この transport を生成したネットワークスレッドから行う
+  - `DtlsTransport` の observer の登録と解除を行うテストをネットワークスレッド経由にし、ネットワークスレッドにソケットサーバーを用意する
+  - @melpon
+
 ## 0.156.0
 
 **リリース日**: 2026-10-11
