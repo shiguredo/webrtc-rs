@@ -67,7 +67,7 @@
   - 停止中のスレッドでは `Thread::blocking_call` が panic するが、`start` 済みかどうかはこの関数では判定できない
   - webrtc_c に `webrtc_Thread_IsQuitting` を追加する
   - @melpon
-- [UPDATE] libwebrtc m156 (m156.8078.3.5) に上げる
+- [UPDATE] libwebrtc m156 (m156.8078.5.1) に上げる
   - @melpon
 - [UPDATE] Windows のビルドで libwebrtc が利用する Clang (clang-cl) と libc++ を利用するようにする
   - MSVC (cl.exe) と MSVC STL ではなく libwebrtc と同じコンパイラと標準ライブラリを使い、C++ の型やシンボルの解釈を libwebrtc と一致させる
