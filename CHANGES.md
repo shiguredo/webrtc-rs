@@ -11,6 +11,10 @@
 
 ## develop
 
+## 0.156.1
+
+**リリース日**: 2026-11-11
+
 - [CHANGE] `PeerConnectionFactoryDependencies` の構築 API を `from_params` に集約する
   - `PeerConnectionFactoryDependencies::new` を削除し、`PeerConnectionFactoryDependencies::from_params` と `PeerConnectionFactoryDependenciesParams` を追加する。`network_thread` / `signaling_thread` / `adm` を `PeerConnectionFactoryDependenciesParams` で受け取り、構築時に確定する。`new` を呼んでいた `Default` も合わせて削除する
   - `PeerConnectionFactoryDependencies` が `from_params` に渡された `Thread` の借用を保持するようになり、ライフタイムパラメータ `'a` を持つ。`Thread` を先に破棄してから依存を使うコードはコンパイルエラーになる。依存は `Thread` の生ポインタを C++ 側に保存するため、`Thread` が先に破棄されると use-after-free になる
