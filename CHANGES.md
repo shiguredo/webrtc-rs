@@ -14,6 +14,10 @@
 - [CHANGE] MSRV (rust-version) を 1.95 に上げる
   - `rust-toolchain.toml` のツールチェーンも MSRV と同じ 1.95 に揃える
   - @melpon
+- [UPDATE] 依存ライブラリを更新する
+  - ビルド依存の `bindgen` を 0.73 に、`shiguredo_toml` を 2026.3 に更新する
+  - `rustls` を 0.23.46 に、`rustls-platform-verifier` を 0.7.1 に更新する
+  - @melpon
 
 ## 0.156.1
 
