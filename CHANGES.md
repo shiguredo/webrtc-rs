@@ -11,6 +11,10 @@
 
 ## develop
 
+- [CHANGE] MSRV (rust-version) を 1.95 に上げる
+  - `rust-toolchain.toml` のツールチェーンも MSRV と同じ 1.95 に揃える
+  - @melpon
+
 ## 0.156.1
 
 **リリース日**: 2026-11-11
