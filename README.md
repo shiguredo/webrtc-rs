@@ -481,7 +481,7 @@ assert_eq!(
 
 必要なもの:
 
-- Rust 1.93 以上
+- Rust 1.95 以上
 - `curl` (prebuilt ダウンロードに使用)
 - `tar` (prebuilt 展開に使用)
 - Linux の場合: `libx11-dev` (リンク時に必要)
@@ -517,7 +517,7 @@ cargo build --features source-build
 
 ソースビルドに必要なもの:
 
-- Rust 1.93 以上
+- Rust 1.95 以上
 - Linux の場合:
   - C++ コンパイラ (`build-essential`)
   - `libclang-dev` (bindgen が利用)

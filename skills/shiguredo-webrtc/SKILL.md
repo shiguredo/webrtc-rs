@@ -20,7 +20,7 @@ libwebrtc の C API バインディングを Rust から安全に利用するた
 - crate 名: `shiguredo_webrtc`
 - 現行バージョン: 0.155.x (libwebrtc m155 ベース、`webrtc-build = "m155.8059.4.1"`)
 - Rust Edition: 2024
-- 最小 Rust バージョン: 1.93
+- 最小 Rust バージョン: 1.95
 - ライセンス: Apache-2.0
 
 ### バージョニング規則
@@ -283,7 +283,7 @@ libwebrtc の `scoped_refptr` 相当を Rust 側で安全に扱うための型:
 
 ### 必要なツール
 
-- prebuilt: Rust 1.93+ / `curl` / `tar` / (Linux のみ) `libx11-dev`
+- prebuilt: Rust 1.95+ / `curl` / `tar` / (Linux のみ) `libx11-dev`
 - source-build (Linux): 上記 + `build-essential`, `libclang-dev`
 - source-build (macOS): 上記 + Xcode Command Line Tools
 - source-build (Windows): 上記 + Visual Studio 2022 (`Desktop development with C++` + `C++ Clang tools for Windows`)
