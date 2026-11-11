@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <memory>
+#include <span>
 #include <string>
 
 // WebRTC
@@ -96,7 +97,7 @@ WEBRTC_EXPORT int webrtc_DataChannelInterface_Send(
     size_t len,
     int is_binary) {
   auto dc = reinterpret_cast<webrtc::DataChannelInterface*>(self);
-  webrtc::CopyOnWriteBuffer buffer(data, len);
+  webrtc::CopyOnWriteBuffer buffer(std::span<const uint8_t>(data, len));
   webrtc::DataBuffer data_buffer(buffer, is_binary != 0);
   return dc->Send(data_buffer) ? 1 : 0;
 }

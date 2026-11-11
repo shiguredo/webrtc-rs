@@ -11,6 +11,12 @@
 
 ## develop
 
+- [UPDATE] libwebrtc m157 (m157.8103.4.0) に上げる
+  - `PeerConnectionFactoryDependencies::worker_thread` と worker thread を受け取る `CreatePeerConnectionFactory` が非推奨になったが、webrtc-c はどちらも利用していないため影響はない
+  - `CopyOnWriteBuffer` のポインタと長さを受け取るコンストラクタが非推奨になり、`std::span` を受け取るコンストラクタが追加されたため、`webrtc_DataChannelInterface_Send` は `std::span` 版を使う
+  - libwebrtc が廃止した統計項目の削除に伴い、`RTCStatsReport::to_json` の出力から `totalEncodedBytesTarget` が無くなる
+  - @melpon
+
 ## 0.156.2
 
 **リリース日**: 2026-11-11
