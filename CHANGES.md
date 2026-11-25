@@ -11,6 +11,12 @@
 
 ## develop
 
+- [ADD] `PeerConnectionRtcConfiguration` に受信音声の jitter buffer 設定の取得・設定口を追加する
+  - `audio_jitter_buffer_max_packets` / `audio_jitter_buffer_fast_accelerate` / `audio_jitter_buffer_min_delay_ms` の getter / setter を追加する
+  - 受信側の NetEq にだけ影響し、PeerConnection の生成時に固定される。生成後に `set_configuration` を呼ぶ場合は生成時と同じ jitter buffer 値で `PeerConnectionRtcConfiguration` を作る
+  - webrtc_c に `webrtc_PeerConnectionInterface_RTCConfiguration_get_audio_jitter_buffer_*` / `webrtc_PeerConnectionInterface_RTCConfiguration_set_audio_jitter_buffer_*` を追加する
+  - @melpon
+
 ## 0.157.0
 
 **リリース日**: 2026-11-11

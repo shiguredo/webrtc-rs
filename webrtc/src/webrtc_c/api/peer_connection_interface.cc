@@ -421,6 +421,55 @@ webrtc_PeerConnectionInterface_RTCConfiguration_set_cpu_adaptation(
           self);
   config->set_cpu_adaptation(cpu_adaptation != 0);
 }
+WEBRTC_EXPORT int
+webrtc_PeerConnectionInterface_RTCConfiguration_get_audio_jitter_buffer_max_packets(
+    const struct webrtc_PeerConnectionInterface_RTCConfiguration* self) {
+  auto config = reinterpret_cast<
+      const webrtc::PeerConnectionInterface::RTCConfiguration*>(self);
+  return config->audio_jitter_buffer_max_packets;
+}
+WEBRTC_EXPORT void
+webrtc_PeerConnectionInterface_RTCConfiguration_set_audio_jitter_buffer_max_packets(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    int audio_jitter_buffer_max_packets) {
+  auto config =
+      reinterpret_cast<webrtc::PeerConnectionInterface::RTCConfiguration*>(
+          self);
+  config->audio_jitter_buffer_max_packets = audio_jitter_buffer_max_packets;
+}
+WEBRTC_EXPORT int
+webrtc_PeerConnectionInterface_RTCConfiguration_get_audio_jitter_buffer_fast_accelerate(
+    const struct webrtc_PeerConnectionInterface_RTCConfiguration* self) {
+  auto config = reinterpret_cast<
+      const webrtc::PeerConnectionInterface::RTCConfiguration*>(self);
+  return config->audio_jitter_buffer_fast_accelerate ? 1 : 0;
+}
+WEBRTC_EXPORT void
+webrtc_PeerConnectionInterface_RTCConfiguration_set_audio_jitter_buffer_fast_accelerate(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    int audio_jitter_buffer_fast_accelerate) {
+  auto config =
+      reinterpret_cast<webrtc::PeerConnectionInterface::RTCConfiguration*>(
+          self);
+  config->audio_jitter_buffer_fast_accelerate =
+      audio_jitter_buffer_fast_accelerate != 0;
+}
+WEBRTC_EXPORT int
+webrtc_PeerConnectionInterface_RTCConfiguration_get_audio_jitter_buffer_min_delay_ms(
+    const struct webrtc_PeerConnectionInterface_RTCConfiguration* self) {
+  auto config = reinterpret_cast<
+      const webrtc::PeerConnectionInterface::RTCConfiguration*>(self);
+  return config->audio_jitter_buffer_min_delay_ms;
+}
+WEBRTC_EXPORT void
+webrtc_PeerConnectionInterface_RTCConfiguration_set_audio_jitter_buffer_min_delay_ms(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    int audio_jitter_buffer_min_delay_ms) {
+  auto config =
+      reinterpret_cast<webrtc::PeerConnectionInterface::RTCConfiguration*>(
+          self);
+  config->audio_jitter_buffer_min_delay_ms = audio_jitter_buffer_min_delay_ms;
+}
 WEBRTC_EXPORT struct webrtc_PeerConnectionDependencies*
 webrtc_PeerConnectionDependencies_new(
     struct webrtc_PeerConnectionObserver* observer) {
