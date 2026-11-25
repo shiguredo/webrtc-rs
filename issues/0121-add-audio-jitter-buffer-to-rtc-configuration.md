@@ -1,7 +1,7 @@
 # PeerConnectionRtcConfiguration に audio jitter buffer 設定の取得・設定口を追加する
 
 - Created: 2026-11-25
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-11-25
 - Branch: feature/add-audio-jitter-buffer-to-rtc-configuration
 - Polished: 2026-11-25
 
@@ -67,4 +67,8 @@ Rust SDK から受信音声の NetEq jitter buffer を設定できるように�
 
 ## 解決方法
 
-未着手
+- `PeerConnectionRtcConfiguration` に `audio_jitter_buffer_max_packets` / `audio_jitter_buffer_fast_accelerate` / `audio_jitter_buffer_min_delay_ms` の getter / setter を追加した
+- webrtc_c に `webrtc_PeerConnectionInterface_RTCConfiguration_get_audio_jitter_buffer_*` / `_set_audio_jitter_buffer_*` を追加した
+- `src/tests.rs` に設定値の往復、20 未満の生値保持、`set_configuration` の同一設定成功と変更設定拒否のテストを追加した
+- `CHANGES.md` の `## develop` に `[ADD]` を追加した
+- `AudioOptions` と C API の `webrtc_AudioOptions_*` は変更せず、既存の設定を残した
