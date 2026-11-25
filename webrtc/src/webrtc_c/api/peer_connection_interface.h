@@ -108,6 +108,30 @@ WEBRTC_EXPORT void
 webrtc_PeerConnectionInterface_RTCConfiguration_set_cpu_adaptation(
     struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
     int cpu_adaptation);
+// 受信側の音声 jitter buffer (NetEq) が保持できるパケット数の上限。
+WEBRTC_EXPORT int
+webrtc_PeerConnectionInterface_RTCConfiguration_get_audio_jitter_buffer_max_packets(
+    const struct webrtc_PeerConnectionInterface_RTCConfiguration* self);
+WEBRTC_EXPORT void
+webrtc_PeerConnectionInterface_RTCConfiguration_set_audio_jitter_buffer_max_packets(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    int audio_jitter_buffer_max_packets);
+// 受信側の音声 jitter buffer (NetEq) の fast accelerate モードの有効/無効。
+WEBRTC_EXPORT int
+webrtc_PeerConnectionInterface_RTCConfiguration_get_audio_jitter_buffer_fast_accelerate(
+    const struct webrtc_PeerConnectionInterface_RTCConfiguration* self);
+WEBRTC_EXPORT void
+webrtc_PeerConnectionInterface_RTCConfiguration_set_audio_jitter_buffer_fast_accelerate(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    int audio_jitter_buffer_fast_accelerate);
+// 受信側の音声 jitter buffer (NetEq) の base minimum delay (ミリ秒)。
+WEBRTC_EXPORT int
+webrtc_PeerConnectionInterface_RTCConfiguration_get_audio_jitter_buffer_min_delay_ms(
+    const struct webrtc_PeerConnectionInterface_RTCConfiguration* self);
+WEBRTC_EXPORT void
+webrtc_PeerConnectionInterface_RTCConfiguration_set_audio_jitter_buffer_min_delay_ms(
+    struct webrtc_PeerConnectionInterface_RTCConfiguration* self,
+    int audio_jitter_buffer_min_delay_ms);
 struct webrtc_PeerConnectionDependencies;
 WEBRTC_EXPORT struct webrtc_PeerConnectionDependencies*
 webrtc_PeerConnectionDependencies_new(

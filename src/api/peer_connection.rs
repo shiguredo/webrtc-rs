@@ -573,6 +573,63 @@ impl PeerConnectionRtcConfiguration {
         }
     }
 
+    /// 受信側の音声 jitter buffer (NetEq) が保持できるパケット数の上限を返す。
+    pub fn audio_jitter_buffer_max_packets(&self) -> i32 {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_RTCConfiguration_get_audio_jitter_buffer_max_packets(
+                self.raw.as_ptr(),
+            )
+        }
+    }
+
+    /// 受信側の音声 jitter buffer (NetEq) が保持できるパケット数の上限を設定する。
+    pub fn set_audio_jitter_buffer_max_packets(&mut self, packets: i32) {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_RTCConfiguration_set_audio_jitter_buffer_max_packets(
+                self.raw.as_ptr(),
+                packets,
+            );
+        }
+    }
+
+    /// 受信側の音声 jitter buffer (NetEq) の fast accelerate モードの有効/無効を返す。
+    pub fn audio_jitter_buffer_fast_accelerate(&self) -> bool {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_RTCConfiguration_get_audio_jitter_buffer_fast_accelerate(
+                self.raw.as_ptr(),
+            ) != 0
+        }
+    }
+
+    /// 受信側の音声 jitter buffer (NetEq) の fast accelerate モードの有効/無効を設定する。
+    pub fn set_audio_jitter_buffer_fast_accelerate(&mut self, enable: bool) {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_RTCConfiguration_set_audio_jitter_buffer_fast_accelerate(
+                self.raw.as_ptr(),
+                enable as i32,
+            );
+        }
+    }
+
+    /// 受信側の音声 jitter buffer (NetEq) の base minimum delay (ミリ秒) を返す。
+    pub fn audio_jitter_buffer_min_delay_ms(&self) -> i32 {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_RTCConfiguration_get_audio_jitter_buffer_min_delay_ms(
+                self.raw.as_ptr(),
+            )
+        }
+    }
+
+    /// 受信側の音声 jitter buffer (NetEq) の base minimum delay (ミリ秒) を設定する。
+    pub fn set_audio_jitter_buffer_min_delay_ms(&mut self, delay_ms: i32) {
+        unsafe {
+            ffi::webrtc_PeerConnectionInterface_RTCConfiguration_set_audio_jitter_buffer_min_delay_ms(
+                self.raw.as_ptr(),
+                delay_ms,
+            );
+        }
+    }
+
     /// servers の読み取り専用の借用を返す。寿命は self に束縛される。
     pub fn servers(&self) -> IceServerVectorRef<'_> {
         let raw = expect_non_null(

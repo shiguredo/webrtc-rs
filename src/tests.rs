@@ -2826,6 +2826,93 @@ fn rtc_configuration_cpu_adaptation_round_trip() {
     );
 }
 
+// jitter buffer の getter / setter が設定値をそのまま往復できることを確認する。
+// 既定値は libwebrtc の RTCConfiguration に依存するため、ここでは固定しない。
+#[test]
+fn rtc_configuration_audio_jitter_buffer_round_trip() {
+    let mut config = PeerConnectionRtcConfiguration::new();
+
+    // 設定した値がそのまま取得できることを確認する。
+    config.set_audio_jitter_buffer_max_packets(123);
+    config.set_audio_jitter_buffer_fast_accelerate(true);
+    config.set_audio_jitter_buffer_min_delay_ms(250);
+    assert_eq!(config.audio_jitter_buffer_max_packets(), 123);
+    assert!(config.audio_jitter_buffer_fast_accelerate());
+    assert_eq!(config.audio_jitter_buffer_min_delay_ms(), 250);
+
+    // 20 未満の値も RTCConfiguration の生値として保持され、getter はその値を返す。
+    // NetEq での実際の扱いは libwebrtc の実装に従う。
+    config.set_audio_jitter_buffer_max_packets(10);
+    assert_eq!(config.audio_jitter_buffer_max_packets(), 10);
+}
+
+// jitter buffer の値が PeerConnection に実際に保持されていることを確認する。
+// 生成時と同じ jitter buffer 値を持つ構成は set_configuration に受け入れられ、
+// max_packets / fast_accelerate / min_delay_ms のいずれかを変えた構成はエラーになる。
+// エラーになることは libwebrtc が生成後の変更を拒否する仕様を利用した確認であり、
+// RtcError は種別を公開していないため、エラーになることだけを確認する。
+#[test]
+fn peer_connection_set_configuration_rejects_audio_jitter_buffer_change() {
+    let dec = AudioDecoderFactory::builtin();
+    let enc = AudioEncoderFactory::builtin();
+    let apb = AudioProcessingBuilder::new_builtin();
+    let mut network = Thread::new_with_socket_server();
+    let mut signaling = Thread::new();
+    network.start();
+    signaling.start();
+    let env = Environment::new();
+    let mut deps = create_deps(&network, &signaling, &env);
+    deps.set_audio_encoder_factory(&enc);
+    deps.set_audio_decoder_factory(&dec);
+    deps.set_audio_processing_builder(apb);
+    deps.enable_media();
+    let factory = PeerConnectionFactory::create_modular(deps)
+        .expect("PeerConnectionFactory の生成に失敗しました");
+
+    // jitter buffer を設定した構成で PeerConnection を生成する。
+    let mut pc_config = PeerConnectionRtcConfiguration::new();
+    pc_config.set_audio_jitter_buffer_max_packets(123);
+    pc_config.set_audio_jitter_buffer_fast_accelerate(true);
+    pc_config.set_audio_jitter_buffer_min_delay_ms(250);
+    let observer = PeerConnectionObserver::new_with_handler(Box::new(NoopHandler));
+    let pc_deps = PeerConnectionDependencies::new(&observer);
+    let pc = PeerConnection::create(&factory, &pc_config, pc_deps)
+        .expect("PeerConnection の生成に失敗しました");
+
+    // 生成時と同じ jitter buffer 値を設定した構成なら set_configuration は成功する。
+    let same_config = {
+        let mut config = PeerConnectionRtcConfiguration::new();
+        config.set_audio_jitter_buffer_max_packets(123);
+        config.set_audio_jitter_buffer_fast_accelerate(true);
+        config.set_audio_jitter_buffer_min_delay_ms(250);
+        config
+    };
+    pc.set_configuration(&same_config)
+        .expect("生成時と同じ jitter buffer 値の set_configuration が失敗しました");
+
+    // jitter buffer の値だけを変えた構成は PeerConnection の生成後に変更できないためエラーになる。
+    // RtcError は種別を公開していないため、エラーになることだけを確認する。
+    for (max_packets, fast_accelerate, min_delay_ms) in
+        [(124, true, 250), (123, false, 250), (123, true, 251)]
+    {
+        let mut changed_config = PeerConnectionRtcConfiguration::new();
+        changed_config.set_audio_jitter_buffer_max_packets(max_packets);
+        changed_config.set_audio_jitter_buffer_fast_accelerate(fast_accelerate);
+        changed_config.set_audio_jitter_buffer_min_delay_ms(min_delay_ms);
+        assert!(
+            pc.set_configuration(&changed_config).is_err(),
+            "jitter buffer を変更した set_configuration がエラーになりません: \
+             max_packets={max_packets}, fast_accelerate={fast_accelerate}, min_delay_ms={min_delay_ms}"
+        );
+    }
+
+    drop(pc);
+    drop(factory);
+    drop(env);
+    network.stop();
+    signaling.stop();
+}
+
 #[test]
 fn tls_cert_policy_round_trip() {
     assert_eq!(
